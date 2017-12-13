@@ -100,6 +100,8 @@ el2_entry_aarch64:
 	msr ICC_SRE_EL2, x0
 
 	msr VTTBR_EL2, xzr
+	ldr x0, =0x80000000
+	ldr x1, [x0, #0]
 
 	// neither EL3 nor EL2 trap floating point or accesses to CPACR
 	msr CPTR_EL2, xzr
@@ -115,5 +117,3 @@ el2_entry_aarch64:
 	bl memset
 
 	b boot_main
-
-	.data

@@ -44,15 +44,6 @@ typedef u16			gid_t;
 typedef	u16			uid_t;
 typedef u8			bool;
 
-typedef _u64			uint64_t;
-typedef _s64			int64_t;
-typedef _u32			uint32_t;
-typedef _s32			int32_t;
-typedef _u16			uint16_t;
-typedef _s16			int16_t;
-typedef _u8			uint8_t;
-typedef _s8			int8_t;
-
 #define MAX(a, b)	a > b ? a : b
 #define MIN(a, b)	a < b ? a : b
 
