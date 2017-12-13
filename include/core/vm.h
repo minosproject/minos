@@ -18,7 +18,7 @@ struct vmm_vm {
 	struct vmm_vcpu *vcpus[VM_MAX_VCPU];
 	uint64_t ram_base;
 	uint64_t ram_size;
-} __attribute__ ((__aligned__ (8)));
+} __attribute__((__aligned__ (8)));
 
 struct vmm_vm_entry {
 	char *name;
@@ -26,9 +26,8 @@ struct vmm_vm_entry {
 	uint64_t ram_size;
 	uint32_t nr_vcpu;
 	uint32_t vcpu_affinity[VM_MAX_VCPU];
-	int (*boot_vm)(uint64_t ram_base, uint64_t ram_size,
-			struct vmm_vcpu_context *c, uint32_t vcpu_id);
-} __attribute__ ((__aligned__ (8)));
+	boot_vm_t boot_vm;
+} __attribute__((__aligned__ (8)));
 
 #define __vmm_vm__	__attribute__((section(".__vmm_vm")))
 

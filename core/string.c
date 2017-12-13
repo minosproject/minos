@@ -2,18 +2,18 @@
 #include <core/string.h>
 #include <core/errno.h>
 
-int absolute(int num)
+long absolute(long num)
 {
 	if (num > 0)
 		return num;
 	return (~num) + 1;
 }
 
-int num_to_str(char *buf, unsigned int num, int bdho)
+long num_to_str(char *buf, unsigned int num, int bdho)
 {
 	char hex[] ="0123456789abcdef";
-	int m, len, res;
-	char tmp_buf[32] = {"00000000000000000000000000000000"};
+	long m, len, res;
+	char tmp_buf[64] = {0};
 	char *tmp = tmp_buf;
 
 	do {
@@ -33,7 +33,7 @@ int num_to_str(char *buf, unsigned int num, int bdho)
 	return res;
 }
 
-int itoa(char *buf, int num)
+long itoa(char *buf, long num)
 {
 	int len = 0;
 	int tmp = 0;
@@ -51,22 +51,22 @@ int itoa(char *buf, int num)
 	return len + tmp;
 }
 
-int inline uitoa(char *buf, unsigned int num)
+long uitoa(char *buf, unsigned long num)
 {
 	return num_to_str(buf, num, 10);
 }
 
-int hextoa(char *buf, unsigned int num)
+long hextoa(char *buf, unsigned long num)
 {
 	return num_to_str(buf, num, 16);
 }
 
-int octtoa(char *buf, unsigned int num)
+long octtoa(char *buf, unsigned long num)
 {
 	return num_to_str(buf, num, 8);
 }
 
-int bintoa(char *buf, unsigned int num)
+long bintoa(char *buf, unsigned long num)
 {
 	return num_to_str(buf, num, 2);
 }
@@ -171,6 +171,9 @@ int strncmp(const char *src, const char *dst, int n)
 	return (ret);
 }
 
+#if 0
+
+#ifndef CONFIG_HAS_ARCH_STRCHR
 char *strchr(char *src, char ch)
 {
 	for (; *src != (char)ch; ++src)
@@ -178,6 +181,7 @@ char *strchr(char *src, char ch)
 			return NULL;
 	return (char *)src;
 }
+#endif
 
 #ifndef CONFIG_HAS_ARCH_MEMCPY
 int memcpy(void *target, void *source, int size)
@@ -205,4 +209,6 @@ void memset(char *base, char ch, int size)
 		*(base + i) = ch;
 	}
 }
+#endif
+
 #endif

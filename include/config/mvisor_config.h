@@ -15,4 +15,6 @@
 #define MAX_VCPU_NR	(64)
 #define VM_MAX_VCPU	(MAX_CPU_NR)
 
+#define CONFIG_LOG_LEVEL	4
+
 #endif

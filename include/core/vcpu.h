@@ -29,10 +29,16 @@ struct vmm_vcpu_context {
 struct vmm_vcpu {
 	uint32_t vcpu_id;
 	struct vmm_vm *vm_belong_to;
-	uint32_t hcpu_affinity;
-	struct list_head hcpu_list;
+	uint32_t pcpu_affinity;
+	struct list_head pcpu_list;
 	struct vmm_vcpu_context context;
 	uint32_t status;
 } __attribute__ ((__aligned__ (8)));
+
+typedef	int (*boot_vm_t)(uint64_t ram_base, uint64_t ram_size,
+			struct vmm_vcpu_context *c, uint32_t vcpu_id);
+
+struct vmm_vcpu *create_vcpu(struct vmm_vm *vm,
+		int index, boot_vm_t func, uint32_t affinity);
 
 #endif

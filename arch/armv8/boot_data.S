@@ -2,6 +2,8 @@
 
 	.global code_start
 	.global code_end
+	.global vmm_vm_start
+	.global vmm_vm_end
 
 code_start	: .long __code_start
 code_end	: .long __code_end
