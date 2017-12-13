@@ -96,9 +96,6 @@ drop_to_el2:
 	.global el2_entry_aarch64
 	.type el2_entry_aarch64, "function"
 el2_entry_aarch64:
-
-
-loop:
 	mov x0, #7	// el1 access ICC_SRE_EL1 will trap to EL2
 	msr ICC_SRE_EL2, x0
 
@@ -110,6 +107,12 @@ loop:
 	ldr x0, =0xc0000000
 	sub x0, x0, x19, lsl #14
 	mov sp, x0
+
+	ldr x0, =__bss_start
+	mov x1, #0
+	ldr x2, =__bss_end
+	sub x2, x2, x0
+	bl memset
 
 	b boot_main
 
