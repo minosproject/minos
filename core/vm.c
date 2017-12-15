@@ -2,14 +2,15 @@
 #include <core/vcpu.h>
 #include <core/vm.h>
 
-extern unsigned long vmm_vm_start;
-extern unsigned long vmm_vm_end;
+extern uint64_t vmm_vm_start;
+extern uint64_t vmm_vm_end;
+
+static struct vmm_vm *vms = NULL;
 
 void init_vms(void)
 {
 	int i, j;
-	uint32_t size = vmm_vm_end - vmm_vm_start;
-	struct vmm_vm *vms = NULL;
+	uint64_t size = vmm_vm_end - vmm_vm_start;
 	unsigned long *start = (unsigned long *)vmm_vm_start;
 	struct vmm_vm *vm;
 	struct vmm_vm_entry *vme;
@@ -38,7 +39,7 @@ void init_vms(void)
 			MIN(strlen(vme->name), VMM_VM_NAME_SIZE - 1));
 		vm->ram_base = vme->ram_base;
 		vm->ram_size = vme->ram_size;
-		vm->vcpu_nr = MAX(vme->nr_vcpu, VM_MAX_VCPU);
+		vm->vcpu_nr = MIN(vme->nr_vcpu, VM_MAX_VCPU);
 
 		for (j = 0; j < vm->vcpu_nr; j++)
 		{

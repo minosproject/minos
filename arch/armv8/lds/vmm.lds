@@ -1,26 +1,24 @@
 ENTRY(_start)
 SECTIONS
 {
-	. = 0x80000000;
+	.vectors 0x80000000:
+	{
+		__code_start = .;
+		KEEP(*(__start_up))
+		KEEP(*(__el3_vectors __el2_vectors __int_handlers))
+	}
 
-	__code_start = .;
 	.text : 
 	{
 		*(.text) 
 		*(.rodata)
 	}
 
-	. = ALIGN(4);
+	. = ALIGN(8);
 
 	.data : {*(.data)}
 
-	. = ALIGN(4);
-
-	__bss_start = .;
-	.bss : {*(.bss)}
-	__bss_end = .;
-
-	. = ALIGN(4);
+	. = ALIGN(8);
 
 	__vmm_vm_start = .;
 	.__vmm_vm : {
@@ -28,9 +26,15 @@ SECTIONS
 	}
 	__vmm_vm_end = .;
 
-	__init_start = .;
+	. = ALIGN(8);
 
-	. = ALIGN(4);
+	__bss_start = .;
+	.bss : {*(.bss)}
+	__bss_end = .;
+
+	. = ALIGN(8);
+
+	__init_start = .;
 
 	__init_func_start = .;
 	.__init_func_0 : {
@@ -56,7 +60,7 @@ SECTIONS
 	}
 	__init_func_end = .;
 
-	. = ALIGN(4);
+	. = ALIGN(8);
 
 	__init_data_start = .;
 	.__init_data_section : {
@@ -64,7 +68,7 @@ SECTIONS
 	}
 	__init_data_end = .;
 
-	. = ALIGN(4);
+	. = ALIGN(8);
 
 	__init_text_start = .;
 	.__init_text : {
@@ -72,7 +76,7 @@ SECTIONS
 	}
 	__init_text_end = .;
 
-	. = ALIGN(4);
+	. = ALIGN(8);
 
 	__init_end = .;
 	__code_end = .;

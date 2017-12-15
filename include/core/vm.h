@@ -32,6 +32,6 @@ struct vmm_vm_entry {
 #define __vmm_vm__	__attribute__((section(".__vmm_vm")))
 
 #define register_vm_entry(vmm_data) \
-	static struct vmm_vm_entry *__vmm_vm_##vmm_data = &vmm_data
+	static struct vmm_vm_entry *__vmm_vm_##vmm_data __vmm_vm__ = &vmm_data
 
 #endif

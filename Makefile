@@ -11,7 +11,7 @@ OBJ_DUMP 	:= $(CROSS_COMPILE)objdump
 INCLUDE_DIR 	:= include/core/*.h include/asm/*.h include/config/*.h
 #INCLUDE_DIR 	:=
 
-CCFLAG 		:= --static -nostdlib -fno-builtin -g -fno-pic -I$(PWD)/include
+CCFLAG 		:= --static -nostdlib -fno-builtin -g -march=armv8-a -I$(PWD)/include
 LDS 		:= arch/$(ARCH)/lds/vmm.lds
 LDFLAG 		:= -T$(LDS) -Map=linkmap.txt
 #LDPATH 		:= -L/opt/i686-linux-android-4.6/lib/gcc/i686-linux-android/4.6.x-google

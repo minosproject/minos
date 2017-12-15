@@ -14,7 +14,7 @@ struct vmm_vm_entry vm_os1 = {
 	.name = "os1",
 	.ram_base = 0x9000000,
 	.ram_size = (256 * 1024 *1024),
-	.nr_vcpu = 1,
+	.nr_vcpu = 4,
 	.vcpu_affinity = {0},
 	.boot_vm = os1_boot_vm,
 };

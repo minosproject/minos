@@ -57,6 +57,24 @@ D_l	.req	x13
 D_h	.req	x14
 
 func memcpy
+	mov	x3, x0
+	mov	x4, x1
+	and 	x3, x3, #0x7
+	and	x4, x4, #0x7
+	cmp	x3, x4
+	b.eq	do_memcpy
+copy_no_align:
+	cmp	x2, #0
+	beq	copy_end
+	ldrb	w3, [x1], #1
+	strb	w3, [x0], #1
+	sub	x2, x2, #1
+	b	copy_no_align
+copy_end:
+	sub	x0, x0, x2
+	ret
+
+do_memcpy:
 	mov	dst, dstin
 	cmp	count, #16
 	/*When memory length is less than 16, the accessed are not aligned.*/

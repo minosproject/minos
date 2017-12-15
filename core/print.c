@@ -104,7 +104,7 @@ int vsprintf(char *buf, const char *fmt, va_list arg)
 				continue;
 				break;
 			case 'c':
-				*str = (char)(va_arg(arg, char));
+				*str = (char)(va_arg(arg, int));
 				str++;
 				continue;
 				break;
@@ -173,14 +173,14 @@ static int update_log_buffer(char *buf, int printed)
 	return 0;
 }
 
-int level_print(const char *fmt,...)
+int level_print(const char *fmt, ...)
 {
 	char ch;
 	va_list arg;
 	int printed;
-	char buf[1024];
+	char buffer[1024];
 
-	buf[0] = 0;
+	buffer[0] = 0;
 
 	ch = *fmt;
 	if (is_digit(ch)) {
@@ -190,13 +190,17 @@ int level_print(const char *fmt,...)
 		fmt++;
 	}
 
+	/*
+	 * TBD need to check the length of fmt
+	 * in case of buffer overflow
+	 */
 
 	va_start(arg, fmt);
-	printed = vsprintf(buf, fmt, arg);
+	printed = vsprintf(buffer, fmt, arg);
 	va_end(arg);
 
 	spin_lock(&log_buffer.buffer_lock);
-	update_log_buffer(buf, printed);
+	update_log_buffer(buffer, printed);
 	spin_unlock(&log_buffer.buffer_lock);
 
 	return printed;
