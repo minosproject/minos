@@ -18,6 +18,7 @@ struct vmm_vm {
 	struct vmm_vcpu *vcpus[VM_MAX_VCPU];
 	uint64_t ram_base;
 	uint64_t ram_size;
+	uint64_t vm_feature;
 } __attribute__((__aligned__ (8)));
 
 struct vmm_vm_entry {

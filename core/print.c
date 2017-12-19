@@ -4,6 +4,7 @@
 #include <core/print.h>
 #include <core/spinlock.h>
 #include <config/mvisor_config.h>
+#include <drivers/uart.h>
 
 #define PRINTF_DEC		0X0001
 #define PRINTF_HEX		0x0002
@@ -31,6 +32,7 @@ int log_buffer_init(void)
 	log_buffer.head = 0;
 	log_buffer.tail = 0;
 	log_buffer.total = 0;
+	uart_init();
 
 	return 0;
 }
@@ -179,6 +181,7 @@ int level_print(const char *fmt, ...)
 	va_list arg;
 	int printed;
 	char buffer[1024];
+	char *buf;
 
 	buffer[0] = 0;
 
@@ -200,7 +203,17 @@ int level_print(const char *fmt, ...)
 	va_end(arg);
 
 	spin_lock(&log_buffer.buffer_lock);
-	update_log_buffer(buffer, printed);
+
+	/*
+	 * temp disable the log buffer
+	 */
+	//update_log_buffer(buffer, printed);
+	buf = buffer;
+	while (*buf) {
+		uart_putc(*buf);
+		buf++;
+	}
+
 	spin_unlock(&log_buffer.buffer_lock);
 
 	return printed;

@@ -9,6 +9,7 @@ extern int init_mem_block(void);
 extern void init_pcpus(void);
 extern void init_vms(void);
 extern int log_buffer_init(void);
+extern void sched_vcpu(void);
 
 int boot_main(void)
 {
@@ -20,6 +21,8 @@ int boot_main(void)
 	init_mem_block();
 	init_pcpus();
 	init_vms();
+
+	sched_vcpu();
 
 	return 0;
 }

@@ -6,6 +6,7 @@ SECTIONS
 		__code_start = .;
 		KEEP(*(__start_up))
 		KEEP(*(__el3_vectors __el2_vectors __int_handlers))
+		KEEP(*(__armv8_cpu))
 	}
 
 	.text : 

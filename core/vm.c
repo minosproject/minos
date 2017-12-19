@@ -6,6 +6,31 @@ extern uint64_t vmm_vm_start;
 extern uint64_t vmm_vm_end;
 
 static struct vmm_vm *vms = NULL;
+static uint32_t total_vms = 0;
+
+static void init_vms_state(void)
+{
+	int i, j;
+	struct vmm_vcpu *vcpu = NULL;
+	struct vmm_vm *vm = NULL;
+
+	/*
+	 * find the boot cpu for each vm and
+	 * mark its status, boot cpu will set
+	 * to ready to run state then other vcpu
+	 * is set to STOP state to wait for bootup
+	 */
+	for (i = 0; i < total_vms; i++) {
+		vm = &vms[i];
+		for (j = 0; j < vm->vcpu_nr; j++) {
+			vcpu = vm->vcpus[j];
+			if (get_vcpu_id(vcpu) == 0)
+				set_vcpu_state(vcpu, VCPU_STATE_READY);
+			else
+				set_vcpu_state(vcpu, VCPU_STATE_STOP);
+		}
+	}
+}
 
 void init_vms(void)
 {
@@ -51,5 +76,8 @@ void init_vms(void)
 		}
 
 		start++;
+		total_vms++;
 	}
+
+	init_vms_state();
 }

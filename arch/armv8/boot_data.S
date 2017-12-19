@@ -5,7 +5,7 @@
 	.global vmm_vm_start
 	.global vmm_vm_end
 
-	.align 10
+	.align 5
 
 code_start	:
 	.word __code_start

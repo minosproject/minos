@@ -7,6 +7,8 @@
 #include "include/v8_mmu.h"
 #include "include/v8_system.h"
 #include "include/GICv3_aliases.h"
+#include <config/mvisor_config.h>
+
 	.section __start_up, "ax"
 	.balign 4
 
@@ -71,7 +73,7 @@ el2_entry_aarch64:
 	// neither EL3 nor EL2 trap floating point or accesses to CPACR
 	msr	CPTR_EL2, xzr
 
-	ldr	x0, =0x88000000
+	ldr	x0, =MVISOR_STACK_BASE
 	sub	x0, x0, x19, lsl #14
 	mov	sp, x0
 
