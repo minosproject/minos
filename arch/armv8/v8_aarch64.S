@@ -4,7 +4,7 @@
 // Copyright (c) 2012-2017 ARM Ltd.  All rights reserved.
 // ------------------------------------------------------------
 
-#include "include/v8_system.h"
+#include <asm/v8_system.h>
 
     .text
     .cfi_sections .debug_frame  // put stack frame info into .debug_frame instead of .eh_frame

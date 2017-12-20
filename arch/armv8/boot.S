@@ -5,7 +5,7 @@
  */
 
 #include "include/v8_mmu.h"
-#include "include/v8_system.h"
+#include <asm/v8_system.h>
 #include "include/GICv3_aliases.h"
 #include <config/mvisor_config.h>
 
@@ -34,6 +34,9 @@ _start:
 	msr	SCR_EL3, x3
 	isb
 
+	/*
+	 * init the vmpidr
+	 */
 	mrs	x0, MPIDR_EL1
 	msr	VMPIDR_EL2, x0
 	mrs	x0, MIDR_EL1
@@ -82,5 +85,12 @@ el2_entry_aarch64:
 	ldr	x2, =__bss_end
 	sub	x2, x2, x0
 	bl	memset
+
+	ldr	x0, = (HCR_EL2_HVC | \
+		      HCR_EL2_TWI | \
+		      HCR_EL2_TWE | \
+		      HCR_EL2_TWE | \
+		      HCR_EL2_RW)
+	msr	hcr_el2, x0
 
 	b	boot_main

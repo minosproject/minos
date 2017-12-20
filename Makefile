@@ -4,6 +4,7 @@ CC 		:= $(CROSS_COMPILE)gcc
 LD 		:= $(CROSS_COMPILE)ld
 OBJ_COPY	:= $(CROSS_COMPILE)objcopy
 OBJ_DUMP 	:= $(CROSS_COMPILE)objdump
+QUIET ?= @
 
 #PLATFORM	:= fvp
 #BOARD		:= armv8-fvp
@@ -38,6 +39,10 @@ VPATH		:= core:arch/$(ARCH):vmm_vms:drivers
 .SUFFIXES:
 .SUFFIXES: .S .c
 
+ifeq ($(QUIET),@)
+PROGRESS = @echo Compiling $< ...
+endif
+
 _OBJ_ARCH	+= $(addprefix $(OUT_ARCH)/, $(patsubst %.c,%.o, $(notdir $(SRC_ARCH_C))))
 _OBJ_ARCH	+= $(addprefix $(OUT_ARCH)/, $(patsubst %.S,%.o, $(notdir $(SRC_ARCH_S))))
 OBJ_ARCH	= $(subst out/$(ARCH)/boot.o,,$(_OBJ_ARCH))
@@ -50,32 +55,40 @@ OBJECT		= $(OUT_ARCH)/boot.o $(OBJ_ARCH) $(OBJ_CORE) $(OBJ_VMM_VMS) $(OBJ_DRIVER
 all: $(OUT) $(OUT_CORE) $(OUT_ARCH) $(OUT_DRIVERS)  $(OUT_VMM_VMS) $(vmm_bin)
 
 $(vmm_bin) : $(vmm_elf)
-	$(OBJ_COPY) -O binary $(vmm_elf) $(vmm_bin)
-	$(OBJ_DUMP) $(vmm_elf) -D > $(vmm_dump)
+	$(QUIET) $(OBJ_COPY) -O binary $(vmm_elf) $(vmm_bin)
+	$(QUIET) $(OBJ_DUMP) $(vmm_elf) -D > $(vmm_dump)
 
 $(vmm_elf) : $(OBJECT) $(LDS)
-	$(LD) $(LDFLAG) -o $(vmm_elf) $(OBJECT) $(LDPATH)
+	@echo Linking $@
+	$(QUIET) $(LD) $(LDFLAG) -o $(vmm_elf) $(OBJECT) $(LDPATH)
+	@echo Done.
 
 $(OUT) $(OUT_CORE) $(OUT_ARCH) $(OUT_VMM_VMS) $(OUT_DRIVERS):
 	@ mkdir -p $@
 
 $(OUT_ARCH)/%.o: %.c $(INCLUDE_DIR)
-	$(CC) $(CCFLAG) -c $< -o $@
+	$(PROGRESS)
+	$(QUIET) $(CC) $(CCFLAG) -c $< -o $@
 
 $(OUT_ARCH)/boot.o: arch/$(ARCH)/boot.S $(INCLUDE_DIR)
-	$(CC) $(CCFLAG) -c arch/$(ARCH)/boot.S -o $@
+	$(PROGRESS)
+	$(QUIET) $(CC) $(CCFLAG) -c arch/$(ARCH)/boot.S -o $@
 
 $(OUT_ARCH)/%.o: %.S $(INCLUDE_DIR) 
-	$(CC) $(CCFLAG) -c $< -o $@
+	$(PROGRESS)
+	$(QUIET) $(CC) $(CCFLAG) -c $< -o $@
 
 $(OUT_CORE)/%.o: %.c $(INCLUDE_DIR)
-	$(CC) $(CCFLAG) -c $< -o $@
+	$(PROGRESS)
+	$(QUIET) $(CC) $(CCFLAG) -c $< -o $@
 
 $(OUT_VMM_VMS)/%.o: %.c $(INCLUDE_DIR)
-	$(CC) $(CCFLAG) -c $< -o $@
+	$(PROGRESS)
+	$(QUIET) $(CC) $(CCFLAG) -c $< -o $@
 
 $(OUT_DRIVERS)/%.o: %.c $(INCLUDE_DIR)
-	$(CC) $(CCFLAG) -c $< -o $@
+	$(PROGRESS)
+	$(QUIET) $(CC) $(CCFLAG) -c $< -o $@
 
 .PHONY: clean run app
 

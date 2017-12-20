@@ -22,7 +22,14 @@ int boot_main(void)
 	init_pcpus();
 	init_vms();
 
+	//wake_up_other_cpus();
+
 	sched_vcpu();
 
 	return 0;
+}
+
+int boot_secondary(void)
+{
+	sched_vcpu();
 }

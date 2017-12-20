@@ -69,7 +69,8 @@ void init_vms(void)
 		for (j = 0; j < vm->vcpu_nr; j++)
 		{
 			vcpu = create_vcpu(vm, j, vme->boot_vm,
-					vme->vcpu_affinity[j]);
+					vme->vcpu_affinity[j],
+					vme->entry_point);
 			if (NULL == vcpu)
 				panic("No more memory to create VCPU\n");
 			vm->vcpus[j] = vcpu;

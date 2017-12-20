@@ -104,7 +104,6 @@ void sched_vcpu(void)
 		 * can goto idle state
 		 */
 	} else {
-		set_vcpu_env(vcpu->vm_belong_to->vm_feature);
 		switch_to_vcpu(&vcpu->context);
 		/*
 		 * should never return here

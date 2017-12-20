@@ -8,6 +8,7 @@
 #include <core/types.h>
 #include <config/mvisor_config.h>
 #include <core/list.h>
+#include <core/vm.h>
 
 typedef enum _vcpu_state_t {
 	VCPU_STATE_READY = 0x0001,
@@ -16,8 +17,6 @@ typedef enum _vcpu_state_t {
 	VCPU_STATE_STOP  = 0x0008,
 	VCPU_STATE_ERROR = 0xffff,
 } vcpu_state_t;
-
-struct vmm_vm;
 
 struct vmm_vcpu_context {
 	uint64_t x0;
@@ -57,28 +56,25 @@ struct vmm_vcpu_context {
 	uint64_t spsr_el1;
 	uint64_t nzcv;
 	uint64_t esr_el1;
+	uint64_t vmpidr;
+	uint64_t sctlr_el1;
 } __attribute__ ((__aligned__ (8)));
 
 struct vmm_vcpu {
+	struct vmm_vcpu_context context;
 	uint32_t vcpu_id;
 	vcpu_state_t state;
 	struct vmm_vm *vm_belong_to;
+	uint64_t entry_point;
 	uint32_t pcpu_affinity;
-	struct list_head pcpu_list;
 	uint32_t status;
-	struct vmm_vcpu_context context;
+	struct list_head pcpu_list;
 } __attribute__ ((__aligned__ (8)));
 
-typedef	int (*boot_vm_t)(uint64_t ram_base, uint64_t ram_size,
-			struct vmm_vcpu_context *c, uint32_t vcpu_id);
 
 struct vmm_vcpu *create_vcpu(struct vmm_vm *vm,
-		int index, boot_vm_t func, uint32_t affinity);
-
-static uint32_t inline get_vcpu_id(struct vmm_vcpu *vcpu)
-{
-	return vcpu->vcpu_id;
-}
+		int index, boot_vm_t func,
+		uint32_t affinity, uint64_t entry_point);
 
 static vcpu_state_t inline
 get_vcpu_state(struct vmm_vcpu *vcpu)
@@ -90,6 +86,24 @@ static void inline
 set_vcpu_state(struct vmm_vcpu *vcpu, vcpu_state_t state)
 {
 	vcpu->state = state;
+}
+
+static uint32_t inline get_vcpu_id(struct vmm_vcpu *vcpu)
+{
+	return vcpu->vcpu_id;
+}
+
+static uint32_t inline get_vm_id(struct vmm_vcpu *vcpu)
+{
+	struct vmm_vm *vm;
+	vm = vcpu->vm_belong_to;
+	return vm->vmid;
+	return (vcpu->vm_belong_to->vmid);
+}
+
+static uint32_t inline get_pcpu_id(struct vmm_vcpu *vcpu)
+{
+	return vcpu->pcpu_affinity;
 }
 
 #endif
