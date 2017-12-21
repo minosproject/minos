@@ -5,13 +5,14 @@
 #include <core/vm.h>
 #include <asm/cpu.h>
 #include <asm/v8_system.h>
+#include <core/vcpu.h>
 
-static int os1_boot_vm(struct vmm_vcpu_context *c)
+static int os1_boot_vm(vcpu_context_t *c)
 {
 	return 0;
 }
 
-struct vmm_vm_entry vm_os1 = {
+vm_entry_t vm_os1 = {
 	.name 		= "os1",
 	.ram_base 	= 0x9000000,
 	.ram_size 	= (256 * 1024 *1024),

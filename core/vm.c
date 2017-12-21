@@ -2,17 +2,19 @@
 #include <core/vcpu.h>
 #include <core/vm.h>
 
-extern uint64_t vmm_vm_start;
-extern uint64_t vmm_vm_end;
+extern unsigned char *vmm_vm_start;
+extern unsigned char *vmm_vm_end;
 
-static struct vmm_vm *vms = NULL;
+static vm_t *vms = NULL;
 static uint32_t total_vms = 0;
+
+phy_addr_t *vcpu_context_table = NULL;
 
 static void init_vms_state(void)
 {
 	int i, j;
-	struct vmm_vcpu *vcpu = NULL;
-	struct vmm_vm *vm = NULL;
+	vcpu_t *vcpu = NULL;
+	vm_t *vm = NULL;
 
 	/*
 	 * find the boot cpu for each vm and
@@ -32,29 +34,55 @@ static void init_vms_state(void)
 	}
 }
 
+static int init_vcpu_context_table(int size)
+{
+	int total_size;
+
+	total_size = size * VM_MAX_VCPU * sizeof(phy_addr_t *);
+	vcpu_context_table = (phy_addr_t *)request_free_mem(total_size);
+	if (!vcpu_context_table)
+		panic("No enought memory for vcpu_context_table\n");
+
+	memset((char *)vcpu_context_table, 0, total_size);
+
+	return 0;
+}
+
+int register_vcpu_context(phy_addr_t *context, uint32_t vmid, uint32_t vcpuid)
+{
+	if ((vmid > total_vms) || (vcpuid > VM_MAX_VCPU))
+		return -EINVAL;
+
+	vcpu_context_table[(vmid  * VM_MAX_VCPU) + vcpuid] = (uint64_t)context;
+	return 0;
+}
+
 void init_vms(void)
 {
 	int i, j;
-	uint64_t size = vmm_vm_end - vmm_vm_start;
-	unsigned long *start = (unsigned long *)vmm_vm_start;
-	struct vmm_vm *vm;
-	struct vmm_vm_entry *vme;
-	struct vmm_vcpu *vcpu;
+	vm_t *vm;
+	vm_entry_t *vme;
+	vcpu_t *vcpu;
+	size_t size = vmm_vm_end - vmm_vm_start;
+	phy_addr_t *start = (phy_addr_t *)vmm_vm_start;
 
 	if (size == 0)
 		panic("No VM is found\n");
 
-	size = size / sizeof(struct vmm_vm_entry *);
+	size = size / sizeof(vm_entry_t *);
 	pr_debug("Found %d VMs config\n", size);
 
-	vms = (struct vmm_vm *)request_free_mem(size * sizeof(struct vmm_vm));
+	vms = (vm_t *)request_free_mem(size * sizeof(vm_t));
 	if (NULL == vms)
 		panic("No more memory for vms\n");
 
-	memset((char *)vms, 0, size * sizeof(struct vmm_vm));
+	memset((char *)vms, 0, size * sizeof(vm_t));
+	total_vms = size;
+
+	init_vcpu_context_table(size);
 
 	for (i = 0; i < size; i++) {
-		vme = (struct vmm_vm_entry *)(*start);
+		vme = (vm_entry_t *)(*start);
 		vm = &vms[i];
 		pr_info("found vm-%d %s ram_base:0x%x ram_size:0x%x nr_vcpu:%d\n",
 			i, vme->name, vme->ram_base, vme->ram_size, vme->nr_vcpu);
@@ -77,7 +105,6 @@ void init_vms(void)
 		}
 
 		start++;
-		total_vms++;
 	}
 
 	init_vms_state();

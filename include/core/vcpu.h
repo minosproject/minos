@@ -18,7 +18,9 @@ typedef enum _vcpu_state_t {
 	VCPU_STATE_ERROR = 0xffff,
 } vcpu_state_t;
 
-struct vmm_vcpu_context {
+#ifdef ARM_AARCH64
+
+typedef struct vmm_vcpu_context {
 	uint64_t x0;
 	uint64_t x1;
 	uint64_t x2;
@@ -58,50 +60,52 @@ struct vmm_vcpu_context {
 	uint64_t esr_el1;
 	uint64_t vmpidr;
 	uint64_t sctlr_el1;
-} __attribute__ ((__aligned__ (8)));
+} vcpu_context_t __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
-struct vmm_vcpu {
-	struct vmm_vcpu_context context;
+#else
+
+typedef vmm_vcpu_context {
+
+} vcpu_context_t ;
+
+#endif
+
+typedef struct vmm_vcpu {
+	vcpu_context_t context;
 	uint32_t vcpu_id;
 	vcpu_state_t state;
-	struct vmm_vm *vm_belong_to;
-	uint64_t entry_point;
+	vm_t *vm_belong_to;
+	phy_addr_t entry_point;
 	uint32_t pcpu_affinity;
 	uint32_t status;
 	struct list_head pcpu_list;
-} __attribute__ ((__aligned__ (8)));
+} vcpu_t __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
 
-struct vmm_vcpu *create_vcpu(struct vmm_vm *vm,
-		int index, boot_vm_t func,
-		uint32_t affinity, uint64_t entry_point);
+vcpu_t *create_vcpu(vm_t *vm, int index, boot_vm_t func,
+		uint32_t affinity, phy_addr_t entry_point);
 
-static vcpu_state_t inline
-get_vcpu_state(struct vmm_vcpu *vcpu)
+static vcpu_state_t inline get_vcpu_state(vcpu_t *vcpu)
 {
 	return vcpu->state;
 }
 
-static void inline
-set_vcpu_state(struct vmm_vcpu *vcpu, vcpu_state_t state)
+static void inline set_vcpu_state(vcpu_t *vcpu, vcpu_state_t state)
 {
 	vcpu->state = state;
 }
 
-static uint32_t inline get_vcpu_id(struct vmm_vcpu *vcpu)
+static uint32_t inline get_vcpu_id(vcpu_t *vcpu)
 {
 	return vcpu->vcpu_id;
 }
 
-static uint32_t inline get_vm_id(struct vmm_vcpu *vcpu)
+static uint32_t inline get_vm_id(vcpu_t *vcpu)
 {
-	struct vmm_vm *vm;
-	vm = vcpu->vm_belong_to;
-	return vm->vmid;
 	return (vcpu->vm_belong_to->vmid);
 }
 
-static uint32_t inline get_pcpu_id(struct vmm_vcpu *vcpu)
+static uint32_t inline get_pcpu_id(vcpu_t *vcpu)
 {
 	return vcpu->pcpu_affinity;
 }

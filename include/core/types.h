@@ -1,48 +1,56 @@
-#ifndef _TYPES_H
-#define _TYPES_H
+#ifndef _MVISOR_TYPES_H_
+#define _MVISOR_TYPES_H_
 
-typedef long			_s64;
+#include <config/mvisor_config.h>
+
+#ifdef	ARM_AARCH64
+
 typedef unsigned long		_u64;
-
 typedef unsigned int		_u32;
 typedef unsigned short		_u16;
 typedef unsigned char		_u8;
-typedef int			_s32;
-typedef short			_s16;
-typedef char			_s8;
+typedef signed long		_s64;
+typedef signed int		_s32;
+typedef signed short		_s16;
+typedef signed char		_s8;
 
-typedef _u32 	uint32_t;
-typedef _s32 	int32_t;
-typedef _u16 	uint16_t;
-typedef _s16 	int16_t;
-typedef _u8 	uint8_t;
-typedef _s8 	int8_t;
-typedef _u64 	uint64_t;
-typedef _s64	int64_t;
+typedef _u32 			uint32_t;
+typedef _s32 			int32_t;
+typedef _u16 			uint16_t;
+typedef _s16 			int16_t;
+typedef _u8 			uint8_t;
+typedef _s8 			int8_t;
+typedef _u64 			uint64_t;
+typedef _s64			int64_t;
 
-typedef _u32			u32;
-typedef _u16			u16;
-typedef _u8			u8;
-typedef _u64			u64;
-typedef _s32			s32;
-typedef _s16			s16;
-typedef _s8			s8;
-typedef _s64			s64;
+typedef uint64_t		size_t;
+typedef uint64_t		phy_addr_t;
 
-typedef int			pid_t;
-typedef int			size_t;
+#else
 
-typedef int			irq_t;
+typedef unsigned long long	_u64;
+typedef unsigned int		_u32;
+typedef unsigned short		_u16;
+typedef unsigned char		_u8;
+typedef signed long long	_s64;
+typedef signed int		_s32;
+typedef signed short		_s16;
+typedef signed char		_s8;
 
-typedef unsigned long		address_t;
-typedef unsigned long 		stack_t;
-typedef u32			dev_t;
-typedef signed long		offset_t;
-typedef long			time_t;
-typedef u32			block_t;
-typedef u16			gid_t;
-typedef	u16			uid_t;
-typedef u8			bool;
+typedef _u32 			uint32_t;
+typedef _s32 			int32_t;
+typedef _u16 			uint16_t;
+typedef _s16 			int16_t;
+typedef _u8 			uint8_t;
+typedef _s8 			int8_t;
+typedef _u64 			uint64_t;
+typedef _s64			int64_t;
+
+typedef uint32_t		size_t;
+typedef uint32_t		phy_addr_t;
+
+#endif
+
 
 #define MAX(a, b)	a > b ? a : b
 #define MIN(a, b)	a < b ? a : b

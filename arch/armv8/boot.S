@@ -13,6 +13,10 @@
 	.balign 4
 
 	.global _start
+	.global __code_start
+	.global __code_end
+	.global __vmm_vm_start
+	.global __vmm_vm_end
 	.type _start, "function"
 _start:	
 	// SCR_EL3 Secure Configuration Register
@@ -92,5 +96,8 @@ el2_entry_aarch64:
 		      HCR_EL2_TWE | \
 		      HCR_EL2_RW)
 	msr	hcr_el2, x0
+
+	// enable interrupt
+
 
 	b	boot_main

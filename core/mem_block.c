@@ -8,15 +8,15 @@
 #include <core/spinlock.h>
 
 static char *free_mem_base = NULL;
-static uint64_t free_mem_size = 0;
+static phy_addr_t free_mem_size = 0;
 static spinlock_t mem_block_lock;
 
-extern uint64_t code_start;
-extern uint64_t code_end;
+extern unsigned char *code_start;
+extern unsigned char *code_end;
 
 int init_mem_block(void)
 {
-	uint64_t size;
+	size_t size;
 
 	spin_lock_init(&mem_block_lock);
 	size = code_end - code_start;
@@ -27,10 +27,10 @@ int init_mem_block(void)
 
 char *request_free_mem(uint64_t size)
 {
-	uint64_t request_size;
+	size_t request_size;
 	char *base;
 
-	request_size = ALIGN(size, sizeof(uint64_t));
+	request_size = ALIGN(size, sizeof(unsigned long));
 
 	spin_lock(&mem_block_lock);
 

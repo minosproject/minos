@@ -4,9 +4,11 @@
 #include <core/pcpu.h>
 #include <asm/cpu.h>
 
-static int set_up_vcpu_env(struct vmm_vcpu *vcpu)
+#ifdef ARM_AARCH64
+
+static int set_up_vcpu_env(vcpu_t *vcpu)
 {
-	struct vmm_vcpu_context *c = &vcpu->context;
+	vcpu_context_t *c = &vcpu->context;
 	uint32_t vmid = get_vm_id(vcpu);
 	uint32_t vcpu_id = get_vcpu_id(vcpu);
 	uint32_t pcpu_id = get_pcpu_id(vcpu);
@@ -54,17 +56,25 @@ static int set_up_vcpu_env(struct vmm_vcpu *vcpu)
 	return 0;
 }
 
-struct vmm_vcpu *create_vcpu(struct vmm_vm *vm,
-		int index, boot_vm_t func,
-		uint32_t affinity, uint64_t entry_point)
-{
-	struct vmm_vcpu *vcpu;
+#else
 
-	vcpu = (struct vmm_vcpu *)request_free_mem(sizeof(struct vmm_vcpu));
+static int set_up_vcpu_env(vcpu_t *vcpu)
+{
+
+}
+
+#endif
+
+vcpu_t *create_vcpu(vm_t *vm, int index, boot_vm_t func,
+		uint32_t affinity, phy_addr_t entry_point)
+{
+	vcpu_t *vcpu;
+
+	vcpu = (vcpu_t *)request_free_mem(sizeof(vcpu_t));
 	if (vcpu == NULL)
 		return NULL;
 
-	memset((char *)vcpu, 0, sizeof(struct vmm_vcpu));
+	memset((char *)vcpu, 0, sizeof(vcpu_t));
 
 	vcpu->vcpu_id = index;
 	vcpu->vm_belong_to = vm;
@@ -83,6 +93,9 @@ struct vmm_vcpu *create_vcpu(struct vmm_vm *vm,
 
 	if (func)
 		func(&vcpu->context);
+
+	register_vcpu_context((phy_addr_t *)&vcpu->context,
+			get_vm_id(vcpu), get_vcpu_id(vcpu));
 
 	return vcpu;
 }

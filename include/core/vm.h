@@ -37,30 +37,18 @@ typedef enum _vm_feature_t {
 	VM_FEATURE_VM_WIDTH	= 0x00040000,
 } vm_feature_t;
 
-#define VM_DEFAULT_FEATURE	VM_FEATURE_VM_WIDTH | \
-	VM_FEATURE_TRAP_SMC | VM_FEATURE_TRAP_WFI | \
-	VM_FEATURE_TRAP_WFE
-
-typedef vm_feature_t (*get_vm_feature_t)(vm_feature_t df);
-
 typedef	int (*boot_vm_t)(struct vmm_vcpu_context *context);
 
-struct vm_feature {
-	uint64_t cpu_feature;
-	uint64_t irq_feature;
-};
-
-struct vmm_vm {
+typedef struct vmm_vm {
 	uint32_t vmid;
 	uint32_t vcpu_nr;
 	char name[VMM_VM_NAME_SIZE];
 	struct vmm_vcpu *vcpus[VM_MAX_VCPU];
-	uint64_t ram_base;
-	uint64_t ram_size;
-	uint64_t vm_feature;
-} __attribute__((__aligned__ (8)));
+	phy_addr_t ram_base;
+	phy_addr_t ram_size;
+} vm_t __attribute__((__aligned__ (8)));
 
-struct vmm_vm_entry {
+typedef struct vmm_vm_entry {
 	char *name;
 	uint64_t ram_base;
 	uint64_t ram_size;
@@ -68,17 +56,10 @@ struct vmm_vm_entry {
 	uint32_t nr_vcpu;
 	uint32_t vcpu_affinity[VM_MAX_VCPU];
 	boot_vm_t boot_vm;
-} __attribute__((__aligned__ (8)));
+} vm_entry_t __attribute__((__aligned__ (8)));
 
-static inline void set_vm_feature(uint64_t *feature, vm_feature_t f)
-{
-	*feature |= f;
-}
-
-static inline void clear_vm_feature(uint64_t *feature, vm_feature_t f)
-{
-	*feature &= ~(f);
-}
+int register_vcpu_context(phy_addr_t *context,
+		uint32_t vmid, uint32_t vcpuid);
 
 #define __vmm_vm__	__attribute__((section(".__vmm_vm")))
 

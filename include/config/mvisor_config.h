@@ -14,9 +14,12 @@
 #define MVISOR_STACK_BASE	(RAM_START_ADDRESS + MVISOR_RAM_SIZE)
 
 #define MAX_CPU_NR		(4)
-#define MAX_VCPU_NR		(64)
+#define MAX_VCPU_NR		(MAX_CPU_NR * MAX_CPU_NR)
 #define VM_MAX_VCPU		(MAX_CPU_NR)
 
 #define CONFIG_LOG_LEVEL	4
+
+#define ARM_AARCH64		1
+#define ARCH_ARMV8_A		1
 
 #endif

@@ -5,12 +5,12 @@
 #ifndef _MVISOR_HCPU_H_
 #define _MVISOR_HCPU_H_
 
-struct vmm_pcpu {
+typedef struct vmm_pcpu {
 	uint32_t pcpu_id;
 	struct list_head vcpu_list;
-};
+} pcpu_t;
 
-uint32_t pcpu_affinity(struct vmm_vcpu *vcpu, uint32_t affinity);
+uint32_t pcpu_affinity(vcpu_t *vcpu, uint32_t affinity);
 
 #define PCPU_AFFINITY_FAIL	(0xffff)
 

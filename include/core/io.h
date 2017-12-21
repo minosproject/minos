@@ -3,34 +3,34 @@
 
 #include <core/types.h>
 
-static inline u8 __raw_readb(const uint8_t *addr)
+static inline uint8_t __raw_readb(const uint8_t *addr)
 {
-	return *(const volatile u8 *)addr;
+	return *(const volatile uint8_t *)addr;
 }
 
-static inline u16 __raw_readw(const uint16_t *addr)
+static inline uint16_t __raw_readw(const uint16_t *addr)
 {
-	return *(const volatile u16 *)addr;
+	return *(const volatile uint16_t *)addr;
 }
 
-static inline u32 __raw_readl(const uint32_t *addr)
+static inline uint32_t __raw_readl(const uint32_t *addr)
 {
-	return *(const volatile u32 *)addr;
+	return *(const volatile uint32_t *)addr;
 }
 
-static void __raw_writeb(uint8_t *addr, u8 b)
+static void __raw_writeb(uint8_t *addr, uint8_t b)
 {
-	*(volatile u8 *)addr = b;
+	*(volatile uint8_t *)addr = b;
 }
 
-static void __raw_writew(uint16_t *addr, u16 w)
+static void __raw_writew(uint16_t *addr, uint16_t w)
 {
-	*(volatile u16 *)addr = w;
+	*(volatile uint16_t *)addr = w;
 }
 
-static void __raw_writel(uint32_t *addr, u32 l)
+static void __raw_writel(uint32_t *addr, uint32_t l)
 {
-	*(volatile u32 *)addr = l;
+	*(volatile uint32_t *)addr = l;
 }
 
 #define readb	__raw_readb
