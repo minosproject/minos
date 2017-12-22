@@ -18,7 +18,7 @@ typedef enum _vcpu_state_t {
 	VCPU_STATE_ERROR = 0xffff,
 } vcpu_state_t;
 
-#ifdef ARM_AARCH64
+#ifdef CONFIG_ARM_AARCH64
 
 typedef struct vmm_vcpu_context {
 	uint64_t x0;

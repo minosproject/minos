@@ -1,5 +1,5 @@
-#ifndef _MVISOR_ARMV8_H_
-#define _MVISOR_ARMV8_H_
+#ifndef _MVISOR_V8_SYSTEM_H_
+#define _MVISOR_V8_SYSTEM_H_
 
 #define AARCH64_SPSR_EL3h	0b1101
 #define AARCH64_SPSR_EL3t	0b1100

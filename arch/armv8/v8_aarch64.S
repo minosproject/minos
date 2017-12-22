@@ -4,7 +4,8 @@
 // Copyright (c) 2012-2017 ARM Ltd.  All rights reserved.
 // ------------------------------------------------------------
 
-#include <asm/v8_system.h>
+#include <asm/armv8_common.h>
+#include "include/asm_marco.S"
 
     .text
     .cfi_sections .debug_frame  // put stack frame info into .debug_frame instead of .eh_frame
@@ -135,14 +136,8 @@ GetMPIDR:
     .cfi_endproc
 
 
-    .type get_cpu_id, "function"
-    .cfi_startproc
-get_cpu_id:
-
-    mrs x0, MIDR_EL1
-    ubfx    x0, x0, #4, #12 // extract PartNum
-// Could decide what to do next depending on part number
-    mrs x0, MPIDR_EL1
-    ubfx    x0, x0, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
-    ret
-    .cfi_endproc
+func get_cpu_id
+	mrs 	x0, MPIDR_EL1
+	ubfx    x0, x0, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
+	ret
+endfunc get_cpu_id

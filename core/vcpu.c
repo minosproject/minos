@@ -4,7 +4,7 @@
 #include <core/pcpu.h>
 #include <asm/cpu.h>
 
-#ifdef ARM_AARCH64
+#ifdef CONFIG_ARM_AARCH64
 
 static int set_up_vcpu_env(vcpu_t *vcpu)
 {
@@ -70,7 +70,7 @@ vcpu_t *create_vcpu(vm_t *vm, int index, boot_vm_t func,
 {
 	vcpu_t *vcpu;
 
-	vcpu = (vcpu_t *)request_free_mem(sizeof(vcpu_t));
+	vcpu = (vcpu_t *)vmm_malloc(sizeof(vcpu_t));
 	if (vcpu == NULL)
 		return NULL;
 

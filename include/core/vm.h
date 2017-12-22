@@ -43,7 +43,7 @@ typedef struct vmm_vm {
 	uint32_t vmid;
 	uint32_t vcpu_nr;
 	char name[VMM_VM_NAME_SIZE];
-	struct vmm_vcpu *vcpus[VM_MAX_VCPU];
+	struct vmm_vcpu *vcpus[CONFIG_VM_MAX_VCPU];
 	phy_addr_t ram_base;
 	phy_addr_t ram_size;
 } vm_t __attribute__((__aligned__ (8)));
@@ -54,7 +54,7 @@ typedef struct vmm_vm_entry {
 	uint64_t ram_size;
 	uint64_t entry_point;
 	uint32_t nr_vcpu;
-	uint32_t vcpu_affinity[VM_MAX_VCPU];
+	uint32_t vcpu_affinity[CONFIG_VM_MAX_VCPU];
 	boot_vm_t boot_vm;
 } vm_entry_t __attribute__((__aligned__ (8)));
 

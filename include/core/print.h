@@ -1,5 +1,5 @@
-#ifndef _PRINTK_H
-#define _PRINTK_H
+#ifndef _MVISOR_PRINT_H_
+#define _MVISOR_PRINT_H_
 
 int level_print(const char *fmt, ...);
 

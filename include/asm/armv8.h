@@ -4,18 +4,12 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef __ARCH_HELPERS_H__
-#define __ARCH_HELPERS_H__
+#ifndef _MVISOR_ARMV8_H_
+#define _MVISOR_ARMV8_H_
 
-#include <arch.h>	/* for additional register definitions */
-#include <cdefs.h>	/* For __dead2 */
-#include <stdint.h>
-#include <sys/types.h>
-
-/**********************************************************************
- * Macros which create inline functions to read or write CPU system
- * registers
- *********************************************************************/
+#include <core/types.h>
+#include <asm/armv8_common.h>
+#include <asm/GICv3_aliases.h>
 
 #define _DEFINE_SYSREG_READ_FUNC(_name, _reg_name)		\
 static inline uint64_t read_ ## _name(void)			\
@@ -205,11 +199,6 @@ uint32_t get_afflvl_shift(uint32_t);
 uint32_t mpidr_mask_lower_afflvls(uint64_t, uint32_t);
 
 
-void __dead2 eret(uint64_t x0, uint64_t x1, uint64_t x2, uint64_t x3,
-		  uint64_t x4, uint64_t x5, uint64_t x6, uint64_t x7);
-void __dead2 smc(uint64_t x0, uint64_t x1, uint64_t x2, uint64_t x3,
-		 uint64_t x4, uint64_t x5, uint64_t x6, uint64_t x7);
-
 /*******************************************************************************
  * System register accessor prototypes
  ******************************************************************************/
@@ -325,6 +314,7 @@ DEFINE_RENAME_SYSREG_WRITE_FUNC(icc_sgi0r_el1, ICC_SGI0R_EL1)
 
 #define IS_IN_EL1() IS_IN_EL(1)
 #define IS_IN_EL3() IS_IN_EL(3)
+#define IS_IN_EL2() IS_IN_EL(2)
 
 /*
  * Check if an EL is implemented from AA64PFR0 register fields. 'el' argument
@@ -353,4 +343,4 @@ DEFINE_RENAME_SYSREG_WRITE_FUNC(icc_sgi0r_el1, ICC_SGI0R_EL1)
 #define read_cpacr()		read_cpacr_el1()
 #define write_cpacr(_v)		write_cpacr_el1(_v)
 
-#endif /* __ARCH_HELPERS_H__ */
+#endif

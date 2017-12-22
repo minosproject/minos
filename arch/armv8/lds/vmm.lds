@@ -27,8 +27,24 @@ SECTIONS
 	}
 	__vmm_vm_end = .;
 
-	. = ALIGN(8);
+	. = ALIGN(4096);
 
+	__percpu_start = .;
+	__percpu_cpu_0_start = .;
+	.percpu_0 : {
+		KEEP(*(".__percpu"))
+	}
+	. = ALIGN(64);
+	__percpu_cpu_0_end = .;
+	__percpu_section_size = __percpu_cpu_0_end - __percpu_cpu_0_start;
+
+	.__percpu_others : {
+
+	}
+	. = __percpu_cpu_0_end + __percpu_section_size * (4 - 1);
+	__percpu_end = .;
+
+	. = ALIGN(4096);
 	__bss_start = .;
 	.bss : {*(.bss)}
 	__bss_end = .;

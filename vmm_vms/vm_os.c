@@ -4,7 +4,7 @@
 
 #include <core/vm.h>
 #include <asm/cpu.h>
-#include <asm/v8_system.h>
+#include <asm/armv8_common.h>
 #include <core/vcpu.h>
 
 static int os1_boot_vm(vcpu_context_t *c)

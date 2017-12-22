@@ -3,7 +3,7 @@
 
 #include <config/mvisor_config.h>
 
-#ifdef	ARM_AARCH64
+#ifdef	CONFIG_ARM_AARCH64
 
 typedef unsigned long		_u64;
 typedef unsigned int		_u32;

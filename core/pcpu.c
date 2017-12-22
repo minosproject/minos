@@ -2,19 +2,40 @@
 #include <core/pcpu.h>
 #include <core/vm.h>
 #include <asm/cpu.h>
+#include <core/core.h>
+#include <core/percpu.h>
 
-static pcpu_t pcpus[MAX_CPU_NR];
+static pcpu_t pcpus[CONFIG_NUM_OF_CPUS];
 extern void switch_to_vcpu(vcpu_context_t *context);
+
+extern unsigned char __percpu_start;
+extern unsigned char __percpu_end;
+extern unsigned char __percpu_section_size;
+
+phy_addr_t percpu_offset[CONFIG_NUM_OF_CPUS];
+
+DEFINE_PER_CPU(vcpu_t *, running_vcpu);
+DEFINE_PER_CPU(pcpu_t *, pcpu);
 
 void init_pcpus(void)
 {
 	int i;
 	pcpu_t *pcpu;
+	size_t size;
 
-	for (i = 0; i < MAX_CPU_NR; i++) {
+	size = (&__percpu_end) - (&__percpu_start);
+	memset((char *)&__percpu_start, 0, size);
+
+	for (i = 0; i < CONFIG_NUM_OF_CPUS; i++) {
+		percpu_offset[i] = (phy_addr_t)(&__percpu_start) +
+			(size_t)(&__percpu_section_size) * i;
+	}
+
+	for (i = 0; i < CONFIG_NUM_OF_CPUS; i++) {
 		pcpu = &pcpus[i];
 		init_list(&pcpu->vcpu_list);
 		pcpu->pcpu_id = i;
+		get_per_cpu(pcpu, i) = pcpu;
 	}
 }
 
@@ -30,7 +51,7 @@ uint32_t pcpu_affinity(vcpu_t *vcpu, uint32_t affinity)
 	 * first check the other vcpu belong to the same
 	 * VM is areadly affinity to this pcpu
 	 */
-	if (affinity >= MAX_CPU_NR)
+	if (affinity >= CONFIG_NUM_OF_CPUS)
 		goto step2;
 
 	pcpu = &pcpus[affinity];
@@ -49,7 +70,7 @@ uint32_t pcpu_affinity(vcpu_t *vcpu, uint32_t affinity)
 	return affinity;
 
 step2:
-	for (i = 0; i < MAX_CPU_NR; i++) {
+	for (i = 0; i < CONFIG_NUM_OF_CPUS; i++) {
 		found = 0;
 		if (i == affinity)
 			continue;
@@ -104,6 +125,7 @@ void sched_vcpu(void)
 		 * can goto idle state
 		 */
 	} else {
+		get_cpu_var(running_vcpu) = vcpu;
 		switch_to_vcpu(&vcpu->context);
 		/*
 		 * should never return here

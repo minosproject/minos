@@ -11,21 +11,21 @@ static char *free_mem_base = NULL;
 static phy_addr_t free_mem_size = 0;
 static spinlock_t mem_block_lock;
 
-extern unsigned char *code_start;
-extern unsigned char *code_end;
+extern unsigned char __code_start;
+extern unsigned char __code_end;
 
 int init_mem_block(void)
 {
 	size_t size;
 
 	spin_lock_init(&mem_block_lock);
-	size = code_end - code_start;
-	size = ALIGN(size, sizeof(uint64_t));
-	free_mem_base = (char *)(MVISOR_START_ADDRESS + size);
-	free_mem_size = MVISOR_RAM_SIZE - size;
+	size = (&__code_end) - (&__code_start);
+	size = ALIGN(size, sizeof(unsigned long));
+	free_mem_base = (char *)(CONFIG_MVISOR_START_ADDRESS + size);
+	free_mem_size = CONFIG_MVISOR_RAM_SIZE - size;
 }
 
-char *request_free_mem(uint64_t size)
+char *vmm_malloc(size_t size)
 {
 	size_t request_size;
 	char *base;

@@ -5,18 +5,14 @@
  */
 
 #include "include/v8_mmu.h"
-#include <asm/v8_system.h>
-#include "include/GICv3_aliases.h"
+#include <asm/armv8_common.h>
+#include <asm/GICv3_aliases.h>
 #include <config/mvisor_config.h>
 
 	.section __start_up, "ax"
 	.balign 4
 
 	.global _start
-	.global __code_start
-	.global __code_end
-	.global __vmm_vm_start
-	.global __vmm_vm_end
 	.type _start, "function"
 _start:	
 	// SCR_EL3 Secure Configuration Register
@@ -46,7 +42,7 @@ _start:
 	mrs	x0, MIDR_EL1
 	msr	VPIDR_EL2, x0
 
-	bl get_cpu_id
+	bl 	get_cpu_id
 	mov	x19, x0
 
 	msr	CPTR_EL3, xzr
@@ -80,7 +76,7 @@ el2_entry_aarch64:
 	// neither EL3 nor EL2 trap floating point or accesses to CPACR
 	msr	CPTR_EL2, xzr
 
-	ldr	x0, =MVISOR_STACK_BASE
+	ldr	x0, =CONFIG_MVISOR_STACK_BASE
 	sub	x0, x0, x19, lsl #14
 	mov	sp, x0
 
@@ -90,10 +86,18 @@ el2_entry_aarch64:
 	sub	x2, x2, x0
 	bl	memset
 
+	/*
+	 * AMO FMO IMO to control the irq fiq and serror trap
+	 * to EL2
+	 */
 	ldr	x0, = (HCR_EL2_HVC | \
 		      HCR_EL2_TWI | \
 		      HCR_EL2_TWE | \
 		      HCR_EL2_TWE | \
+		      HCR_EL2_TIDCP | \
+		      HCR_EL2_IMO | \
+		      HCR_EL2_FMO | \
+		      HCR_EL2_AMO | \
 		      HCR_EL2_RW)
 	msr	hcr_el2, x0
 

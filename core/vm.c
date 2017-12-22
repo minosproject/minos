@@ -2,8 +2,8 @@
 #include <core/vcpu.h>
 #include <core/vm.h>
 
-extern unsigned char *vmm_vm_start;
-extern unsigned char *vmm_vm_end;
+extern unsigned char __vmm_vm_start;
+extern unsigned char __vmm_vm_end;
 
 static vm_t *vms = NULL;
 static uint32_t total_vms = 0;
@@ -38,8 +38,8 @@ static int init_vcpu_context_table(int size)
 {
 	int total_size;
 
-	total_size = size * VM_MAX_VCPU * sizeof(phy_addr_t *);
-	vcpu_context_table = (phy_addr_t *)request_free_mem(total_size);
+	total_size = size * CONFIG_VM_MAX_VCPU * sizeof(phy_addr_t *);
+	vcpu_context_table = (phy_addr_t *)vmm_malloc(total_size);
 	if (!vcpu_context_table)
 		panic("No enought memory for vcpu_context_table\n");
 
@@ -50,10 +50,10 @@ static int init_vcpu_context_table(int size)
 
 int register_vcpu_context(phy_addr_t *context, uint32_t vmid, uint32_t vcpuid)
 {
-	if ((vmid > total_vms) || (vcpuid > VM_MAX_VCPU))
+	if ((vmid > total_vms) || (vcpuid > CONFIG_VM_MAX_VCPU))
 		return -EINVAL;
 
-	vcpu_context_table[(vmid  * VM_MAX_VCPU) + vcpuid] = (uint64_t)context;
+	vcpu_context_table[(vmid  * CONFIG_VM_MAX_VCPU) + vcpuid] = (uint64_t)context;
 	return 0;
 }
 
@@ -63,8 +63,8 @@ void init_vms(void)
 	vm_t *vm;
 	vm_entry_t *vme;
 	vcpu_t *vcpu;
-	size_t size = vmm_vm_end - vmm_vm_start;
-	phy_addr_t *start = (phy_addr_t *)vmm_vm_start;
+	size_t size = (&__vmm_vm_end) - (&__vmm_vm_start);
+	phy_addr_t *start = (phy_addr_t *)(&__vmm_vm_start);
 
 	if (size == 0)
 		panic("No VM is found\n");
@@ -72,7 +72,7 @@ void init_vms(void)
 	size = size / sizeof(vm_entry_t *);
 	pr_debug("Found %d VMs config\n", size);
 
-	vms = (vm_t *)request_free_mem(size * sizeof(vm_t));
+	vms = (vm_t *)vmm_malloc(size * sizeof(vm_t));
 	if (NULL == vms)
 		panic("No more memory for vms\n");
 
@@ -92,7 +92,7 @@ void init_vms(void)
 			MIN(strlen(vme->name), VMM_VM_NAME_SIZE - 1));
 		vm->ram_base = vme->ram_base;
 		vm->ram_size = vme->ram_size;
-		vm->vcpu_nr = MIN(vme->nr_vcpu, VM_MAX_VCPU);
+		vm->vcpu_nr = MIN(vme->nr_vcpu, CONFIG_VM_MAX_VCPU);
 
 		for (j = 0; j < vm->vcpu_nr; j++)
 		{
