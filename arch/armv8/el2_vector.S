@@ -129,7 +129,7 @@ _sync_el2_handler:
 	str	x1, [x0], #8
 	mrs	x1, sctlr_el1
 	str	x1, [x0]
-	sub	x0, x0, #312
+	sub	x0, x0, #304
 
 	bl	sync_el2_handler
 

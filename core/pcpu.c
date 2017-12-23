@@ -117,7 +117,7 @@ void sched_vcpu(void)
 	vcpu_t *vcpu;
 
 	cpuid = get_cpu_id();
-	pcpu = &pcpus[cpuid];
+	pcpu = get_cpu_var(pcpu);
 
 	vcpu = find_vcpu_to_run(pcpu);
 	if (vcpu == NULL) {

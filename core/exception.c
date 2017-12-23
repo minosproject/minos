@@ -2,6 +2,7 @@
 #include <core/vcpu.h>
 #include <core/exception.h>
 #include <core/core.h>
+#include <asm/armv8.h>
 
 static unsigned long ec_unknown_handler(uint32_t iss, uint32_t il, void *arg)
 {
@@ -10,7 +11,9 @@ static unsigned long ec_unknown_handler(uint32_t iss, uint32_t il, void *arg)
 
 static unsigned long ec_wfi_wfe_handler(uint32_t iss, uint32_t il, void *arg)
 {
+	vcpu_t *vcpu = (vcpu_t *)arg;
 
+	vcpu->context.elr_el2 += 4;
 }
 
 static unsigned long ec_mcr_mrc_cp15_handler(uint32_t iss, uint32_t il, void *arg)
@@ -216,12 +219,47 @@ static ec_config_t ec_config_table[] = {
 	{EC_BRK_INS, EC_TYPE_AARCH64, ec_brk_ins_handler},
 };
 
+ec_config_t *get_ec_config(uint32_t ec_type)
+{
+	int i;
+	ec_config_t *config;
+	int size = sizeof(ec_config_table) / sizeof(ec_config_t);
+
+	for (i = 0; i < size; i++) {
+		config = &ec_config_table[i];
+		if (config->type == ec_type)
+			return config;
+	}
+
+	return NULL;
+}
+
 uint64_t sync_el2_handler(vcpu_t *vcpu)
 {
 	int cpuid = get_cpu_id();
+	uint32_t esr_value;
+	uint32_t ec_type, il, iss;
+	ec_config_t *ec;
+	long ret;
 
 	if (get_pcpu_id(vcpu) != cpuid)
 		panic("this vcpu is not belont to the pcpu");
 
+	esr_value = read_esr_el2();
+	ec_type = (esr_value & 0xfc000000) >> 26;
+	il = (esr_value & 0x02000000) >> 25;
+	iss = (esr_value & 0x01ffffff);
+	pr_debug("value of esr_el2 ec:0x%x il:0x%x iss:0x%x\n", ec, il, iss);
+
+	ec = get_ec_config(ec_type);
+	if (ec == NULL) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	ret = ec->handler(iss, il, (void *)vcpu);
+
+out:
+	vcpu->context.x0 = ret;
 	return 0;
 }

@@ -150,12 +150,12 @@ DEFINE_SYSOP_TYPE_PARAM_FUNC(at, s12e1w)
 DEFINE_SYSOP_TYPE_PARAM_FUNC(at, s12e0r)
 DEFINE_SYSOP_TYPE_PARAM_FUNC(at, s12e0w)
 
-void flush_dcache_range(uintptr_t addr, size_t size);
-void clean_dcache_range(uintptr_t addr, size_t size);
-void inv_dcache_range(uintptr_t addr, size_t size);
+void flush_dcache_range(uint32_t *addr, size_t size);
+void clean_dcache_range(uint32_t *addr, size_t size);
+void inv_dcache_range(uint32_t *addr, size_t size);
 
-void dcsw_op_louis(u_register_t op_type);
-void dcsw_op_all(u_register_t op_type);
+void dcsw_op_louis(uint32_t op_type);
+void dcsw_op_all(uint32_t op_type);
 
 void disable_mmu_el1(void);
 void disable_mmu_el3(void);
