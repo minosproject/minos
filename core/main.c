@@ -10,6 +10,7 @@ extern void init_pcpus(void);
 extern void init_vms(void);
 extern int log_buffer_init(void);
 extern void sched_vcpu(void);
+extern void el2_stage2_vmsa_init(void);
 
 int boot_main(void)
 {
@@ -19,6 +20,7 @@ int boot_main(void)
 		panic("cpu is not cpu0");
 
 	init_mem_block();
+	el2_stage2_vmsa_init();
 	init_pcpus();
 	init_vms();
 

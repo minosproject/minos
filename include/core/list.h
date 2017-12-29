@@ -1,5 +1,5 @@
-#ifndef _LIST_H
-#define _LIST_H
+#ifndef _MVISOR_LIST_H_
+#define _MVISOR_LIST_H_
 
 struct list_head;
 

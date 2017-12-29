@@ -4,7 +4,7 @@
  * Created by Le Min(lemin9538@163.com)
  */
 
-#include "include/v8_mmu.h"
+#include <asm/v8_mmu.h>
 #include <asm/armv8_common.h>
 #include <asm/GICv3_aliases.h>
 #include <config/mvisor_config.h>
@@ -67,7 +67,7 @@ el2_entry_aarch64:
 	ldr	x1, =el2_vectors
 	msr	VBAR_EL2, x1
 
-	mov	x0, #7	// el1 access ICC_SRE_EL1 will trap to EL2
+	mov	x0, #15	// el1 access ICC_SRE_EL1 will trap to EL2
 	msr	ICC_SRE_EL2, x0
 
 	msr	VTTBR_EL2, xzr
@@ -89,6 +89,7 @@ el2_entry_aarch64:
 	/*
 	 * AMO FMO IMO to control the irq fiq and serror trap
 	 * to EL2
+	 * VM to control to enable stage2 transtion for el1 and el0
 	 */
 	ldr	x0, = (HCR_EL2_HVC | \
 		      HCR_EL2_TWI | \

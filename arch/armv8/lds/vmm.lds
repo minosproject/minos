@@ -27,6 +27,12 @@ SECTIONS
 	}
 	__vmm_vm_end = .;
 
+	.el2_stack (NOLOAD): {
+		. = ALIGN(64);
+		. = . + 4 * 0x2000;
+		__el2_stack = .;
+	}
+
 	. = ALIGN(4096);
 
 	__percpu_start = .;
