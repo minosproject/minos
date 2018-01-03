@@ -62,6 +62,9 @@ char *vmm_alloc_pages(int pages)
 	size_t request_size = pages * SIZE_4K;
 	char *base;
 
+	if (pages <= 0)
+		return NULL;
+
 	spin_lock(&mem_block_lock);
 	if (free_mem_size < request_size)
 		return NULL;

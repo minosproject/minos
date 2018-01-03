@@ -94,8 +94,8 @@ vcpu_t *create_vcpu(vm_t *vm, int index, boot_vm_t func,
 				vcpu->vcpu_id, affinity);
 		panic(NULL);
 	} else {
-		pr_info("Affinity the vcpu %d to pcpu %d\n",
-				vcpu->vcpu_id, vcpu->pcpu_affinity);
+		pr_info("Affinity the vcpu %d to pcpu %d for %s\n",
+				vcpu->vcpu_id, vcpu->pcpu_affinity, vm->name);
 	}
 
 	set_up_vcpu_env(vcpu);
@@ -176,9 +176,10 @@ static int parse_all_vms(void)
 			}
 		}
 
-
 		start++;
 	}
+
+	return 0;
 }
 
 static int parse_vm_memory(void)
@@ -225,6 +226,7 @@ static int parse_vm_memory(void)
 				m_reg->type = MEM_TYPE_IO;
 
 			vm = &vms[tmp->vmid];
+			list_add(&vm->mem_list, &m_reg->mem_region_list);
 		}
 	}
 

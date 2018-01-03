@@ -1,3 +1,5 @@
+#include <config/mvisor_config.h>
+
 ENTRY(_start)
 SECTIONS
 {
@@ -27,30 +29,8 @@ SECTIONS
 	}
 	__vmm_vm_end = .;
 
-	.el2_stack (NOLOAD): {
-		. = ALIGN(64);
-		. = . + 4 * 0x2000;
-		__el2_stack = .;
-	}
+	. = ALIGN(8);
 
-	. = ALIGN(4096);
-
-	__percpu_start = .;
-	__percpu_cpu_0_start = .;
-	.percpu_0 : {
-		KEEP(*(".__percpu"))
-	}
-	. = ALIGN(64);
-	__percpu_cpu_0_end = .;
-	__percpu_section_size = __percpu_cpu_0_end - __percpu_cpu_0_start;
-
-	.__percpu_others : {
-
-	}
-	. = __percpu_cpu_0_end + __percpu_section_size * (4 - 1);
-	__percpu_end = .;
-
-	. = ALIGN(4096);
 	__bss_start = .;
 	.bss : {*(.bss)}
 	__bss_end = .;
@@ -102,5 +82,44 @@ SECTIONS
 	. = ALIGN(8);
 
 	__init_end = .;
+
+	.el2_stack (NOLOAD): {
+		. = ALIGN(64);
+		__el2_stack = .;
+		. = . + (CONFIG_NUM_OF_CPUS * 0x2000);
+		__el2_stack_end = .;
+	}
+
+	. = ALIGN(4096);
+
+	__percpu_start = .;
+	__percpu_cpu_0_start = .;
+	.percpu_0 : {
+		KEEP(*(".__percpu"))
+	}
+	. = ALIGN(64);
+	__percpu_cpu_0_end = .;
+	__percpu_section_size = __percpu_cpu_0_end - __percpu_cpu_0_start;
+
+	.__percpu_others : {
+
+	}
+	. = __percpu_cpu_0_end + __percpu_section_size * (CONFIG_NUM_OF_CPUS - 1);
+	__percpu_end = .;
+
+	.el2_stage2_ttb_l1 (NOLOAD): {
+		. = ALIGN(MMU_TTB_LEVEL1_ALIGN);
+		__el2_stage2_ttb_l1 = .;
+		. = . + (CONFIG_NUM_OF_CPUS * MMU_TTB_LEVEL1_SIZE);
+		__el2_stage2_ttb_l1_end = .;
+	}
+
+	.el2_stage2_ttbl2 (NOLOAD): {
+		. = ALIGN(MMU_TTB_LEVEL2_ALIGN);
+		__el2_stage2_ttb_l2 = .;
+		. = . + (CONFIG_NUM_OF_CPUS * MMU_TTB_LEVEL2_SIZE);
+		__el2_stage2_ttb_l2_end = .;
+	}
+
 	__code_end = .;
 }

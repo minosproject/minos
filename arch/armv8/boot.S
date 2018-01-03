@@ -76,8 +76,8 @@ el2_entry_aarch64:
 	// neither EL3 nor EL2 trap floating point or accesses to CPACR
 	msr	CPTR_EL2, xzr
 
-	ldr	x0, =CONFIG_MVISOR_STACK_BASE
-	sub	x0, x0, x19, lsl #14
+	ldr	x0, =__el2_stack_end
+	sub	x0, x0, x19, lsl #13
 	mov	sp, x0
 
 	ldr	x0, =__bss_start

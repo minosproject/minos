@@ -13,15 +13,14 @@ INCLUDE_DIR 	:= include/core/*.h include/asm/*.h include/config/*.h include/driv
 #INCLUDE_DIR 	:=
 
 CCFLAG 		:= --static -nostdlib -fno-builtin -g -march=armv8-a -I$(PWD)/include
-LDS 		:= arch/$(ARCH)/lds/vmm.lds
-LDFLAG 		:= -T$(LDS) -Map=linkmap.txt
-#LDPATH 		:= -L/opt/i686-linux-android-4.6/lib/gcc/i686-linux-android/4.6.x-google
+LDS 		:= arch/$(ARCH)/lds/vmm.ld.c
 
 OUT 		:= out
 OUT_CORE 	= $(OUT)/core
 OUT_ARCH 	= $(OUT)/$(ARCH)
 OUT_VMM_VMS	= $(OUT)/vmm_vms
 OUT_DRIVERS	= $(OUT)/drivers
+TARGET_LDS	= $(OUT)/vmm.lds
 
 vmm_elf 	:= $(OUT)/vmm.elf
 vmm_bin 	:= $(OUT)/vmm.bin
@@ -33,8 +32,9 @@ SRC_CORE	:= $(wildcard core/*.c)
 SRC_VMM_VMS	:= $(wildcard vmm_vms/*.c)
 SRC_DRIVERS	:= $(wildcard drivers/*.c)
 
-#VPATH		:= kernel:mm:init:fs:drivers:syscall:arch/$(ARCH)/platform/$(PLATFORM):arch/$(ARCH)/board/$(BOARD):arch/$(ARCH)/kernel
 VPATH		:= core:arch/$(ARCH):vmm_vms:drivers
+
+LDFLAG 		:= -T$(TARGET_LDS) -Map=linkmap.txt
 
 .SUFFIXES:
 .SUFFIXES: .S .c
@@ -58,10 +58,14 @@ $(vmm_bin) : $(vmm_elf)
 	$(QUIET) $(OBJ_COPY) -O binary $(vmm_elf) $(vmm_bin)
 	$(QUIET) $(OBJ_DUMP) $(vmm_elf) -D > $(vmm_dump)
 
-$(vmm_elf) : $(OBJECT) $(LDS)
+$(vmm_elf) : $(OBJECT) $(TARGET_LDS)
 	@echo Linking $@
 	$(QUIET) $(LD) $(LDFLAG) -o $(vmm_elf) $(OBJECT) $(LDPATH)
 	@echo Done.
+
+$(TARGET_LDS) : $(LDS) $(INCLUDE_DIR)
+	@echo Generate LDS file
+	$(QUIET) $(CC) $(CCFLAG) -E -P $(LDS) -o $(TARGET_LDS)
 
 $(OUT) $(OUT_CORE) $(OUT_ARCH) $(OUT_VMM_VMS) $(OUT_DRIVERS):
 	@ mkdir -p $@

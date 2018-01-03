@@ -1,6 +1,7 @@
 #include <core/core.h>
 #include <core/mmu.h>
 #include <asm/armv8.h>
+#include <config/mvisor_config.h>
 
 #define G4K_LEVEL1_OFFSET	(30)
 #define G4K_LEVEL2_OFFSET	(21)
@@ -20,19 +21,15 @@
 	#define LEVEL2_PAGES		(1)
 #elif CONFIG_GRANULE_SIZE_16K
 	#define GRANULE_TYPE		GRANULE_SIZE_16K
-	#define LEVEL2_OFFSET		G16K_LEVEL2_OFFSET
 	#define LEVEL1_OFFSET		G16K_LEVEL1_OFFSET
 	#define LEVEL2_OFFSET		G16K_LEVEL2_OFFSET
-	#define LEVEL1_OFFSET		G16K_LEVEL1_OFFSET
 	#define LEVEL2_ENTRY_MAP_SIZE	(SIZE_16K)
 	#define LEVEL1_ENTRY_MAP_SIZE	(SIZE_32M)
 	#define LEVEL1_DESCRIPTION_TYPE	(DESCRIPTION_TABLE)
 	#define LEVEL2_DESCRIPTION_TYPE	(DESCRIPTION_BLOCK)
 	#define LEVEL2_PAGES		(4)
 #else
-	#define GRANULE_TYPE		GRANULE_SIZE_16K
-	#define LEVEL2_OFFSET		G64K_LEVEL2_OFFSET
-	#define LEVEL1_OFFSET		G64K_LEVEL1_OFFSET
+	#define GRANULE_TYPE		GRANULE_SIZE_64K
 	#define LEVEL2_OFFSET		G64K_LEVEL2_OFFSET
 	#define LEVEL1_OFFSET		G64K_LEVEL1_OFFSET
 	#define LEVEL2_ENTRY_MAP_SIZE	(SIZE_64K)
@@ -53,6 +50,67 @@ struct aa64mmfr0 {
 	uint64_t t_gran_4k : 4;
 	uint64_t res : 32;
 };
+
+extern unsigned char __el2_stage2_ttb_l1;
+extern unsigned char __el2_stage2_ttb_l1_end;
+extern unsigned char __el2_stage2_ttb_l2;
+extern unsigned char __el2_stage2_ttb_l2_end;
+
+static char *level1_base;
+static char *level2_base;
+static size_t level1_size;
+static size_t level2_size;
+
+static spinlock_t tt_lock;
+
+static int stage2_tt_mem_init(void)
+{
+	level1_base = &__el2_stage2_ttb_l1;
+	level2_base = &__el2_stage2_ttb_l2;
+	level1_size = &__el2_stage2_ttb_l1_end - &__el2_stage2_ttb_l1;
+	level2_size = &__el2_stage2_ttb_l2_end - &__el2_stage2_ttb_l2;
+
+	pr_info("level1: 0x%x 0x%x level2:0x%x 0x%x\n",
+			level1_base, level1_size, level2_base, level2_size);
+	if ((level1_size <= 0) || (level2_size <= 0))
+		panic("No memory for el2 stage2 translation table\n");
+
+	spin_lock_init(&tt_lock);
+
+	return 0;
+}
+
+static char *mmu_alloc_level1_mem(void)
+{
+	char *ret = NULL;
+
+	spin_lock(&tt_lock);
+	if (level1_size < MMU_TTB_LEVEL1_SIZE)
+		return NULL;
+
+	ret = level1_base;
+	level1_base += MMU_TTB_LEVEL1_SIZE;
+	level1_size -= MMU_TTB_LEVEL1_SIZE;
+	spin_unlock(&tt_lock);
+
+	return ret;
+}
+
+static char *mmu_alloc_level2_mem(void)
+{
+	char *ret = NULL;
+
+	spin_lock(&tt_lock);
+	if (level2_size < (LEVEL2_PAGES * SIZE_4K))
+		return NULL;
+
+	ret = level2_base;
+	level2_base += (LEVEL2_PAGES * SIZE_4K);
+	level2_size -= (LEVEL2_PAGES * SIZE_4K);
+	spin_unlock(&tt_lock);
+
+	return ret;
+}
 
 uint64_t get_tt_description(int m_type, int d_type)
 {
@@ -93,6 +151,9 @@ static int mmu_map_level2_pages(phy_addr_t *tbase, phy_addr_t vbase,
 	offset = (vbase - tmp) >> LEVEL2_OFFSET;
 
 	for (i = 0; i < (size >> LEVEL2_OFFSET); i++) {
+		if (*(tbase + offset) != 0)
+			continue;
+
 		*(tbase + offset) = (attr | \
 			(pbase >> LEVEL2_OFFSET) << LEVEL2_OFFSET);
 		vbase += LEVEL2_ENTRY_MAP_SIZE;
@@ -122,16 +183,22 @@ int mmu_map_mem(phy_addr_t *tbase, phy_addr_t base, size_t size, int type)
 		offset = base >> LEVEL1_OFFSET;
 		value = *(tbase + offset);
 		if (value == 0) {
-			tmp = (phy_addr_t)vmm_alloc_pages(LEVEL2_PAGES);
+			tmp = (phy_addr_t)mmu_alloc_level2_mem();
 			if (!tmp)
 				return -ENOMEM;
+			memset((char *)tmp, 0, LEVEL2_PAGES * SIZE_4K);
 
 			*(tbase + offset) = attr | \
 				((tmp >> LEVEL2_OFFSET) << LEVEL2_OFFSET);
 			value = (uint64_t)tmp;
+		} else {
+			/* get the base address of the entry */
+			value = value & 0x0000ffffffffffff;
+			value = value >> LEVEL2_OFFSET;
+			value = value << LEVEL2_OFFSET;
 		}
 
-		if (size > (SIZE_32M)) {
+		if (size > (LEVEL1_ENTRY_MAP_SIZE)) {
 			map_size = BALIGN(base, LEVEL1_ENTRY_MAP_SIZE) - base;
 			map_size = map_size ? map_size : LEVEL1_ENTRY_MAP_SIZE;
 		} else {
@@ -181,7 +248,6 @@ phy_addr_t mmu_map_vm_memory(struct list_head *mem_list)
 	char *page;
 	uint32_t page_nr;
 	uint32_t offset;
-	uint64_t max_size = CONFIG_MAX_PHYSICAL_SIZE;
 
 	if (!mem_list)
 		return 0;
@@ -189,26 +255,11 @@ phy_addr_t mmu_map_vm_memory(struct list_head *mem_list)
 	if (is_list_empty(mem_list))
 		return 0;
 
-	/*
-	 * calculate how many pages the first level
-	 * needed
-	 */
-	if (GRANULE_TYPE == GRANULE_SIZE_4K)
-		offset = 30;
-	else if (GRANULE_TYPE == GRANULE_SIZE_16K)
-		offset = 25;
-	else
-		offset = 29;
-
-	page_nr = (max_size >> offset) * sizeof(uint64_t);
-	page_nr = page_nr >> 12;
-	pr_info("%d pages for the first level table\n", page_nr);
-
-	page = vmm_alloc_pages(page_nr);
+	page = mmu_alloc_level1_mem();
 	if (!page)
 		panic("No memory to map vm memory\n");
 
-	memset(page, 0, SIZE_4K * page_nr);
+	memset(page, 0, MMU_TTB_LEVEL1_SIZE);
 	mmu_map_memory_region_list((phy_addr_t)page, mem_list);
 
 	return (phy_addr_t)page;
@@ -225,9 +276,11 @@ int el2_stage2_vmsa_init(void)
 
 	value = read_id_aa64mmfr0_el1();
 	memcpy(&aa64mmfr0, &value, sizeof(uint64_t));
-	pr_debug("aa64mmfr0: pa_range:0x%x t_gran_16k:0x%x \
-			t_gran_64k:0x%x t_gran_4k:0x%x\n",
+	pr_debug("aa64mmfr0: pa_range:0x%x t_gran_16k:0x%x t_gran_64k:0x%x t_gran_4k:0x%x\n",
 			aa64mmfr0.pa_range, aa64mmfr0.t_gran_16k,
 			aa64mmfr0.t_gran_64k, aa64mmfr0.t_gran_4k);
+
+	stage2_tt_mem_init();
+
 	return 0;
 }
