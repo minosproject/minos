@@ -26,7 +26,7 @@
 	#define LEVEL2_ENTRY_MAP_SIZE	(SIZE_16K)
 	#define LEVEL1_ENTRY_MAP_SIZE	(SIZE_32M)
 	#define LEVEL1_DESCRIPTION_TYPE	(DESCRIPTION_TABLE)
-	#define LEVEL2_DESCRIPTION_TYPE	(DESCRIPTION_BLOCK)
+	#define LEVEL2_DESCRIPTION_TYPE	(DESCRIPTION_PAGE)
 	#define LEVEL2_PAGES		(4)
 #else
 	#define GRANULE_TYPE		GRANULE_SIZE_64K
@@ -35,7 +35,7 @@
 	#define LEVEL2_ENTRY_MAP_SIZE	(SIZE_64K)
 	#define LEVEL1_ENTRY_MAP_SIZE	(SIZE_512M)
 	#define LEVEL1_DESCRIPTION_TYPE	(DESCRIPTION_TABLE)
-	#define LEVEL2_DESCRIPTION_TYPE	(DESCRIPTION_BLOCK)
+	#define LEVEL2_DESCRIPTION_TYPE	(DESCRIPTION_PAGE)
 	#define LEVEL2_PAGES		(16)
 #endif
 
@@ -119,7 +119,7 @@ uint64_t get_tt_description(int m_type, int d_type)
 	if (d_type == DESCRIPTION_TABLE)
 		return (uint64_t)TT_S2_ATTR_TABLE;
 
-	if ((d_type == DESCRIPTION_BLOCK) || (d_type == DESCRIPTION_PAGE)) {
+	if (d_type == DESCRIPTION_BLOCK) {
 		if (m_type == MEM_TYPE_NORMAL) {
 			attr = TT_S2_ATTR_BLOCK | TT_S2_ATTR_AP_RW | \
 				TT_S2_ATTR_SH_INNER | TT_S2_ATTR_AF | \
@@ -127,6 +127,22 @@ uint64_t get_tt_description(int m_type, int d_type)
 				TT_S2_ATTR_MEMATTR_NORMAL_INNER_WT;
 		} else {
 			attr = TT_S2_ATTR_BLOCK | TT_S2_ATTR_AP_RW | \
+			       TT_S2_ATTR_SH_INNER | TT_S2_ATTR_AF | \
+			       TT_S2_ATTR_MEMATTR_DEVICE | \
+			       TT_S2_ATTR_MEMATTR_DEV_nGnRnE;
+		}
+
+		return attr;
+	}
+
+	if (d_type == DESCRIPTION_PAGE) {
+		if (m_type == MEM_TYPE_NORMAL) {
+			attr = TT_S2_ATTR_PAGE | TT_S2_ATTR_AP_RW | \
+			       TT_S2_ATTR_SH_INNER | TT_S2_ATTR_AF | \
+			       TT_S2_ATTR_MEMATTR_OUTER_WT | \
+			       TT_S2_ATTR_MEMATTR_NORMAL_INNER_WT;
+		} else {
+			attr = TT_S2_ATTR_PAGE | TT_S2_ATTR_AP_RW | \
 			       TT_S2_ATTR_SH_INNER | TT_S2_ATTR_AF | \
 			       TT_S2_ATTR_MEMATTR_DEVICE | \
 			       TT_S2_ATTR_MEMATTR_DEV_nGnRnE;
@@ -263,6 +279,43 @@ phy_addr_t mmu_map_vm_memory(struct list_head *mem_list)
 	mmu_map_memory_region_list((phy_addr_t)page, mem_list);
 
 	return (phy_addr_t)page;
+}
+
+uint64_t mmu_generate_vtcr_el2(void)
+{
+	uint64_t value = 0;
+
+	value |= (0x20 << 0);	// t0sz = 0x20 32bits vaddr
+	value |= (0x01 << 6);	// SL0: 64kb/16 start at level2 4k start at level1
+	value |= (0x0 << 8);	// Normal memory, Inner Non-cacheable
+	value |= (0x0 << 10);	// Normal memory, Outer Non-cacheable
+	value |= (0x3 << 12);	// Inner Shareable
+
+	// TG0
+	if (GRANULE_TYPE == GRANULE_SIZE_4K)
+		value |= (0x0 << 14);
+	else if (GRANULE_TYPE == GRANULE_SIZE_16K)
+		value |= (0x2 << 14);
+	else
+		value |= (0x1 << 14);
+
+	// PS --- pysical size
+	value |= (0x0 << 16);
+
+	// vmid -- 8bit
+	value |= (0x0 << 19);
+
+	return value;
+}
+
+uint64_t mmu_get_vttbr_el2_base(uint32_t vmid, phy_addr_t base)
+{
+	uint64_t value = 0;
+
+	value = base ;
+	value |= (uint64_t)vmid << 48;
+
+	return value;
 }
 
 int el2_stage2_vmsa_init(void)

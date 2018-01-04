@@ -16,6 +16,7 @@
 #define CONFIG_MAX_CPU_NR		(8)
 #define CONFIG_NUM_OF_CPUS		(4)
 #define CONFIG_VM_MAX_VCPU		(CONFIG_NUM_OF_CPUS)
+#define CONFIG_MAX_VM			(4)
 
 #define CONFIG_LOG_LEVEL		4
 

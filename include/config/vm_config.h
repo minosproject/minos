@@ -17,6 +17,7 @@ typedef struct vmm_vm_entry {
 	uint64_t entry_point;
 	uint32_t nr_vcpu;
 	uint32_t vcpu_affinity[CONFIG_VM_MAX_VCPU];
+	uint32_t mmu_on;
 	void *boot_vm;
 } vm_entry_t __attribute__((__aligned__ (8)));
 

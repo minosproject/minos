@@ -128,8 +128,18 @@ _sync_el2_handler:
 	mrs	x1, vmpidr_el2
 	str	x1, [x0], #8
 	mrs	x1, sctlr_el1
+	str	x1, [x0], #8
+	mrs	x1, ttbr0_el1
+	str	x1, [x0], #8
+	mrs	x1, ttbr1_el1
+	str	x1, [x0], #8
+	mrs	x1, vttbr_el2
+	str	x1, [x0], #8
+	mrs	x1, vtcr_el2
+	str	x1, [x0], #8
+	mrs	x1, hcr_el2
 	str	x1, [x0]
-	sub	x0, x0, #304
+	sub	x0, x0, #344
 
 	bl	sync_el2_handler
 
@@ -176,7 +186,19 @@ _sync_el2_handler:
 	msr	esr_el1, x1
 	ldr	x1, [x0], #8
 	msr	vmpidr_el2, x1
-	sub	x0, x0, #304
+	ldr	x1, [x0], #8
+	msr	sctlr_el1, x1
+	ldr	x1, [x0], #8
+	msr	ttbr0_el1, x1
+	ldr	x1, [x0], #8
+	msr	ttbr1_el1, x1
+	ldr	x1, [x0], #8
+	msr	vttbr_el2, x1
+	ldr	x1, [x0], #8
+	msr	vtcr_el2, x1
+	ldr	x1, [x0], #8
+	msr	hcr_el2, x1
+	sub	x0, x0, #344
 	ldr	x1, [x0, #8]
 	ldr	x0, [x0]
 	eret

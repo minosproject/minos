@@ -35,7 +35,19 @@ func switch_to_vcpu
 	msr	esr_el1, x1
 	ldr	x1, [x0], #8
 	msr	vmpidr_el2, x1
-	sub	x0, x0, #304
+	ldr	x1, [x0], #8
+	msr	sctlr_el1, x1
+	ldr	x1, [x0], #8
+	msr	ttbr0_el1, x1
+	ldr	x1, [x0], #8
+	msr	ttbr1_el1, x1
+	ldr	x1, [x0], #8
+	msr	vttbr_el2, x1
+	ldr	x1, [x0], #8
+	msr	vtcr_el2, x1
+	ldr	x1, [x0], #8
+	msr	hcr_el2, x1
+	sub	x0, x0, #352
 	ldr	x1, [x0, #8]
 	ldr	x0, [x0]
 	eret

@@ -11,11 +11,11 @@
 #include <core/vm.h>
 
 typedef enum _vcpu_state_t {
-	VCPU_STATE_READY = 0x0001,
-	VCPU_STATE_RUNNING = 0x0002,
-	VCPU_STATE_SLEEP = 0x0004,
-	VCPU_STATE_STOP  = 0x0008,
-	VCPU_STATE_ERROR = 0xffff,
+	VCPU_STATE_READY 	= 0x0001,
+	VCPU_STATE_RUNNING 	= 0x0002,
+	VCPU_STATE_SLEEP 	= 0x0004,
+	VCPU_STATE_STOP  	= 0x0008,
+	VCPU_STATE_ERROR 	= 0xffff,
 } vcpu_state_t;
 
 #ifdef CONFIG_ARM_AARCH64
@@ -55,11 +55,16 @@ typedef struct vmm_vcpu_context {
 	uint64_t sp_el1;
 	uint64_t elr_el2;
 	uint64_t vbar_el1;
-	uint64_t spsr_el1;
+	uint64_t spsr_el2;
 	uint64_t nzcv;
 	uint64_t esr_el1;
 	uint64_t vmpidr;
 	uint64_t sctlr_el1;
+	uint64_t ttbr0_el1;
+	uint64_t ttbr1_el1;
+	uint64_t vttbr_el2;
+	uint64_t vtcr_el2;
+	uint64_t hcr_el2;
 } vcpu_context_t __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
 #else

@@ -86,23 +86,6 @@ el2_entry_aarch64:
 	sub	x2, x2, x0
 	bl	memset
 
-	/*
-	 * AMO FMO IMO to control the irq fiq and serror trap
-	 * to EL2
-	 * VM to control to enable stage2 transtion for el1 and el0
-	 */
-	ldr	x0, = (HCR_EL2_HVC | \
-		      HCR_EL2_TWI | \
-		      HCR_EL2_TWE | \
-		      HCR_EL2_TWE | \
-		      HCR_EL2_TIDCP | \
-		      HCR_EL2_IMO | \
-		      HCR_EL2_FMO | \
-		      HCR_EL2_AMO | \
-		      HCR_EL2_RW)
-	msr	hcr_el2, x0
-
 	// enable interrupt
-
 
 	b	boot_main

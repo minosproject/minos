@@ -18,6 +18,7 @@ vm_entry_t vm_os1 = {
 	.entry_point 	= 0x90000000,
 	.vcpu_affinity 	= {0},
 	.boot_vm 	= os1_boot_vm,
+	.mmu_on		= 1,
 };
 
 register_vm_entry(vm_os1);

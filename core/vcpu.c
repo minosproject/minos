@@ -3,19 +3,21 @@
 #include <core/vcpu.h>
 #include <core/pcpu.h>
 #include <asm/cpu.h>
+#include <asm/armv8.h>
 #include <config/vm_config.h>
+#include <config/mvisor_config.h>
 
 extern unsigned char __vmm_vm_start;
 extern unsigned char __vmm_vm_end;
 
-static vm_t *vms = NULL;
+static vm_t *vms[CONFIG_MAX_VM];
 static uint32_t total_vms = 0;
 
 struct list_head shared_mem_list;
 
 #ifdef CONFIG_ARM_AARCH64
 
-static int set_up_vcpu_env(vcpu_t *vcpu)
+static int set_up_vcpu_env(vm_t *vm, vcpu_t *vcpu)
 {
 	vcpu_context_t *c = &vcpu->context;
 	uint32_t vmid = get_vm_id(vcpu);
@@ -56,87 +58,65 @@ static int set_up_vcpu_env(vcpu_t *vcpu)
 	c->sp_el1 = 0x0;
 	c->elr_el2 = vcpu->entry_point;
 	c->vbar_el1 = 0;
-	c->spsr_el1 = AARCH64_SPSR_EL1h | AARCH64_SPSR_F | \
+	c->spsr_el2 = AARCH64_SPSR_EL1h | AARCH64_SPSR_F | \
 		      AARCH64_SPSR_I | AARCH64_SPSR_A;
 	c->nzcv = 0;
 	c->esr_el1 = 0x0;
 	c->vmpidr = generate_vcpu_id(vmid, vcpu_id, pcpu_id);
+	c->sctlr_el1 = 0;
+	c->ttbr0_el1 = 0;
+	c->ttbr1_el1 = 0;
+	c->vttbr_el2 = vm->vttbr_el2_addr;
+	c->vtcr_el2 = vm->vtcr_el2;
+	c->hcr_el2 = vm->hcr_el2;
 
 	return 0;
 }
 
 #else
 
-static int set_up_vcpu_env(vcpu_t *vcpu)
+static int set_up_vcpu_env(vm_t *vm, vcpu_t *vcpu)
 {
 
 }
 
 #endif
 
-vcpu_t *create_vcpu(vm_t *vm, int index, boot_vm_t func,
-		uint32_t affinity, phy_addr_t entry_point)
+static int vm_add_vm(vm_entry_t *vme)
 {
-	vcpu_t *vcpu;
+	int i;
+	vm_t *vm;
 
-	vcpu = (vcpu_t *)vmm_malloc(sizeof(vcpu_t));
-	if (vcpu == NULL)
-		return NULL;
+	if (!vme)
+		return -EINVAL;
 
-	memset((char *)vcpu, 0, sizeof(vcpu_t));
+	vm = (vm_t *)vmm_malloc(sizeof(vm_t));
+	if (!vm)
+		return -ENOMEM;
 
-	vcpu->vcpu_id = index;
-	vcpu->vm_belong_to = vm;
-	vcpu->entry_point = entry_point;
-	vcpu->pcpu_affinity = pcpu_affinity(vcpu, affinity);
-	if (vcpu->pcpu_affinity == PCPU_AFFINITY_FAIL) {
-		pr_fatal("Can not affinity the vcpu %d to pcpu %d\n",
-				vcpu->vcpu_id, affinity);
-		panic(NULL);
-	} else {
-		pr_info("Affinity the vcpu %d to pcpu %d for %s\n",
-				vcpu->vcpu_id, vcpu->pcpu_affinity, vm->name);
-	}
+	memset((char *)vm, 0, sizeof(vm_t));
+	vm->vmid = vme->vmid;
+	strncpy(vm->name, vme->name,
+		MIN(strlen(vme->name), VMM_VM_NAME_SIZE - 1));
+	vm->vcpu_nr = MIN(vme->nr_vcpu, CONFIG_VM_MAX_VCPU);
+	init_list(&vm->mem_list);
+	vm->boot_vm = (boot_vm_t)vme->boot_vm;
+	vm->mmu_on = vme->mmu_on;
+	vm->entry_point = vme->entry_point;
+	memcpy(vm->vcpu_affinity, vme->vcpu_affinity,
+			sizeof(uint32_t) * CONFIG_VM_MAX_VCPU);
 
-	set_up_vcpu_env(vcpu);
+	vm->index = total_vms;
+	vms[total_vms] = vm;
+	total_vms++;
 
-	if (func)
-		func(&vcpu->context);
-
-	return vcpu;
-}
-
-
-static void init_vms_state(void)
-{
-	int i, j;
-	vcpu_t *vcpu = NULL;
-	vm_t *vm = NULL;
-
-	/*
-	 * find the boot cpu for each vm and
-	 * mark its status, boot cpu will set
-	 * to ready to run state then other vcpu
-	 * is set to STOP state to wait for bootup
-	 */
-	for (i = 0; i < total_vms; i++) {
-		vm = &vms[i];
-		for (j = 0; j < vm->vcpu_nr; j++) {
-			vcpu = vm->vcpus[j];
-			if (get_vcpu_id(vcpu) == 0)
-				set_vcpu_state(vcpu, VCPU_STATE_READY);
-			else
-				set_vcpu_state(vcpu, VCPU_STATE_STOP);
-		}
-	}
+	return 0;
 }
 
 static int parse_all_vms(void)
 {
-	int i, j;
-	vm_t *vm;
+	int i;
 	vm_entry_t *vme;
-	vcpu_t *vcpu;
 	size_t size = (&__vmm_vm_end) - (&__vmm_vm_start);
 	phy_addr_t *start = (phy_addr_t *)(&__vmm_vm_start);
 
@@ -146,40 +126,27 @@ static int parse_all_vms(void)
 	size = size / sizeof(vm_entry_t *);
 	pr_debug("Found %d VMs config\n", size);
 
-	vms = (vm_t *)vmm_malloc(size * sizeof(vm_t));
-	if (NULL == vms)
-		panic("No more memory for vms\n");
-
-	memset((char *)vms, 0, size * sizeof(vm_t));
-	total_vms = size;
-
 	for (i = 0; i < size; i++) {
 		vme = (vm_entry_t *)(*start);
-		vm = &vms[i];
-		pr_info("found vm-%d %s nr_vcpu:%d\n", i, vme->name, vme->nr_vcpu);
-
-		vm->vmid = vme->vmid;
-		strncpy(vm->name, vme->name,
-			MIN(strlen(vme->name), VMM_VM_NAME_SIZE - 1));
-		vm->vcpu_nr = MIN(vme->nr_vcpu, CONFIG_VM_MAX_VCPU);
-		init_list(&vm->mem_list);
-
-		for (i = 0; i < total_vms; i++) {
-			for (j = 0; j < vm->vcpu_nr; j++) {
-				vcpu = create_vcpu(vm, j, vme->boot_vm,
-					vme->vcpu_affinity[j],
-					vme->entry_point);
-				if (NULL == vcpu)
-					panic("No more memory to create VCPU\n");
-
-				vm->vcpus[j] = vcpu;
-			}
-		}
-
+		vm_add_vm(vme);
 		start++;
 	}
 
 	return 0;
+}
+
+static vm_t *vm_get_vm(uint32_t vmid)
+{
+	int i;
+	vm_t *vm;
+
+	for (i = 0; i < total_vms; i++) {
+		vm = vms[i];
+		if (vm->vmid == vmid)
+			return vm;
+	}
+
+	return NULL;
 }
 
 static int parse_vm_memory(void)
@@ -225,7 +192,12 @@ static int parse_vm_memory(void)
 			else
 				m_reg->type = MEM_TYPE_IO;
 
-			vm = &vms[tmp->vmid];
+			vm = vm_get_vm(tmp->vmid);
+			if (!vm) {
+				pr_error("Can not find the vm for the vmid:%d\n", tmp->vmid);
+				continue;
+			}
+
 			list_add(&vm->mem_list, &m_reg->mem_region_list);
 		}
 	}
@@ -233,33 +205,115 @@ static int parse_vm_memory(void)
 	return 0;
 }
 
-static int map_vm_memory(void)
+static int vm_create_vcpus(vm_t *vm)
 {
 	int i;
-	vm_t *vm;
-	struct list_head *list;
-	struct memory_region *region;
-	phy_addr_t ttb2_addr;
-	uint64_t tcr_el2;
+	vcpu_t *vcpu;
 
-	for (i = 0; i < total_vms; i++) {
-		vm = &vms[i];
-		ttb2_addr = mmu_map_vm_memory(&vm->mem_list);
-		mmu_map_memory_region_list(ttb2_addr, &shared_mem_list);
+	if (!vm)
+		return -EINVAL;
 
-		tcr_el2 = mmu_generate_tcr_el2();
+	for (i = 0; i < vm->vcpu_nr; i++) {
+		vcpu = (vcpu_t *)vmm_malloc(sizeof(vcpu_t));
+		if (vcpu == NULL)
+			return -ENOMEM;
 
-		vm->ttb2_addr = ttb2_addr;
-		vm->tcr_el2 = tcr_el2;
+		memset((char *)vcpu, 0, sizeof(vcpu_t));
+
+		vcpu->vcpu_id = i;
+		vcpu->vm_belong_to = vm;
+		vcpu->entry_point = vm->entry_point;
+		vcpu->pcpu_affinity = pcpu_affinity(vcpu, vm->vcpu_affinity[i]);
+		if (vcpu->pcpu_affinity == PCPU_AFFINITY_FAIL) {
+			pr_fatal("%s Can not affinity for vcpu %d\n",
+					vm->name, vcpu->vcpu_id);
+			panic(NULL);
+		} else {
+			pr_info("Affinity the vcpu %d to pcpu %d for %s\n",
+				vcpu->vcpu_id, vcpu->pcpu_affinity, vm->name);
+			vm->vcpu_affinity[i] = vcpu->pcpu_affinity;
+		}
+		vm->vcpus[i] = vcpu;
 	}
 
 	return 0;
 }
 
-uint64_t mmu_generate_tcr_el2(void)
+static int vm_map_memory(vm_t *vm)
 {
+	phy_addr_t ttb2_addr;
+	uint64_t tcr_el2;
+
+	if (!vm)
+		return -EINVAL;
+
+	ttb2_addr = mmu_map_vm_memory(&vm->mem_list);
+	mmu_map_memory_region_list(ttb2_addr, &shared_mem_list);
+	tcr_el2 = mmu_generate_vtcr_el2();
+
+	vm->vttbr_el2_addr = mmu_get_vttbr_el2_base(vm->vmid, ttb2_addr);
+	vm->vtcr_el2 = tcr_el2;
+
 	return 0;
 }
+
+static void vm_config_hcrel2(vm_t *vm)
+{
+	uint64_t value = 0;
+
+	/*
+	 * AMO FMO IMO to control the irq fiq and serror trap
+	 * to EL2
+	 * VM to control to enable stage2 transtion for el1 and el0
+	 */
+	value = HCR_EL2_HVC | HCR_EL2_TWI | HCR_EL2_TWE | \
+		HCR_EL2_TIDCP | HCR_EL2_IMO | HCR_EL2_FMO | \
+		HCR_EL2_AMO | HCR_EL2_RW | HCR_EL2_VM;
+	vm->hcr_el2 = value;
+}
+
+static int vm_state_init(vm_t *vm)
+{
+	int i;
+	vcpu_t *vcpu = NULL;
+
+	if (!vm)
+		return -EINVAL;
+
+	/*
+	 * find the boot cpu for each vm and
+	 * mark its status, boot cpu will set
+	 * to ready to run state then other vcpu
+	 * is set to STOP state to wait for bootup
+	 */
+	for (i = 0; i < vm->vcpu_nr; i++) {
+		vcpu = vm->vcpus[i];
+		set_up_vcpu_env(vm, vcpu);
+		if (get_vcpu_id(vcpu) == 0)
+			set_vcpu_state(vcpu, VCPU_STATE_READY);
+		else
+			set_vcpu_state(vcpu, VCPU_STATE_STOP);
+	}
+
+	return 0;
+}
+
+static int vm_do_init_vms(void)
+{
+	int i;
+	vm_t *vm;
+
+	for (i = 0; i < total_vms; i++) {
+		vm = vms[i];
+		vm_create_vcpus(vm);
+		vm_map_memory(vm);
+		vm_config_hcrel2(vm);
+		vm_state_init(vm);
+	}
+
+	return 0;
+}
+
 
 int init_vms(void)
 {
@@ -270,8 +324,7 @@ int init_vms(void)
 		panic("parsing the vm fail\n");
 
 	parse_vm_memory();
-	map_vm_memory();
-	init_vms_state();
+	vm_do_init_vms();
 
 	return 0;
 }
