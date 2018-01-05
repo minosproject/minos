@@ -84,6 +84,7 @@ typedef struct _ec_config_t {
 	vmm_ec_t type;
 	int aarch;
 	ec_handler_t handler;
+	int32_t ret_addr_adjust;
 } ec_config_t;
 
 #endif
