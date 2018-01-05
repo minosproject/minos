@@ -37,6 +37,21 @@ static struct vmm_memory_region mem_regions[] = {
 		.vmid = 0,
 		.name = "color_lcd",
 	},
+
+	{
+		.mem_base = 0x1c010000,
+		.mem_end = 0x1c020000,
+		.type = 1,
+		.vmid = 0,
+		.name = "ve-sys",
+	},
+	{
+		.mem_base = 0x1c110000,
+		.mem_end = 0x1c120000,
+		.type = 1,
+		.vmid = 0,
+		.name = "timer",
+	},
 };
 
 uint32_t get_mem_config_size(void)

@@ -108,7 +108,9 @@ static unsigned long ec_misaligned_pc_handler(uint32_t iss, uint32_t il, void *a
 
 static unsigned long ec_dataabort_tfl_handler(uint32_t iss, uint32_t il, void *arg)
 {
+	vcpu_t *vcpu = (vcpu_t *)arg;
 
+	vcpu->context.elr_el2 += 4;
 }
 
 static unsigned long ec_dataabort_twe_handler(uint32_t iss, uint32_t il, void *arg)
