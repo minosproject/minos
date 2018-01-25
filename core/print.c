@@ -175,12 +175,13 @@ static int update_log_buffer(char *buf, int printed)
 	return 0;
 }
 
+static char buffer[1024];
+
 int level_print(const char *fmt, ...)
 {
 	char ch;
 	va_list arg;
 	int printed;
-	char buffer[1024];
 	char *buf;
 
 	buffer[0] = 0;
@@ -198,11 +199,11 @@ int level_print(const char *fmt, ...)
 	 * in case of buffer overflow
 	 */
 
+	spin_lock(&log_buffer.buffer_lock);
+
 	va_start(arg, fmt);
 	printed = vsprintf(buffer, fmt, arg);
 	va_end(arg);
-
-	spin_lock(&log_buffer.buffer_lock);
 
 	/*
 	 * temp disable the log buffer

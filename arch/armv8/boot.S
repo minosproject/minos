@@ -80,6 +80,8 @@ el2_entry_aarch64:
 	sub	x0, x0, x19, lsl #13
 	mov	sp, x0
 
+	cbnz	x19, secondary_start_up
+
 	ldr	x0, =__bss_start
 	mov	x1, #0
 	ldr	x2, =__bss_end
@@ -89,3 +91,6 @@ el2_entry_aarch64:
 	// enable interrupt
 
 	b	boot_main
+
+secondary_start_up:
+	b	boot_secondary

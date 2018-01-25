@@ -14,7 +14,7 @@ l1:	wfe
 l2:	ldaxr	w1, [x0]
 	cbnz	w1, l1
 	stxr	w1, w2, [x0]
-	cbnz	w1, l2
+	cbnz	w1, l1
 	ret
 endfunc arch_spin_lock
 

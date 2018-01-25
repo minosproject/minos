@@ -14,6 +14,8 @@ extern void el2_stage2_vmsa_init(void);
 
 int boot_main(void)
 {
+	int i;
+
 	log_buffer_init();
 	pr_info("Starting mVisor ...\n");
 
@@ -24,8 +26,15 @@ int boot_main(void)
 	el2_stage2_vmsa_init();
 	init_pcpus();
 	init_vms();
+	//gic_global_init();
+	//gic_local_init();
+	vmm_irqs_init();
 
-	//wake_up_other_cpus();
+	/*
+	 * now we can power on other cpu core
+	 */
+	for (i = 1; i < CONFIG_NUM_OF_CPUS; i++)
+		power_on_cpu_core();
 
 	sched_vcpu();
 
@@ -34,5 +43,15 @@ int boot_main(void)
 
 int boot_secondary(void)
 {
+	//gic_local_init();
+
+	/*
+	 * wait for boot cpu ready
+	 */
+	while (1) {
+		if (get_cpu_id() != 1)
+			pr_info("wait for boot cpu bootup %d\n", get_cpu_id());
+	}
+
 	sched_vcpu();
 }

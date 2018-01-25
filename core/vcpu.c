@@ -20,9 +20,9 @@ struct list_head shared_mem_list;
 static int set_up_vcpu_env(vm_t *vm, vcpu_t *vcpu)
 {
 	vcpu_context_t *c = &vcpu->context;
-	uint32_t vmid = get_vm_id(vcpu);
-	uint32_t vcpu_id = get_vcpu_id(vcpu);
-	uint32_t pcpu_id = get_pcpu_id(vcpu);
+	uint32_t vmid = vmm_get_vm_id(vcpu);
+	uint32_t vcpu_id = vmm_get_vcpu_id(vcpu);
+	uint32_t pcpu_id = vmm_get_pcpu_id(vcpu);
 
 	c->x0 = 0;
 	c->x1 = 1;
@@ -135,7 +135,7 @@ static int parse_all_vms(void)
 	return 0;
 }
 
-static vm_t *vm_get_vm(uint32_t vmid)
+vm_t *vmm_get_vm(uint32_t vmid)
 {
 	int i;
 	vm_t *vm;
@@ -147,6 +147,20 @@ static vm_t *vm_get_vm(uint32_t vmid)
 	}
 
 	return NULL;
+}
+
+vcpu_t *vmm_get_vcpu(uint32_t vmid, uint32_t vcpu_id)
+{
+	vm_t *vm;
+
+	vm = vmm_get_vm(vmid);
+	if (!vm)
+		return NULL;
+
+	if (vcpu_id >= vm->vcpu_nr)
+		return NULL;
+
+	return vm->vcpus[vcpu_id];
 }
 
 static int parse_vm_memory(void)
@@ -192,7 +206,7 @@ static int parse_vm_memory(void)
 			else
 				m_reg->type = MEM_TYPE_IO;
 
-			vm = vm_get_vm(tmp->vmid);
+			vm = vmm_get_vm(tmp->vmid);
 			if (!vm) {
 				pr_error("Can not find the vm for the vmid:%d\n", tmp->vmid);
 				continue;
@@ -289,10 +303,10 @@ static int vm_state_init(vm_t *vm)
 	for (i = 0; i < vm->vcpu_nr; i++) {
 		vcpu = vm->vcpus[i];
 		set_up_vcpu_env(vm, vcpu);
-		if (get_vcpu_id(vcpu) == 0)
-			set_vcpu_state(vcpu, VCPU_STATE_READY);
+		if (vmm_get_vcpu_id(vcpu) == 0)
+			vmm_set_vcpu_state(vcpu, VCPU_STATE_READY);
 		else
-			set_vcpu_state(vcpu, VCPU_STATE_STOP);
+			vmm_set_vcpu_state(vcpu, VCPU_STATE_STOP);
 	}
 
 	return 0;
@@ -313,7 +327,6 @@ static int vm_do_init_vms(void)
 
 	return 0;
 }
-
 
 int init_vms(void)
 {

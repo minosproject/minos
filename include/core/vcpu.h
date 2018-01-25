@@ -86,33 +86,31 @@ typedef struct vmm_vcpu {
 	struct list_head pcpu_list;
 } vcpu_t __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
-
-vcpu_t *create_vcpu(vm_t *vm, int index, boot_vm_t func,
-		uint32_t affinity, phy_addr_t entry_point);
-
-static vcpu_state_t inline get_vcpu_state(vcpu_t *vcpu)
+static vcpu_state_t inline vmm_get_vcpu_state(vcpu_t *vcpu)
 {
 	return vcpu->state;
 }
 
-static void inline set_vcpu_state(vcpu_t *vcpu, vcpu_state_t state)
+static void inline vmm_set_vcpu_state(vcpu_t *vcpu, vcpu_state_t state)
 {
 	vcpu->state = state;
 }
 
-static uint32_t inline get_vcpu_id(vcpu_t *vcpu)
+static uint32_t inline vmm_get_vcpu_id(vcpu_t *vcpu)
 {
 	return vcpu->vcpu_id;
 }
 
-static uint32_t inline get_vm_id(vcpu_t *vcpu)
+static uint32_t inline vmm_get_vm_id(vcpu_t *vcpu)
 {
 	return (vcpu->vm_belong_to->vmid);
 }
 
-static uint32_t inline get_pcpu_id(vcpu_t *vcpu)
+static uint32_t inline vmm_get_pcpu_id(vcpu_t *vcpu)
 {
 	return vcpu->pcpu_affinity;
 }
+
+vcpu_t *vmm_get_vcpu(uint32_t vmid, uint32_t vcpu_id);
 
 #endif

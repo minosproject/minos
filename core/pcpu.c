@@ -102,7 +102,7 @@ static vcpu_t *find_vcpu_to_run(pcpu_t *pcpu)
 
 	list_for_each(&pcpu->vcpu_list, list) {
 		vcpu = list_entry(list, vcpu_t, pcpu_list);
-		if (get_vcpu_state(vcpu) == VCPU_STATE_READY)
+		if (vmm_get_vcpu_state(vcpu) == VCPU_STATE_READY)
 			return vcpu;
 	}
 

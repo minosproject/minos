@@ -44,4 +44,6 @@
 	#define MMU_TTB_LEVEL2_SIZE	((CONFIG_MAX_PHYSICAL_SIZE >> 30) << 12)
 #endif
 
+#define CONFIG_MAX_IRQ			(512)
+
 #endif

@@ -11,6 +11,14 @@ struct vmm_memory_region {
 	char *name;
 };
 
+struct irq_config {
+	uint32_t hno;
+	uint32_t vno;
+	uint32_t vmid;
+	uint32_t affinity;
+	char *name;
+};
+
 typedef struct vmm_vm_entry {
 	uint32_t vmid;
 	char *name;
@@ -23,6 +31,8 @@ typedef struct vmm_vm_entry {
 
 uint32_t get_mem_config_size(void);
 void *get_mem_config_data(void);
+int get_irq_config_size(void);
+void *get_irq_config_table(void);
 
 #define __vmm_vm__	__attribute__((section(".__vmm_vm")))
 

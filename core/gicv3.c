@@ -45,12 +45,18 @@ void disable_gicd(uint32_t flags)
 void sync_are_in_gicd(int flags, uint32_t dosync)
 {
 	if (dosync) {
+		/*
+		 * other cpu check whether ARE is ok
+		 */
 		uint32_t tmask = GICD_CTLR_ARE_S | GICD_ARE_NS;
 		uint32_t tval = flags & tmask;
 
 		while ((ioread32(gicd_base + GICD_CTLR) & tmask) != tval);
 
 	} else {
+		/*
+		 * boot cpu enable the ARE
+		 */
 		spin_lock(&gicd_lock);
 		iowrite32(gicd_base + GICD_CTLR, flags);
 		spin_unlock(&gicd_lock);
@@ -276,7 +282,7 @@ void set_private_int_sec_block(int group)
 	iowrite32(gicr_sgi_base() + GICR_IGRPMODR0, groupmod);
 }
 
-void gicv3_init(void)
+void gic_global_init(void)
 {
 	int i;
 	unsigned long rbase;
