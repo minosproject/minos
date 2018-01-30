@@ -6,7 +6,7 @@
 
 #include <asm/v8_mmu.h>
 #include <asm/armv8_common.h>
-#include <asm/GICv3_aliases.h>
+#include <asm/gicv3_reg.h>
 #include <config/mvisor_config.h>
 
 	.section __start_up, "ax"

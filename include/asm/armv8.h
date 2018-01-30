@@ -9,7 +9,7 @@
 
 #include <core/types.h>
 #include <asm/armv8_common.h>
-#include <asm/GICv3_aliases.h>
+#include <asm/gicv3_reg.h>
 
 #define _DEFINE_SYSREG_READ_FUNC(_name, _reg_name)		\
 static inline uint64_t read_ ## _name(void)			\
@@ -342,5 +342,26 @@ DEFINE_RENAME_SYSREG_WRITE_FUNC(icc_sgi0r_el1, ICC_SGI0R_EL1)
 
 #define read_cpacr()		read_cpacr_el1()
 #define write_cpacr(_v)		write_cpacr_el1(_v)
+
+#define READ_SYSREG32(name) ({                          \
+    uint32_t _r;                                        \
+    asm volatile("mrs  %0, "stringify(name) : "=r" (_r));         \
+    _r; })
+#define WRITE_SYSREG32(v, name) do {                    \
+    uint32_t _r = v;                                    \
+    asm volatile("msr "stringify(name)", %0" : : "r" (_r));       \
+} while (0)
+
+#define WRITE_SYSREG64(v, name) do {                    \
+    uint64_t _r = v;                                    \
+    asm volatile("msr "stringify(name)", %0" : : "r" (_r));       \
+} while (0)
+#define READ_SYSREG64(name) ({                          \
+    uint64_t _r;                                        \
+    asm volatile("mrs  %0, "stringify(name) : "=r" (_r));         \
+    _r; })
+
+#define READ_SYSREG(name)     READ_SYSREG64(name)
+#define WRITE_SYSREG(v, name) WRITE_SYSREG64(v, name)
 
 #endif

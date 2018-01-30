@@ -1,6 +1,8 @@
 #ifndef _MVISOR_GICV3_H_
 #define _MVISOR_GICV3_H_
 
+#include <asm/gicv3_reg.h>
+
 #if 0
 #define GICD_CTLR_ENABLE_GRP0		(1 << 0)
 #define GICD_CTLR_ENABLE_GRP1NS		(1 << 1)
@@ -57,36 +59,6 @@
 #define GICD_SPENDSGIR			(0x0f20)
 #define GICD_IROUTER			(0x6000)
 
-#define GICD_ISENABLER_OFFSET(id) \
-	(GICD_ISENABLER + (((id >> 5) & 0x1f)) * sizeof(uint32_t))
-
-#define GICD_ICENABLER_OFFSET(id) \
-	(GICD_ICENABLER + (((id >> 5) & 0x1f)) * sizeof(uint32_t))
-
-#define GICD_IPRIORITYR_OFFSET(id) \
-	(GICD_IPRIORITYR + (id & 1023) * sizeof(uint8_t))
-
-#define GICD_IROUTER_OFFSET(id) \
-	(GICD_IROUTER + (id & 1023) * sizeof(uint64_t))
-
-#define GICD_ITARGETSR_OFFSET(id) \
-	(GICD_ITARGETSR + (id & 1023) * sizeof(uint8_t))
-
-#define GICD_ICFGR_OFFSET(id) \
-	(GICD_ICFGR + (id & 63) * sizeof(uint32_t))
-
-#define GICD_ISPENDR_OFFSET(id) \
-	(GICD_ISPENDR + (id & 31) * sizeof(uint32_t))
-
-#define GICD_ICPENDR_OFFSET(id) \
-	(GICR_ICPENDR + (id & 31) * sizeof(uint32_t))
-
-#define GICD_IGROUPR_OFFSET(id) \
-	(GICD_IGROUPR + (id & 31) * sizeof(uint32_t))
-
-#define GICD_IGRPMODR_OFFSET(id) \
-	(GICD_IGRPMODR + (id & 31) * sizeof(uint32_t))
-
 #define GICR_CTLR			(0x0000)
 #define GICR_IIDR			(0x0004)
 #define GICR_TYPER			(0x0008)
@@ -106,24 +78,17 @@
 #define GICR_IGROUPR0			(0x0080)
 #define GICR_ISENABLER			(0x0100)
 #define GICR_ICENABLER			(0x0180)
-#define GICR_ISPENDR			(0x0200)
-#define GICR_ICPENDR			(0x0280)
-#define GICR_ISACTIVER			(0x0300)
-#define GICR_ICACTIVER			(0x0380)
-#define GICR_IPRIORITYR			(0x0400)
-#define GICR_ICNOFGR			(0x0c00)
+#define GICR_ISPENDR0			(0x0200)
+#define GICR_ICPENDR0			(0x0280)
+#define GICR_ISACTIVER0			(0x0300)
+#define GICR_ICACTIVER0			(0x0380)
+#define GICR_IPRIORITYR0		(0x0400)
+#define GICR_ICFGR0			(0x0c00)
+#define GICR_ICFGR1			(0x0c04)
 #define GICR_IGRPMODR0			(0x0d00)
 #define GICR_NSACR			(0x0e00)
 
-#define GICR_IPRIORITYR_OFFSET(id) \
-	(GICR_IPRIORITYR + ((id & 0x1f) * 8))
-
-static inline uint64_t gicv3_pack_affinity(uint32_t aff3,
-		uint32_t aff2, uint32_t aff1, uint32_t aff0)
-{
-	return ((((uint64_t)aff3 & 0xff) << 32) |
-		((aff2 & 0xff) << 16) |
-		((aff1 & 0xff) << 8) | aff0);
-}
+#define GICV3_NR_LOCAL_IRQS	(32)
+#define GICV3_NR_SGI		(16)
 
 #endif

@@ -32,8 +32,7 @@ int boot_main(void)
 	init_pcpus();
 	smp_init();
 	init_vms();
-	gic_global_init();
-	gic_local_init();
+	gic_init();
 	vmm_irqs_init();
 
 	/*
@@ -65,7 +64,7 @@ int boot_secondary(void)
 	get_per_cpu(cpu_id, cpuid) = cpuid;
 	pr_info("cpu-%d is up\n", cpuid);
 
-	gic_local_init();
+	gic_secondary_init();
 
 	sched_vcpu();
 }

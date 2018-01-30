@@ -1,5 +1,4 @@
 #include <core/core.h>
-#include <asm/gicv3.h>
 #include <core/irq.h>
 #include <config/vm_config.h>
 #include <core/vcpu.h>

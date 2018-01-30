@@ -1,45 +1,35 @@
 #ifndef _MVISOR_GIC_H_
 #define _MVISOR_GIC_H_
 
-#include <asm/gicv3.h>
+#include <core/gicv3.h>
 
-int gic_gicd_global_init(void);
-int gic_gicr_global_init(void);
+/**
+ * IRQ line type.
+ *
+ * IRQ_TYPE_NONE            - default, unspecified type
+ * IRQ_TYPE_EDGE_RISING     - rising edge triggered
+ * IRQ_TYPE_EDGE_FALLING    - falling edge triggered
+ * IRQ_TYPE_EDGE_BOTH       - rising and falling edge triggered
+ * IRQ_TYPE_LEVEL_HIGH      - high level triggered
+ * IRQ_TYPE_LEVEL_LOW       - low level triggered
+ * IRQ_TYPE_LEVEL_MASK      - Mask to filter out the level bits
+ * IRQ_TYPE_SENSE_MASK      - Mask for all the above bits
+ * IRQ_TYPE_INVALID         - Use to initialize the type
+ */
+#define IRQ_TYPE_NONE           	0x00000000
+#define IRQ_TYPE_EDGE_RISING    	0x00000001
+#define IRQ_TYPE_EDGE_FALLING  		0x00000002
+#define IRQ_TYPE_EDGE_BOTH                           \
+    (IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING)
+#define IRQ_TYPE_LEVEL_HIGH     	0x00000004
+#define IRQ_TYPE_LEVEL_LOW      	0x00000008
+#define IRQ_TYPE_LEVEL_MASK                          \
+    (IRQ_TYPE_LEVEL_LOW | IRQ_TYPE_LEVEL_HIGH)
+#define IRQ_TYPE_SENSE_MASK     	0x0000000f
 
-void config_gicd(uint32_t value);
-void enable_gicd(uint32_t flags);
-void disable_gicd(uint32_t flags);
-void sync_are_in_gicd(int flags, uint32_t dosync);
-void enable_spi(uint32_t id);
-void disable_spi(uint32_t id);
-void set_spi_int_priority(uint32_t id, uint32_t priority);
-uint32_t get_spi_int_priority(uint32_t id);
-void set_spi_int_route(uint32_t id, uint32_t affinity, uint64_t mode);
-void set_spi_int_target(uint32_t id, uint32_t target);
-uint32_t get_spi_int_target(uint32_t id);
-void config_spi_int(uint32_t id, uint32_t config);
-void set_spi_int_pending(uint32_t id);
-void clear_spi_int_pending(uint32_t id);
-uint32_t get_spi_int_pending(uint32_t id);
-void set_spi_int_sec(uint32_t id, int group);
-void set_spi_int_sec_block(uint32_t block, uint32_t group);
-void set_spi_int_sec_all(uint32_t group);
-uint64_t get_spi_route(uint32_t id);
+#define IRQ_TYPE_INVALID        	0x00000010
 
-void wakeup_gicr(void);
-void enable_private_int(uint32_t id);
-void set_private_int_priority(uint32_t id, uint32_t priority);
-uint32_t get_private_int_priority(uint32_t id);
-void set_private_int_pending(uint32_t id);
-void clear_private_int_pending(uint32_t id);
-uint32_t get_private_int_pending(uint32_t id);
-void set_private_int_sec(uint32_t id, int group);
-void set_private_int_sec_block(int group);
-
-int gic_local_init(void);
-int gic_global_init(void);
-
-void send_sgi_int_to_cpu(uint32_t cpu, uint8_t intid);
-void send_sgi_int_to_all(uint8_t intid);
+void gic_init(void);
+void gic_secondary_init(void);
 
 #endif
