@@ -42,13 +42,19 @@ _start:
 	mrs	x0, MIDR_EL1
 	msr	VPIDR_EL2, x0
 
-	bl 	get_cpu_id
-	mov	x19, x0
+	/* get the cpu id to x19 */
+	mrs	x19, MPIDR_EL1
+	ubfx	x19, x19, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
 
 	msr	CPTR_EL3, xzr
 
 	mov	x0, #0
 	msr	SCTLR_EL3, x0
+
+	mov	x0, #0xff
+	msr	ICC_PMR_EL1, x0
+
+	cbnz	x19, drop_to_el2
 
 	.global drop_to_el2
 drop_to_el2:
@@ -88,9 +94,9 @@ el2_entry_aarch64:
 	sub	x2, x2, x0
 	bl	memset
 
-	// enable interrupt
-
 	b	boot_main
 
 secondary_start_up:
+	/* here wait for boot cpu finish tht init work */
 	b	boot_secondary
+

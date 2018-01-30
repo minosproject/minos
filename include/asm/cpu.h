@@ -5,8 +5,6 @@
 #ifndef _MVISOR_CPU_H_
 #define _MVISOR_CPU_H_
 
-#include <core/types.h>
-
 #define AARCH64_SPSR_EL3h 0b1101
 #define AARCH64_SPSR_EL3t 0b1100
 #define AARCH64_SPSR_EL2h 0b1001
@@ -25,13 +23,5 @@
 #define AARCH64_SPSR_C  (1 << 29)
 #define AARCH64_SPSR_Z  (1 << 30)
 #define AARCH64_SPSR_N  (1 << 31)
-
-int get_cpu_id(void);
-
-static inline uint64_t
-generate_vcpu_id(uint32_t pcpu_id, uint32_t vm_id, uint32_t vcpu_id)
-{
-	return ((vcpu_id) | (vm_id << 8) | (pcpu_id << 16));
-}
 
 #endif

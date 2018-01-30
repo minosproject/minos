@@ -3,6 +3,7 @@
 #include <core/exception.h>
 #include <core/core.h>
 #include <asm/armv8.h>
+#include <core/smp.h>
 
 static unsigned long ec_unknown_handler(uint32_t iss, uint32_t il, void *arg)
 {

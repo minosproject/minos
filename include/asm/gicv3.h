@@ -1,15 +1,22 @@
 #ifndef _MVISOR_GICV3_H_
 #define _MVISOR_GICV3_H_
 
+#if 0
 #define GICD_CTLR_ENABLE_GRP0		(1 << 0)
 #define GICD_CTLR_ENABLE_GRP1NS		(1 << 1)
 #define GICD_CTLR_ENABLE_GRP1A		(1 << 1)
 #define GICD_CTLR_ENABLE_GRP1S		(1 << 2)
 #define GICD_CTLR_ENABLE_ALL		((1 << 0) | (1 << 1) | (1 << 2))
 #define GICD_CTLR_ARE_S			(1 << 4)
-#define GICD_ARE_NS			(1 << 5)
-#define GICD_DS				(1 << 6)
-#define GICD_E1NWF			(1 << 7)
+#define GICD_CTLR_ARE_NS		(1 << 5)
+#define GICD_CTLR_DS			(1 << 6)
+#define GICD_CTLR_E1NWF			(1 << 7)
+#else /* for no-secure access */
+#define GICD_CTLR_ENABLE_GRP1		(0 << 1)
+#define GICD_CTLR_ENABLE_GRP1A		(1 << 1)
+#define GICD_CTLR_ARE_NS		(1 << 4)
+#endif
+
 
 #define GICD_IROUTER_MODE_SPECIFIC	(0)
 #define GICD_IROUTER_MODE_ANY		(1 << 31)

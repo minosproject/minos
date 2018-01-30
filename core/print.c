@@ -181,10 +181,8 @@ int level_print(const char *fmt, ...)
 {
 	char ch;
 	va_list arg;
-	int printed;
+	int printed, i;
 	char *buf;
-
-	buffer[0] = 0;
 
 	ch = *fmt;
 	if (is_digit(ch)) {
@@ -210,7 +208,7 @@ int level_print(const char *fmt, ...)
 	 */
 	//update_log_buffer(buffer, printed);
 	buf = buffer;
-	while (*buf) {
+	for(i = 0; i < printed; i++) {
 		uart_putc(*buf);
 		buf++;
 	}

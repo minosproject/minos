@@ -4,6 +4,9 @@
 
 #include <asm/cpu.h>
 #include <core/core.h>
+#include <core/gic.h>
+#include <asm/armv8.h>
+#include <core/percpu.h>
 
 extern int init_mem_block(void);
 extern void init_pcpus(void);
@@ -11,6 +14,8 @@ extern void init_vms(void);
 extern int log_buffer_init(void);
 extern void sched_vcpu(void);
 extern void el2_stage2_vmsa_init(void);
+extern void vmm_irqs_init(void);
+extern void smp_init(void);
 
 int boot_main(void)
 {
@@ -25,16 +30,16 @@ int boot_main(void)
 	init_mem_block();
 	el2_stage2_vmsa_init();
 	init_pcpus();
+	smp_init();
 	init_vms();
-	//gic_global_init();
-	//gic_local_init();
+	gic_global_init();
+	gic_local_init();
 	vmm_irqs_init();
 
 	/*
-	 * now we can power on other cpu core
+	 * wake up other cpus
 	 */
-	for (i = 1; i < CONFIG_NUM_OF_CPUS; i++)
-		power_on_cpu_core();
+	smp_cpus_up();
 
 	sched_vcpu();
 
@@ -43,15 +48,24 @@ int boot_main(void)
 
 int boot_secondary(void)
 {
-	//gic_local_init();
+	uint32_t cpuid = get_cpu_id();
+	uint64_t mid;
+	uint64_t mpidr;
 
 	/*
-	 * wait for boot cpu ready
+	 * here wait up bootup cpu to wakeup us
 	 */
-	while (1) {
-		if (get_cpu_id() != 1)
-			pr_info("wait for boot cpu bootup %d\n", get_cpu_id());
+	mpidr = read_mpidr_el1() & MPIDR_ID_MASK;
+	for (;;) {
+		mid = smp_holding_pen[cpuid];
+		if (mpidr == mid)
+			break;
 	}
+
+	get_per_cpu(cpu_id, cpuid) = cpuid;
+	pr_info("cpu-%d is up\n", cpuid);
+
+	gic_local_init();
 
 	sched_vcpu();
 }

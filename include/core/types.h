@@ -70,6 +70,9 @@ typedef uint32_t		phy_addr_t;
 #define ALIGN(num, size)	((num) & ~(size - 1))
 #define BALIGN(num, size)	(((num) + (size - 1)) & ~(size - 1))
 
+#define stringify_no_expansion(x) #x
+#define stringify(x) stringify_no_expansion(x)
+
 #define SIZE_1G		(0x40000000)
 #define SIZE_4K		(0x1000)
 #define SIZE_1M		(0x100000)

@@ -9,6 +9,7 @@
 #include <core/spinlock.h>
 #include <core/errno.h>
 #include <core/panic.h>
+#include <core/smp.h>
 #include <core/varlist.h>
 
 #endif
