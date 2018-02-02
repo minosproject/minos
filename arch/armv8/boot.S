@@ -34,6 +34,11 @@ _start:
 	msr	SCR_EL3, x3
 	isb
 
+	mov	x0, #15
+	msr	ICC_SRE_EL2, x0
+	isb
+	msr	ICC_SRE_EL1, X0
+
 	/*
 	 * init the vmpidr
 	 */
@@ -51,10 +56,16 @@ _start:
 	mov	x0, #0
 	msr	SCTLR_EL3, x0
 
-	mov	x0, #0xff
-	msr	ICC_PMR_EL1, x0
+	ldr	x0, =__el3_stack_end
+	sub	x0, x0, x19, lsl #12
+	mov	sp, x0
+
+	/* do the gic setting for el3 */
+	bl	gic_init_el3
 
 	cbnz	x19, drop_to_el2
+
+	/* do other init things */
 
 	.global drop_to_el2
 drop_to_el2:

@@ -90,6 +90,13 @@ SECTIONS
 		__el2_stack_end = .;
 	}
 
+	.el3_stack (NOLOAD): {
+		. = ALIGN(64);
+		__el3_stack = .;
+		. = . + (CONFIG_NUM_OF_CPUS * 0x1000);
+		__el3_stack_end = .;
+	}
+
 	. = ALIGN(4096);
 
 	__percpu_start = .;

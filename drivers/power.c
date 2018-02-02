@@ -2,7 +2,7 @@
 #include <drivers/power.h>
 #include <core/io.h>
 
-static uint64_t pc_base = 0x1c10000;
+static void *pc_base = (void *)0x1c10000;
 
 void power_on_cpu_core(uint8_t aff0,
 		uint8_t aff1, uint8_t aff2)

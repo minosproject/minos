@@ -306,7 +306,6 @@ DEFINE_RENAME_SYSREG_READ_FUNC(icc_iar0_el1, ICC_IAR0_EL1)
 DEFINE_RENAME_SYSREG_READ_FUNC(icc_iar1_el1, ICC_IAR1_EL1)
 DEFINE_RENAME_SYSREG_WRITE_FUNC(icc_eoir0_el1, ICC_EOIR0_EL1)
 DEFINE_RENAME_SYSREG_WRITE_FUNC(icc_eoir1_el1, ICC_EOIR1_EL1)
-DEFINE_RENAME_SYSREG_WRITE_FUNC(icc_sgi0r_el1, ICC_SGI0R_EL1)
 
 
 #define IS_IN_EL(x) \
@@ -343,25 +342,38 @@ DEFINE_RENAME_SYSREG_WRITE_FUNC(icc_sgi0r_el1, ICC_SGI0R_EL1)
 #define read_cpacr()		read_cpacr_el1()
 #define write_cpacr(_v)		write_cpacr_el1(_v)
 
-#define READ_SYSREG32(name) ({                          \
+#define read_sysreg32(name) ({                          \
     uint32_t _r;                                        \
     asm volatile("mrs  %0, "stringify(name) : "=r" (_r));         \
     _r; })
-#define WRITE_SYSREG32(v, name) do {                    \
+#define write_sysreg32(v, name) do {                    \
     uint32_t _r = v;                                    \
     asm volatile("msr "stringify(name)", %0" : : "r" (_r));       \
 } while (0)
 
-#define WRITE_SYSREG64(v, name) do {                    \
+#define write_sysreg64(v, name) do {                    \
     uint64_t _r = v;                                    \
     asm volatile("msr "stringify(name)", %0" : : "r" (_r));       \
 } while (0)
-#define READ_SYSREG64(name) ({                          \
+#define read_sysreg64(name) ({                          \
     uint64_t _r;                                        \
     asm volatile("mrs  %0, "stringify(name) : "=r" (_r));         \
     _r; })
 
-#define READ_SYSREG(name)     READ_SYSREG64(name)
-#define WRITE_SYSREG(v, name) WRITE_SYSREG64(v, name)
+#define read_sysreg(name)     read_sysreg64(name)
+#define write_sysreg(v, name) write_sysreg64(v, name)
+
+#define arch_disable_irq()	write_daifset(2)
+#define arch_enable_irq() 	write_daifclr(2)
+
+static inline unsigned long arch_save_irqflags(void)
+{
+	return	read_daif();
+}
+
+static inline void arch_restore_irqflags(unsigned long flags)
+{
+	write_daif(flags);
+}
 
 #endif

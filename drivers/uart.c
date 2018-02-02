@@ -1,7 +1,7 @@
 #include <core/io.h>
 #include <drivers/uart.h>
 
-static uint64_t base = 0x1c090000;
+static void *base = (void *)0x1c090000;
 
 void uart_init(void)
 {

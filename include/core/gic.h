@@ -3,33 +3,18 @@
 
 #include <core/gicv3.h>
 
-/**
- * IRQ line type.
- *
- * IRQ_TYPE_NONE            - default, unspecified type
- * IRQ_TYPE_EDGE_RISING     - rising edge triggered
- * IRQ_TYPE_EDGE_FALLING    - falling edge triggered
- * IRQ_TYPE_EDGE_BOTH       - rising and falling edge triggered
- * IRQ_TYPE_LEVEL_HIGH      - high level triggered
- * IRQ_TYPE_LEVEL_LOW       - low level triggered
- * IRQ_TYPE_LEVEL_MASK      - Mask to filter out the level bits
- * IRQ_TYPE_SENSE_MASK      - Mask for all the above bits
- * IRQ_TYPE_INVALID         - Use to initialize the type
- */
-#define IRQ_TYPE_NONE           	0x00000000
-#define IRQ_TYPE_EDGE_RISING    	0x00000001
-#define IRQ_TYPE_EDGE_FALLING  		0x00000002
-#define IRQ_TYPE_EDGE_BOTH                           \
-    (IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING)
-#define IRQ_TYPE_LEVEL_HIGH     	0x00000004
-#define IRQ_TYPE_LEVEL_LOW      	0x00000008
-#define IRQ_TYPE_LEVEL_MASK                          \
-    (IRQ_TYPE_LEVEL_LOW | IRQ_TYPE_LEVEL_HIGH)
-#define IRQ_TYPE_SENSE_MASK     	0x0000000f
-
-#define IRQ_TYPE_INVALID        	0x00000010
+struct vmm_irq;
 
 void gic_init(void);
 void gic_secondary_init(void);
+uint32_t gic_get_line_num(void);
+void gic_mask_irq(struct vmm_irq *vmm_irq);
+void gic_eoi_irq(struct vmm_irq *vmm_irq);
+void gic_dir_irq(struct vmm_irq *vmm_irq);
+uint32_t gic_read_irq(void);
+void gic_set_irq_type(struct vmm_irq *vmm_irq, uint32_t type);
+void gic_set_irq_priority(struct vmm_irq *vmm_irq, uint32_t pr);
+void gic_set_irq_affinity(struct vmm_irq *vmm_irq, int cpu);
+void gic_unmask_irq(struct vmm_irq *vmm_irq);
 
 #endif

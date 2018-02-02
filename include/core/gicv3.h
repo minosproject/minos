@@ -88,6 +88,32 @@
 #define GICR_IGRPMODR0			(0x0d00)
 #define GICR_NSACR			(0x0e00)
 
+#define GICH_VMCR_VENG0			(1 << 0)
+#define GICH_VMCR_VENG1			(1 << 1)
+#define GICH_VMCR_VACKCTL		(1 << 2)
+#define GICH_VMCR_VFIQEN		(1 << 3)
+#define GICH_VMCR_VCBPR			(1 << 4)
+#define GICH_VMCR_VEOIM			(1 << 9)
+
+#define GICH_HCR_EN       		(1 << 0)
+#define GICH_HCR_UIE      		(1 << 1)
+#define GICH_HCR_LRENPIE  		(1 << 2)
+#define GICH_HCR_NPIE     		(1 << 3)
+#define GICH_HCR_VGRP0EIE 		(1 << 4)
+#define GICH_HCR_VGRP0DIE 		(1 << 5)
+#define GICH_HCR_VGRP1EIE 		(1 << 6)
+#define GICH_HCR_VGRP1DIE 		(1 << 7)
+
+#define ICH_SGI_IRQMODE_SHIFT        	(40)
+#define ICH_SGI_IRQMODE_MASK         	(0x1)
+#define ICH_SGI_TARGET_OTHERS        	(1UL)
+#define ICH_SGI_TARGET_LIST          	(0)
+#define ICH_SGI_IRQ_SHIFT            	(24)
+#define ICH_SGI_IRQ_MASK             	(0xf)
+#define ICH_SGI_TARGETLIST_MASK      	(0xffff)
+#define ICH_SGI_AFFx_MASK            	(0xff)
+#define ICH_SGI_AFFINITY_LEVEL(x)    	(16 * (x))
+
 #define GICV3_NR_LOCAL_IRQS	(32)
 #define GICV3_NR_SGI		(16)
 

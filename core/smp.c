@@ -1,6 +1,7 @@
 #include <core/core.h>
 #include <config/mvisor_config.h>
 #include <core/percpu.h>
+#include <asm/armv8.h>
 
 DEFINE_PER_CPU(uint64_t, cpu_id);
 
@@ -41,6 +42,27 @@ int smp_cpu_up(uint64_t mpidr_id)
 	return 0;
 }
 
+int wait_cpus_up(void)
+{
+	int i;
+	int ok;
+
+	while (1) {
+		ok = 0;
+		for (i = 1; i < CONFIG_NUM_OF_CPUS; i++) {
+			if (smp_holding_pen[i] != 0xffff) {
+				ok = 1;
+				break;
+			}
+		}
+
+		if (!ok)
+			break;
+	}
+
+	return 0;
+}
+
 void smp_cpus_up(void)
 {
 	int i;
@@ -56,5 +78,5 @@ void smp_init(void)
 	for (i = 0; i < CONFIG_NUM_OF_CPUS; i++)
 		get_per_cpu(cpu_id, i) = 0xffff;
 
-	get_per_cpu(cpu_id, 0) = 0;
+	get_per_cpu(cpu_id, 0) = read_mpidr_el1() & MPIDR_ID_MASK;
 }

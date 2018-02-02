@@ -50,5 +50,6 @@ func switch_to_vcpu
 	sub	x0, x0, #352
 	ldr	x1, [x0, #8]
 	ldr	x0, [x0]
+	isb
 	eret
 endfunc switch_to_vcpu

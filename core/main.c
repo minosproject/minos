@@ -7,6 +7,7 @@
 #include <core/gic.h>
 #include <asm/armv8.h>
 #include <core/percpu.h>
+#include <core/irq.h>
 
 extern int init_mem_block(void);
 extern void init_pcpus(void);
@@ -39,6 +40,9 @@ int boot_main(void)
 	 * wake up other cpus
 	 */
 	smp_cpus_up();
+	enable_irq();
+	wait_cpus_up();
+	gic_send_sgi(15, SGI_TO_SELF, NULL);
 
 	sched_vcpu();
 
@@ -61,10 +65,15 @@ int boot_secondary(void)
 			break;
 	}
 
-	get_per_cpu(cpu_id, cpuid) = cpuid;
+	get_per_cpu(cpu_id, cpuid) = mpidr;
 	pr_info("cpu-%d is up\n", cpuid);
 
 	gic_secondary_init();
+	enable_irq();
+	smp_holding_pen[cpuid] = 0xffff;
+	gic_send_sgi(15, SGI_TO_SELF, NULL);
+
+	while (1);
 
 	sched_vcpu();
 }
