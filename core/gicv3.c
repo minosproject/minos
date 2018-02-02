@@ -224,17 +224,15 @@ static int gic_gicc_init(void)
 
 static int gic_hyp_init(void)
 {
-	uint64_t value;
-
 	write_sysreg32(GICH_VMCR_VEOIM | GICH_VMCR_VENG1, ICH_VMCR_EL2);
 	write_sysreg32(GICH_HCR_EN, ICH_HCR_EL2);
 
-	value = HCR_EL2_HVC | HCR_EL2_TWI | HCR_EL2_TWE | \
-		HCR_EL2_TIDCP | HCR_EL2_IMO | HCR_EL2_FMO | \
-		HCR_EL2_AMO | HCR_EL2_RW | HCR_EL2_VM;
-
-
-	write_sysreg64(value, HCR_EL2);
+	/*
+	 * set IMO and FMO let physic irq and fiq taken to
+	 * EL2, without this irq and fiq will not send to
+	 * the cpu
+	 */
+	write_sysreg64(HCR_EL2_IMO | HCR_EL2_FMO, HCR_EL2);
 	isb();
 	return 0;
 }
