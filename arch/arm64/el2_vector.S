@@ -1,5 +1,5 @@
-#include <asm/armv8_common.h>
-#include <config/mvisor_config.h>
+#include "include/aarch64_common.h"
+#include "config/config.h"
 
 	.global el2_vectors
 

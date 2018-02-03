@@ -4,12 +4,12 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef _MVISOR_ARMV8_H_
-#define _MVISOR_ARMV8_H_
+#ifndef _MVISOR_AARCH64_H_
+#define _MVISOR_AARCH64_H_
 
 #include <core/types.h>
-#include <asm/armv8_common.h>
-#include <asm/gicv3_reg.h>
+#include <asm/aarch64_common.h>
+#include <asm/gic_reg.h>
 
 #define _DEFINE_SYSREG_READ_FUNC(_name, _reg_name)		\
 static inline uint64_t read_ ## _name(void)			\
