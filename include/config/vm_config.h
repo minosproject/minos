@@ -1,7 +1,8 @@
 #ifndef _MVISOR_VM_CONFIG_H_
 #define _MVISOR_VM_CONFIG_H_
 
-#include <core/types.h>
+#include <mvisor/types.h>
+#include <config/config.h>
 
 struct vmm_memory_region {
 	phy_addr_t mem_base;
@@ -16,6 +17,7 @@ struct irq_config {
 	uint32_t vno;
 	uint32_t vmid;
 	uint32_t affinity;
+	uint32_t type;
 	char *name;
 };
 

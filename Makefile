@@ -1,4 +1,4 @@
-ARCH 		:= armv8
+ARCH 		:= aarch64
 CROSS_COMPILE 	:= aarch64-elf-
 CC 		:= $(CROSS_COMPILE)gcc
 LD 		:= $(CROSS_COMPILE)ld
@@ -9,14 +9,14 @@ QUIET ?= @
 #PLATFORM	:= fvp
 #BOARD		:= armv8-fvp
 
-INCLUDE_DIR 	:= include/core/*.h include/asm/*.h include/config/*.h include/drivers/*.h
+INCLUDE_DIR 	:= include/mvisor/*.h include/asm/*.h include/config/*.h include/drivers/*.h
 #INCLUDE_DIR 	:=
 
 CCFLAG 		:= --static -nostdlib -fno-builtin -g -march=armv8-a -I$(PWD)/include
 LDS 		:= arch/$(ARCH)/lds/vmm.ld.c
 
 OUT 		:= out
-OUT_CORE 	= $(OUT)/core
+OUT_CORE 	= $(OUT)/mvisor
 OUT_ARCH 	= $(OUT)/$(ARCH)
 OUT_VMM_VMS	= $(OUT)/vmm_vms
 OUT_DRIVERS	= $(OUT)/drivers
@@ -28,13 +28,13 @@ vmm_dump 	:= $(OUT)/vmm.s
 
 SRC_ARCH_C	:= $(wildcard arch/$(ARCH)/*.c)
 SRC_ARCH_S	:= $(wildcard arch/$(ARCH)/*.S)
-SRC_CORE	:= $(wildcard core/*.c)
+SRC_CORE	:= $(wildcard mvisor/*.c)
 SRC_VMM_VMS	:= $(wildcard vmm_vms/*.c)
 SRC_DRIVERS	:= $(wildcard drivers/*.c)
 
-VPATH		:= core:arch/$(ARCH):vmm_vms:drivers
+VPATH		:= mvisor:arch/$(ARCH):vmm_vms:drivers
 
-LDFLAG 		:= -T$(TARGET_LDS) -Map=linkmap.txt
+LDFLAG 		:= -T$(TARGET_LDS) -Map=$(OUT)/linkmap.txt
 
 .SUFFIXES:
 .SUFFIXES: .S .c

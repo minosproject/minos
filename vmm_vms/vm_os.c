@@ -2,8 +2,8 @@
  * created by Le MIn 2017/12/09
  */
 
-#include <core/types.h>
-#include <core/vcpu.h>
+#include <mvisor/types.h>
+#include <mvisor/vcpu.h>
 #include <config/vm_config.h>
 
 static int os1_boot_vm(void *vc)

@@ -1,6 +1,6 @@
-#include <core/core.h>
+#include <mvisor/mvisor.h>
 #include <drivers/power.h>
-#include <core/io.h>
+#include <mvisor/io.h>
 
 static void *pc_base = (void *)0x1c10000;
 
