@@ -4,10 +4,10 @@
  * Created by Le Min(lemin9538@163.com)
  */
 
-#include "include/mmu.h"
-#include "include/aarch64_common.h"
-#include "include/gic_reg.h"
-#include <config/config.h>
+#include <asm/v8_mmu.h>
+#include <asm/armv8_common.h>
+#include <asm/gicv3_reg.h>
+#include <config/mvisor_config.h>
 
 	.section __start_up, "ax"
 	.balign 4

@@ -1,4 +1,4 @@
-ARCH 		:= arm64
+ARCH 		:= armv8
 CROSS_COMPILE 	:= aarch64-elf-
 CC 		:= $(CROSS_COMPILE)gcc
 LD 		:= $(CROSS_COMPILE)ld
