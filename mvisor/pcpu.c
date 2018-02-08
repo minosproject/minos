@@ -5,7 +5,7 @@
 #include <mvisor/percpu.h>
 
 static pcpu_t pcpus[CONFIG_NR_CPUS];
-extern void switch_to_vcpu(vcpu_context_t *context);
+extern void switch_to_vcpu(pt_regs *regs);
 
 extern unsigned char __percpu_start;
 extern unsigned char __percpu_end;
@@ -125,7 +125,7 @@ void sched_vcpu(void)
 		 */
 	} else {
 		get_cpu_var(running_vcpu) = vcpu;
-		switch_to_vcpu(&vcpu->context);
+		//switch_to_vcpu(&vcpu->context);
 		/*
 		 * should never return here
 		 */

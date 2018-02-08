@@ -9,7 +9,7 @@
 
 #include <mvisor/types.h>
 #include <asm/aarch64_common.h>
-#include <drivers/gic_reg.h>
+#include <asm/gic_reg.h>
 
 #define _DEFINE_SYSREG_READ_FUNC(_name, _reg_name)		\
 static inline uint64_t read_ ## _name(void)			\

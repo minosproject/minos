@@ -5,13 +5,13 @@
 #include <mvisor/mm.h>
 #include <config/config.h>
 #include <mvisor/device_id.h>
+#include <mvisor/module.h>
 
 uint32_t irq_nums;
 static struct vmm_irq **irq_table;
 typedef uint32_t (*get_nr_t)(void);
 
-#define NR_IRQ_CHIPS	4
-struct irq_chip *irq_chips[NR_IRQ_CHIPS];
+struct irq_chip *irq_chip;
 
 static void parse_all_irqs(void)
 {
@@ -101,44 +101,17 @@ int vmm_alloc_irqs(uint32_t start,
 	return 0;
 }
 
-int register_irq_chip(struct irq_chip *chip)
-{
-	int i;
-
-	for (i = 0; i < NR_IRQ_CHIPS; i++) {
-		if (irq_chips[i])
-			continue;
-
-		irq_chips[i] = chip;
-		return 0;
-	}
-
-	return -EINVAL;
-}
-
-struct irq_chip_id *get_irq_chip_id(char *name)
-{
-
-}
-
 int vmm_irq_init(void)
 {
 	uint32_t size;
 	char *chip_name = CONFIG_IRQ_CHIP_NAME;
-	struct irq_chip_id *chip_id;
-	get_nr_t fn;
 
-	memset((char *)irq_chips, 0, NR_IRQ_CHIPS * sizeof(struct irq_chip *));
+	irq_chip = (struct irq_chip *)vmm_get_module_pdata(chip_name,
+			VMM_MODULE_NAME_IRQCHIP);
+	if (!irq_chip)
+		panic("can not find the irqchip for system\n");
 
-	chip_id = get_irq_chip_id(chip_name);
-	if (!chip_id)
-		panic("Can not find irq chip for mvisor\n");
-
-	irq_nums = 512;
-	if (chip_id->data) {
-		fn = (get_nr_t)chip_id->data;
-		irq_nums = fn();
-	}
+	irq_nums = irq_chip->irq_num;
 
 	size = irq_nums * sizeof(struct vmm_irq *);
 	irq_table = (struct vmm_irq **)vmm_malloc(size);
@@ -148,12 +121,22 @@ int vmm_irq_init(void)
 	memset((char *)irq_table, 0, size);
 
 	/*
-	 * now init the irqchip
+	 * now init the irqchip, and in the irq chip
+	 * the chip driver need to alloc the irq it
+	 * need used in the ssystem
 	 */
-	if (!chip_id->init)
-		panic("Can not init the irq chip\n");
+	if (irq_chip->init)
+		irq_chip->init();
 
-	chip_id->init();
+	parse_all_irqs();
+
+	return 0;
+}
+
+int vmm_irq_secondary_init(void)
+{
+	if (irq_chip)
+		irq_chip->secondary_init();
 
 	return 0;
 }

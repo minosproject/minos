@@ -49,6 +49,8 @@ struct irq_chip {
 	int (*irq_set_type)(struct vmm_irq *data, unsigned int flow_type);
 	int (*irq_set_priority)(struct vmm_irq *data, uint32_t pr);
 	void (*send_sgi)(struct vmm_irq *data, enum sgi_mode mode, cpumask_t *mask);
+	int (*init)(void);
+	int (*secondary_init)(void);
 };
 
 /*
@@ -74,13 +76,5 @@ struct vmm_irq {
 int vmm_alloc_irqs(uint32_t start,
 		uint32_t end, unsigned long flags);
 int register_irq_chip(struct irq_chip *chip);
-
-#define IRQCHIP_DECLARE(name, compstr, init_fn, fn) \
-	static const struct irq_chip_id irqchip_of_match_##name \
-	__section(__irq_chip) = { \
-		.compatible = compstr,\
-		.init = init_fn, \
-		.data = fn, \
-	}
 
 #endif

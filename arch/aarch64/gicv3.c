@@ -4,12 +4,17 @@
 #include <mvisor/spinlock.h>
 #include <mvisor/irq.h>
 #include <mvisor/print.h>
-#include <drivers/gicv3.h>
+#include <asm/gicv3.h>
 #include <mvisor/errno.h>
+#include <mvisor/module.h>
 
 spinlock_t gicv3_lock;
 static void *gicd_base = (void *)0x2f000000;
 static void * __gicr_rd_base = (void *)0x2f100000;
+
+struct gicv3_context {
+
+};
 
 DEFINE_PER_CPU(void *, gicr_rd_base);
 DEFINE_PER_CPU(void *, gicr_sgi_base);
@@ -267,15 +272,20 @@ static int gicv3_gicr_init(void)
 	return 0;
 }
 
-static struct irq_chip gicv3_chip = {
-	.irq_mask 		= gicv3_mask_irq,
-	.irq_unmask 		= gicv3_unmask_irq,
-	.irq_eoi 		= gicv3_eoi_irq,
-	.irq_set_type 		= gicv3_set_irq_type,
-	.irq_set_affinity 	= gicv3_set_irq_affinity,
-	.send_sgi		= gicv3_send_sgi,
-	.irq_set_priority	= gicv3_set_irq_priority,
-};
+static void gicv3_state_save(vcpu_t *vcpu, void *context)
+{
+
+}
+
+static void gicv3_state_restore(vcpu_t *vcpu, void *context)
+{
+
+}
+
+static void gicv3_state_init(vcpu_t *vcpu, void *context)
+{
+
+}
 
 void gic_init_el3(void)
 {
@@ -342,13 +352,6 @@ int gicv3_init(void)
 	type = ioread32(gicd_base + GICD_TYPER);
 	nr_lines = 32 * ((type & 0x1f));
 
-	gicv3_chip.irq_start = 0;
-	gicv3_chip.irq_num = nr_lines;
-	if (register_irq_chip(&gicv3_chip)) {
-		pr_error("register gicv3 irq chip failed\n");
-		return -EINVAL;
-	}
-
 	/* alloc LOCAL_IRQS for each cpus */
 	vmm_alloc_irqs(0, 31, 1);
 
@@ -388,7 +391,7 @@ int gicv3_init(void)
 	spin_unlock(&gicv3_lock);
 }
 
-void gic_secondary_init(void)
+int gicv3_secondary_init(void)
 {
 	spin_lock(&gicv3_lock);
 
@@ -399,4 +402,36 @@ void gic_secondary_init(void)
 	spin_unlock(&gicv3_lock);
 }
 
-IRQCHIP_DECLARE(gicv3, "gicv3", gicv3_init, (void *)gicv3_get_irq_num);
+static struct irq_chip gicv3_chip = {
+	.irq_mask 		= gicv3_mask_irq,
+	.irq_unmask 		= gicv3_unmask_irq,
+	.irq_eoi 		= gicv3_eoi_irq,
+	.irq_set_type 		= gicv3_set_irq_type,
+	.irq_set_affinity 	= gicv3_set_irq_affinity,
+	.send_sgi		= gicv3_send_sgi,
+	.irq_set_priority	= gicv3_set_irq_priority,
+	.init			= gicv3_init,
+	.secondary_init		= gicv3_secondary_init,
+};
+
+static int gicv3_module_init(struct vmm_module *module)
+{
+	uint32_t type, nr_lines;
+
+	type = ioread32(gicd_base + GICD_TYPER);
+	nr_lines = 32 * ((type & 0x1f));
+
+	gicv3_chip.irq_start = 0;
+	gicv3_chip.irq_num = nr_lines;
+
+	module->context_size = sizeof(struct gicv3_context);
+	module->pdata = (void *)&gicv3_chip;
+	module->state_init = gicv3_state_init;
+	module->state_save = gicv3_state_save;
+	module->state_restore = gicv3_state_restore;
+
+	return 0;
+}
+
+VMM_MODULE_DECLARE(gicv3, "gicv3",
+	"irq_chip", (void *)gicv3_module_init);

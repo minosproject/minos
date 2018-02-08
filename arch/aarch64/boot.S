@@ -6,7 +6,7 @@
 
 #include <asm/asm_mmu.h>
 #include <asm/aarch64_common.h>
-#include <drivers/gic_reg.h>
+#include <asm/gic_reg.h>
 #include <config/config.h>
 
 	.section __start_up, "ax"

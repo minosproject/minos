@@ -23,11 +23,11 @@ SECTIONS
 
 	. = ALIGN(8);
 
-	__irq_chip_start = .;
-	.__irq_chip : {
-		*(.__irq_chip)
+	__vmm_module_start = .;
+	.__vmm_module : {
+		*(.__vmm_module)
 	}
-	__irq_chip_end = .;
+	__vmm_module_end = .;
 
 	. = ALIGN(8);
 

@@ -18,7 +18,7 @@ static char *free_4k_base = 0;
 extern unsigned char __code_start;
 extern unsigned char __code_end;
 
-int mm_init(void)
+int vmm_mm_init(void)
 {
 	size_t size;
 

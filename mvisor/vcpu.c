@@ -4,6 +4,7 @@
 #include <mvisor/pcpu.h>
 #include <config/vm_config.h>
 #include <config/config.h>
+#include <mvisor/module.h>
 
 extern unsigned char __vmm_vm_start;
 extern unsigned char __vmm_vm_end;
@@ -12,73 +13,7 @@ static vm_t *vms[CONFIG_MAX_VM];
 static uint32_t total_vms = 0;
 
 struct list_head shared_mem_list;
-
-#ifdef CONFIG_ARM_AARCH64
-
-static int set_up_vcpu_env(vm_t *vm, vcpu_t *vcpu)
-{
-	vcpu_context_t *c = &vcpu->context;
-	uint32_t vmid = vmm_get_vm_id(vcpu);
-	uint32_t vcpu_id = vmm_get_vcpu_id(vcpu);
-	uint32_t pcpu_id = vmm_get_pcpu_id(vcpu);
-
-	c->x0 = 0;
-	c->x1 = 1;
-	c->x2 = 2;
-	c->x3 = 3;
-	c->x4 = 4;
-	c->x5 = 5;
-	c->x6 = 6;
-	c->x7 = 7;
-	c->x8 = 8;
-	c->x9 = 9;
-	c->x10 = 10;
-	c->x11 = 11;
-	c->x12 = 12;
-	c->x13 = 13;
-	c->x14 = 14;
-	c->x15 = 15;
-	c->x16 = 16;
-	c->x17 = 17;
-	c->x18 = 18;
-	c->x19 = 19;
-	c->x20 = 20;
-	c->x21 = 21;
-	c->x22 = 22;
-	c->x23 = 23;
-	c->x24 = 24;
-	c->x25 = 25;
-	c->x26 = 26;
-	c->x27 = 27;
-	c->x28 = 28;
-	c->x29 = 29;
-	c->x30_lr = 30;
-	c->sp_el1 = 0x0;
-	c->elr_el2 = vcpu->entry_point;
-	c->vbar_el1 = 0;
-	c->spsr_el2 = AARCH64_SPSR_EL1h | AARCH64_SPSR_F | \
-		      AARCH64_SPSR_I | AARCH64_SPSR_A;
-	c->nzcv = 0;
-	c->esr_el1 = 0x0;
-	c->vmpidr = generate_vcpu_id(vmid, vcpu_id, pcpu_id);
-	c->sctlr_el1 = 0;
-	c->ttbr0_el1 = 0;
-	c->ttbr1_el1 = 0;
-	c->vttbr_el2 = vm->vttbr_el2_addr;
-	c->vtcr_el2 = vm->vtcr_el2;
-	c->hcr_el2 = vm->hcr_el2;
-
-	return 0;
-}
-
-#else
-
-static int set_up_vcpu_env(vm_t *vm, vcpu_t *vcpu)
-{
-
-}
-
-#endif
+struct list_head vm_list;
 
 static int vmm_add_vm(vm_entry_t *vme)
 {
@@ -107,6 +42,7 @@ static int vmm_add_vm(vm_entry_t *vme)
 	vm->index = total_vms;
 	vms[total_vms] = vm;
 	total_vms++;
+	list_add_tail(&vm_list, &vm->vm_list);
 
 	return 0;
 }
@@ -263,8 +199,8 @@ static int vm_map_memory(vm_t *vm)
 	mmu_map_memory_region_list(ttb2_addr, &shared_mem_list);
 	tcr_el2 = mmu_generate_vtcr_el2();
 
-	vm->vttbr_el2_addr = mmu_get_vttbr_el2_base(vm->vmid, ttb2_addr);
-	vm->vtcr_el2 = tcr_el2;
+	//vm->vttbr_el2_addr = mmu_get_vttbr_el2_base(vm->vmid, ttb2_addr);
+	//vm->vtcr_el2 = tcr_el2;
 
 	return 0;
 }
@@ -281,7 +217,7 @@ static void vm_config_hcrel2(vm_t *vm)
 	value = HCR_EL2_HVC | HCR_EL2_TWI | HCR_EL2_TWE | \
 		HCR_EL2_TIDCP | HCR_EL2_IMO | HCR_EL2_FMO | \
 		HCR_EL2_AMO | HCR_EL2_RW | HCR_EL2_VM;
-	vm->hcr_el2 = value;
+	//vm->hcr_el2 = value;
 }
 
 static int vm_state_init(vm_t *vm)
@@ -300,7 +236,7 @@ static int vm_state_init(vm_t *vm)
 	 */
 	for (i = 0; i < vm->vcpu_nr; i++) {
 		vcpu = vm->vcpus[i];
-		set_up_vcpu_env(vm, vcpu);
+		//set_up_vcpu_env(vm, vcpu);
 		if (vmm_get_vcpu_id(vcpu) == 0)
 			vmm_set_vcpu_state(vcpu, VCPU_STATE_READY);
 		else
@@ -315,6 +251,16 @@ static int vm_arch_init(vm_t *vm)
 	return arch_vm_init(vm);
 }
 
+static int vm_modules_init(vm_t *vm)
+{
+	int i;
+
+	for (i = 0; i < vm->vcpu_nr; i++)
+		vcpu_modules_init(vm->vcpus[i]);
+
+	return 0;
+}
+
 static int vm_do_init_vms(void)
 {
 	int i;
@@ -327,6 +273,7 @@ static int vm_do_init_vms(void)
 		//vm_config_hcrel2(vm);
 		vm_state_init(vm);
 		vm_arch_init(vm);
+		vm_modules_init(vm);
 	}
 
 	return 0;
@@ -336,6 +283,7 @@ int init_vms(void)
 {
 	int ret = 0;
 
+	init_list(&vm_list);
 	ret = parse_all_vms();
 	if (ret)
 		panic("parsing the vm fail\n");

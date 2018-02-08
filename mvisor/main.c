@@ -27,7 +27,7 @@ int boot_main(void)
 		panic("cpu is not cpu0");
 
 	arch_early_init();
-	mm_init();
+	vmm_mm_init();
 	arch_init();
 	//el2_stage2_vmsa_init();
 	init_pcpus();

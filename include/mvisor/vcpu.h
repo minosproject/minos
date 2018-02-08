@@ -21,7 +21,7 @@ typedef enum _vcpu_state_t {
 } vcpu_state_t;
 
 typedef struct vmm_vcpu {
-	vcpu_context_t context;
+	pt_regs regs;
 	uint32_t vcpu_id;
 	vcpu_state_t state;
 	vm_t *vm_belong_to;
@@ -29,6 +29,7 @@ typedef struct vmm_vcpu {
 	uint32_t pcpu_affinity;
 	uint32_t status;
 	struct list_head pcpu_list;
+	void **module_context;
 	void *arch_data;
 } vcpu_t __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
@@ -58,5 +59,7 @@ static uint32_t inline vmm_get_pcpu_id(vcpu_t *vcpu)
 }
 
 vcpu_t *vmm_get_vcpu(uint32_t vmid, uint32_t vcpu_id);
+
+int arch_vm_init(vm_t *vm);
 
 #endif

@@ -12,8 +12,3 @@ int arch_init(void)
 {
 	return 0;
 }
-
-int arch_vm_init(vm_t *vm)
-{
-
-}

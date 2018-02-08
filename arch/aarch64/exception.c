@@ -278,7 +278,7 @@ uint64_t sync_el2_handler(vcpu_t *vcpu)
 	ret = ec->handler(iss, il, (void *)vcpu);
 
 out:
-	vcpu->context.elr_el2 += ec->ret_addr_adjust;
+	//vcpu->context.elr_el2 += ec->ret_addr_adjust;
 	return 0;
 }
 

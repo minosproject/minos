@@ -3,7 +3,7 @@
 
 #include <mvisor/types.h>
 
-typedef struct vmm_vcpu_context {
+typedef struct _pt_regs {
 	uint64_t x0;
 	uint64_t x1;
 	uint64_t x2;
@@ -37,17 +37,11 @@ typedef struct vmm_vcpu_context {
 	uint64_t x30_lr;
 	uint64_t sp_el1;
 	uint64_t elr_el2;
-	uint64_t vbar_el1;
 	uint64_t spsr_el2;
 	uint64_t nzcv;
-	uint64_t esr_el1;
-	uint64_t vmpidr;
-	uint64_t sctlr_el1;
-	uint64_t ttbr0_el1;
-	uint64_t ttbr1_el1;
-	uint64_t vttbr_el2;
-	uint64_t vtcr_el2;
-	uint64_t hcr_el2;
+} pt_regs __attribute__ ((__aligned__ (sizeof(unsigned long))));
+
+struct gic_context {
 	uint64_t ich_ap0r0_el2;
 	uint64_t ich_ap1r0_el2;
 	uint64_t ich_eisr_el2;
@@ -88,10 +82,27 @@ typedef struct vmm_vcpu_context {
 	uint64_t icv_igrpen1_el1;
 	uint64_t icv_pmr_el1;
 	uint64_t icv_rpr_el1;
-} vcpu_context_t __attribute__ ((__aligned__ (sizeof(unsigned long))));
+} __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
-struct aarch64_arch_data {
+struct vmsa_context {
+	uint64_t vtcr_el2;
+	uint64_t ttbr0_el1;
+	uint64_t ttbr1_el1;
+	uint64_t vttbr_el2;
+} __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
+struct system_context {
+	uint64_t vbar_el1;
+	uint64_t esr_el1;
+	uint64_t vmpidr;
+	uint64_t sctlr_el1;
+	uint64_t hcr_el2;
+} __attribute__ ((__aligned__ (sizeof(unsigned long))));
+
+struct aarch64_vcpu {
+	struct gic_context gic_context;
+	struct vmsa_context vmsa_context;
+	struct system_context system_context;
 };
 
 #endif
