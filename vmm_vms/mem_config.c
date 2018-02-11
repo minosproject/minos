@@ -54,6 +54,17 @@ static struct vmm_memory_region mem_regions[] = {
 	},
 };
 
+static struct vmm_memory_region system_regions[] = {
+	{
+		.mem_base = 0x80000000,
+		.mem_end = 0xc0000000,
+		.name = "dram_memory",
+	},
+	{
+
+	},
+};
+
 uint32_t get_mem_config_size(void)
 {
 	return (sizeof(mem_regions) /
@@ -63,4 +74,9 @@ uint32_t get_mem_config_size(void)
 void *get_mem_config_data(void)
 {
 	return (void *)mem_regions;
+}
+
+void *get_memory_regions(void)
+{
+	return (void *)system_regions;
 }
