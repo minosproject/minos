@@ -6,6 +6,7 @@
 #include <config/config.h>
 #include <mvisor/spinlock.h>
 #include <mvisor/mvisor.h>
+#include <config/vm_config.h>
 
 extern unsigned char __code_start;
 extern unsigned char __code_end;
@@ -147,7 +148,7 @@ static int add_memory_section(unsigned long mem_base,
 	if (size == 0)
 		return -EINVAL;
 
-	pr_info("add memory region start:0x%x size:0x%x\n", start, size);
+	pr_info("add memory region start:0x%x size:0x%x\n", mem_base, size);
 	ms->phy_start = mem_base;
 	ms->size = size;
 	ms->nr_pages = size >> PAGE_SHIFT;
@@ -170,7 +171,7 @@ static void parse_system_regions(void)
 	struct vmm_memory_region *regions;
 	struct vmm_memory_region *region;
 
-	regions = get_memory_regions();
+	regions = (struct vmm_memory_region *)get_memory_regions();
 	if (regions = NULL)
 		panic("No memory config for system\n");
 
@@ -179,8 +180,8 @@ static void parse_system_regions(void)
 		if (region->mem_end == 0)
 			break;
 
-		add_memory_section(section->mem_base,
-				section->mem_end, section->name);
+		add_memory_section(region->mem_base,
+				region->mem_end, region->name);
 	}
 }
 
@@ -233,12 +234,12 @@ static int mm_sections_init(void)
 	unsigned long mem_start, mem_end;
 	struct mm_section *section = NULL;
 	struct mm_section *boot_section = NULL;
-	unsigned long code_base = &__code_start;
+	unsigned long code_base = (unsigned long)&__code_start;
 	struct page *page;
 
 	spin_lock(&mm_pool->lock);
 
-	mem_start = &__code_end;
+	mem_start = (unsigned long)&__code_end;
 	mem_start = BALIGN(mem_start, sizeof(unsigned long));
 	mem_start = pages_table_init(mem_start);
 
@@ -246,9 +247,9 @@ static int mm_sections_init(void)
 	mem_start = pages_bitmap_init(mem_start);
 
 	for (i = 0; i < mm_pool->nr_sections; i++) {
-		section = mm_pool->sections[i];
-		if ((code >= section->phy_start) &&
-				(code < (section->phy_start + section->size))) {
+		section = &mm_pool->sections[i];
+		if ((code_base >= section->phy_start) &&
+				(code_base < (section->phy_start + section->size))) {
 			boot_section = section;
 			break;
 		}
@@ -300,6 +301,11 @@ static void update_memory_bitmap(uint32_t *bitmap,
 	}
 }
 
+static int init_pages(struct mm_section *section, long index, int count)
+{
+	return 0;
+}
+
 static void *get_pages_from_section(struct mm_section *section, int count)
 {
 	long index;
@@ -344,7 +350,7 @@ void *get_free_pages(int count)
 
 	for (i = 0; i < mm_pool->nr_sections; i++) {
 		section = &mm_pool->sections[i];
-		if (section->free_page >= count)
+		if (section->free_pages >= count)
 			break;
 	}
 
@@ -360,12 +366,17 @@ void *get_free_pages(int count)
 	return base;
 }
 
+char *vmm_malloc(size_t size)
+{
+	return NULL;
+}
+
 int vmm_mm_init(void)
 {
 	memset((char *)mm_pool, 0, sizeof(struct mm_pool));
 	spin_lock_init(&mm_pool->lock);
 
-	parse_system_regions(void);
+	parse_system_regions();
 
 	mm_sections_init();
 

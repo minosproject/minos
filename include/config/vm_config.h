@@ -33,6 +33,7 @@ typedef struct vmm_vm_entry {
 
 uint32_t get_mem_config_size(void);
 void *get_mem_config_data(void);
+void *get_memory_regions(void);
 int get_irq_config_size(void);
 void *get_irq_config_table(void);
 

@@ -62,4 +62,6 @@ vcpu_t *vmm_get_vcpu(uint32_t vmid, uint32_t vcpu_id);
 
 int arch_vm_init(vm_t *vm);
 
+int vmm_create_vms(void);
+
 #endif

@@ -104,6 +104,7 @@ static int parse_vm_memory(void)
 	struct vmm_memory_region *regions;
 	struct vmm_memory_region *tmp;
 	struct memory_region *m_reg;
+	struct mm_struct *mm;
 	vm_t *vm;
 
 	size = get_mem_config_size();
@@ -236,7 +237,6 @@ static int vm_state_init(vm_t *vm)
 	 */
 	for (i = 0; i < vm->vcpu_nr; i++) {
 		vcpu = vm->vcpus[i];
-		//set_up_vcpu_env(vm, vcpu);
 		if (vmm_get_vcpu_id(vcpu) == 0)
 			vmm_set_vcpu_state(vcpu, VCPU_STATE_READY);
 		else
@@ -279,7 +279,7 @@ static int vm_do_init_vms(void)
 	return 0;
 }
 
-int init_vms(void)
+int vmm_create_vms(void)
 {
 	int ret = 0;
 
@@ -288,8 +288,8 @@ int init_vms(void)
 	if (ret)
 		panic("parsing the vm fail\n");
 
-	parse_vm_memory();
-	vm_do_init_vms();
+	//parse_vm_memory();
+	//vm_do_init_vms();
 
 	return 0;
 }

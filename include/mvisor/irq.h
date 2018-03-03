@@ -77,4 +77,8 @@ int vmm_alloc_irqs(uint32_t start,
 		uint32_t end, unsigned long flags);
 int register_irq_chip(struct irq_chip *chip);
 
+int vmm_irq_init(void);
+
+int vmm_irq_secondary_init(void);
+
 #endif
