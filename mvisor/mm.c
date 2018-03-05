@@ -7,9 +7,65 @@
 #include <mvisor/spinlock.h>
 #include <mvisor/mvisor.h>
 #include <config/vm_config.h>
+#include <mvisor/resource.h>
 
 extern unsigned char __code_start;
 extern unsigned char __code_end;
+
+struct list_head shared_mem_list;
+
+int vmm_register_memory_region(void *res)
+{
+	struct memory_region *region;
+	struct memory_resource *resource;
+	vm_t *vm;
+
+	if (res == NULL)
+		return -EINVAL;
+
+	resource = (struct memory_resource *)res;
+	region = (struct memory_region *)
+		vmm_malloc(sizeof(struct memory_resource));
+	if (!region) {
+		pr_error("No memory for new memory region\n");
+		return -ENOMEM;
+	}
+
+	pr_debug("register memory region: 0x%x 0x%x %d %d %s\n",
+			resource->mem_base, resource->mem_end,
+			resource->type, resource->vmid, resource->name);
+
+	memset((char *)region, 0, sizeof(struct memory_region));
+	region->mem_base = resource->mem_base;
+	region->size = resource->mem_end - resource->mem_base;
+	strncpy(region->name, resource->name,
+		MIN(strlen(resource->name), MEM_REGION_NAME_SIZE - 1));
+
+	/*
+	 * shared memory is for all vm to ipc purpose
+	 */
+	if (resource->type == 0x2) {
+		region->type = MEM_TYPE_NORMAL;
+		list_add(&shared_mem_list, &region->list);
+	} else {
+		if (resource->type == 0x0)
+			region->type = MEM_TYPE_NORMAL;
+		else
+			region->type = MEM_TYPE_IO;
+
+		vm = vmm_get_vm(resource->vmid);
+		if (!vm) {
+			pr_error("Can not find the vm for the vmid:%d\n",
+					resource->vmid);
+			vmm_free(region);
+			return -EINVAL;
+		}
+
+		list_add(&vm->mm.mem_list, &region->list);
+	}
+
+	return 0;
+}
 
 #ifdef CONFIG_MVISOR_MM_SIMPLE_MODE
 
@@ -79,12 +135,12 @@ char *vmm_alloc_pages(int pages)
 	return base;
 }
 
-void vmm_free(char *addr)
+void vmm_free(void *addr)
 {
 	panic("vmm_free not support on MM_SIMPLE mode\n");
 }
 
-void vmm_free_pages(char *addr)
+void vmm_free_pages(void *addr)
 {
 	panic("vmm_free_pages not supported on MM_SIMPLE mode\n");
 }

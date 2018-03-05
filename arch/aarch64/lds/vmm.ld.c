@@ -45,52 +45,6 @@ SECTIONS
 
 	. = ALIGN(8);
 
-	__init_start = .;
-
-	__init_func_start = .;
-	.__init_func_0 : {
-		*(.__init_func_0)
-	}
-	.__init_func_1 : {
-		*(.__init_func_1)
-	}
-	.__init_func_2 : {
-		*(.__init_func_2)
-	}
-	.__init_func_3 : {
-		*(.__init_func_3)
-	}
-	.__init_func_4 : {
-		*(.__init_func_4)
-	}
-	.__init_func_5 : {
-		*(.__init_func_5)
-	}
-	.__init_func_6 : {
-		*(.__init_func_6)
-	}
-	__init_func_end = .;
-
-	. = ALIGN(8);
-
-	__init_data_start = .;
-	.__init_data_section : {
-		*(.__init_data_section)
-	}
-	__init_data_end = .;
-
-	. = ALIGN(8);
-
-	__init_text_start = .;
-	.__init_text : {
-		*(__init_text)
-	}
-	__init_text_end = .;
-
-	. = ALIGN(8);
-
-	__init_end = .;
-
 	.el2_stack (NOLOAD): {
 		. = ALIGN(64);
 		__el2_stack = .;
@@ -135,6 +89,68 @@ SECTIONS
 		. = . + (CONFIG_NR_CPUS * MMU_TTB_LEVEL2_SIZE);
 		__el2_stage2_ttb_l2_end = .;
 	}
+
+	. = ALIGN(8);
+
+	__init_start = .;
+
+	__init_func_start = .;
+	.__init_func_0 : {
+		*(.__init_func_0)
+	}
+	.__init_func_1 : {
+		*(.__init_func_1)
+	}
+	.__init_func_2 : {
+		*(.__init_func_2)
+	}
+	.__init_func_3 : {
+		*(.__init_func_3)
+	}
+	.__init_func_4 : {
+		*(.__init_func_4)
+	}
+	.__init_func_5 : {
+		*(.__init_func_5)
+	}
+	.__init_func_6 : {
+		*(.__init_func_6)
+	}
+	__init_func_end = .;
+
+	. = ALIGN(8);
+
+	__init_data_start = .;
+	.__init_data_section : {
+		*(.__init_data_section)
+	}
+	__init_data_end = .;
+
+	. = ALIGN(8);
+
+	__init_text_start = .;
+	.__init_text : {
+		*(__init_text)
+	}
+	__init_text_end = .;
+
+	. = ALIGN(8);
+	__vmm_irq_resource_start = .;
+	.__vmm_irq_resource : {
+		*(.__vmm_irq_resource)
+	}
+	__vmm_irq_resource_end = .;
+
+	. = ALIGN(8);
+	__vmm_memory_resource_start = .;
+	.__vmm_memory_resource : {
+		*(.__vmm_memory_resource)
+	}
+	__vmm_memory_resource_end = .;
+
+	. = ALIGN(8);
+
+	__init_end = .;
 
 	__code_end = .;
 }

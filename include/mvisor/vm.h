@@ -43,4 +43,6 @@ typedef struct vmm_vm {
 	boot_vm_t boot_vm;
 } vm_t __attribute__((__aligned__ (8)));
 
+vm_t *vmm_get_vm(uint32_t vmid);
+
 #endif

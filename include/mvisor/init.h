@@ -28,6 +28,9 @@ typedef int (*init_call)(void);
 #define __init_5	__attribute__((section(".__init_func_5")))
 #define __init_6	__attribute__((section(".__init_func_6")))
 
+#define __irq_resource  __attribute__((section(".__vmm_irq_resource")))
+#define __memory_resource  __attribute__((section(".__vmm_memory_resource")))
+
 #define early_initcall(fn)	\
 	static init_call __init_call_##fn __init_0 = fn
 

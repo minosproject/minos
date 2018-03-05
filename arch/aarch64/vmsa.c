@@ -243,7 +243,7 @@ int mmu_map_memory_region_list(phy_addr_t tbase,
 
 	list_for_each(mem_list, list) {
 		region = list_entry(list,
-			struct memory_region, mem_region_list);
+			struct memory_region, list);
 		/*
 		 * TBD to check the aligment of the address
 		 */

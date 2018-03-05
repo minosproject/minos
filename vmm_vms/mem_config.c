@@ -1,11 +1,12 @@
-#include <config/vm_config.h>
+#include <mvisor/resource.h>
+#include <mvisor/init.h>
 
 /*
  * mem_type : 0 - normal memory
  * 	      1 - device memory
  * 	      2 - shared memory
  */
-static struct vmm_memory_region mem_regions[] = {
+static struct memory_resource mem_regions[] __memory_resource = {
 	{
 		.mem_base = 0x90000000,
 		.mem_end  = 0xA0000000,
@@ -53,30 +54,3 @@ static struct vmm_memory_region mem_regions[] = {
 		.name = "timer",
 	},
 };
-
-static struct vmm_memory_region system_regions[] = {
-	{
-		.mem_base = 0x80000000,
-		.mem_end = 0xc0000000,
-		.name = "dram_memory",
-	},
-	{
-
-	},
-};
-
-uint32_t get_mem_config_size(void)
-{
-	return (sizeof(mem_regions) /
-		sizeof(struct vmm_memory_region));
-}
-
-void *get_mem_config_data(void)
-{
-	return (void *)mem_regions;
-}
-
-void *get_memory_regions(void)
-{
-	return (void *)system_regions;
-}

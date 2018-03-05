@@ -36,7 +36,6 @@ int boot_main(void)
 	vmm_irq_init();
 	vmm_create_vms();
 	vmm_parse_resource();
-	//vmm_memory_init();
 
 	/*
 	 * wake up other cpus

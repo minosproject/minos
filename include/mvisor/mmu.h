@@ -17,7 +17,7 @@ struct memory_region {
 	size_t size;
 	int type;
 	char name[MEM_REGION_NAME_SIZE];
-	struct list_head mem_region_list;
+	struct list_head list;
 };
 
 int mmu_map_memory_region_list(phy_addr_t tbase,

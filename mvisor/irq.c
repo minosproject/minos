@@ -6,6 +6,7 @@
 #include <config/config.h>
 #include <mvisor/device_id.h>
 #include <mvisor/module.h>
+#include <mvisor/resource.h>
 
 uint32_t irq_nums;
 static struct vmm_irq **irq_table;
@@ -13,46 +14,43 @@ typedef uint32_t (*get_nr_t)(void);
 
 struct irq_chip *irq_chip;
 
-static void parse_all_irqs(void)
+int vmm_register_irq_entry(void *res)
 {
-	int i;
-	uint32_t size;
-	struct irq_config *configs;
-	struct irq_config *config;
+	struct irq_resource *config;
 	struct vmm_irq *vmm_irq;
 	vcpu_t *vcpu;
 
-	size = get_irq_config_size();
-	configs = (struct irq_config *)get_irq_config_table();
+	if (res == NULL)
+		return -EINVAL;
 
-	for (i = 0; i < size; i++) {
-		config = &configs[i];
-		if ((config->hno >= irq_nums) || (config->hno < NR_LOCAL_IRQS)) {
-			pr_error("Find an invalid irq %d\n", config->hno);
-			continue;
-		}
-
-		vcpu = vmm_get_vcpu(config->vmid, config->affinity);
-		if (!vcpu) {
-			pr_error("Vcpu:%d is not exist for this vm\n", config->affinity);
-			continue;
-		}
-
-		vmm_irq = irq_table[config->hno];
-		if (!vmm_irq) {
-			pr_error("irq %d not been allocated\n", config->hno);
-			continue;
-		}
-
-		vmm_irq->vno = config->vno;
-		vmm_irq->hno = config->hno;
-		vmm_irq->vmid = config->vmid;
-		vmm_irq->affinity_vcpu = config->affinity;
-		vmm_irq->affinity_pcpu = vmm_get_pcpu_id(vcpu);
-		strncpy(vmm_irq->name, config->name,
-			MIN(strlen(config->name), MAX_IRQ_NAME_SIZE - 1));
-		vmm_irq->flags |= config->type;
+	config = (struct irq_resource *)res;
+	if ((config->hno >= irq_nums) || (config->hno < NR_LOCAL_IRQS)) {
+		pr_error("Find an invalid irq %d\n", config->hno);
+		return -EINVAL;
 	}
+
+	vcpu = vmm_get_vcpu(config->vmid, config->affinity);
+	if (!vcpu) {
+		pr_error("Vcpu:%d is not exist for this vm\n", config->affinity);
+		return -EINVAL;;
+	}
+
+	vmm_irq = irq_table[config->hno];
+	if (!vmm_irq) {
+		pr_error("irq %d not been allocated\n", config->hno);
+		return -ENOMEM;
+	}
+
+	vmm_irq->vno = config->vno;
+	vmm_irq->hno = config->hno;
+	vmm_irq->vmid = config->vmid;
+	vmm_irq->affinity_vcpu = config->affinity;
+	vmm_irq->affinity_pcpu = vmm_get_pcpu_id(vcpu);
+	strncpy(vmm_irq->name, config->name,
+		MIN(strlen(config->name), MAX_IRQ_NAME_SIZE - 1));
+	vmm_irq->flags |= config->type;
+
+	return 0;
 }
 
 static void vmm_set_up_irqs(void)
@@ -127,8 +125,6 @@ int vmm_irq_init(void)
 	 */
 	if (irq_chip->init)
 		irq_chip->init();
-
-	parse_all_irqs();
 
 	return 0;
 }

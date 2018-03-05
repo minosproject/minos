@@ -81,4 +81,6 @@ int vmm_irq_init(void);
 
 int vmm_irq_secondary_init(void);
 
+int vmm_register_irq_entry(void *res);
+
 #endif

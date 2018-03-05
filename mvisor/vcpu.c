@@ -12,7 +12,6 @@ extern unsigned char __vmm_vm_end;
 static vm_t *vms[CONFIG_MAX_VM];
 static uint32_t total_vms = 0;
 
-struct list_head shared_mem_list;
 struct list_head vm_list;
 
 static int vmm_add_vm(vm_entry_t *vme)
@@ -97,63 +96,6 @@ vcpu_t *vmm_get_vcpu(uint32_t vmid, uint32_t vcpu_id)
 	return vm->vcpus[vcpu_id];
 }
 
-static int parse_vm_memory(void)
-{
-	uint32_t size;
-	int i;
-	struct vmm_memory_region *regions;
-	struct vmm_memory_region *tmp;
-	struct memory_region *m_reg;
-	struct mm_struct *mm;
-	vm_t *vm;
-
-	size = get_mem_config_size();
-	regions = (struct vmm_memory_region *)get_mem_config_data();
-	init_list(&shared_mem_list);
-
-	if (size == 0)
-		panic("Please get the memory config for system\n");
-
-	for (i = 0; i < size; i++) {
-		tmp = &regions[i];
-		m_reg = (struct memory_region *)vmm_malloc(sizeof(struct memory_region));
-		if (!m_reg)
-			panic("No memory to parse the memory config");
-
-		pr_debug("find memory region: 0x%x 0x%x %d %d %s\n",
-				tmp->mem_base, tmp->mem_end, tmp->type,
-				tmp->vmid, tmp->name);
-		memset((char *)m_reg, 0, sizeof(struct memory_region));
-		m_reg->mem_base = tmp->mem_base;
-		m_reg->size = tmp->mem_end - tmp->mem_base;
-		strncpy(m_reg->name, tmp->name,
-			MIN(strlen(tmp->name), MEM_REGION_NAME_SIZE - 1));
-
-		/*
-		 * shared memory is for all vm to ipc
-		 */
-		if (tmp->type == 0x2) {
-			m_reg->type = MEM_TYPE_NORMAL;
-			list_add(&shared_mem_list, &m_reg->mem_region_list);
-		} else {
-			if (tmp->type == 0x0)
-				m_reg->type = MEM_TYPE_NORMAL;
-			else
-				m_reg->type = MEM_TYPE_IO;
-
-			vm = vmm_get_vm(tmp->vmid);
-			if (!vm) {
-				pr_error("Can not find the vm for the vmid:%d\n", tmp->vmid);
-				continue;
-			}
-
-			list_add(&vm->mem_list, &m_reg->mem_region_list);
-		}
-	}
-
-	return 0;
-}
-
 static int vm_create_vcpus(vm_t *vm)
 {
 	int i;
@@ -197,7 +139,7 @@ static int vm_map_memory(vm_t *vm)
 		return -EINVAL;
 
 	ttb2_addr = mmu_map_vm_memory(&vm->mem_list);
-	mmu_map_memory_region_list(ttb2_addr, &shared_mem_list);
+	//mmu_map_memory_region_list(ttb2_addr, &shared_mem_list);
 	tcr_el2 = mmu_generate_vtcr_el2();
 
 	//vm->vttbr_el2_addr = mmu_get_vttbr_el2_base(vm->vmid, ttb2_addr);
@@ -288,7 +230,6 @@ int vmm_create_vms(void)
 	if (ret)
 		panic("parsing the vm fail\n");
 
-	//parse_vm_memory();
 	//vm_do_init_vms();
 
 	return 0;
