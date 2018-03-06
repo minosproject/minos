@@ -10,18 +10,19 @@
 #include <mvisor/vcpu.h>
 #include <mvisor/resource.h>
 
-extern void init_pcpus(void);
+extern void vmm_init_pcpus(void);
 extern int log_buffer_init(void);
 extern void sched_vcpu(void);
-extern void el2_stage2_vmsa_init(void);
 extern void vmm_irqs_init(void);
-extern void smp_init(void);
+extern void vmm_smp_init(void);
+extern int vmm_arch_init(void);
+extern int vmm_early_init(void);
 
 int boot_main(void)
 {
 	int i;
 
-	arch_early_init();
+	vmm_early_init();
 	vmm_mm_init();
 	log_buffer_init();
 
@@ -30,12 +31,24 @@ int boot_main(void)
 	if (get_cpu_id() != 0)
 		panic("cpu is not cpu0");
 
-	arch_init();
-	init_pcpus();
-	smp_init();
+	vmm_arch_init();
+	vmm_init_pcpus();
+	vmm_smp_init();
 	vmm_irq_init();
+	vmm_mmu_init();
 	vmm_create_vms();
+
+	/*
+	 * here we need to handle all the resource
+	 * config include memory and irq
+	 */
 	vmm_parse_resource();
+	vmm_setup_irqs();
+
+	/*
+	 * prepare each vm to run
+	 */
+	vmm_vms_init();
 
 	/*
 	 * wake up other cpus

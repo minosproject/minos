@@ -5,6 +5,7 @@
 #include <config/vm_config.h>
 #include <config/config.h>
 #include <mvisor/module.h>
+#include <mvisor/mm.h>
 
 extern unsigned char __vmm_vm_start;
 extern unsigned char __vmm_vm_end;
@@ -138,9 +139,8 @@ static int vm_map_memory(vm_t *vm)
 	if (!vm)
 		return -EINVAL;
 
-	ttb2_addr = mmu_map_vm_memory(&vm->mem_list);
 	//mmu_map_memory_region_list(ttb2_addr, &shared_mem_list);
-	tcr_el2 = mmu_generate_vtcr_el2();
+	//tcr_el2 = mmu_generate_vtcr_el2();
 
 	//vm->vttbr_el2_addr = mmu_get_vttbr_el2_base(vm->vmid, ttb2_addr);
 	//vm->vtcr_el2 = tcr_el2;
@@ -203,7 +203,7 @@ static int vm_modules_init(vm_t *vm)
 	return 0;
 }
 
-static int vm_do_init_vms(void)
+int vmm_vms_init(void)
 {
 	int i;
 	vm_t *vm;
@@ -211,8 +211,7 @@ static int vm_do_init_vms(void)
 	for (i = 0; i < total_vms; i++) {
 		vm = vms[i];
 		vm_create_vcpus(vm);
-		//vm_map_memory(vm);
-		//vm_config_hcrel2(vm);
+		vm_memory_init(vm);
 		vm_state_init(vm);
 		vm_arch_init(vm);
 		vm_modules_init(vm);
@@ -229,8 +228,6 @@ int vmm_create_vms(void)
 	ret = parse_all_vms();
 	if (ret)
 		panic("parsing the vm fail\n");
-
-	//vm_do_init_vms();
 
 	return 0;
 }

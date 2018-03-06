@@ -64,4 +64,6 @@ int arch_vm_init(vm_t *vm);
 
 int vmm_create_vms(void);
 
+int vm_memory_init(vm_t *vm);
+
 #endif

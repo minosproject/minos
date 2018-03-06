@@ -16,7 +16,7 @@ phy_addr_t percpu_offset[CONFIG_NR_CPUS];
 DEFINE_PER_CPU(vcpu_t *, running_vcpu);
 DEFINE_PER_CPU(pcpu_t *, pcpu);
 
-void init_pcpus(void)
+void vmm_init_pcpus(void)
 {
 	int i;
 	pcpu_t *pcpu;

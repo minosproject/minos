@@ -11,8 +11,16 @@ void vmm_free_pages(void *addr);
 
 int vmm_register_memory_region(void *res);
 
+struct memory_region {
+	phy_addr_t mem_base;
+	phy_addr_t vir_base;
+	size_t size;
+	int type;
+	struct list_head list;
+};
+
 struct mm_struct {
-	void *page_table_base;
+	phy_addr_t page_table_base;
 	struct list_head mem_list;
 };
 

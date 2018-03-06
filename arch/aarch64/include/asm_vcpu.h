@@ -84,13 +84,6 @@ struct gic_context {
 	uint64_t icv_rpr_el1;
 } __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
-struct vmsa_context {
-	uint64_t vtcr_el2;
-	uint64_t ttbr0_el1;
-	uint64_t ttbr1_el1;
-	uint64_t vttbr_el2;
-} __attribute__ ((__aligned__ (sizeof(unsigned long))));
-
 struct system_context {
 	uint64_t vbar_el1;
 	uint64_t esr_el1;
@@ -101,7 +94,6 @@ struct system_context {
 
 struct aarch64_vcpu {
 	struct gic_context gic_context;
-	struct vmsa_context vmsa_context;
 	struct system_context system_context;
 };
 

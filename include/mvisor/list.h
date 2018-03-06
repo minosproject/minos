@@ -79,4 +79,9 @@ static inline struct list_head *list_prve(struct list_head *list)
 #define list_for_each(head, list)	\
 	for(list = (head)->next; list != (head); list = list->next)
 
+#define list_for_each_entry(pos, head, member)	\
+	for (pos = list_entry((head)->next, typeof(*pos), member); \
+	     &pos->member != (head); \
+	     pos = list_entry(pos->member.next, typeof(*pos), member))
+
 #endif

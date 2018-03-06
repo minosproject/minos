@@ -45,4 +45,6 @@ typedef struct vmm_vm {
 
 vm_t *vmm_get_vm(uint32_t vmid);
 
+int vmm_vms_init(void);
+
 #endif

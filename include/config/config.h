@@ -19,6 +19,7 @@
 #define CONFIG_MAX_VM			(4)
 
 #define CONFIG_IRQ_CHIP_NAME		"gicv3"
+#define CONFIG_MMU_CHIP_NAME		"armv8-mmu"
 
 #define CONFIG_LOG_LEVEL		4
 

@@ -70,7 +70,7 @@ void smp_cpus_up(void)
 		smp_cpu_up((i << 0) | (0 << 8) | (0 << 16) | (0ul << 32));
 }
 
-void smp_init(void)
+void vmm_smp_init(void)
 {
 	int i;
 

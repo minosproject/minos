@@ -12,7 +12,7 @@ uint32_t irq_nums;
 static struct vmm_irq **irq_table;
 typedef uint32_t (*get_nr_t)(void);
 
-struct irq_chip *irq_chip;
+static struct irq_chip *irq_chip;
 
 int vmm_register_irq_entry(void *res)
 {
@@ -53,7 +53,7 @@ int vmm_register_irq_entry(void *res)
 	return 0;
 }
 
-static void vmm_set_up_irqs(void)
+void vmm_setup_irqs(void)
 {
 	int i;
 	struct vmm_irq *vmm_irq;

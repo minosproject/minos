@@ -38,8 +38,6 @@ int vmm_register_memory_region(void *res)
 	memset((char *)region, 0, sizeof(struct memory_region));
 	region->mem_base = resource->mem_base;
 	region->size = resource->mem_end - resource->mem_base;
-	strncpy(region->name, resource->name,
-		MIN(strlen(resource->name), MEM_REGION_NAME_SIZE - 1));
 
 	/*
 	 * shared memory is for all vm to ipc purpose
@@ -440,3 +438,27 @@ int vmm_mm_init(void)
 }
 
 #endif
+
+int vm_memory_init(vm_t *vm)
+{
+	struct mm_struct *mm = &vm->mm;
+	struct memory_region *region;
+
+	mm->page_table_base = mmu_alloc_page_table();
+	if (mm->page_table_base == 0) {
+		pr_error("No memory for vm page table\n");
+		return -ENOMEM;
+	}
+
+	if (is_list_empty(&mm->mem_list)) {
+		pr_error("No memory config for this vm\n");
+		return -EINVAL;
+	}
+
+	list_for_each_entry(region, &mm->mem_list, list) {
+		mmu_map_memory(mm->page_table_base, region->mem_base,
+			region->vir_base, region->size, region->type);
+	}
+
+	return 0;
+}

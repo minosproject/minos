@@ -1,6 +1,8 @@
 #include <mvisor/mvisor.h>
 #include <mvisor/mmu.h>
 #include <config/config.h>
+#include <mvisor/vcpu.h>
+#include <mvisor/module.h>
 
 #define G4K_LEVEL1_OFFSET	(30)
 #define G4K_LEVEL2_OFFSET	(21)
@@ -179,8 +181,15 @@ static int mmu_map_level2_pages(phy_addr_t *tbase, phy_addr_t vbase,
 	return 0;
 }
 
-int mmu_map_mem(phy_addr_t *tbase, phy_addr_t base, size_t size, int type)
+static phy_addr_t alloc_page_tabe(void)
 {
+	return 0;
+}
+
+int mmu_map_mem(phy_addr_t tbase, phy_addr_t base,
+		phy_addr_t vir_base, size_t size, int type)
+{
+#if 0
 	int i;
 	phy_addr_t tmp;
 	uint32_t offset;
@@ -225,10 +234,11 @@ int mmu_map_mem(phy_addr_t *tbase, phy_addr_t base, size_t size, int type)
 		base += map_size;
 		size -= map_size;
 	}
-
+#endif
 	return 0;
 }
 
+#if 0
 int mmu_map_memory_region_list(phy_addr_t tbase,
 		struct list_head *mem_list)
 {
@@ -279,6 +289,7 @@ phy_addr_t mmu_map_vm_memory(struct list_head *mem_list)
 
 	return (phy_addr_t)page;
 }
+#endif
 
 uint64_t mmu_generate_vtcr_el2(void)
 {
@@ -336,3 +347,44 @@ int el2_stage2_vmsa_init(void)
 
 	return 0;
 }
+
+static void vmsa_state_init(vcpu_t *vcpu, void *context)
+{
+
+}
+
+static void vmsa_state_save(vcpu_t *vcpu, void *context)
+{
+
+}
+
+static void vmsa_state_restore(vcpu_t *vcpu, void *context)
+{
+
+}
+
+static struct mmu_chip vmsa_mmu = {
+	.map_memory = mmu_map_mem,
+	.alloc_page_table = alloc_page_tabe,
+};
+
+struct vmsa_context {
+	uint64_t vtcr_el2;
+	uint64_t ttbr0_el1;
+	uint64_t ttbr1_el1;
+	uint64_t vttbr_el2;
+} __attribute__ ((__aligned__ (sizeof(unsigned long))));
+
+static int vmsa_module_init(struct vmm_module *module)
+{
+	module->context_size = sizeof(struct vmsa_context);
+	module->pdata = (void *)&vmsa_mmu;
+	module->state_init = vmsa_state_init;
+	module->state_save = vmsa_state_save;
+	module->state_restore = vmsa_state_restore;
+
+	return 0;
+}
+
+VMM_MODULE_DECLARE(vmsa, "armv8-mmu",
+	VMM_MODULE_NAME_MMU, (void *)vmsa_module_init);
