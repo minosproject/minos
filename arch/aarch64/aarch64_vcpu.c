@@ -3,7 +3,7 @@
 
 #include <mvisor/vcpu.h>
 
-static int aarch64_init_pt_regs(vm_t *vm)
+int arch_vm_init(vm_t *vm)
 {
 	int i;
 	vcpu_t *vcpu;
@@ -50,37 +50,6 @@ static int aarch64_init_pt_regs(vm_t *vm)
 				 AARCH64_SPSR_I | AARCH64_SPSR_A;
 		regs->nzcv = 0;
 	}
-
-	return 0;
-}
-
-static int aarch64_init_gic_state(vm_t *vm)
-{
-	int i;
-
-	for (i = 0; i < vm->vcpu_nr; i++) {
-		//gic_init_vcpu_state();
-	}
-
-	return 0;
-}
-
-static int aarch64_init_vmsa_state(vm_t *vm)
-{
-	return 0;
-}
-
-static int aarch64_init_system_state(vm_t *vm)
-{
-	return 0;
-}
-
-int arch_vm_init(vm_t *vm)
-{
-	aarch64_init_pt_regs(vm);
-	aarch64_init_gic_state(vm);
-	aarch64_init_vmsa_state(vm);
-	aarch64_init_system_state(vm);
 
 	return 0;
 }

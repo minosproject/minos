@@ -25,7 +25,7 @@ typedef struct vmm_vcpu {
 	uint32_t vcpu_id;
 	vcpu_state_t state;
 	vm_t *vm_belong_to;
-	phy_addr_t entry_point;
+	unsigned long entry_point;
 	uint32_t pcpu_affinity;
 	uint32_t status;
 	struct list_head pcpu_list;

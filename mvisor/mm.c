@@ -68,7 +68,7 @@ int vmm_register_memory_region(void *res)
 #ifdef CONFIG_MVISOR_MM_SIMPLE_MODE
 
 static char *free_mem_base = NULL;
-static phy_addr_t free_mem_size = 0;
+static unsigned long free_mem_size = 0;
 static spinlock_t mem_block_lock;
 static char *free_4k_base = 0;
 
@@ -122,7 +122,7 @@ char *vmm_alloc_pages(int pages)
 	if (free_mem_size < request_size)
 		return NULL;
 
-	if (((phy_addr_t)free_4k_base - request_size) < free_mem_size)
+	if (((unsigned long)free_4k_base - request_size) < free_mem_size)
 		return NULL;
 
 	base = free_4k_base - request_size;

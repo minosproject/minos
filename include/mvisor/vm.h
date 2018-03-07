@@ -29,7 +29,7 @@ typedef struct vmm_vm {
 	uint32_t mmu_on;
 	uint32_t index;
 	uint32_t vcpu_affinity[CONFIG_VM_MAX_VCPU];
-	phy_addr_t entry_point;
+	unsigned long entry_point;
 	char name[VMM_VM_NAME_SIZE];
 	struct vmm_vcpu *vcpus[CONFIG_VM_MAX_VCPU];
 	struct list_head mem_list;

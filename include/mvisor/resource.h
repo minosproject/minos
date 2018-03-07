@@ -10,8 +10,8 @@ enum vmm_resource_type {
 };
 
 struct memory_resource {
-	phy_addr_t mem_base;
-	phy_addr_t mem_end;
+	unsigned long mem_base;
+	unsigned long mem_end;
 	int type;
 	uint32_t vmid;
 	char *name;

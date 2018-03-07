@@ -52,7 +52,7 @@ static int parse_all_vms(void)
 	int i;
 	vm_entry_t *vme;
 	size_t size = (&__vmm_vm_end) - (&__vmm_vm_start);
-	phy_addr_t *start = (phy_addr_t *)(&__vmm_vm_start);
+	unsigned long *start = (unsigned long *)(&__vmm_vm_start);
 
 	if (size == 0)
 		panic("No VM is found\n");
@@ -133,7 +133,7 @@ static int vm_create_vcpus(vm_t *vm)
 
 static int vm_map_memory(vm_t *vm)
 {
-	phy_addr_t ttb2_addr;
+	unsigned long ttb2_addr;
 	uint64_t tcr_el2;
 
 	if (!vm)

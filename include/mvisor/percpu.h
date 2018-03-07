@@ -5,7 +5,7 @@
 #include <mvisor/types.h>
 
 extern int get_cpu_id();
-extern phy_addr_t percpu_offset[];
+extern unsigned long percpu_offset[];
 
 #define DEFINE_PER_CPU(type, name) \
 	__attribute__((__section__(".__percpu"))) __typeof__(type) per_cpu_##name

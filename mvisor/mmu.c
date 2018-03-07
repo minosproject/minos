@@ -5,8 +5,8 @@
 
 static struct mmu_chip *mmu_chip;
 
-int mmu_map_memory(phy_addr_t page_table_base, phy_addr_t phy_base,
-		phy_addr_t vir_base, size_t size, int type)
+int mmu_map_memory(unsigned long page_table_base, unsigned long phy_base,
+		unsigned long vir_base, size_t size, int type)
 {
 	if (!mmu_chip->map_memory)
 		return -EINVAL;
@@ -15,7 +15,7 @@ int mmu_map_memory(phy_addr_t page_table_base, phy_addr_t phy_base,
 			phy_base, size, vir_base, type);
 }
 
-phy_addr_t mmu_alloc_page_table(void)
+unsigned long mmu_alloc_page_table(void)
 {
 	if (!mmu_chip->alloc_page_table)
 		return -EINVAL;

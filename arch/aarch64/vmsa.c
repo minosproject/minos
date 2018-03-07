@@ -155,13 +155,13 @@ uint64_t get_tt_description(int m_type, int d_type)
 	return 0;
 }
 
-static int mmu_map_level2_pages(phy_addr_t *tbase, phy_addr_t vbase,
-		phy_addr_t pbase, size_t size, int type)
+static int mmu_map_level2_pages(unsigned long *tbase, unsigned long vbase,
+		unsigned long pbase, size_t size, int type)
 {
 	int i;
 	uint64_t attr;
 	uint32_t offset;
-	phy_addr_t tmp;
+	unsigned long tmp;
 
 	attr = get_tt_description(type, LEVEL2_DESCRIPTION_TYPE);
 	tmp = ALIGN(vbase, LEVEL1_ENTRY_MAP_SIZE);
@@ -181,21 +181,32 @@ static int mmu_map_level2_pages(phy_addr_t *tbase, phy_addr_t vbase,
 	return 0;
 }
 
-static phy_addr_t alloc_page_tabe(void)
+static unsigned long alloc_page_tabe(void)
 {
-	return 0;
+	/*
+	 * return the table base address, this function
+	 * is called when init the vm
+	 */
+	char *page;
+
+	page = mmu_alloc_level1_mem();
+	if (!page)
+		panic("No memory to map vm memory\n");
+
+	memset(page, 0, MMU_TTB_LEVEL1_SIZE);
+	return (unsigned long)page;
 }
 
-int mmu_map_mem(phy_addr_t tbase, phy_addr_t base,
-		phy_addr_t vir_base, size_t size, int type)
+int mmu_map_mem(unsigned long t_base, unsigned long base,
+		unsigned long vir_base, size_t size, int type)
 {
-#if 0
 	int i;
-	phy_addr_t tmp;
+	unsigned long tmp;
 	uint32_t offset;
 	uint64_t value;
 	uint64_t attr;
 	size_t map_size;
+	unsigned long *tbase = (unsigned long *)t_base;
 
 	base = ALIGN(base, LEVEL2_ENTRY_MAP_SIZE);
 	tmp = BALIGN(base + size, LEVEL2_ENTRY_MAP_SIZE);
@@ -207,7 +218,7 @@ int mmu_map_mem(phy_addr_t tbase, phy_addr_t base,
 		offset = base >> LEVEL1_OFFSET;
 		value = *(tbase + offset);
 		if (value == 0) {
-			tmp = (phy_addr_t)mmu_alloc_level2_mem();
+			tmp = (unsigned long)mmu_alloc_level2_mem();
 			if (!tmp)
 				return -ENOMEM;
 			memset((char *)tmp, 0, LEVEL2_PAGES * SIZE_4K);
@@ -229,67 +240,14 @@ int mmu_map_mem(phy_addr_t tbase, phy_addr_t base,
 			map_size = size;
 		}
 
-		mmu_map_level2_pages((phy_addr_t *)value, base,
+		mmu_map_level2_pages((unsigned long *)value, base,
 				base, map_size, type);
 		base += map_size;
 		size -= map_size;
 	}
-#endif
-	return 0;
-}
-
-#if 0
-int mmu_map_memory_region_list(phy_addr_t tbase,
-		struct list_head *mem_list)
-{
-	struct list_head *list;
-	struct memory_region *region;
-
-	if (!mem_list)
-		return -EINVAL;
-
-	if (is_list_empty(mem_list))
-		return -EINVAL;
-
-	list_for_each(mem_list, list) {
-		region = list_entry(list,
-			struct memory_region, list);
-		/*
-		 * TBD to check the aligment of the address
-		 */
-		mmu_map_mem((phy_addr_t *)tbase, region->mem_base,
-				region->size, region->type);
-	};
 
 	return 0;
 }
-
-phy_addr_t mmu_map_vm_memory(struct list_head *mem_list)
-{
-	/*
-	 * return the table base address, this function
-	 * is called when init the vm
-	 */
-	char *page;
-	uint32_t page_nr;
-	uint32_t offset;
-
-	if (!mem_list)
-		return 0;
-
-	if (is_list_empty(mem_list))
-		return 0;
-
-	page = mmu_alloc_level1_mem();
-	if (!page)
-		panic("No memory to map vm memory\n");
-
-	memset(page, 0, MMU_TTB_LEVEL1_SIZE);
-	mmu_map_memory_region_list((phy_addr_t)page, mem_list);
-
-	return (phy_addr_t)page;
-}
-#endif
 
 uint64_t mmu_generate_vtcr_el2(void)
 {
@@ -318,7 +276,7 @@ uint64_t mmu_generate_vtcr_el2(void)
 	return value;
 }
 
-uint64_t mmu_get_vttbr_el2_base(uint32_t vmid, phy_addr_t base)
+uint64_t mmu_get_vttbr_el2_base(uint32_t vmid, unsigned long base)
 {
 	uint64_t value = 0;
 
