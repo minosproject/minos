@@ -41,49 +41,6 @@ typedef struct _pt_regs {
 	uint64_t nzcv;
 } pt_regs __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
-struct gic_context {
-	uint64_t ich_ap0r0_el2;
-	uint64_t ich_ap1r0_el2;
-	uint64_t ich_eisr_el2;
-	uint64_t ich_elrsr_el2;
-	uint64_t ich_hcr_el2;
-	uint64_t ich_lr0_el2;
-	uint64_t ich_lr1_el2;
-	uint64_t ich_lr2_el2;
-	uint64_t ich_lr3_el2;
-	uint64_t ich_lr4_el2;
-	uint64_t ich_lr5_el2;
-	uint64_t ich_lr6_el2;
-	uint64_t ich_lr7_el2;
-	uint64_t ich_lr8_el2;
-	uint64_t ich_lr9_el2;
-	uint64_t ich_lr10_el2;
-	uint64_t ich_lr11_el2;
-	uint64_t ich_lr12_el2;
-	uint64_t ich_lr13_el2;
-	uint64_t ich_lr14_el2;
-	uint64_t ich_lr15_el2;
-	uint64_t ich_misr_el2;
-	uint64_t ich_vmcr_el2;
-	uint64_t ich_vtr_el2;
-	uint64_t icv_ap0r0_el1;
-	uint64_t icv_ap1r0_el1;
-	uint64_t icv_bpr0_el1;
-	uint64_t icv_bpr1_el1;
-	uint64_t icv_ctlr_el1;
-	uint64_t icv_dir_el1;
-	uint64_t icv_eoir0_el1;
-	uint64_t icv_eoir1_el1;
-	uint64_t icv_hppir0_el1;
-	uint64_t icv_hppir1_el1;
-	uint64_t icv_iar0_el1;
-	uint64_t icv_iar1_el1;
-	uint64_t icv_igrpen0_el1;
-	uint64_t icv_igrpen1_el1;
-	uint64_t icv_pmr_el1;
-	uint64_t icv_rpr_el1;
-} __attribute__ ((__aligned__ (sizeof(unsigned long))));
-
 struct system_context {
 	uint64_t vbar_el1;
 	uint64_t esr_el1;
@@ -93,7 +50,6 @@ struct system_context {
 } __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
 struct aarch64_vcpu {
-	struct gic_context gic_context;
 	struct system_context system_context;
 };
 

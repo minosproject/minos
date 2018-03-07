@@ -1,6 +1,8 @@
 #ifndef _MVISOR_PRINT_H_
 #define _MVISOR_PRINT_H_
 
+int log_buffer_init(void);
+
 int level_print(const char *fmt, ...);
 
 #define	pr_debug(...)		level_print("4DEBUG : " __VA_ARGS__)

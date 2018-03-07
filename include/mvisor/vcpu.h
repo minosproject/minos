@@ -24,7 +24,7 @@ typedef struct vmm_vcpu {
 	pt_regs regs;
 	uint32_t vcpu_id;
 	vcpu_state_t state;
-	vm_t *vm_belong_to;
+	vm_t *vm;
 	unsigned long entry_point;
 	uint32_t pcpu_affinity;
 	uint32_t status;
@@ -33,27 +33,27 @@ typedef struct vmm_vcpu {
 	void *arch_data;
 } vcpu_t __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
-static vcpu_state_t inline vmm_get_vcpu_state(vcpu_t *vcpu)
+static vcpu_state_t inline get_vcpu_state(vcpu_t *vcpu)
 {
 	return vcpu->state;
 }
 
-static void inline vmm_set_vcpu_state(vcpu_t *vcpu, vcpu_state_t state)
+static void inline set_vcpu_state(vcpu_t *vcpu, vcpu_state_t state)
 {
 	vcpu->state = state;
 }
 
-static uint32_t inline vmm_get_vcpu_id(vcpu_t *vcpu)
+static uint32_t inline get_vcpu_id(vcpu_t *vcpu)
 {
 	return vcpu->vcpu_id;
 }
 
-static uint32_t inline vmm_get_vm_id(vcpu_t *vcpu)
+static uint32_t inline get_vmid(vcpu_t *vcpu)
 {
-	return (vcpu->vm_belong_to->vmid);
+	return (vcpu->vm->vmid);
 }
 
-static uint32_t inline vmm_get_pcpu_id(vcpu_t *vcpu)
+static uint32_t inline get_pcpu_id(vcpu_t *vcpu)
 {
 	return vcpu->pcpu_affinity;
 }

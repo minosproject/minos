@@ -4,6 +4,13 @@
 #include <mvisor/vcpu.h>
 #include <mvisor/module.h>
 
+struct vmsa_context {
+	uint64_t vtcr_el2;
+	uint64_t ttbr0_el1;
+	uint64_t ttbr1_el1;
+	uint64_t vttbr_el2;
+} __attribute__ ((__aligned__ (sizeof(unsigned long))));
+
 #define G4K_LEVEL1_OFFSET	(30)
 #define G4K_LEVEL2_OFFSET	(21)
 #define G16K_LEVEL1_OFFSET	(25)
@@ -249,7 +256,7 @@ int mmu_map_mem(unsigned long t_base, unsigned long base,
 	return 0;
 }
 
-uint64_t mmu_generate_vtcr_el2(void)
+static uint64_t generate_vtcr_el2(void)
 {
 	uint64_t value = 0;
 
@@ -276,7 +283,7 @@ uint64_t mmu_generate_vtcr_el2(void)
 	return value;
 }
 
-uint64_t mmu_get_vttbr_el2_base(uint32_t vmid, unsigned long base)
+static uint64_t generate_vttbr_el2(uint32_t vmid, unsigned long base)
 {
 	uint64_t value = 0;
 
@@ -308,7 +315,11 @@ int el2_stage2_vmsa_init(void)
 
 static void vmsa_state_init(vcpu_t *vcpu, void *context)
 {
+	vm_t *vm = vcpu->vm;
+	struct vmsa_context *c = (struct vmsa_context *)context;
 
+	c->vtcr_el2 = generate_vtcr_el2();
+	c->vttbr_el2 = generate_vttbr_el2(vm->vmid, vm->mm.page_table_base);
 }
 
 static void vmsa_state_save(vcpu_t *vcpu, void *context)
@@ -325,13 +336,6 @@ static struct mmu_chip vmsa_mmu = {
 	.map_memory = mmu_map_mem,
 	.alloc_page_table = alloc_page_tabe,
 };
-
-struct vmsa_context {
-	uint64_t vtcr_el2;
-	uint64_t ttbr0_el1;
-	uint64_t ttbr1_el1;
-	uint64_t vttbr_el2;
-} __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
 static int vmsa_module_init(struct vmm_module *module)
 {

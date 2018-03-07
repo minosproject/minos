@@ -18,6 +18,8 @@ int get_cpu_id(void);
 void smp_cpus_up(void);
 int smp_cpu_up(uint64_t mpidr_id);
 
+void vmm_smp_init(void);
+
 static inline uint64_t
 generate_vcpu_id(uint32_t pcpu_id, uint32_t vm_id, uint32_t vcpu_id)
 {

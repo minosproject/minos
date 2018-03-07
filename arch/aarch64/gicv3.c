@@ -12,10 +12,6 @@ spinlock_t gicv3_lock;
 static void *gicd_base = (void *)0x2f000000;
 static void * __gicr_rd_base = (void *)0x2f100000;
 
-struct gicv3_context {
-
-};
-
 DEFINE_PER_CPU(void *, gicr_rd_base);
 DEFINE_PER_CPU(void *, gicr_sgi_base);
 
@@ -284,7 +280,7 @@ static void gicv3_state_restore(vcpu_t *vcpu, void *context)
 
 static void gicv3_state_init(vcpu_t *vcpu, void *context)
 {
-
+	struct gic_context *c = (struct gic_context *)context;
 }
 
 void gic_init_el3(void)
@@ -424,7 +420,7 @@ static int gicv3_module_init(struct vmm_module *module)
 	gicv3_chip.irq_start = 0;
 	gicv3_chip.irq_num = nr_lines;
 
-	module->context_size = sizeof(struct gicv3_context);
+	module->context_size = sizeof(struct gic_context);
 	module->pdata = (void *)&gicv3_chip;
 	module->state_init = gicv3_state_init;
 	module->state_save = gicv3_state_save;

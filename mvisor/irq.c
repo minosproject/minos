@@ -45,7 +45,7 @@ int vmm_register_irq_entry(void *res)
 	vmm_irq->hno = config->hno;
 	vmm_irq->vmid = config->vmid;
 	vmm_irq->affinity_vcpu = config->affinity;
-	vmm_irq->affinity_pcpu = vmm_get_pcpu_id(vcpu);
+	vmm_irq->affinity_pcpu = get_pcpu_id(vcpu);
 	strncpy(vmm_irq->name, config->name,
 		MIN(strlen(config->name), MAX_IRQ_NAME_SIZE - 1));
 	vmm_irq->flags |= config->type;

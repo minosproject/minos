@@ -260,7 +260,7 @@ uint64_t sync_el2_handler(vcpu_t *vcpu)
 	ec_config_t *ec;
 	long ret;
 
-	if (vmm_get_pcpu_id(vcpu) != cpuid)
+	if (get_pcpu_id(vcpu) != cpuid)
 		panic("this vcpu is not belont to the pcpu");
 
 	esr_value = read_esr_el2();

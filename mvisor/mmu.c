@@ -18,7 +18,7 @@ int mmu_map_memory(unsigned long page_table_base, unsigned long phy_base,
 unsigned long mmu_alloc_page_table(void)
 {
 	if (!mmu_chip->alloc_page_table)
-		return -EINVAL;
+		return 0;
 
 	return mmu_chip->alloc_page_table();
 }

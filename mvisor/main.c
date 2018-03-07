@@ -9,14 +9,10 @@
 #include <asm/arch.h>
 #include <mvisor/vcpu.h>
 #include <mvisor/resource.h>
-
-extern void vmm_init_pcpus(void);
-extern int log_buffer_init(void);
-extern void sched_vcpu(void);
-extern void vmm_irqs_init(void);
-extern void vmm_smp_init(void);
-extern int vmm_arch_init(void);
-extern int vmm_early_init(void);
+#include <mvisor/pm.h>
+#include <mvisor/init.h>
+#include <mvisor/sched.h>
+#include <mvisor/smp.h>
 
 int boot_main(void)
 {
@@ -32,7 +28,8 @@ int boot_main(void)
 		panic("cpu is not cpu0");
 
 	vmm_arch_init();
-	vmm_init_pcpus();
+	vmm_percpus_init();
+	vmm_pcpus_init();
 	vmm_smp_init();
 	vmm_irq_init();
 	vmm_mmu_init();
@@ -56,7 +53,10 @@ int boot_main(void)
 	smp_cpus_up();
 	enable_local_irq();
 
-	sched_vcpu();
+	while (1) {
+		sched_vcpu();
+		cpu_idle();
+	}
 
 	return 0;
 }
@@ -85,7 +85,8 @@ int boot_secondary(void)
 	smp_holding_pen[cpuid] = 0xffff;
 	//gic_send_sgi(15, SGI_TO_SELF, NULL);
 
-	while (1);
-
-	sched_vcpu();
+	while (1) {
+		sched_vcpu();
+		cpu_idle();
+	}
 }

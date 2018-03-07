@@ -1,5 +1,5 @@
 #include <mvisor/vcpu.h>
-#include <mvisor/pcpu.h>
+#include <mvisor/sched.h>
 #include <mvisor/vm.h>
 #include <mvisor/mvisor.h>
 #include <mvisor/percpu.h>
@@ -7,36 +7,8 @@
 static pcpu_t pcpus[CONFIG_NR_CPUS];
 extern void switch_to_vcpu(pt_regs *regs);
 
-extern unsigned char __percpu_start;
-extern unsigned char __percpu_end;
-extern unsigned char __percpu_section_size;
-
-phy_addr_t percpu_offset[CONFIG_NR_CPUS];
-
 DEFINE_PER_CPU(vcpu_t *, running_vcpu);
 DEFINE_PER_CPU(pcpu_t *, pcpu);
-
-void vmm_init_pcpus(void)
-{
-	int i;
-	pcpu_t *pcpu;
-	size_t size;
-
-	size = (&__percpu_end) - (&__percpu_start);
-	memset((char *)&__percpu_start, 0, size);
-
-	for (i = 0; i < CONFIG_NR_CPUS; i++) {
-		percpu_offset[i] = (phy_addr_t)(&__percpu_start) +
-			(size_t)(&__percpu_section_size) * i;
-	}
-
-	for (i = 0; i < CONFIG_NR_CPUS; i++) {
-		pcpu = &pcpus[i];
-		init_list(&pcpu->vcpu_list);
-		pcpu->pcpu_id = i;
-		get_per_cpu(pcpu, i) = pcpu;
-	}
-}
 
 uint32_t pcpu_affinity(vcpu_t *vcpu, uint32_t affinity)
 {
@@ -56,8 +28,8 @@ uint32_t pcpu_affinity(vcpu_t *vcpu, uint32_t affinity)
 	pcpu = &pcpus[affinity];
 	list_for_each(&pcpu->vcpu_list, list) {
 		tvcpu = list_entry(list, vcpu_t, pcpu_list);
-		if ((vcpu->vm_belong_to->vmid) ==
-				(tvcpu->vm_belong_to->vmid))
+		if ((vcpu->vm->vmid) ==
+				(tvcpu->vm->vmid))
 			goto step2;
 	}
 
@@ -77,8 +49,8 @@ step2:
 		pcpu = &pcpus[i];
 		list_for_each(&pcpu->vcpu_list, list) {
 			tvcpu = list_entry(list, vcpu_t, pcpu_list);
-			if ((vcpu->vm_belong_to->vmid) ==
-					(tvcpu->vm_belong_to->vmid)) {
+			if ((vcpu->vm->vmid) ==
+					(tvcpu->vm->vmid)) {
 				found = 1;
 				break;
 			}
@@ -101,7 +73,7 @@ static vcpu_t *find_vcpu_to_run(pcpu_t *pcpu)
 
 	list_for_each(&pcpu->vcpu_list, list) {
 		vcpu = list_entry(list, vcpu_t, pcpu_list);
-		if (vmm_get_vcpu_state(vcpu) == VCPU_STATE_READY)
+		if (get_vcpu_state(vcpu) == VCPU_STATE_READY)
 			return vcpu;
 	}
 
@@ -129,5 +101,18 @@ void sched_vcpu(void)
 		/*
 		 * should never return here
 		 */
+	}
+}
+
+void vmm_pcpus_init(void)
+{
+	int i;
+	pcpu_t *pcpu;
+
+	for (i = 0; i < CONFIG_NR_CPUS; i++) {
+		pcpu = &pcpus[i];
+		init_list(&pcpu->vcpu_list);
+		pcpu->pcpu_id = i;
+		get_per_cpu(pcpu, i) = pcpu;
 	}
 }

@@ -1,7 +1,7 @@
 #include <mvisor/mvisor.h>
 #include <mvisor/vm.h>
 #include <mvisor/vcpu.h>
-#include <mvisor/pcpu.h>
+#include <mvisor/sched.h>
 #include <config/vm_config.h>
 #include <config/config.h>
 #include <mvisor/module.h>
@@ -113,7 +113,7 @@ static int vm_create_vcpus(vm_t *vm)
 		memset((char *)vcpu, 0, sizeof(vcpu_t));
 
 		vcpu->vcpu_id = i;
-		vcpu->vm_belong_to = vm;
+		vcpu->vm = vm;
 		vcpu->entry_point = vm->entry_point;
 		vcpu->pcpu_affinity = pcpu_affinity(vcpu, vm->vcpu_affinity[i]);
 		if (vcpu->pcpu_affinity == PCPU_AFFINITY_FAIL) {
@@ -179,10 +179,10 @@ static int vm_state_init(vm_t *vm)
 	 */
 	for (i = 0; i < vm->vcpu_nr; i++) {
 		vcpu = vm->vcpus[i];
-		if (vmm_get_vcpu_id(vcpu) == 0)
-			vmm_set_vcpu_state(vcpu, VCPU_STATE_READY);
+		if (get_vcpu_id(vcpu) == 0)
+			set_vcpu_state(vcpu, VCPU_STATE_READY);
 		else
-			vmm_set_vcpu_state(vcpu, VCPU_STATE_STOP);
+			set_vcpu_state(vcpu, VCPU_STATE_STOP);
 	}
 
 	return 0;
