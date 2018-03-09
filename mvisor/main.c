@@ -14,7 +14,7 @@
 #include <mvisor/sched.h>
 #include <mvisor/smp.h>
 
-int boot_main(void)
+void boot_main(void)
 {
 	int i;
 
@@ -53,15 +53,10 @@ int boot_main(void)
 	smp_cpus_up();
 	enable_local_irq();
 
-	while (1) {
-		sched_vcpu();
-		cpu_idle();
-	}
-
-	return 0;
+	sched_vcpu();
 }
 
-int boot_secondary(void)
+void boot_secondary(void)
 {
 	uint32_t cpuid = get_cpu_id();
 	uint64_t mid;
@@ -85,8 +80,5 @@ int boot_secondary(void)
 	smp_holding_pen[cpuid] = 0xffff;
 	//gic_send_sgi(15, SGI_TO_SELF, NULL);
 
-	while (1) {
-		sched_vcpu();
-		cpu_idle();
-	}
+	sched_vcpu();
 }

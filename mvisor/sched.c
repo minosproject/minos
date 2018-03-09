@@ -3,11 +3,13 @@
 #include <mvisor/vm.h>
 #include <mvisor/mvisor.h>
 #include <mvisor/percpu.h>
+#include <mvisor/pm.h>
 
 static pcpu_t pcpus[CONFIG_NR_CPUS];
 extern void switch_to_vcpu(pt_regs *regs);
 
-DEFINE_PER_CPU(vcpu_t *, running_vcpu);
+DEFINE_PER_CPU(vcpu_t *, current_vcpu);
+DEFINE_PER_CPU(vcpu_t *, next_vcpu);
 DEFINE_PER_CPU(pcpu_t *, pcpu);
 
 uint32_t pcpu_affinity(vcpu_t *vcpu, uint32_t affinity)
@@ -24,6 +26,14 @@ uint32_t pcpu_affinity(vcpu_t *vcpu, uint32_t affinity)
 	 */
 	if (affinity >= CONFIG_NR_CPUS)
 		goto step2;
+
+	/*
+	 * idle vcpu for each pcpu
+	 */
+	if (vcpu->vm == NULL) {
+		list_add_tail(&pcpu->vcpu_list, &vcpu->pcpu_list);
+		return affinity;
+	}
 
 	pcpu = &pcpus[affinity];
 	list_for_each(&pcpu->vcpu_list, list) {
@@ -82,25 +92,30 @@ static vcpu_t *find_vcpu_to_run(pcpu_t *pcpu)
 
 void sched_vcpu(void)
 {
-	int cpuid;
 	pcpu_t *pcpu;
 	struct list_head *list;
 	vcpu_t *vcpu;
 
-	cpuid = get_cpu_id();
 	pcpu = get_cpu_var(pcpu);
 
-	vcpu = find_vcpu_to_run(pcpu);
-	if (vcpu == NULL) {
-		/*
-		 * can goto idle state
-		 */
-	} else {
-		get_cpu_var(running_vcpu) = vcpu;
-		//switch_to_vcpu(&vcpu->context);
-		/*
-		 * should never return here
-		 */
+	while (1) {
+resched:
+		vcpu = find_vcpu_to_run(pcpu);
+
+		if ((vcpu == NULL) && (!pcpu->need_resched)) {
+			/*
+			 * if there is no vcpu to sched and
+			 * do not need to resched, then this
+			 * pcpu can goto idle state
+			 */
+			cpu_idle();
+		} else {
+			if (pcpu->need_resched)
+				goto resched;
+
+			get_cpu_var(current_vcpu) = vcpu;
+			break;
+		}
 	}
 }
 

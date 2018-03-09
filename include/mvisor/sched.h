@@ -11,6 +11,7 @@
 
 typedef struct vmm_pcpu {
 	uint32_t pcpu_id;
+	int need_resched;
 	struct list_head vcpu_list;
 } pcpu_t;
 

@@ -252,13 +252,14 @@ ec_config_t *get_ec_config(uint32_t ec_type)
 	return NULL;
 }
 
-uint64_t sync_el2_handler(vcpu_t *vcpu)
+void SError_from_el1_handler(void *data)
 {
 	int cpuid = get_cpu_id();
 	uint32_t esr_value;
 	uint32_t ec_type, il, iss;
 	ec_config_t *ec;
 	long ret;
+	vcpu_t *vcpu = (vcpu_t *)data;
 
 	if (get_pcpu_id(vcpu) != cpuid)
 		panic("this vcpu is not belont to the pcpu");
@@ -272,13 +273,18 @@ uint64_t sync_el2_handler(vcpu_t *vcpu)
 	ec = get_ec_config(ec_type);
 	if (ec == NULL) {
 		ret = -EINVAL;
-		goto out;
+		return;
 	}
 
 	ret = ec->handler(iss, il, (void *)vcpu);
 
-out:
-	//vcpu->context.elr_el2 += ec->ret_addr_adjust;
-	return 0;
+	/*
+	 * TBD
+	 */
+}
+
+void SError_from_el2_handler(void *data)
+{
+	while (1);
 }
 
