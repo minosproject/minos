@@ -7,7 +7,7 @@ int arch_vm_init(vm_t *vm)
 {
 	int i;
 	vcpu_t *vcpu;
-	pt_regs *regs;
+	vcpu_regs *regs;
 
 	for (i = 0; i < vm->vcpu_nr; i++) {
 		vcpu = vm->vcpus[i];

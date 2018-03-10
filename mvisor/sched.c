@@ -6,7 +6,7 @@
 #include <mvisor/pm.h>
 
 static pcpu_t pcpus[CONFIG_NR_CPUS];
-extern void switch_to_vcpu(pt_regs *regs);
+extern void switch_to_vcpu(vcpu_regs *regs);
 
 DEFINE_PER_CPU(vcpu_t *, current_vcpu);
 DEFINE_PER_CPU(vcpu_t *, next_vcpu);

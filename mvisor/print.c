@@ -26,7 +26,7 @@ struct log_buffer {
 
 static struct log_buffer log_buffer;
 
-int log_buffer_init(void)
+int vmm_log_init(void)
 {
 	spin_lock_init(&log_buffer.buffer_lock);
 	log_buffer.head = 0;

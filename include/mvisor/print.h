@@ -1,7 +1,7 @@
 #ifndef _MVISOR_PRINT_H_
 #define _MVISOR_PRINT_H_
 
-int log_buffer_init(void);
+int vmm_log_init(void);
 
 int level_print(const char *fmt, ...);
 

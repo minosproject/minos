@@ -44,6 +44,9 @@ int vmm_register_irq_entry(void *res)
 	vmm_irq->vno = config->vno;
 	vmm_irq->hno = config->hno;
 	vmm_irq->vmid = config->vmid;
+	if (vmm_irq->vmid == 0xffffffff)
+		vmm_irq->flag |= IRQ_FLAG_OWNER_VMM;
+
 	vmm_irq->affinity_vcpu = config->affinity;
 	vmm_irq->affinity_pcpu = get_pcpu_id(vcpu);
 	strncpy(vmm_irq->name, config->name,
@@ -99,6 +102,138 @@ int vmm_alloc_irqs(uint32_t start,
 	return 0;
 }
 
+static int do_handle_guest_irq(struct vmm_irq *vmm_irq, vcpu_regs *regs)
+{
+	vm_t *vm;
+	vcpu_t *vcpu_o;
+	vcpu_t *vcpu = (vcpu_t *)regs;
+
+	vm = get_vm_by_id(vmm_irq->vmid);
+	if (!vm) {
+		pr_error("Invaild vm for this irq %d\n", vmm_irq->hno);
+		return -EINVAL;
+	}
+
+	vcpu_o = get_vcpu_in_vm(vm, vmm_irq->affinity_vcpu);
+	if (vcpu_o == NULL) {
+		pr_error("Invaild vcpu for this irq %d\n", vmm_irq->hno);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static int do_handle_vmm_irq(struct vmm_irq *vmm_irq, vcpu_regs *vcpu)
+{
+	uint32_t cpuid = get_cpu_id();
+
+	if (cpuid != vmm_irq->affinity_pcpu) {
+		pr_info("irq %d do not belong tho this cpu\n", vmm_irq->hno);
+		return -EINVAL;
+	}
+
+	if (!vmm_irq->irq_handler) {
+		pr_error("Irq is not register by VMM\n");
+		return -EINVAL;
+	}
+
+	return vmm_irq->irq_handler(vmm_irq->hno, vmm_irq->pdata);
+}
+
+static int do_spi_int(uint32_t irq, vcpu_regs *regs)
+{
+	struct vmm_irq *vmm_irq;
+	int ret;
+
+	vmm_irq = irq_table[irq];
+	if (vmm_irq == NULL) {
+		pr_error("irq is not register\n");
+		goto out;
+	}
+
+	if (vmm_irq->flags & IRQ_FLAG_OWNER_VMM)
+		ret = do_handle_vmm_irq(vmm_irq, regs);
+	else
+		ret = do_handle_guest_irq(vmm_irq, regs);
+
+	if (irq_chip->handle_api_int)
+		irq_chip->handle_spi_int(vmm_irq, regs);
+
+	return ret;
+}
+
+static int do_sgi_int(uint32_t irq, vcpu_regs *regs)
+{
+	return 0;
+}
+
+static int do_ppi_int(uint32_t irq, vcpu_regs *regs)
+{
+	return 0;
+}
+
+static int do_lpi_int(uint32_t irq, vcpu_regs *regs)
+{
+	return 0;
+}
+
+static int do_special_int(uint32_t irq, vcpu_regs *regs)
+{
+	return 0;
+}
+
+static int do_lpi_int(uint32_t irq, vcpu_regs *regs)
+{
+	return 0;
+}
+
+static int do_bad_int(uint32_t irq, vcpu_regs *regs)
+{
+	return 0;
+}
+
+int do_irq_handler(vcpu_regs *regs)
+{
+	uint32_t irq;
+	int ret;
+	struct vmm_irq *vmm_irq;
+	int type = IRQ_TYPE_SPI;
+
+	if (!irq_chip)
+		panic("irq_chip is Null when irq is triggered\n");
+
+	irq = irq_chip->get_pending_irq();
+
+	if (irq_chip->get_irq_type(irq))
+		type = irq_chip->get_irq_type(irq);
+
+	switch (type) {
+	case IRQ_TYPE_SGI:
+		ret = do_sgi_int(irq, regs);
+		break;
+	case IRQ_TYPE_PPI:
+		ret = do_ppi_int(irq, regs);
+		break;
+	case IRQ_TYPE_SPI:
+		ret = do_spi_int(irq, regs);
+		break;
+	case IRQ_TYPE_LPI:
+		ret = do_lpi_int(irq, regs);
+		break;
+	case IRQ_TYPE_SPECIAL:
+		ret = do_special_int(irq, regs);
+		break;
+	case IRQ_TYPE_BAD:
+		ret = do_bad_int(irq, regs);
+		break;
+	default:
+		break;
+	}
+
+	irq_chip->eoi_irq(irq);
+	return ret;
+}
+
 int vmm_irq_init(void)
 {
 	uint32_t size;
@@ -125,6 +260,9 @@ int vmm_irq_init(void)
 	 */
 	if (irq_chip->init)
 		irq_chip->init();
+
+	if (!irq_chip->get_pending_irq)
+		panic("No function to get irq nr\n");
 
 	return 0;
 }

@@ -3,7 +3,7 @@
 
 #include <mvisor/types.h>
 
-typedef struct _pt_regs {
+typedef struct aarch64_vcpu_regs {
 	uint64_t x0;
 	uint64_t x1;
 	uint64_t x2;
@@ -39,7 +39,7 @@ typedef struct _pt_regs {
 	uint64_t elr_el2;
 	uint64_t spsr_el2;
 	uint64_t nzcv;
-} pt_regs __attribute__ ((__aligned__ (sizeof(unsigned long))));
+} vcpu_regs __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
 struct system_context {
 	uint64_t vbar_el1;

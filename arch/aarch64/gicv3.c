@@ -184,6 +184,16 @@ void gicv3_unmask_irq(struct vmm_irq *vmm_irq)
 	spin_unlock(&gicv3_lock);
 }
 
+static int gicv3_get_irq_type(uint32_t irq)
+{
+	return 0;
+}
+
+static int gicv3_handle_sgi_int(uint32_t irq, vcpu_t *vcpu)
+{
+	return 0;
+}
+
 static void gicv3_wakeup_gicr(void)
 {
 	uint32_t gicv3_waker_value;
@@ -405,6 +415,8 @@ static struct irq_chip gicv3_chip = {
 	.irq_set_type 		= gicv3_set_irq_type,
 	.irq_set_affinity 	= gicv3_set_irq_affinity,
 	.send_sgi		= gicv3_send_sgi,
+	.get_pending_irq	= gicv3_read_irq,
+	.get_irq_type		= gicv3_get_irq_type,
 	.irq_set_priority	= gicv3_set_irq_priority,
 	.init			= gicv3_init,
 	.secondary_init		= gicv3_secondary_init,

@@ -69,7 +69,7 @@ static int parse_all_vms(void)
 	return 0;
 }
 
-vm_t *vmm_get_vm(uint32_t vmid)
+vm_t *get_vm_by_id(uint32_t vmid)
 {
 	int i;
 	vm_t *vm;
@@ -83,18 +83,23 @@ vm_t *vmm_get_vm(uint32_t vmid)
 	return NULL;
 }
 
-vcpu_t *vmm_get_vcpu(uint32_t vmid, uint32_t vcpu_id)
+vcpu_t *get_vcpu_in_vm(vm_t *vm, uint32_t vcpu_id)
 {
-	vm_t *vm;
-
-	vm = vmm_get_vm(vmid);
-	if (!vm)
-		return NULL;
-
 	if (vcpu_id >= vm->vcpu_nr)
 		return NULL;
 
 	return vm->vcpus[vcpu_id];
+}
+
+vcpu_t *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id)
+{
+	vm_t *vm;
+
+	vm = get_vm_by_id(vmid);
+	if (!vm)
+		return NULL;
+
+	return get_vcpu_in_vm(vm, vcpu_id);
 }
 
 static int vm_create_vcpus(vm_t *vm)

@@ -20,7 +20,8 @@ void boot_main(void)
 
 	vmm_early_init();
 	vmm_mm_init();
-	log_buffer_init();
+
+	vmm_log_init();
 
 	pr_info("Starting mVisor ...\n");
 
