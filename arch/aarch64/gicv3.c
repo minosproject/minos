@@ -12,6 +12,9 @@ spinlock_t gicv3_lock;
 static void *gicd_base = (void *)0x2f000000;
 static void * __gicr_rd_base = (void *)0x2f100000;
 
+static int gicv3_nr_lr = 0;
+static int gicv3_nr_pr = 0;
+
 DEFINE_PER_CPU(void *, gicr_rd_base);
 DEFINE_PER_CPU(void *, gicr_sgi_base);
 
@@ -136,6 +139,149 @@ static void gicv3_send_sgi_list(uint32_t sgi, cpumask_t *mask)
 		(0ul << 48) | (sgi << 24);
 	write_sysreg64(val, ICC_SGI1R_EL1);
 	isb();
+}
+
+uint64_t gicv3_read_lr(int lr)
+{
+	switch ( lr ) {
+	case 0:
+		return READ_SYSREG(ICH_LR0_EL2);
+	case 1:
+		return READ_SYSREG(ICH_LR1_EL2);
+	case 2:
+		return READ_SYSREG(ICH_LR2_EL2);
+	case 3:
+		return READ_SYSREG(ICH_LR3_EL2);
+	case 4:
+		return READ_SYSREG(ICH_LR4_EL2);
+	case 5:
+		return READ_SYSREG(ICH_LR5_EL2);
+	case 6:
+		return READ_SYSREG(ICH_LR6_EL2);
+	case 7:
+		return READ_SYSREG(ICH_LR7_EL2);
+	case 8:
+		return READ_SYSREG(ICH_LR8_EL2);
+	case 9:
+		return READ_SYSREG(ICH_LR9_EL2);
+	case 10:
+		return READ_SYSREG(ICH_LR10_EL2);
+	case 11:
+		return READ_SYSREG(ICH_LR11_EL2);
+	case 12:
+		return READ_SYSREG(ICH_LR12_EL2);
+	case 13:
+		return READ_SYSREG(ICH_LR13_EL2);
+	case 14:
+		return READ_SYSREG(ICH_LR14_EL2);
+	case 15:
+		return READ_SYSREG(ICH_LR15_EL2);
+	default:
+		panic("Invaild LR list\n");
+}
+
+static void gicv3_write_lr(int lr, uint64_t val)
+{
+	switch ( lr )
+	{
+	case 0:
+		WRITE_SYSREG(val, ICH_LR0_EL2);
+		break;
+	case 1:
+		WRITE_SYSREG(val, ICH_LR1_EL2);
+		break;
+	case 2:
+		WRITE_SYSREG(val, ICH_LR2_EL2);
+		break;
+	case 3:
+		WRITE_SYSREG(val, ICH_LR3_EL2);
+		break;
+	case 4:
+		WRITE_SYSREG(val, ICH_LR4_EL2);
+		break;
+	case 5:
+		WRITE_SYSREG(val, ICH_LR5_EL2);
+		break;
+	case 6:
+		WRITE_SYSREG(val, ICH_LR6_EL2);
+		break;
+	case 7:
+		WRITE_SYSREG(val, ICH_LR7_EL2);
+		break;
+	case 8:
+		WRITE_SYSREG(val, ICH_LR8_EL2);
+		break;
+	case 9:
+		WRITE_SYSREG(val, ICH_LR9_EL2);
+		break;
+	case 10:
+		WRITE_SYSREG(val, ICH_LR10_EL2);
+		break;
+	case 11:
+		WRITE_SYSREG(val, ICH_LR11_EL2);
+		break;
+	case 12:
+		WRITE_SYSREG(val, ICH_LR12_EL2);
+		break;
+	case 13:
+		WRITE_SYSREG(val, ICH_LR13_EL2);
+		break;
+	case 14:
+		WRITE_SYSREG(val, ICH_LR14_EL2);
+		break;
+	case 15:
+		WRITE_SYSREG(val, ICH_LR15_EL2);
+		break;
+	default:
+		return;
+	}
+
+	isb();
+}
+
+static int send_virtual_irq(void *c, uint32_t v, uint32_t h)
+{
+	int i, empty = 0xff;
+	uint64_t *lr_base;
+	uint64_t value;
+	struct gic_lr *lr;
+
+	lr = (struct gic_lr *)&value;
+
+	if (c)
+		lr_base = (uint64_t *)c;
+	/*
+	 * first find one empty list lr register
+	 */
+	for(i = 0; i < gicv3_nr_lr; i++) {
+		if (c)
+			value = lr_base[i];
+		else
+			value = gicv3_read_lr(i);
+
+		if (lr->state == 0) {
+			empty = i;
+		}
+
+		if (lr->p_intid == h)
+			return 0;
+	}
+
+	lr->v_intid = v;
+	lr->p_intid = h;
+	lr->priority = 0;
+	lr->group = 1;
+	lr->hw = h;
+
+	if (empty) {
+		if (c)
+			lr_base[empty] = value;
+		else
+			gicv3_write_lr(empty, value);
+	}
+
+out:
+	return -EAGAIN;
 }
 
 void gicv3_send_sgi(struct vmm_irq *data, enum sgi_mode mode, cpumask_t *cpu)
@@ -291,6 +437,8 @@ static void gicv3_state_restore(vcpu_t *vcpu, void *context)
 static void gicv3_state_init(vcpu_t *vcpu, void *context)
 {
 	struct gic_context *c = (struct gic_context *)context;
+
+
 }
 
 void gic_init_el3(void)
@@ -425,12 +573,20 @@ static struct irq_chip gicv3_chip = {
 static int gicv3_module_init(struct vmm_module *module)
 {
 	uint32_t type, nr_lines;
+	uint32_t value;
 
 	type = ioread32(gicd_base + GICD_TYPER);
 	nr_lines = 32 * ((type & 0x1f));
 
 	gicv3_chip.irq_start = 0;
 	gicv3_chip.irq_num = nr_lines;
+
+	value = READ_SYSREG32(ICH_VTR_EL2);
+	gicv3_nr_lr = (value & 0x3f) + 1;
+	gicv3_nr_pr = ((value >> 29) & 0x7) + 1;
+
+	if (!((gicv3_nr_pr > 4) && (gicv3_nr_pr < 8)))
+		panic("GICv3: Invalid number of priority bits\n");
 
 	module->context_size = sizeof(struct gic_context);
 	module->pdata = (void *)&gicv3_chip;

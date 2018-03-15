@@ -67,6 +67,8 @@ struct irq_chip {
 	int (*handle_lpi_int)(uint32_t irq, vcpu_t *vcpu);
 	int (*handle_special_int)(uint32_t irq, vcpu_t *vcpu);
 	int (*handle_bad_int)(uint32_t irq, vcpu_t *vcpu);
+	int (*send_virtual_irq)(struct vcpu_irq *vcpu_irq, void *context);
+	int (*get_virq_state)(struct vcpu_irq *vcpu_irq, void *context);
 	int (*init)(void);
 	int (*secondary_init)(void);
 };

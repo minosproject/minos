@@ -120,11 +120,6 @@
 #define SPI_OFFSET(num)	(num - 32)
 
 struct gic_context {
-	uint64_t ich_ap0r0_el2;
-	uint64_t ich_ap1r0_el2;
-	uint64_t ich_eisr_el2;
-	uint64_t ich_elrsr_el2;
-	uint64_t ich_hcr_el2;
 	uint64_t ich_lr0_el2;
 	uint64_t ich_lr1_el2;
 	uint64_t ich_lr2_el2;
@@ -141,9 +136,6 @@ struct gic_context {
 	uint64_t ich_lr13_el2;
 	uint64_t ich_lr14_el2;
 	uint64_t ich_lr15_el2;
-	uint64_t ich_misr_el2;
-	uint64_t ich_vmcr_el2;
-	uint64_t ich_vtr_el2;
 	uint64_t icv_ap0r0_el1;
 	uint64_t icv_ap1r0_el1;
 	uint64_t icv_bpr0_el1;
@@ -161,5 +153,16 @@ struct gic_context {
 	uint64_t icv_pmr_el1;
 	uint64_t icv_rpr_el1;
 } __attribute__ ((__aligned__ (sizeof(unsigned long))));
+
+struct gic_lr {
+	uint64_t v_intid : 32;
+	uint64_t p_intid : 10;
+	uint64_t res0 : 6;
+	uint64_t priority : 8;
+	uint64_t res1 : 4;
+	uint64_t group : 1;
+	uint64_t hw : 1;
+	uint64_t state : 2;
+};
 
 #endif

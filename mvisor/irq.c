@@ -102,11 +102,29 @@ int vmm_alloc_irqs(uint32_t start,
 	return 0;
 }
 
-static int do_handle_guest_irq(struct vmm_irq *vmm_irq, vcpu_regs *regs)
+static int send_virtual_irq(vcpu_t *vcpu, uint32_t v, uint32_t h)
+{
+	int ret;
+	void *context = NULL;
+
+	if (vcpu)
+		context = get_vcpu_module_data(vcpu, VMM_MODULE_NAME_IRQCHIP);
+
+	/*
+	 * just to change some register's settings, ture
+	 * virq will trigger when return to guest vm, if
+	 * the virq is not send successful this time then
+	 * add it to the pending list for next time
+	 */
+	ret = irq_chip->send_virtual_irq(context, v, h);
+
+	return 0;
+}
+
+static int do_handle_guest_irq(struct vmm_irq *vmm_irq, vcpu_t *vcpu)
 {
 	vm_t *vm;
 	vcpu_t *vcpu_o;
-	vcpu_t *vcpu = (vcpu_t *)regs;
 
 	vm = get_vm_by_id(vmm_irq->vmid);
 	if (!vm) {
@@ -120,10 +138,17 @@ static int do_handle_guest_irq(struct vmm_irq *vmm_irq, vcpu_regs *regs)
 		return -EINVAL;
 	}
 
+	/*
+	 * do send the virtual irq to the guest vm
+	 */
+	send_virtual_irq(vcpu_o, vmm_irq->vno, vmm_irq->hno);
+
+	if ()
+
 	return 0;
 }
 
-static int do_handle_vmm_irq(struct vmm_irq *vmm_irq, vcpu_regs *vcpu)
+static int do_handle_vmm_irq(struct vmm_irq *vmm_irq, vcpu_t *vcpu)
 {
 	uint32_t cpuid = get_cpu_id();
 
@@ -140,7 +165,7 @@ static int do_handle_vmm_irq(struct vmm_irq *vmm_irq, vcpu_regs *vcpu)
 	return vmm_irq->irq_handler(vmm_irq->hno, vmm_irq->pdata);
 }
 
-static int do_spi_int(uint32_t irq, vcpu_regs *regs)
+static int do_spi_int(uint32_t irq, vcpu_t *vcpu)
 {
 	struct vmm_irq *vmm_irq;
 	int ret;
@@ -152,47 +177,47 @@ static int do_spi_int(uint32_t irq, vcpu_regs *regs)
 	}
 
 	if (vmm_irq->flags & IRQ_FLAG_OWNER_VMM)
-		ret = do_handle_vmm_irq(vmm_irq, regs);
+		ret = do_handle_vmm_irq(vmm_irq, vcpu);
 	else
-		ret = do_handle_guest_irq(vmm_irq, regs);
+		ret = do_handle_guest_irq(vmm_irq, vcpu);
 
-	if (irq_chip->handle_api_int)
-		irq_chip->handle_spi_int(vmm_irq, regs);
+	if (irq_chip->handle_spi_int)
+		irq_chip->handle_spi_int(vmm_irq, vcpu);
 
 	return ret;
 }
 
-static int do_sgi_int(uint32_t irq, vcpu_regs *regs)
+static int do_sgi_int(uint32_t irq, vcpu_t *vcpu)
 {
 	return 0;
 }
 
-static int do_ppi_int(uint32_t irq, vcpu_regs *regs)
+static int do_ppi_int(uint32_t irq, vcpu_t *vcpu)
 {
 	return 0;
 }
 
-static int do_lpi_int(uint32_t irq, vcpu_regs *regs)
+static int do_lpi_int(uint32_t irq, vcpu_t *vcpu)
 {
 	return 0;
 }
 
-static int do_special_int(uint32_t irq, vcpu_regs *regs)
+static int do_special_int(uint32_t irq, vcpu_t *vcpu)
 {
 	return 0;
 }
 
-static int do_lpi_int(uint32_t irq, vcpu_regs *regs)
+static int do_lpi_int(uint32_t irq, vcpu_t *vcpu)
 {
 	return 0;
 }
 
-static int do_bad_int(uint32_t irq, vcpu_regs *regs)
+static int do_bad_int(uint32_t irq, vcpu_t *vcpu)
 {
 	return 0;
 }
 
-int do_irq_handler(vcpu_regs *regs)
+int do_irq_handler(vcpu_t *vcpu)
 {
 	uint32_t irq;
 	int ret;
@@ -207,24 +232,29 @@ int do_irq_handler(vcpu_regs *regs)
 	if (irq_chip->get_irq_type(irq))
 		type = irq_chip->get_irq_type(irq);
 
+	/*
+	 * TBD - here we need deactive the irq
+	 * for arm write the ICC_EOIR1_EL1 register
+	 */
+
 	switch (type) {
 	case IRQ_TYPE_SGI:
-		ret = do_sgi_int(irq, regs);
+		ret = do_sgi_int(irq, vcpu);
 		break;
 	case IRQ_TYPE_PPI:
-		ret = do_ppi_int(irq, regs);
+		ret = do_ppi_int(irq, vcpu);
 		break;
 	case IRQ_TYPE_SPI:
-		ret = do_spi_int(irq, regs);
+		ret = do_spi_int(irq, vcpu);
 		break;
 	case IRQ_TYPE_LPI:
-		ret = do_lpi_int(irq, regs);
+		ret = do_lpi_int(irq, vcpu);
 		break;
 	case IRQ_TYPE_SPECIAL:
-		ret = do_special_int(irq, regs);
+		ret = do_special_int(irq, vcpu);
 		break;
 	case IRQ_TYPE_BAD:
-		ret = do_bad_int(irq, regs);
+		ret = do_bad_int(irq, vcpu);
 		break;
 	default:
 		break;
@@ -232,6 +262,52 @@ int do_irq_handler(vcpu_regs *regs)
 
 	irq_chip->eoi_irq(irq);
 	return ret;
+}
+
+#define VIRQ_STATE_INACTIVE		(0x0)
+#define VIRQ_STATE_PENDING		(0x1)
+#define VIRQ_STATE_ACTIVE		(0x2)
+#define VIRQ_STATE_ACTIVE_AND_PENDING	(0x3)
+
+static int irq_exit_from_guest(vcpu_t *vcpu, void *data)
+{
+	/*
+	 * here we update the states of the irq state
+	 * which the vcpu is handles, since this is running
+	 * on percpu and hanlde per_vcpu's data so do not
+	 * need spinlock
+	 */
+	struct vcpu_irq *vcpu_irq;
+	struct irq_struct *irq_struct = &vcpu->irq_struct;
+	uint32_t set_bit;
+	int status;
+	void *context;
+
+	context = get_vcpu_module_data(vcpu, VMM_MODULE_NAME_IRQCHIP);
+
+	for_each_set_bit(set_bit, &irq_struct->irq_bitmap,
+			CONFIG_VCPU_MAX_ACTIVE_IRQS) {
+		vcpu_irq = (struct vcpu_irq *)&irq_struct->vcpu_irqs[set_bit];
+		status = irq_chip->get_virq_state(vcpu_irq, context);
+
+		/*
+		 * the virq has been handled by the VCPU
+		 */
+		if (status == VIRQ_STATE_INACTIVE) {
+			clear_bit(&irq_struct->irq_bitmap, set_bit);
+			irq_struct->count--;
+			if (irq_struct->count < 0) {
+				pr_error("irq count is error\n");
+				break;
+			}
+
+			vcpu_irq->h_intno = 0;
+			vcpu_irq->v_intno = 0;
+			vcpu_irq->state = VIRQ_STATE_INACTIVE;
+		}
+	}
+
+	return 0;
 }
 
 int vmm_irq_init(void)
@@ -263,6 +339,9 @@ int vmm_irq_init(void)
 
 	if (!irq_chip->get_pending_irq)
 		panic("No function to get irq nr\n");
+
+	vmm_register_hook(irq_exit_from_guest,
+			NULL, VMM_HOOK_TYPE_EXIT_GUEST);
 
 	return 0;
 }

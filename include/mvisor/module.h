@@ -21,12 +21,17 @@ struct vmm_module {
 	uint32_t context_size;
 	void *pdata;
 	void *context;
+	void (*exit_from_guest)(vcpu_t *vcpu, void *context);
+	void (*return_to_guest)(vcpu_t *vcpu, void *context);
 	void (*state_save)(vcpu_t *vcpu, void *context);
 	void (*state_restore)(vcpu_t *vcpu, void *context);
 	void (*state_init)(vcpu_t *vcpu, void *context);
 };
 
 int vcpu_modules_init(vcpu_t *vcpu);
+
 void *vmm_get_module_pdata(char *name, char *type);
+
+void *get_vcpu_module_data(vcpu_t *vcpu, char *name);
 
 #endif

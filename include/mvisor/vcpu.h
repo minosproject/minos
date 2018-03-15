@@ -20,8 +20,26 @@ typedef enum _vcpu_state_t {
 	VCPU_STATE_ERROR 	= 0xffff,
 } vcpu_state_t;
 
+#define CONFIG_VCPU_MAX_ACTIVE_IRQS	(16)
+
+struct vcpu_irq {
+	uint32_t h_intno;
+	uint32_t v_intno;
+	int state;
+	int id;
+	struct list_head list;
+};
+
+struct irq_struct {
+	uint32_t count;
+	struct list_head pending_list;
+	DECLARE_BITMAP(irq_bitmap, CONFIG_VCPU_MAX_ACTIVE_IRQS);
+	struct vcpu_irq vcpu_irqs[CONFIG_VCPU_MAX_ACTIVE_IRQS];
+};
+
 typedef struct vmm_vcpu {
 	vcpu_regs regs;
+	int guest_vm;
 	uint32_t vcpu_id;
 	vcpu_state_t state;
 	vm_t *vm;
@@ -29,6 +47,13 @@ typedef struct vmm_vcpu {
 	uint32_t pcpu_affinity;
 	uint32_t status;
 	struct list_head pcpu_list;
+
+	/*
+	 * member to record the irq list which the
+	 * vcpu is handling now
+	 */
+	struct irq_struct irq_struct;
+
 	void **module_context;
 	void *arch_data;
 } vcpu_t __attribute__ ((__aligned__ (sizeof(unsigned long))));

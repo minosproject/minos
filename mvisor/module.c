@@ -63,6 +63,17 @@ static void vmm_create_module(struct module_id *id)
 	list_add(&module_list, &module->list);
 }
 
+void *get_vcpu_module_data(vcpu_t *vcpu, char *name)
+{
+	uint32_t id;
+
+	id = get_module_id(name);
+	if (id >= sizeof(vmm_module_names) / sizeof(vmm_module_names[0]))
+		return 0;
+
+	return vcpu->module_context[id];
+}
+
 int vcpu_modules_init(vcpu_t *vcpu)
 {
 	struct list_head *list;

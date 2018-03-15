@@ -261,6 +261,8 @@ void SError_from_el1_handler(void *data)
 	long ret;
 	vcpu_t *vcpu = (vcpu_t *)data;
 
+	vmm_exit_from_guest();
+
 	if (get_pcpu_id(vcpu) != cpuid)
 		panic("this vcpu is not belont to the pcpu");
 

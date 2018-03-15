@@ -14,6 +14,56 @@
 #include <mvisor/sched.h>
 #include <mvisor/smp.h>
 
+struct list_head hook_lists[VMM_HOOK_TYPE_UNKNOWN];
+
+static void vmm_hook_init(void)
+{
+	int i;
+
+	for (i = 0; i < VMM_HOOK_TYPE_UNKNOWN; i++)
+		init_list(&hook_lists[i]);
+}
+
+int vmm_register_hook(hook_func_t fn, void *data, enum vmm_hook_type type)
+{
+	struct vmm_hook *hook;
+
+	if ((fn == NULL) || (type >= VMM_HOOK_TYPE_UNKNOWN)) {
+		pr_error("Hook info is invaild\n");
+		return -EINVAL;
+	}
+
+	hook = (struct vmm_hook *)vmm_malloc(sizeof(struct vmm_hook));
+	if (!hook)
+		return -ENOMEM;
+
+	memset((char *)hook, 0, sizeof(struct vmm_hook));
+	hook->fn = fn;
+	hook->data = data;
+	init_list(&hook->list);
+
+	list_add_tail(&hook_lists[type], &hook->list);
+
+	return 0;
+}
+
+static int vmm_do_hooks(vcpu_t *vcpu, enum vmm_hook_type type)
+{
+	struct vmm_hook *hook;
+
+	list_for_each_entry(hook, &hook_lists[type], list)
+		hook->fn(vcpu, hook->data);
+
+	return 0;
+}
+
+int vmm_exit_from_guest(vcpu_t *vcpu)
+{
+	vmm_do_hooks(vcpu, VMM_HOOK_TYPE_EXIT_GUEST);
+
+	return 0;
+}
+
 void boot_main(void)
 {
 	int i;

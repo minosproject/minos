@@ -131,6 +131,8 @@ static int vm_create_vcpus(vm_t *vm)
 			vm->vcpu_affinity[i] = vcpu->pcpu_affinity;
 		}
 		vm->vcpus[i] = vcpu;
+
+		init_list(&vcpu->pcpu_list);
 	}
 
 	return 0;
