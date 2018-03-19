@@ -19,10 +19,6 @@
 #include <mvisor/bitops.h>
 #include <mvisor/bitmap.h>
 
-#define __round_mask(x, y) ((__typeof__(x))((y)-1))
-#define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)
-#define round_down(x, y) ((x) & ~__round_mask(x, y))
-
 /*
  * This is a common helper function for find_next_bit and
  * find_next_zero_bit.  The difference is the "invert" argument, which

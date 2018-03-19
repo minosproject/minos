@@ -51,7 +51,7 @@ int vmm_register_memory_region(void *res)
 		else
 			region->type = MEM_TYPE_IO;
 
-		vm = vmm_get_vm(resource->vmid);
+		vm = get_vm_by_id(resource->vmid);
 		if (!vm) {
 			pr_error("Can not find the vm for the vmid:%d\n",
 					resource->vmid);

@@ -98,4 +98,6 @@ int vmm_create_vms(void);
 
 int vm_memory_init(vm_t *vm);
 
+vcpu_t *get_vcpu_in_vm(vm_t *vm, uint32_t vcpu_id);
+
 #endif

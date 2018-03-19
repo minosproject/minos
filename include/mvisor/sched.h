@@ -2,12 +2,15 @@
  * created by Le MIn 2017/12/09
  */
 
-#ifndef _MVISOR_PCPU_H_
-#define _MVISOR_PCPU_H_
+#ifndef _MVISOR_SCHED_H_
+#define _MVISOR_SCHED_H_
 
 #include <mvisor/vcpu.h>
+#include <mvisor/percpu.h>
 
 #define PCPU_AFFINITY_FAIL	(0xffff)
+
+DECLARE_PER_CPU(vcpu_t *, current_vcpu);
 
 typedef struct vmm_pcpu {
 	uint32_t pcpu_id;

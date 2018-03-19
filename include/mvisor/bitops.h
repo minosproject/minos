@@ -25,6 +25,14 @@ extern unsigned long sw_hweight64(__u64 w);
  */
 #include <asm/bitops.h>
 
+unsigned long find_next_bit(const unsigned long *addr, unsigned long size,
+			    unsigned long offset);
+unsigned long find_next_zero_bit(const unsigned long *addr, unsigned long size,
+				 unsigned long offset);
+unsigned long find_first_bit(const unsigned long *addr, unsigned long size);
+unsigned long find_first_zero_bit(const unsigned long *addr, unsigned long size);
+unsigned long find_last_bit(const unsigned long *addr, unsigned long size);
+
 #define for_each_set_bit(bit, addr, size) \
 	for ((bit) = find_first_bit((addr), (size));		\
 	     (bit) < (size);					\
@@ -200,8 +208,6 @@ static inline unsigned long __ffs64(__u64 word)
 	return __ffs((unsigned long)word);
 }
 
-#ifdef __KERNEL__
-
 #ifndef set_mask_bits
 #define set_mask_bits(ptr, _mask, _bits)	\
 ({								\
@@ -245,5 +251,11 @@ extern unsigned long find_last_bit(const unsigned long *addr,
 				   unsigned long size);
 #endif
 
-#endif /* __KERNEL__ */
+void set_bit(int nr, const unsigned long *p);
+void clear_bit(int nr, const unsigned long *p);
+void change_bit(int nr, const unsigned long *p);
+int test_and_set_bit(int nr, const unsigned long *p);
+int test_and_clear_bit(int nr, const unsigned long *p);
+int test_and_change_bit(int nr, const unsigned long *p);
+
 #endif

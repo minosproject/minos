@@ -7,6 +7,9 @@
 #include <asm/gicv3.h>
 #include <mvisor/errno.h>
 #include <mvisor/module.h>
+#include <mvisor/vcpu.h>
+#include <mvisor/panic.h>
+#include <asm/arch.h>
 
 spinlock_t gicv3_lock;
 static void *gicd_base = (void *)0x2f000000;
@@ -45,15 +48,13 @@ void gicv3_mask_irq(struct vmm_irq *vmm_irq)
 		gicv3_gicd_wait_for_rwp();
 	}
 
-	vmm_irq->flags &= ~IRQ_STATUS_MASK;
-	vmm_irq->flags |= IRQ_STATUS_MASKED;
+	vmm_irq->flags &= ~IRQ_FLAG_STATUS_MASK;
+	vmm_irq->flags |= IRQ_FLAG_STATUS_MASKED;
 	spin_unlock(&gicv3_lock);
 }
 
-void gicv3_eoi_irq(struct vmm_irq *vmm_irq)
+void gicv3_eoi_irq(uint32_t irq)
 {
-	uint32_t irq = vmm_irq->hno;
-
 	write_sysreg32(irq, ICC_EOIR1_EL1);
 	isb();
 }
@@ -62,7 +63,7 @@ void gicv3_dir_irq(struct vmm_irq *vmm_irq)
 {
 	uint32_t irq = vmm_irq->hno;
 
-	write_sysreg32(irq, ICC_DIR_EL1);
+	write_sysreg32(irq, ICC_EOIR1_EL1);
 	isb();
 }
 
@@ -90,14 +91,14 @@ int gicv3_set_irq_type(struct vmm_irq *vmm_irq, uint32_t type)
 
 	cfg = ioread32(base);
 	edgebit = 2u << (2 * (irq % 16));
-	if (type & IRQ_TYPE_LEVEL_MASK)
+	if (type & IRQ_FLAG_TYPE_LEVEL_MASK)
 		cfg &= ~edgebit;
-	else if (type & IRQ_TYPE_EDGE_BOTH)
+	else if (type & IRQ_FLAG_TYPE_EDGE_BOTH)
 		cfg |= edgebit;
 
 	iowrite32(base, cfg);
-	vmm_irq->flags &= ~IRQ_TYPE_MASK;
-	vmm_irq->flags |= (type & IRQ_TYPE_MASK);
+	vmm_irq->flags &= ~IRQ_FLAG_TYPE_MASK;
+	vmm_irq->flags |= (type & IRQ_FLAG_TYPE_MASK);
 
 	spin_unlock(&gicv3_lock);
 }
@@ -141,43 +142,67 @@ static void gicv3_send_sgi_list(uint32_t sgi, cpumask_t *mask)
 	isb();
 }
 
-uint64_t gicv3_read_lr(int lr)
+static uint64_t gicv3_read_lr(int lr)
 {
-	switch ( lr ) {
+switch ( lr )
+    {
+    case 0: return read_sysreg(ICH_LR0_EL2);
+    case 1: return read_sysreg(ICH_LR1_EL2);
+    case 2: return read_sysreg(ICH_LR2_EL2);
+    case 3: return read_sysreg(ICH_LR3_EL2);
+    case 4: return read_sysreg(ICH_LR4_EL2);
+    case 5: return read_sysreg(ICH_LR5_EL2);
+    case 6: return read_sysreg(ICH_LR6_EL2);
+    case 7: return read_sysreg(ICH_LR7_EL2);
+    case 8: return read_sysreg(ICH_LR8_EL2);
+    case 9: return read_sysreg(ICH_LR9_EL2);
+    case 10: return read_sysreg(ICH_LR10_EL2);
+    case 11: return read_sysreg(ICH_LR11_EL2);
+    case 12: return read_sysreg(ICH_LR12_EL2);
+    case 13: return read_sysreg(ICH_LR13_EL2);
+    case 14: return read_sysreg(ICH_LR14_EL2);
+    case 15: return read_sysreg(ICH_LR15_EL2);
+    default:
+        return 0;
+    }
+
+#if 0
+	switch (lr) {
 	case 0:
-		return READ_SYSREG(ICH_LR0_EL2);
+		return read_sysreg(ICH_LR0_EL2);
 	case 1:
-		return READ_SYSREG(ICH_LR1_EL2);
+		return read_sysreg(ICH_LR1_EL2);
 	case 2:
-		return READ_SYSREG(ICH_LR2_EL2);
+		return read_sysreg(ICH_LR2_EL2);
 	case 3:
-		return READ_SYSREG(ICH_LR3_EL2);
+		return read_sysreg(ICH_LR3_EL2);
 	case 4:
-		return READ_SYSREG(ICH_LR4_EL2);
+		return read_sysreg(ICH_LR4_EL2);
 	case 5:
-		return READ_SYSREG(ICH_LR5_EL2);
+		return read_sysreg(ICH_LR5_EL2);
 	case 6:
-		return READ_SYSREG(ICH_LR6_EL2);
+		return read_sysreg(ICH_LR6_EL2);
 	case 7:
-		return READ_SYSREG(ICH_LR7_EL2);
+		return read_sysreg(ICH_LR7_EL2);
 	case 8:
-		return READ_SYSREG(ICH_LR8_EL2);
+		return read_sysreg(ICH_LR8_EL2);
 	case 9:
-		return READ_SYSREG(ICH_LR9_EL2);
+		return read_sysreg(ICH_LR9_EL2);
 	case 10:
-		return READ_SYSREG(ICH_LR10_EL2);
+		return read_sysreg(ICH_LR10_EL2);
 	case 11:
-		return READ_SYSREG(ICH_LR11_EL2);
+		return read_sysreg(ICH_LR11_EL2);
 	case 12:
-		return READ_SYSREG(ICH_LR12_EL2);
+		return read_sysreg(ICH_LR12_EL2);
 	case 13:
-		return READ_SYSREG(ICH_LR13_EL2);
+		return read_sysreg(ICH_LR13_EL2);
 	case 14:
-		return READ_SYSREG(ICH_LR14_EL2);
+		return read_sysreg(ICH_LR14_EL2);
 	case 15:
-		return READ_SYSREG(ICH_LR15_EL2);
+		return read_sysreg(ICH_LR15_EL2);
 	default:
 		panic("Invaild LR list\n");
+#endif
 }
 
 static void gicv3_write_lr(int lr, uint64_t val)
@@ -185,52 +210,52 @@ static void gicv3_write_lr(int lr, uint64_t val)
 	switch ( lr )
 	{
 	case 0:
-		WRITE_SYSREG(val, ICH_LR0_EL2);
+		write_sysreg(val, ICH_LR0_EL2);
 		break;
 	case 1:
-		WRITE_SYSREG(val, ICH_LR1_EL2);
+		write_sysreg(val, ICH_LR1_EL2);
 		break;
 	case 2:
-		WRITE_SYSREG(val, ICH_LR2_EL2);
+		write_sysreg(val, ICH_LR2_EL2);
 		break;
 	case 3:
-		WRITE_SYSREG(val, ICH_LR3_EL2);
+		write_sysreg(val, ICH_LR3_EL2);
 		break;
 	case 4:
-		WRITE_SYSREG(val, ICH_LR4_EL2);
+		write_sysreg(val, ICH_LR4_EL2);
 		break;
 	case 5:
-		WRITE_SYSREG(val, ICH_LR5_EL2);
+		write_sysreg(val, ICH_LR5_EL2);
 		break;
 	case 6:
-		WRITE_SYSREG(val, ICH_LR6_EL2);
+		write_sysreg(val, ICH_LR6_EL2);
 		break;
 	case 7:
-		WRITE_SYSREG(val, ICH_LR7_EL2);
+		write_sysreg(val, ICH_LR7_EL2);
 		break;
 	case 8:
-		WRITE_SYSREG(val, ICH_LR8_EL2);
+		write_sysreg(val, ICH_LR8_EL2);
 		break;
 	case 9:
-		WRITE_SYSREG(val, ICH_LR9_EL2);
+		write_sysreg(val, ICH_LR9_EL2);
 		break;
 	case 10:
-		WRITE_SYSREG(val, ICH_LR10_EL2);
+		write_sysreg(val, ICH_LR10_EL2);
 		break;
 	case 11:
-		WRITE_SYSREG(val, ICH_LR11_EL2);
+		write_sysreg(val, ICH_LR11_EL2);
 		break;
 	case 12:
-		WRITE_SYSREG(val, ICH_LR12_EL2);
+		write_sysreg(val, ICH_LR12_EL2);
 		break;
 	case 13:
-		WRITE_SYSREG(val, ICH_LR13_EL2);
+		write_sysreg(val, ICH_LR13_EL2);
 		break;
 	case 14:
-		WRITE_SYSREG(val, ICH_LR14_EL2);
+		write_sysreg(val, ICH_LR14_EL2);
 		break;
 	case 15:
-		WRITE_SYSREG(val, ICH_LR15_EL2);
+		write_sysreg(val, ICH_LR15_EL2);
 		break;
 	default:
 		return;
@@ -239,12 +264,14 @@ static void gicv3_write_lr(int lr, uint64_t val)
 	isb();
 }
 
-static int send_virtual_irq(void *c, uint32_t v, uint32_t h)
+static int gicv3_send_virq(void *c, struct vcpu_irq *vcpu_irq)
 {
+#if 0
 	int i, empty = 0xff;
 	uint64_t *lr_base;
 	uint64_t value;
 	struct gic_lr *lr;
+	uint32_t h = vcpu_irq->
 
 	lr = (struct gic_lr *)&value;
 
@@ -281,6 +308,8 @@ static int send_virtual_irq(void *c, uint32_t v, uint32_t h)
 	}
 
 out:
+
+#endif
 	return -EAGAIN;
 }
 
@@ -325,17 +354,12 @@ void gicv3_unmask_irq(struct vmm_irq *vmm_irq)
 		iowrite32(gicd_base + GICD_ISENABLER + (irq / 32) * 4, mask);
 		gicv3_gicd_wait_for_rwp();
 	}
-	vmm_irq->flags &= ~IRQ_STATUS_MASK;
-	vmm_irq->flags |= IRQ_STATUS_UNMASKED;
+	vmm_irq->flags &= ~IRQ_FLAG_STATUS_MASK;
+	vmm_irq->flags |= IRQ_FLAG_STATUS_UNMASKED;
 	spin_unlock(&gicv3_lock);
 }
 
 static int gicv3_get_irq_type(uint32_t irq)
-{
-	return 0;
-}
-
-static int gicv3_handle_sgi_int(uint32_t irq, vcpu_t *vcpu)
 {
 	return 0;
 }
@@ -361,7 +385,7 @@ uint32_t gicv3_get_irq_num(void)
 	return (32 * ((type & 0x1f)));
 }
 
-int gicv3_get_virq_state(struct vcpu_irq *vcpu_irq, void *context)
+int gicv3_get_virq_state(void *c, struct vcpu_irq *vcpu_irq)
 {
 	return 0;
 }
@@ -572,6 +596,7 @@ static struct irq_chip gicv3_chip = {
 	.get_irq_type		= gicv3_get_irq_type,
 	.irq_set_priority	= gicv3_set_irq_priority,
 	.get_virq_state		= gicv3_get_virq_state,
+	.send_virq		= gicv3_send_virq,
 	.init			= gicv3_init,
 	.secondary_init		= gicv3_secondary_init,
 };
@@ -587,7 +612,7 @@ static int gicv3_module_init(struct vmm_module *module)
 	gicv3_chip.irq_start = 0;
 	gicv3_chip.irq_num = nr_lines;
 
-	value = READ_SYSREG32(ICH_VTR_EL2);
+	value = read_sysreg32(ICH_VTR_EL2);
 	gicv3_nr_lr = (value & 0x3f) + 1;
 	gicv3_nr_pr = ((value >> 29) & 0x7) + 1;
 

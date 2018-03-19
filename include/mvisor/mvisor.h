@@ -11,6 +11,7 @@
 #include <mvisor/panic.h>
 #include <mvisor/smp.h>
 #include <mvisor/varlist.h>
+#include <mvisor/vcpu.h>
 
 typedef int (*hook_func_t)(vcpu_t *vcpu, void *data);
 
@@ -27,9 +28,8 @@ struct vmm_hook {
 };
 
 void vmm_exit_from_guest(vcpu_t *vcpu);
-
-void vmm_resume_to_guest(vcpu_t *vcpu);
-
-int vmm_register_hook(hook_func_t fn, void *data, enum vmm_hook_type type);
+void vmm_enter_to_guest(vcpu_t *vcpu);
+int vmm_register_hook(hook_func_t fn,
+	void *data, enum vmm_hook_type type);
 
 #endif

@@ -29,7 +29,7 @@ int vmm_register_irq_entry(void *res)
 		return -EINVAL;
 	}
 
-	vcpu = vmm_get_vcpu(config->vmid, config->affinity);
+	vcpu = get_vcpu_by_id(config->vmid, config->affinity);
 	if (!vcpu) {
 		pr_error("Vcpu:%d is not exist for this vm\n", config->affinity);
 		return -EINVAL;;
@@ -45,7 +45,7 @@ int vmm_register_irq_entry(void *res)
 	vmm_irq->hno = config->hno;
 	vmm_irq->vmid = config->vmid;
 	if (vmm_irq->vmid == 0xffffffff)
-		vmm_irq->flag |= IRQ_FLAG_OWNER_VMM;
+		vmm_irq->flags |= IRQ_FLAG_OWNER_VMM;
 
 	vmm_irq->affinity_vcpu = config->affinity;
 	vmm_irq->affinity_pcpu = get_pcpu_id(vcpu);
@@ -95,16 +95,13 @@ int vmm_alloc_irqs(uint32_t start,
 
 		memset((char *)irq, 0, sizeof(struct vmm_irq));
 		irq->hno = i;
-		if (flags)
-			irq->flags |= IRQ_OWNER_PERCPU;
 	}
 
 	return 0;
 }
 
-static int send_virtual_irq(vcpu_t *vcpu, uint32_t v, uint32_t h)
+static int inline send_virtual_irq(vcpu_t *vcpu, struct vcpu_irq *vcpu_irq)
 {
-	int ret;
 	void *context = NULL;
 
 	if (vcpu)
@@ -116,15 +113,16 @@ static int send_virtual_irq(vcpu_t *vcpu, uint32_t v, uint32_t h)
 	 * the virq is not send successful this time then
 	 * add it to the pending list for next time
 	 */
-	ret = irq_chip->send_virtual_irq(context, v, h);
-
-	return 0;
+	return irq_chip->send_virq(context, vcpu_irq);
 }
 
 static int do_handle_guest_irq(struct vmm_irq *vmm_irq, vcpu_t *vcpu)
 {
 	vm_t *vm;
 	vcpu_t *vcpu_o;
+	unsigned long index;
+	struct vcpu_irq *vcpu_irq;
+	struct irq_struct *irq_struct = &vcpu->irq_struct;
 
 	vm = get_vm_by_id(vmm_irq->vmid);
 	if (!vm) {
@@ -138,14 +136,31 @@ static int do_handle_guest_irq(struct vmm_irq *vmm_irq, vcpu_t *vcpu)
 		return -EINVAL;
 	}
 
+	irq_struct = &vcpu_o->irq_struct;
+	index = find_first_zero_bit(irq_struct->irq_bitmap,
+			CONFIG_VCPU_MAX_ACTIVE_IRQS);
+	if (index == CONFIG_VCPU_MAX_ACTIVE_IRQS) {
+		/*
+		 * no empty resource to handle this virtual irq
+		 * need to drop it ? TBD
+		 */
+		pr_error("Can not send this virq now\n");
+		return -EAGAIN;
+	}
+
+	vcpu_irq = &irq_struct->vcpu_irqs[index];
+	vcpu_irq->h_intno = vmm_irq->hno;
+	vcpu_irq->v_intno = vmm_irq->vno;
+	set_bit(index, irq_struct->irq_bitmap);
+
 	/*
 	 * do send the virtual irq to the guest vm
+	 * if the irq is send to the current vcpu
 	 */
-	send_virtual_irq(vcpu_o, vmm_irq->vno, vmm_irq->hno);
+	if (vcpu == vcpu_o)
+		vcpu_o = NULL;
 
-	if ()
-
-	return 0;
+	return send_virtual_irq(vcpu_o, vcpu_irq);
 }
 
 static int do_handle_vmm_irq(struct vmm_irq *vmm_irq, vcpu_t *vcpu)
@@ -173,16 +188,13 @@ static int do_spi_int(uint32_t irq, vcpu_t *vcpu)
 	vmm_irq = irq_table[irq];
 	if (vmm_irq == NULL) {
 		pr_error("irq is not register\n");
-		goto out;
+		return -EINVAL;
 	}
 
 	if (vmm_irq->flags & IRQ_FLAG_OWNER_VMM)
 		ret = do_handle_vmm_irq(vmm_irq, vcpu);
 	else
 		ret = do_handle_guest_irq(vmm_irq, vcpu);
-
-	if (irq_chip->handle_spi_int)
-		irq_chip->handle_spi_int(vmm_irq, vcpu);
 
 	return ret;
 }
@@ -203,11 +215,6 @@ static int do_lpi_int(uint32_t irq, vcpu_t *vcpu)
 }
 
 static int do_special_int(uint32_t irq, vcpu_t *vcpu)
-{
-	return 0;
-}
-
-static int do_lpi_int(uint32_t irq, vcpu_t *vcpu)
 {
 	return 0;
 }
@@ -260,7 +267,7 @@ int do_irq_handler(vcpu_t *vcpu)
 		break;
 	}
 
-	irq_chip->eoi_irq(irq);
+	irq_chip->irq_eoi(irq);
 	return ret;
 }
 
@@ -281,16 +288,16 @@ static int irq_exit_from_guest(vcpu_t *vcpu, void *data)
 
 	context = get_vcpu_module_data(vcpu, VMM_MODULE_NAME_IRQCHIP);
 
-	for_each_set_bit(set_bit, &irq_struct->irq_bitmap,
+	for_each_set_bit(set_bit, irq_struct->irq_bitmap,
 			CONFIG_VCPU_MAX_ACTIVE_IRQS) {
 		vcpu_irq = (struct vcpu_irq *)&irq_struct->vcpu_irqs[set_bit];
-		status = irq_chip->get_virq_state(vcpu_irq, context);
+		status = irq_chip->get_virq_state(context, vcpu_irq);
 
 		/*
 		 * the virq has been handled by the VCPU
 		 */
 		if (status == VIRQ_STATE_INACTIVE) {
-			clear_bit(&irq_struct->irq_bitmap, set_bit);
+			clear_bit(set_bit, irq_struct->irq_bitmap);
 			irq_struct->count--;
 			if (irq_struct->count < 0) {
 				pr_error("irq count is error\n");

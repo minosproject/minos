@@ -52,23 +52,17 @@ struct vmm_irq;
 struct irq_chip {
 	uint32_t irq_start;
 	uint32_t irq_num;
+	uint32_t (*get_pending_irq)(void);
 	void (*irq_mask)(struct vmm_irq *data);
 	void (*irq_unmask)(struct vmm_irq *data);
-	void (*irq_eoi)(struct vmm_irq *data);
+	void (*irq_eoi)(uint32_t irq);
 	int (*irq_set_affinity)(struct vmm_irq *data, cpumask_t *dest);
 	int (*irq_set_type)(struct vmm_irq *data, unsigned int flow_type);
 	int (*irq_set_priority)(struct vmm_irq *data, uint32_t pr);
-	uint32_t (*get_pending_irq)(void);
 	int (*get_irq_type)(uint32_t irq);
 	void (*send_sgi)(struct vmm_irq *data, enum sgi_mode mode, cpumask_t *mask);
-	int (*handle_sgi_int)(uint32_t irq, vcpu_t *vcpu);
-	int (*handle_ppi_int)(uint32_t irq, vcpu_t *vcpu);
-	int (*handle_spi_int)(uint32_t irq, vcpu_t *vcpu);
-	int (*handle_lpi_int)(uint32_t irq, vcpu_t *vcpu);
-	int (*handle_special_int)(uint32_t irq, vcpu_t *vcpu);
-	int (*handle_bad_int)(uint32_t irq, vcpu_t *vcpu);
-	int (*send_virtual_irq)(struct vcpu_irq *vcpu_irq, void *context);
-	int (*get_virq_state)(struct vcpu_irq *vcpu_irq, void *context);
+	int (*send_virq)(void *context, struct vcpu_irq *vcpu_irq);
+	int (*get_virq_state)(void *context, struct vcpu_irq *vcpu_irq);
 	int (*init)(void);
 	int (*secondary_init)(void);
 };
@@ -105,5 +99,7 @@ int vmm_irq_secondary_init(void);
 int vmm_register_irq_entry(void *res);
 
 void vmm_setup_irqs(void);
+
+int do_irq_handler(vcpu_t *vcpu);
 
 #endif
