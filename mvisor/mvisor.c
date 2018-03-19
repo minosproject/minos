@@ -57,11 +57,14 @@ static int vmm_do_hooks(vcpu_t *vcpu, enum vmm_hook_type type)
 	return 0;
 }
 
-int vmm_exit_from_guest(vcpu_t *vcpu)
+void vmm_exit_from_guest(vcpu_t *vcpu)
 {
-	vmm_do_hooks(vcpu, VMM_HOOK_TYPE_EXIT_GUEST);
+	vmm_do_hooks(vcpu, VMM_HOOK_TYPE_EXIT_FROM_GUEST);
+}
 
-	return 0;
+void vmm_enter_to_guest(vcpu_t *vcpu)
+{
+	vmm_do_hooks(vcpu, VMM_HOOK_TYPE_ENTER_TO_GUEST);
 }
 
 void boot_main(void)

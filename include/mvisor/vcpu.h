@@ -22,6 +22,11 @@ typedef enum _vcpu_state_t {
 
 #define CONFIG_VCPU_MAX_ACTIVE_IRQS	(16)
 
+#define VIRQ_STATE_INACTIVE		(0x0)
+#define VIRQ_STATE_PENDING		(0x1)
+#define VIRQ_STATE_ACTIVE		(0x2)
+#define VIRQ_STATE_ACTIVE_AND_PENDING	(0x3)
+
 struct vcpu_irq {
 	uint32_t h_intno;
 	uint32_t v_intno;

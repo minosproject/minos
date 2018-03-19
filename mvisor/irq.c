@@ -264,10 +264,6 @@ int do_irq_handler(vcpu_t *vcpu)
 	return ret;
 }
 
-#define VIRQ_STATE_INACTIVE		(0x0)
-#define VIRQ_STATE_PENDING		(0x1)
-#define VIRQ_STATE_ACTIVE		(0x2)
-#define VIRQ_STATE_ACTIVE_AND_PENDING	(0x3)
 
 static int irq_exit_from_guest(vcpu_t *vcpu, void *data)
 {
@@ -278,10 +274,10 @@ static int irq_exit_from_guest(vcpu_t *vcpu, void *data)
 	 * need spinlock
 	 */
 	struct vcpu_irq *vcpu_irq;
-	struct irq_struct *irq_struct = &vcpu->irq_struct;
 	uint32_t set_bit;
 	int status;
 	void *context;
+	struct irq_struct *irq_struct = &vcpu->irq_struct;
 
 	context = get_vcpu_module_data(vcpu, VMM_MODULE_NAME_IRQCHIP);
 
@@ -341,7 +337,7 @@ int vmm_irq_init(void)
 		panic("No function to get irq nr\n");
 
 	vmm_register_hook(irq_exit_from_guest,
-			NULL, VMM_HOOK_TYPE_EXIT_GUEST);
+			NULL, VMM_HOOK_TYPE_EXIT_FROM_GUEST);
 
 	return 0;
 }

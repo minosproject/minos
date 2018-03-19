@@ -361,6 +361,11 @@ uint32_t gicv3_get_irq_num(void)
 	return (32 * ((type & 0x1f)));
 }
 
+int gicv3_get_virq_state(struct vcpu_irq *vcpu_irq, void *context)
+{
+	return 0;
+}
+
 static int gicv3_gicc_init(void)
 {
 	unsigned long reg_value;
@@ -566,6 +571,7 @@ static struct irq_chip gicv3_chip = {
 	.get_pending_irq	= gicv3_read_irq,
 	.get_irq_type		= gicv3_get_irq_type,
 	.irq_set_priority	= gicv3_set_irq_priority,
+	.get_virq_state		= gicv3_get_virq_state,
 	.init			= gicv3_init,
 	.secondary_init		= gicv3_secondary_init,
 };

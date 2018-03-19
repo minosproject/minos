@@ -17,6 +17,8 @@ typedef unsigned long phy_addr_t;
 
 #define MAX(a, b)	a > b ? a : b
 #define MIN(a, b)	a < b ? a : b
+#define max(a, b)	a > b ? a : b
+#define min(a, b)	a < b ? a : b
 
 #define u8_to_u16(low, high)	((high << 8) | low)
 #define u8_to_u32(u1, u2, u3, u4)	\
@@ -29,7 +31,7 @@ typedef void (*void_func_t)(void);
 #define container_of(ptr, name, member) \
 	(name *)((unsigned char *)ptr - ((unsigned char *)&(((name *)0)->member)))
 
-#define BIT(nr) (1 << (nr))
+#define BIT(nr) (1UL << (nr))
 
 #define ALIGN(num, size)	((num) & ~(size - 1))
 #define BALIGN(num, size)	(((num) + (size - 1)) & ~(size - 1))
@@ -48,5 +50,20 @@ typedef void (*void_func_t)(void);
 #define SIZE_512M	(512 * SIZE_1M)
 #define SIZE_2M		(2 * 1024 * 1024)
 #define SIZE_8M		(8 * 1024 * 1024)
+
+#define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
+
+#define BITS_TO_LONGS(nr) DIV_ROUND_UP(nr, BITS_PER_BYTE * sizeof(long))
+
+#define DECLARE_BITMAP(name,bits) \
+	unsigned long name[BITS_TO_LONGS(bits)]
+
+#define BITS_PER_LONG		64
+#define BIT_ULL(nr)		(1ULL << (nr))
+#define BIT_MASK(nr)		(1UL << ((nr) % BITS_PER_LONG))
+#define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
+#define BIT_ULL_MASK(nr)	(1ULL << ((nr) % BITS_PER_LONG_LONG))
+#define BIT_ULL_WORD(nr)	((nr) / BITS_PER_LONG_LONG)
+#define BITS_PER_BYTE		8
 
 #endif
