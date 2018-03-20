@@ -25,7 +25,7 @@ int vmm_register_memory_region(void *res)
 
 	resource = (struct memory_resource *)res;
 	region = (struct memory_region *)
-		vmm_malloc(sizeof(struct memory_resource));
+		vmm_malloc(sizeof(struct memory_region));
 	if (!region) {
 		pr_error("No memory for new memory region\n");
 		return -ENOMEM;
@@ -36,8 +36,15 @@ int vmm_register_memory_region(void *res)
 			resource->type, resource->vmid, resource->name);
 
 	memset((char *)region, 0, sizeof(struct memory_region));
+
+	/*
+	 * vmm no using phy --> phy mapping
+	 */
+	region->vir_base = resource->mem_base;
 	region->mem_base = resource->mem_base;
 	region->size = resource->mem_end - resource->mem_base;
+
+	init_list(&region->list);
 
 	/*
 	 * shared memory is for all vm to ipc purpose
@@ -59,7 +66,7 @@ int vmm_register_memory_region(void *res)
 			return -EINVAL;
 		}
 
-		list_add(&vm->mm.mem_list, &region->list);
+		list_add_tail(&vm->mm.mem_list, &region->list);
 	}
 
 	return 0;
@@ -86,6 +93,7 @@ int vmm_mm_init(void)
 	 * assume the memory region is 4k align
 	 */
 	free_4k_base = free_mem_base + free_mem_size;
+	init_list(&shared_mem_list);
 }
 
 char *vmm_malloc(size_t size)
@@ -438,6 +446,14 @@ int vmm_mm_init(void)
 }
 
 #endif
+
+void vm_mm_struct_init(vm_t *vm)
+{
+	struct mm_struct *mm = &vm->mm;
+
+	init_list(&mm->mem_list);
+	mm->page_table_base = 0;
+}
 
 int vm_memory_init(vm_t *vm)
 {

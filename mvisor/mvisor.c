@@ -71,12 +71,12 @@ void boot_main(void)
 {
 	int i;
 
+	vmm_log_init();
+	pr_info("Starting mVisor ...\n");
+
 	vmm_early_init();
 	vmm_mm_init();
-
-	vmm_log_init();
-
-	pr_info("Starting mVisor ...\n");
+	vmm_hook_init();
 
 	if (get_cpu_id() != 0)
 		panic("cpu is not cpu0");
@@ -131,8 +131,9 @@ void boot_secondary(void)
 
 	vmm_irq_secondary_init();
 	enable_local_irq();
-	smp_holding_pen[cpuid] = 0xffff;
-	//gic_send_sgi(15, SGI_TO_SELF, NULL);
+	smp_holding_pen[cpuid] = mpidr;
 
+	//gic_send_sgi(15, SGI_TO_SELF, NULL);
 	sched_vcpu();
 }
+

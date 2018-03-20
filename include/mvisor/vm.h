@@ -32,7 +32,6 @@ typedef struct vmm_vm {
 	unsigned long entry_point;
 	char name[VMM_VM_NAME_SIZE];
 	struct vmm_vcpu *vcpus[CONFIG_VM_MAX_VCPU];
-	struct list_head mem_list;
 	struct mm_struct mm;
 	struct os os;
 	struct list_head vm_list;
@@ -46,5 +45,7 @@ typedef struct vmm_vm {
 vm_t *vmm_get_vm(uint32_t vmid);
 
 int vmm_vms_init(void);
+void vm_mm_struct_init(vm_t *vm);
+int vm_memory_init(vm_t *vm);
 
 #endif

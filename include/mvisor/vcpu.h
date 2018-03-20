@@ -44,13 +44,10 @@ struct irq_struct {
 
 typedef struct vmm_vcpu {
 	vcpu_regs regs;
-	int guest_vm;
 	uint32_t vcpu_id;
-	vcpu_state_t state;
 	vm_t *vm;
 	unsigned long entry_point;
 	uint32_t pcpu_affinity;
-	uint32_t status;
 	struct list_head pcpu_list;
 
 	/*
@@ -59,19 +56,14 @@ typedef struct vmm_vcpu {
 	 */
 	struct irq_struct irq_struct;
 
+	/*
+	 * below members is used to sched
+	 */
+	vcpu_state_t state;
+
 	void **module_context;
 	void *arch_data;
 } vcpu_t __attribute__ ((__aligned__ (sizeof(unsigned long))));
-
-static vcpu_state_t inline get_vcpu_state(vcpu_t *vcpu)
-{
-	return vcpu->state;
-}
-
-static void inline set_vcpu_state(vcpu_t *vcpu, vcpu_state_t state)
-{
-	vcpu->state = state;
-}
 
 static uint32_t inline get_vcpu_id(vcpu_t *vcpu)
 {
@@ -95,8 +87,6 @@ vm_t *get_vm_by_id(uint32_t vmid);
 int arch_vm_init(vm_t *vm);
 
 int vmm_create_vms(void);
-
-int vm_memory_init(vm_t *vm);
 
 vcpu_t *get_vcpu_in_vm(vm_t *vm, uint32_t vcpu_id);
 

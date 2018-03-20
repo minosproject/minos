@@ -49,7 +49,15 @@ exception_from_el1_handler:
 	stp	x26, x27, [x0], #16
 	stp	x28, x29, [x0], #16
 	str	x30, [x0], #8
-	sub	x0, x0, #248
+	mrs	x1, sp_el1
+	str	x1, [x0], #8
+	mrs	x1, elr_el2
+	str	x1, [x0], #8
+	mrs	x1, spsr_el2
+	str	x1, [x0], #8
+	mrs	x1, nzcv
+	str	x1, [x0], #8
+	sub	x0, x0, #280
 
 	blr	x4
 
@@ -101,7 +109,15 @@ exit_el2_exception_handler:
 	ldp	x26, x27, [x0], #16
 	ldp	x28, x29, [x0], #16
 	ldr	x30, [x0], #8
-	sub	x0, x0, #248
+	ldr	x1, [x0], #8
+	msr	sp_el1, x1
+	ldr	x1, [x0], #8
+	msr	elr_el2, x1
+	ldr	x1, [x0], #8
+	msr	spsr_el2, x1
+	ldr	x1, [x0], #8
+	msr	nzcv, x1
+	sub	x0, x0, #280
 	ldr	x1, [x0, #8]
 	ldr	x0, [x0]
 	isb

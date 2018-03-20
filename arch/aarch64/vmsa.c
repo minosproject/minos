@@ -9,6 +9,7 @@ struct vmsa_context {
 	uint64_t ttbr0_el1;
 	uint64_t ttbr1_el1;
 	uint64_t vttbr_el2;
+	uint64_t hcr_el2;
 } __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
 #define G4K_LEVEL1_OFFSET	(30)
@@ -320,6 +321,9 @@ static void vmsa_state_init(vcpu_t *vcpu, void *context)
 
 	c->vtcr_el2 = generate_vtcr_el2();
 	c->vttbr_el2 = generate_vttbr_el2(vm->vmid, vm->mm.page_table_base);
+	c->hcr_el2 = HCR_EL2_HVC | HCR_EL2_TWI | HCR_EL2_TWE | \
+		     HCR_EL2_TIDCP | HCR_EL2_IMO | HCR_EL2_FMO | \
+		     HCR_EL2_AMO | HCR_EL2_RW | HCR_EL2_VM;
 }
 
 static void vmsa_state_save(vcpu_t *vcpu, void *context)

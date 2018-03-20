@@ -12,7 +12,7 @@ struct module_id {
 
 #define VMM_MODULE_DECLARE(mname, mn, t, init_fn) \
 	static const struct module_id vmm_module_match_##mname \
-	__section(__vmm_module) = { \
+	__section(.__vmm_module) = { \
 		.name = mn, \
 		.type = t, \
 		.fn = init_fn, \

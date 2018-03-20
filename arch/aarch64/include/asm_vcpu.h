@@ -41,16 +41,4 @@ typedef struct aarch64_vcpu_regs {
 	uint64_t nzcv;
 } vcpu_regs __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
-struct system_context {
-	uint64_t vbar_el1;
-	uint64_t esr_el1;
-	uint64_t vmpidr;
-	uint64_t sctlr_el1;
-	uint64_t hcr_el2;
-} __attribute__ ((__aligned__ (sizeof(unsigned long))));
-
-struct aarch64_vcpu {
-	struct system_context system_context;
-};
-
 #endif

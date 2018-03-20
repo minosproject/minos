@@ -418,7 +418,8 @@ static int gicv3_hyp_init(void)
 	 * EL2, without this irq and fiq will not send to
 	 * the cpu
 	 */
-	//write_sysreg64(HCR_EL2_IMO | HCR_EL2_FMO, HCR_EL2);
+	write_sysreg64(HCR_EL2_IMO | HCR_EL2_FMO, HCR_EL2);
+
 	isb();
 	return 0;
 }

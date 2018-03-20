@@ -6,7 +6,6 @@
 #include <mvisor/pm.h>
 
 static pcpu_t pcpus[CONFIG_NR_CPUS];
-extern void switch_to_vcpu(vcpu_regs *regs);
 
 DEFINE_PER_CPU(vcpu_t *, current_vcpu);
 DEFINE_PER_CPU(vcpu_t *, next_vcpu);
@@ -90,6 +89,25 @@ static vcpu_t *find_vcpu_to_run(pcpu_t *pcpu)
 	return NULL;
 }
 
+int vcpu_sched_init(vcpu_t *vcpu)
+{
+	if (!vcpu)
+		return -EINVAL;
+
+	/*
+	 * find the boot cpu for each vm and
+	 * mark its status, boot cpu will set
+	 * to ready to run state then other vcpu
+	 * is set to STOP state to wait for bootup
+	 */
+	if (get_vcpu_id(vcpu) == 0)
+		set_vcpu_state(vcpu, VCPU_STATE_READY);
+	else
+		set_vcpu_state(vcpu, VCPU_STATE_STOP);
+
+	return 0;
+}
+
 void sched_vcpu(void)
 {
 	pcpu_t *pcpu;
@@ -113,10 +131,27 @@ resched:
 			if (pcpu->need_resched)
 				goto resched;
 
-			get_cpu_var(current_vcpu) = vcpu;
+			get_cpu_var(next_vcpu) = vcpu;
 			break;
 		}
 	}
+}
+
+void switch_to_vcpu(vcpu_t *current, vcpu_t *next)
+{
+	/*
+	 * if current != next and current != NULL
+	 * then need to save the current cpu context
+	 * to the current vcpu
+	 */
+	if ((current != NULL) && (current != next)) {
+
+	}
+
+	/*
+	 * restore the next vcpu's context to the real
+	 * hardware
+	 */
 }
 
 void vmm_pcpus_init(void)

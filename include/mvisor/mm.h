@@ -12,10 +12,10 @@ void vmm_free_pages(void *addr);
 int vmm_register_memory_region(void *res);
 
 struct memory_region {
+	int type;
 	unsigned long mem_base;
 	unsigned long vir_base;
 	size_t size;
-	int type;
 	struct list_head list;
 };
 

@@ -56,7 +56,7 @@ typedef void (*void_func_t)(void);
 #define BITS_TO_LONGS(nr) DIV_ROUND_UP(nr, BITS_PER_BYTE * sizeof(long))
 
 #define DECLARE_BITMAP(name,bits) \
-	const unsigned long name[BITS_TO_LONGS(bits)]
+	unsigned long name[BITS_TO_LONGS(bits)]
 
 #define BITS_PER_LONG		64
 #define BIT_ULL(nr)		(1ULL << (nr))

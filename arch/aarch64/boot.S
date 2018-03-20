@@ -105,14 +105,14 @@ el2_entry_aarch64:
 	sub	x2, x2, x0
 	bl	memset
 
-	b	boot_main
+	bl	boot_main
 	nop
 	isb
 	b	return_to_el1
 
 secondary_start_up:
 	/* here wait for boot cpu finish tht init work */
-	b	boot_secondary
+	bl	boot_secondary
 	nop
 	isb
 	b return_to_el1

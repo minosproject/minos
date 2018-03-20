@@ -6,6 +6,7 @@
 #include <config/config.h>
 #include <mvisor/module.h>
 #include <mvisor/mm.h>
+#include <mvisor/bitmap.h>
 
 extern unsigned char __vmm_vm_start;
 extern unsigned char __vmm_vm_end;
@@ -32,7 +33,6 @@ static int vmm_add_vm(vm_entry_t *vme)
 	strncpy(vm->name, vme->name,
 		MIN(strlen(vme->name), VMM_VM_NAME_SIZE - 1));
 	vm->vcpu_nr = MIN(vme->nr_vcpu, CONFIG_VM_MAX_VCPU);
-	init_list(&vm->mem_list);
 	vm->boot_vm = (boot_vm_t)vme->boot_vm;
 	vm->mmu_on = vme->mmu_on;
 	vm->entry_point = vme->entry_point;
@@ -54,8 +54,10 @@ static int parse_all_vms(void)
 	size_t size = (&__vmm_vm_end) - (&__vmm_vm_start);
 	unsigned long *start = (unsigned long *)(&__vmm_vm_start);
 
-	if (size == 0)
-		panic("No VM is found\n");
+	if (size == 0) {
+		pr_error("No VM is found\n");
+		return -ENOENT;
+	}
 
 	size = size / sizeof(vm_entry_t *);
 	pr_debug("Found %d VMs config\n", size);
@@ -102,6 +104,28 @@ vcpu_t *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id)
 	return get_vcpu_in_vm(vm, vcpu_id);
 }
 
+static void vcpu_irq_struct_init(struct irq_struct *irq_struct)
+{
+	int i;
+	struct vcpu_irq *vcpu_irq;
+
+	if (!irq_struct)
+		return;
+
+	irq_struct->count = 0;
+	init_list(&irq_struct->pending_list);
+	bitmap_clear(irq_struct->irq_bitmap, 0, CONFIG_VCPU_MAX_ACTIVE_IRQS);
+
+	for (i = 0; i < CONFIG_VCPU_MAX_ACTIVE_IRQS; i++) {
+		vcpu_irq = &irq_struct->vcpu_irqs[i];
+		vcpu_irq->h_intno = 0;
+		vcpu_irq->v_intno = 0;
+		vcpu_irq->state = VIRQ_STATE_INACTIVE;
+		vcpu_irq->id = i;
+		init_list(&vcpu_irq->list);
+	}
+}
+
 static int vm_create_vcpus(vm_t *vm)
 {
 	int i;
@@ -133,69 +157,24 @@ static int vm_create_vcpus(vm_t *vm)
 		vm->vcpus[i] = vcpu;
 
 		init_list(&vcpu->pcpu_list);
+		vcpu_irq_struct_init(&vcpu->irq_struct);
 	}
 
 	return 0;
 }
 
-static int vm_map_memory(vm_t *vm)
-{
-	unsigned long ttb2_addr;
-	uint64_t tcr_el2;
-
-	if (!vm)
-		return -EINVAL;
-
-	//mmu_map_memory_region_list(ttb2_addr, &shared_mem_list);
-	//tcr_el2 = mmu_generate_vtcr_el2();
-
-	//vm->vttbr_el2_addr = mmu_get_vttbr_el2_base(vm->vmid, ttb2_addr);
-	//vm->vtcr_el2 = tcr_el2;
-
-	return 0;
-}
-
-static void vm_config_hcrel2(vm_t *vm)
-{
-	uint64_t value = 0;
-
-	/*
-	 * AMO FMO IMO to control the irq fiq and serror trap
-	 * to EL2
-	 * VM to control to enable stage2 transtion for el1 and el0
-	 */
-	value = HCR_EL2_HVC | HCR_EL2_TWI | HCR_EL2_TWE | \
-		HCR_EL2_TIDCP | HCR_EL2_IMO | HCR_EL2_FMO | \
-		HCR_EL2_AMO | HCR_EL2_RW | HCR_EL2_VM;
-	//vm->hcr_el2 = value;
-}
-
-static int vm_state_init(vm_t *vm)
+static void vm_sched_init(vm_t *vm)
 {
 	int i;
 	vcpu_t *vcpu = NULL;
 
-	if (!vm)
-		return -EINVAL;
-
-	/*
-	 * find the boot cpu for each vm and
-	 * mark its status, boot cpu will set
-	 * to ready to run state then other vcpu
-	 * is set to STOP state to wait for bootup
-	 */
 	for (i = 0; i < vm->vcpu_nr; i++) {
 		vcpu = vm->vcpus[i];
-		if (get_vcpu_id(vcpu) == 0)
-			set_vcpu_state(vcpu, VCPU_STATE_READY);
-		else
-			set_vcpu_state(vcpu, VCPU_STATE_STOP);
+		vcpu_sched_init(vcpu);
 	}
-
-	return 0;
 }
 
-static int vm_arch_init(vm_t *vm)
+static int inline vm_arch_init(vm_t *vm)
 {
 	return arch_vm_init(vm);
 }
@@ -217,9 +196,8 @@ int vmm_vms_init(void)
 
 	for (i = 0; i < total_vms; i++) {
 		vm = vms[i];
-		vm_create_vcpus(vm);
 		vm_memory_init(vm);
-		vm_state_init(vm);
+		vm_sched_init(vm);
 		vm_arch_init(vm);
 		vm_modules_init(vm);
 	}
@@ -229,12 +207,19 @@ int vmm_vms_init(void)
 
 int vmm_create_vms(void)
 {
+	int i;
+	vm_t *vm;
 	int ret = 0;
 
 	init_list(&vm_list);
 	ret = parse_all_vms();
 	if (ret)
 		panic("parsing the vm fail\n");
+
+	for (i = 0; i < total_vms; i++) {
+		vm_mm_struct_init(vms[i]);
+		vm_create_vcpus(vms[i]);
+	}
 
 	return 0;
 }

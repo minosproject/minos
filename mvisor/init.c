@@ -33,8 +33,8 @@ int vmm_arch_init(void)
 {
 	arch_init();
 
-	call_init_func((unsigned long)&__init_func_0_start,
-			(unsigned long)&__init_func_1_start);
+	call_init_func((unsigned long)&__init_func_1_start,
+			(unsigned long)&__init_func_2_start);
 
 	return 0;
 }
@@ -43,8 +43,8 @@ int vmm_early_init(void)
 {
 	arch_early_init();
 
-	call_init_func((unsigned long)&__init_func_1_start,
-			(unsigned long)&__init_func_2_start);
+	call_init_func((unsigned long)&__init_func_0_start,
+			(unsigned long)&__init_func_1_start);
 
 	return 0;
 }

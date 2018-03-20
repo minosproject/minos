@@ -12,7 +12,7 @@ int mmu_map_memory(unsigned long page_table_base, unsigned long phy_base,
 		return -EINVAL;
 
 	return mmu_chip->map_memory(page_table_base,
-			phy_base, size, vir_base, type);
+			phy_base, vir_base, size, type);
 }
 
 unsigned long mmu_alloc_page_table(void)

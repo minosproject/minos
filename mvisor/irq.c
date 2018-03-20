@@ -29,6 +29,12 @@ int vmm_register_irq_entry(void *res)
 		return -EINVAL;
 	}
 
+	if (config->vmid == 0xffff) {
+		pr_info("irq %d is for vmm\n", config->hno);
+		vmm_irq->flags |= IRQ_FLAG_OWNER_VMM;
+		return 0;
+	}
+
 	vcpu = get_vcpu_by_id(config->vmid, config->affinity);
 	if (!vcpu) {
 		pr_error("Vcpu:%d is not exist for this vm\n", config->affinity);
@@ -44,8 +50,6 @@ int vmm_register_irq_entry(void *res)
 	vmm_irq->vno = config->vno;
 	vmm_irq->hno = config->hno;
 	vmm_irq->vmid = config->vmid;
-	if (vmm_irq->vmid == 0xffffffff)
-		vmm_irq->flags |= IRQ_FLAG_OWNER_VMM;
 
 	vmm_irq->affinity_vcpu = config->affinity;
 	vmm_irq->affinity_pcpu = get_pcpu_id(vcpu);
@@ -95,6 +99,7 @@ int vmm_alloc_irqs(uint32_t start,
 
 		memset((char *)irq, 0, sizeof(struct vmm_irq));
 		irq->hno = i;
+		irq_table[i] = irq;
 	}
 
 	return 0;

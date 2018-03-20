@@ -132,7 +132,7 @@ void *vmm_get_module_pdata(char *name, char *type)
 int vmm_modules_init(void)
 {
 	int32_t i;
-	uint64_t base;
+	uint64_t base, end;
 	uint32_t size;
 	struct module_id *mid;
 
@@ -140,6 +140,7 @@ int vmm_modules_init(void)
 	spin_lock_init(&module_lock);
 	module_class_nr = 0;
 	base = (uint64_t)&__vmm_module_start;
+	end = (uint64_t)&__vmm_module_end;
 	size = (&__vmm_module_end - &__vmm_module_start) /
 			sizeof(struct module_id);
 
