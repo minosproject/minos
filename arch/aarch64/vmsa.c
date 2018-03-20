@@ -3,13 +3,13 @@
 #include <config/config.h>
 #include <mvisor/vcpu.h>
 #include <mvisor/module.h>
+#include <asm/arch.h>
 
 struct vmsa_context {
 	uint64_t vtcr_el2;
 	uint64_t ttbr0_el1;
 	uint64_t ttbr1_el1;
 	uint64_t vttbr_el2;
-	uint64_t hcr_el2;
 } __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
 #define G4K_LEVEL1_OFFSET	(30)
@@ -321,19 +321,28 @@ static void vmsa_state_init(vcpu_t *vcpu, void *context)
 
 	c->vtcr_el2 = generate_vtcr_el2();
 	c->vttbr_el2 = generate_vttbr_el2(vm->vmid, vm->mm.page_table_base);
-	c->hcr_el2 = HCR_EL2_HVC | HCR_EL2_TWI | HCR_EL2_TWE | \
-		     HCR_EL2_TIDCP | HCR_EL2_IMO | HCR_EL2_FMO | \
-		     HCR_EL2_AMO | HCR_EL2_RW | HCR_EL2_VM;
+	c->ttbr0_el1 = 0;
+	c->ttbr1_el1 = 0;
 }
 
 static void vmsa_state_save(vcpu_t *vcpu, void *context)
 {
+	struct vmsa_context *c = (struct vmsa_context *)context;
 
+	c->vtcr_el2 = read_sysreg(VTCR_EL2);
+	c->vttbr_el2 = read_sysreg(VTTBR_EL2);
+	c->ttbr0_el1 = read_sysreg(TTBR0_EL1);
+	c->ttbr1_el1 = read_sysreg(TTBR1_EL1);
 }
 
 static void vmsa_state_restore(vcpu_t *vcpu, void *context)
 {
+	struct vmsa_context *c = (struct vmsa_context *)context;
 
+	write_sysreg(c->vtcr_el2, VTCR_EL2);
+	write_sysreg(c->vttbr_el2, VTTBR_EL2);
+	write_sysreg(c->ttbr0_el1, TTBR0_EL1);
+	write_sysreg(c->ttbr1_el1, TTBR1_EL1);
 }
 
 static struct mmu_chip vmsa_mmu = {
