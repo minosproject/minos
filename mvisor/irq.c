@@ -110,7 +110,7 @@ static int inline send_virtual_irq(vcpu_t *vcpu, struct vcpu_irq *vcpu_irq)
 	void *context = NULL;
 
 	if (vcpu)
-		context = get_vcpu_module_data(vcpu, VMM_MODULE_NAME_IRQCHIP);
+		context = get_module_data_by_name(vcpu, VMM_MODULE_NAME_IRQCHIP);
 
 	/*
 	 * just to change some register's settings, ture
@@ -291,7 +291,7 @@ static int irq_exit_from_guest(vcpu_t *vcpu, void *data)
 	void *context;
 	struct irq_struct *irq_struct = &vcpu->irq_struct;
 
-	context = get_vcpu_module_data(vcpu, VMM_MODULE_NAME_IRQCHIP);
+	context = get_module_data_by_name(vcpu, VMM_MODULE_NAME_IRQCHIP);
 
 	for_each_set_bit(set_bit, irq_struct->irq_bitmap,
 			CONFIG_VCPU_MAX_ACTIVE_IRQS) {

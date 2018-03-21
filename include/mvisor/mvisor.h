@@ -18,6 +18,7 @@ typedef int (*hook_func_t)(vcpu_t *vcpu, void *data);
 enum vmm_hook_type {
 	VMM_HOOK_TYPE_EXIT_FROM_GUEST = 0,
 	VMM_HOOK_TYPE_ENTER_TO_GUEST,
+	VMM_HOOK_TYPE_CREATE_VM,
 	VMM_HOOK_TYPE_UNKNOWN,
 };
 
