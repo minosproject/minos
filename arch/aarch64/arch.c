@@ -31,7 +31,7 @@ static void aarch64_system_state_init(vcpu_t *vcpu, void *c)
 	struct aarch64_system_context *context =
 			(struct aarch64_system_context *)c;
 
-	context->hcr_el2 = HCR_EL2_HVC | HCR_EL2_TWI | HCR_EL2_TWE | \
+	context->hcr_el2 = 0ul | HCR_EL2_HVC | HCR_EL2_TWI | HCR_EL2_TWE | \
 		     HCR_EL2_TIDCP | HCR_EL2_IMO | HCR_EL2_FMO | \
 		     HCR_EL2_AMO | HCR_EL2_RW | HCR_EL2_VM;
 	context->vbar_el1 = 0;

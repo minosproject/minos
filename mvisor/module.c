@@ -129,6 +129,32 @@ void *vmm_get_module_pdata(char *name, char *type)
 	return pdata;
 }
 
+void restore_vcpu_module_state(vcpu_t *vcpu)
+{
+	struct vmm_module *module;
+	void *context;
+
+	list_for_each_entry(module, &module_list, list) {
+		if (module->state_restore) {
+			context = get_vcpu_module_data(vcpu, module->type);
+			module->state_restore(vcpu, context);
+		}
+	}
+}
+
+void save_vcpu_module_state(vcpu_t *vcpu)
+{
+	struct vmm_module *module;
+	void *context;
+
+	list_for_each_entry(module, &module_list, list) {
+		if (module->state_save) {
+			context = get_vcpu_module_data(vcpu, module->type);
+			module->state_save(vcpu, context);
+		}
+	}
+}
+
 int vmm_modules_init(void)
 {
 	int32_t i;

@@ -29,9 +29,9 @@ struct vmm_module {
 };
 
 int vcpu_modules_init(vcpu_t *vcpu);
-
 void *vmm_get_module_pdata(char *name, char *type);
-
 void *get_vcpu_module_data(vcpu_t *vcpu, char *name);
+void save_vcpu_module_state(vcpu_t *vcpu);
+void restore_vcpu_module_state(vcpu_t *vcpu);
 
 #endif

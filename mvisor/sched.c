@@ -4,6 +4,7 @@
 #include <mvisor/mvisor.h>
 #include <mvisor/percpu.h>
 #include <mvisor/pm.h>
+#include <mvisor/module.h>
 
 static pcpu_t pcpus[CONFIG_NR_CPUS];
 
@@ -144,13 +145,18 @@ void switch_to_vcpu(vcpu_t *current, vcpu_t *next)
 	 * then need to save the current cpu context
 	 * to the current vcpu
 	 */
-	if ((current != NULL) && (current != next)) {
-
-	}
+	if ((current != NULL) && (current != next))
+		save_vcpu_module_state(current);
 
 	/*
 	 * restore the next vcpu's context to the real
 	 * hardware
+	 */
+	restore_vcpu_module_state(next);
+
+	/*
+	 * here need to deal the cache and tlb
+	 * TBD
 	 */
 }
 
