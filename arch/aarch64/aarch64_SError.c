@@ -252,7 +252,7 @@ ec_config_t *get_ec_config(uint32_t ec_type)
 	return NULL;
 }
 
-void SError_from_el1_handler(void *data)
+void SError_from_el1_handler(vcpu_regs *data)
 {
 	int cpuid = get_cpu_id();
 	uint32_t esr_value;
@@ -266,26 +266,28 @@ void SError_from_el1_handler(void *data)
 	if (get_pcpu_id(vcpu) != cpuid)
 		panic("this vcpu is not belont to the pcpu");
 
-	esr_value = read_esr_el2();
+	esr_value = data->esr_el2;
 	ec_type = (esr_value & 0xfc000000) >> 26;
 	il = (esr_value & 0x02000000) >> 25;
 	iss = (esr_value & 0x01ffffff);
+
 	pr_debug("value of esr_el2 ec:0x%x il:0x%x iss:0x%x\n", ec_type, il, iss);
 
 	ec = get_ec_config(ec_type);
 	if (ec == NULL) {
 		ret = -EINVAL;
-		return;
+		goto out;
 	}
 
-	ret = ec->handler(iss, il, (void *)vcpu);
-
 	/*
-	 * TBD
+	 * result will store at x0
 	 */
+	ret = ec->handler(iss, il, (void *)vcpu);
+out:
+	data->x0 = ret;
 }
 
-void SError_from_el2_handler(void *data)
+void SError_from_el2_handler(vcpu_regs *data)
 {
 	while (1);
 }

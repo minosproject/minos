@@ -57,7 +57,9 @@ exception_from_el1_handler:
 	str	x1, [x0], #8
 	mrs	x1, nzcv
 	str	x1, [x0], #8
-	sub	x0, x0, #280
+	mrs	x1, esr_el2
+	str	x1, [x0], #8
+	sub	x0, x0, #288
 
 	blr	x4
 
@@ -117,7 +119,9 @@ exit_el2_exception_handler:
 	msr	spsr_el2, x1
 	ldr	x1, [x0], #8
 	msr	nzcv, x1
-	sub	x0, x0, #280
+	ldr	x1, [x0], #8
+	msr	esr_el2, x1
+	sub	x0, x0, #288
 	ldr	x1, [x0, #8]
 	ldr	x0, [x0]
 	isb

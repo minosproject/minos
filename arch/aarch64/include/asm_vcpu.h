@@ -39,6 +39,7 @@ typedef struct aarch64_vcpu_regs {
 	uint64_t elr_el2;
 	uint64_t spsr_el2;
 	uint64_t nzcv;
+	uint64_t esr_el2;
 } vcpu_regs __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
 #endif
