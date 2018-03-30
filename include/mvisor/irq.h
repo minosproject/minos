@@ -91,15 +91,14 @@ struct vmm_irq {
 int vmm_alloc_irqs(uint32_t start,
 		uint32_t end, unsigned long flags);
 int register_irq_chip(struct irq_chip *chip);
-
 int vmm_irq_init(void);
-
 int vmm_irq_secondary_init(void);
-
 int vmm_register_irq_entry(void *res);
-
 void vmm_setup_irqs(void);
-
 int do_irq_handler(vcpu_t *vcpu);
+void irq_mask(uint32_t irq);
+void irq_unmask(uint32_t irq);
+void virq_mask(uint32_t irq);
+void virq_unmask(uint32_t irq);
 
 #endif

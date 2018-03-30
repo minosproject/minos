@@ -44,6 +44,8 @@ static int vmm_add_vm(vm_entry_t *vme)
 	total_vms++;
 	list_add_tail(&vm_list, &vm->vm_list);
 
+	modules_create_vm(vm);
+
 	return 0;
 }
 

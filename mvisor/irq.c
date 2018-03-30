@@ -60,6 +60,26 @@ int vmm_register_irq_entry(void *res)
 	return 0;
 }
 
+void irq_mask(uint32_t irq)
+{
+
+}
+
+void irq_unmask(uint32_t irq)
+{
+
+}
+
+void virq_mask(uint32_t irq)
+{
+	//vcpu_t *vcpu = get_running_vcpu();
+}
+
+void virq_unmask(uint32_t irq)
+{
+
+}
+
 void vmm_setup_irqs(void)
 {
 	int i;

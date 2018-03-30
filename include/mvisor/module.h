@@ -33,5 +33,7 @@ void *get_module_data_by_name(vcpu_t *vcpu, char *name);
 void *get_module_data_by_id(vcpu_t *vcpu, int id);
 void save_vcpu_module_state(vcpu_t *vcpu);
 void restore_vcpu_module_state(vcpu_t *vcpu);
+int get_module_id(char *type);
+void modules_create_vm(vm_t *vm);
 
 #endif

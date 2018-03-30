@@ -144,65 +144,26 @@ static void gicv3_send_sgi_list(uint32_t sgi, cpumask_t *mask)
 
 static uint64_t gicv3_read_lr(int lr)
 {
-switch ( lr )
-    {
-    case 0: return read_sysreg(ICH_LR0_EL2);
-    case 1: return read_sysreg(ICH_LR1_EL2);
-    case 2: return read_sysreg(ICH_LR2_EL2);
-    case 3: return read_sysreg(ICH_LR3_EL2);
-    case 4: return read_sysreg(ICH_LR4_EL2);
-    case 5: return read_sysreg(ICH_LR5_EL2);
-    case 6: return read_sysreg(ICH_LR6_EL2);
-    case 7: return read_sysreg(ICH_LR7_EL2);
-    case 8: return read_sysreg(ICH_LR8_EL2);
-    case 9: return read_sysreg(ICH_LR9_EL2);
-    case 10: return read_sysreg(ICH_LR10_EL2);
-    case 11: return read_sysreg(ICH_LR11_EL2);
-    case 12: return read_sysreg(ICH_LR12_EL2);
-    case 13: return read_sysreg(ICH_LR13_EL2);
-    case 14: return read_sysreg(ICH_LR14_EL2);
-    case 15: return read_sysreg(ICH_LR15_EL2);
-    default:
-        return 0;
-    }
-
-#if 0
-	switch (lr) {
-	case 0:
-		return read_sysreg(ICH_LR0_EL2);
-	case 1:
-		return read_sysreg(ICH_LR1_EL2);
-	case 2:
-		return read_sysreg(ICH_LR2_EL2);
-	case 3:
-		return read_sysreg(ICH_LR3_EL2);
-	case 4:
-		return read_sysreg(ICH_LR4_EL2);
-	case 5:
-		return read_sysreg(ICH_LR5_EL2);
-	case 6:
-		return read_sysreg(ICH_LR6_EL2);
-	case 7:
-		return read_sysreg(ICH_LR7_EL2);
-	case 8:
-		return read_sysreg(ICH_LR8_EL2);
-	case 9:
-		return read_sysreg(ICH_LR9_EL2);
-	case 10:
-		return read_sysreg(ICH_LR10_EL2);
-	case 11:
-		return read_sysreg(ICH_LR11_EL2);
-	case 12:
-		return read_sysreg(ICH_LR12_EL2);
-	case 13:
-		return read_sysreg(ICH_LR13_EL2);
-	case 14:
-		return read_sysreg(ICH_LR14_EL2);
-	case 15:
-		return read_sysreg(ICH_LR15_EL2);
+	switch ( lr ) {
+	case 0: return read_sysreg(ICH_LR0_EL2);
+	case 1: return read_sysreg(ICH_LR1_EL2);
+	case 2: return read_sysreg(ICH_LR2_EL2);
+	case 3: return read_sysreg(ICH_LR3_EL2);
+	case 4: return read_sysreg(ICH_LR4_EL2);
+	case 5: return read_sysreg(ICH_LR5_EL2);
+	case 6: return read_sysreg(ICH_LR6_EL2);
+	case 7: return read_sysreg(ICH_LR7_EL2);
+	case 8: return read_sysreg(ICH_LR8_EL2);
+	case 9: return read_sysreg(ICH_LR9_EL2);
+	case 10: return read_sysreg(ICH_LR10_EL2);
+	case 11: return read_sysreg(ICH_LR11_EL2);
+	case 12: return read_sysreg(ICH_LR12_EL2);
+	case 13: return read_sysreg(ICH_LR13_EL2);
+	case 14: return read_sysreg(ICH_LR14_EL2);
+	case 15: return read_sysreg(ICH_LR15_EL2);
 	default:
-		panic("Invaild LR list\n");
-#endif
+		 return 0;
+	}
 }
 
 static void gicv3_write_lr(int lr, uint64_t val)

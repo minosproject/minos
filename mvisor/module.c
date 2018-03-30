@@ -26,7 +26,7 @@ int get_module_id(char *type)
 	struct vmm_module *module;
 
 	list_for_each_entry(module, &module_list, list) {
-		if (strcmp(module->name, type) == 0)
+		if (strcmp(module->type, type) == 0)
 			return module->id;
 	}
 
@@ -57,6 +57,7 @@ static struct vmm_module *vmm_create_module(struct module_id *id)
 	}
 
 	list_add(&module_list, &module->list);
+	return module;
 }
 
 void *get_module_data_by_name(vcpu_t *vcpu, char *name)
@@ -106,6 +107,16 @@ int vcpu_modules_init(vcpu_t *vcpu)
 	}
 
 	return 0;
+}
+
+void modules_create_vm(vm_t *vm)
+{
+	struct vmm_module *module;
+
+	list_for_each_entry(module, &module_list, list) {
+		if (module->create_vm)
+			module->create_vm(vm);
+	}
 }
 
 void *vmm_get_module_pdata(char *name, char *type)

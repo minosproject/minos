@@ -42,4 +42,26 @@ typedef struct aarch64_vcpu_regs {
 	uint64_t esr_el2;
 } vcpu_regs __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
+static inline unsigned long
+get_reg_value(vcpu_regs *regs, uint32_t index)
+{
+	unsigned long *base = (unsigned long *)regs;
+
+	if (index > 30)
+		return 0;
+
+	return *(base + index);
+}
+
+static inline void
+set_reg_value(vcpu_regs *regs, uint32_t index, unsigned long value)
+{
+	unsigned long *base = (unsigned long *)regs;
+
+	if (index > 30)
+		return;
+
+	*(base + index) = value;
+}
+
 #endif
