@@ -31,15 +31,15 @@ static void inline spin_unlock(spinlock_t *lock)
 
 #define spin_lock_irqsave(l, flags) \
 	do { \
-		flags = arch_save_irqflags() \
-		arch_disable_irq() \
-		arch_spin_lock(l) \
+		flags = arch_save_irqflags(); \
+		arch_disable_local_irq(); \
+		arch_spin_lock(l); \
 	} while (0)
 
 #define spin_unlock_irqrestore(l, flags) \
 	do { \
-		arch_spin_unlock(l) \
-		arch_restore_irqflags(flags) \
-	}
+		arch_spin_unlock(l); \
+		arch_restore_irqflags(flags); \
+	} while (0)
 
 #endif

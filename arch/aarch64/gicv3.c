@@ -34,9 +34,8 @@ static void gicv3_gicr_wait_for_rwp(void)
 	while (ioread32(gicr_rd_base() + GICR_CTLR) & (1 << 3));
 }
 
-void gicv3_mask_irq(struct vmm_irq *vmm_irq)
+void gicv3_mask_irq(uint32_t irq)
 {
-	uint32_t irq = vmm_irq->hno;
 	uint32_t mask = 1 << (irq % 32);
 
 	spin_lock(&gicv3_lock);
@@ -47,9 +46,6 @@ void gicv3_mask_irq(struct vmm_irq *vmm_irq)
 		iowrite32(gicd_base + GICD_ICENABLER + (irq / 32) * 4, mask);
 		gicv3_gicd_wait_for_rwp();
 	}
-
-	vmm_irq->flags &= ~IRQ_FLAG_STATUS_MASK;
-	vmm_irq->flags |= IRQ_FLAG_STATUS_MASKED;
 	spin_unlock(&gicv3_lock);
 }
 
@@ -59,10 +55,8 @@ void gicv3_eoi_irq(uint32_t irq)
 	isb();
 }
 
-void gicv3_dir_irq(struct vmm_irq *vmm_irq)
+void gicv3_dir_irq(uint32_t irq)
 {
-	uint32_t irq = vmm_irq->hno;
-
 	write_sysreg32(irq, ICC_EOIR1_EL1);
 	isb();
 }
@@ -76,10 +70,9 @@ uint32_t gicv3_read_irq(void)
 	return irq;
 }
 
-int gicv3_set_irq_type(struct vmm_irq *vmm_irq, uint32_t type)
+int gicv3_set_irq_type(uint32_t irq, uint32_t type)
 {
 	void *base;
-	uint32_t irq = vmm_irq->hno;
 	uint32_t cfg, actual, edgebit;
 
 	spin_lock(&gicv3_lock);
@@ -91,22 +84,18 @@ int gicv3_set_irq_type(struct vmm_irq *vmm_irq, uint32_t type)
 
 	cfg = ioread32(base);
 	edgebit = 2u << (2 * (irq % 16));
-	if (type & IRQ_FLAG_TYPE_LEVEL_MASK)
+	if (type & IRQ_FLAG_TYPE_LEVEL_BOTH)
 		cfg &= ~edgebit;
 	else if (type & IRQ_FLAG_TYPE_EDGE_BOTH)
 		cfg |= edgebit;
 
 	iowrite32(base, cfg);
-	vmm_irq->flags &= ~IRQ_FLAG_TYPE_MASK;
-	vmm_irq->flags |= (type & IRQ_FLAG_TYPE_MASK);
 
 	spin_unlock(&gicv3_lock);
 }
 
-int gicv3_set_irq_priority(struct vmm_irq *vmm_irq, uint32_t pr)
+int gicv3_set_irq_priority(uint32_t irq, uint32_t pr)
 {
-	uint32_t irq = vmm_irq->hno;
-
 	spin_lock(&gicv3_lock);
 
 	if (irq < GICV3_NR_LOCAL_IRQS)
@@ -117,9 +106,16 @@ int gicv3_set_irq_priority(struct vmm_irq *vmm_irq, uint32_t pr)
 	spin_unlock(&gicv3_lock);
 }
 
-int gicv3_set_irq_affinity(struct vmm_irq *vmm_irq, cpumask_t *dest)
+int gicv3_set_irq_affinity(uint32_t irq, uint32_t pcpu)
 {
+	uint64_t affinity;
 
+	affinity = logic_cpu_to_irq_affinity(pcpu);
+	affinity &= ~(1 << 31); //GICD_IROUTER_SPI_MODE_ANY
+
+	spin_lock(&gicv3_lock);
+	iowrite64(gicd_base + GICD_IROUTER + irq * 8, affinity);
+	spin_unlock(&gicv3_lock);
 }
 
 static void gicv3_send_sgi_list(uint32_t sgi, cpumask_t *mask)
@@ -274,10 +270,9 @@ out:
 	return -EAGAIN;
 }
 
-void gicv3_send_sgi(struct vmm_irq *data, enum sgi_mode mode, cpumask_t *cpu)
+void gicv3_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *cpu)
 {
 	cpumask_t cpus_mask;
-	uint32_t sgi = data->hno;
 
 	if (sgi > 15)
 		return;
@@ -301,9 +296,8 @@ void gicv3_send_sgi(struct vmm_irq *data, enum sgi_mode mode, cpumask_t *cpu)
 	}
 }
 
-void gicv3_unmask_irq(struct vmm_irq *vmm_irq)
+void gicv3_unmask_irq(uint32_t irq)
 {
-	uint32_t irq = vmm_irq->hno;
 	uint32_t mask = 1 << (irq % 32);
 
 	spin_lock(&gicv3_lock);
@@ -315,8 +309,7 @@ void gicv3_unmask_irq(struct vmm_irq *vmm_irq)
 		iowrite32(gicd_base + GICD_ISENABLER + (irq / 32) * 4, mask);
 		gicv3_gicd_wait_for_rwp();
 	}
-	vmm_irq->flags &= ~IRQ_FLAG_STATUS_MASK;
-	vmm_irq->flags |= IRQ_FLAG_STATUS_UNMASKED;
+
 	spin_unlock(&gicv3_lock);
 }
 
@@ -498,10 +491,11 @@ int gicv3_init(void)
 	nr_lines = 32 * ((type & 0x1f));
 
 	/* alloc LOCAL_IRQS for each cpus */
-	vmm_alloc_irqs(0, 31, 1);
+	vmm_alloc_irqs(0, 15, IRQ_TYPE_SGI);
+	vmm_alloc_irqs(16, 31, IRQ_TYPE_PPI);
 
 	/* alloc SPI irqs */
-	vmm_alloc_irqs(32, nr_lines - 1, 0);
+	vmm_alloc_irqs(32, nr_lines - 1, IRQ_TYPE_SPI);
 
 	/* default all golbal IRQS to level, active low */
 	for (i = GICV3_NR_LOCAL_IRQS; i < nr_lines; i += 16)

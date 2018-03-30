@@ -14,6 +14,23 @@ typedef uint32_t (*get_nr_t)(void);
 
 static struct irq_chip *irq_chip;
 
+static uint32_t virq_to_irq(uint32_t virq)
+{
+	int i;
+	struct vmm_irq *vmm_irq;
+
+	for (i = 0; i < irq_nums; i++) {
+		vmm_irq = irq_table[i];
+		if (!vmm_irq)
+			continue;
+
+		if (vmm_irq->vno == virq)
+			return vmm_irq->hno;
+	}
+
+	return BAD_IRQ;
+}
+
 int vmm_register_irq_entry(void *res)
 {
 	struct irq_resource *config;
@@ -60,24 +77,51 @@ int vmm_register_irq_entry(void *res)
 	return 0;
 }
 
-void irq_mask(uint32_t irq)
+void __irq_enable(uint32_t irq, int enable)
 {
+	unsigned long flag;
+	struct vmm_irq *vmm_irq;
 
+	if (irq >= irq_nums)
+		return;
+
+	vmm_irq = irq_table[irq];
+	if (!vmm_irq)
+		return;
+
+	spin_lock_irqsave(&vmm_irq->lock, flag);
+
+	if (enable) {
+		if (vmm_irq->flags & IRQ_FLAG_STATUS_MASK ==
+				IRQ_FLAG_STATUS_MASKED)
+			goto out;
+
+		irq_chip->irq_unmask(irq);
+		vmm_irq->flags &= ~IRQ_FLAG_STATUS_MASK;
+		vmm_irq->flags |= IRQ_FLAG_STATUS_UNMASKED;
+	} else {
+		if (vmm_irq->flags & IRQ_FLAG_STATUS_MASK ==
+				IRQ_FLAG_STATUS_UNMASKED)
+			goto out;
+
+		irq_chip->irq_mask(irq);
+		vmm_irq->flags &= ~IRQ_FLAG_STATUS_MASK;
+		vmm_irq->flags |= IRQ_FLAG_STATUS_MASKED;
+	}
+
+out:
+	spin_unlock_irqrestore(&vmm_irq->lock, flag);
 }
 
-void irq_unmask(uint32_t irq)
+void __virq_enable(uint32_t virq, int enable)
 {
+	uint32_t irq;
 
-}
+	irq = virq_to_irq(virq);
+	if (irq == BAD_IRQ)
+		return;
 
-void virq_mask(uint32_t irq)
-{
-	//vcpu_t *vcpu = get_running_vcpu();
-}
-
-void virq_unmask(uint32_t irq)
-{
-
+	__irq_enable(irq, enable);
 }
 
 void vmm_setup_irqs(void)
@@ -90,14 +134,16 @@ void vmm_setup_irqs(void)
 		if (!vmm_irq)
 			continue;
 
-		//gic_set_irq_affinity(vmm_irq, vmm_irq->affinity_pcpu);
-		//gic_set_irq_type(vmm_irq, vmm_irq->flags & IRQ_TYPE_MASK);
-		//gic_unmask_irq(vmm_irq);
+		if (vmm_irq->flags & IRQ_FLAG_AFFINITY_VCPU) {
+			irq_chip->irq_set_type(vmm_irq->hno,
+					vmm_irq->flags & IRQ_FLAG_TYPE_MASK);
+			irq_chip->irq_set_affinity(vmm_irq->hno,
+					vmm_irq->affinity_pcpu);
+		}
 	}
 }
 
-int vmm_alloc_irqs(uint32_t start,
-		uint32_t end, unsigned long flags)
+int vmm_alloc_irqs(uint32_t start, uint32_t end, enum irq_type type)
 {
 	int i;
 	struct vmm_irq *irq;
@@ -120,6 +166,9 @@ int vmm_alloc_irqs(uint32_t start,
 		memset((char *)irq, 0, sizeof(struct vmm_irq));
 		irq->hno = i;
 		irq_table[i] = irq;
+
+		if (type == IRQ_TYPE_SPI)
+			irq->flags |= IRQ_FLAG_AFFINITY_VCPU;
 	}
 
 	return 0;

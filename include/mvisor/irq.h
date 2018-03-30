@@ -8,8 +8,10 @@
 #include <config/config.h>
 #include <mvisor/smp.h>
 #include <mvisor/vcpu.h>
+#include <mvisor/spinlock.h>
 
 #define MAX_IRQ_NAME_SIZE	32
+#define BAD_IRQ			(1024)
 
 #define IRQ_FLAG_TYPE_NONE           		(0x00000000)
 #define IRQ_FLAG_TYPE_EDGE_RISING    		(0x00000001)
@@ -20,7 +22,7 @@
 #define IRQ_FLAG_TYPE_INVALID        		(0x00000010)
 #define IRQ_FLAG_TYPE_EDGE_BOTH \
     (IRQ_FLAG_TYPE_EDGE_FALLING | IRQ_FLAG_TYPE_EDGE_RISING)
-#define IRQ_FLAG_TYPE_LEVEL_MASK \
+#define IRQ_FLAG_TYPE_LEVEL_BOTH \
     (IRQ_FLAG_TYPE_LEVEL_LOW | IRQ_FLAG_TYPE_LEVEL_HIGH)
 #define IRQ_FLAG_TYPE_MASK			(0x000000ff)
 
@@ -31,6 +33,10 @@
 #define IRQ_FLAG_OWNER_GUEST			(0x00000000)
 #define IRQ_FLAG_OWNER_VMM			(0x00001000)
 #define IRQ_FLAG_OWNER_MASK			(0x0000f000)
+
+#define IRQ_FLAG_AFFINITY_VCPU			(0x00010000)
+#define IRQ_FLAG_AFFINITY_PERCPU		(0x00000000)
+#define IRQ_FLAG_AFFINITY_MASK			(0x000f0000)
 
 enum sgi_mode {
 	SGI_TO_OTHERS,
@@ -53,14 +59,14 @@ struct irq_chip {
 	uint32_t irq_start;
 	uint32_t irq_num;
 	uint32_t (*get_pending_irq)(void);
-	void (*irq_mask)(struct vmm_irq *data);
-	void (*irq_unmask)(struct vmm_irq *data);
+	void (*irq_mask)(uint32_t irq);
+	void (*irq_unmask)(uint32_t irq);
 	void (*irq_eoi)(uint32_t irq);
-	int (*irq_set_affinity)(struct vmm_irq *data, cpumask_t *dest);
-	int (*irq_set_type)(struct vmm_irq *data, unsigned int flow_type);
-	int (*irq_set_priority)(struct vmm_irq *data, uint32_t pr);
+	int (*irq_set_affinity)(uint32_t irq, uint32_t pcpu);
+	int (*irq_set_type)(uint32_t irq, unsigned int flow_type);
+	int (*irq_set_priority)(uint32_t irq, uint32_t pr);
 	int (*get_irq_type)(uint32_t irq);
-	void (*send_sgi)(struct vmm_irq *data, enum sgi_mode mode, cpumask_t *mask);
+	void (*send_sgi)(uint32_t irq, enum sgi_mode mode, cpumask_t *mask);
 	int (*send_virq)(void *context, struct vcpu_irq *vcpu_irq);
 	int (*get_virq_state)(void *context, struct vcpu_irq *vcpu_irq);
 	int (*init)(void);
@@ -79,6 +85,7 @@ struct vmm_irq {
 	uint32_t affinity_vcpu;
 	uint32_t affinity_pcpu;
 	uint32_t flags;
+	spinlock_t lock;
 	char name[MAX_IRQ_NAME_SIZE];
 	unsigned long irq_count;
 	int (*irq_handler)(uint32_t irq, void *data);
@@ -88,17 +95,36 @@ struct vmm_irq {
 #define enable_local_irq() arch_enable_local_irq()
 #define disable_local_irq() arch_disable_local_irq()
 
-int vmm_alloc_irqs(uint32_t start,
-		uint32_t end, unsigned long flags);
+int vmm_alloc_irqs(uint32_t start, uint32_t end, enum irq_type type);
 int register_irq_chip(struct irq_chip *chip);
 int vmm_irq_init(void);
 int vmm_irq_secondary_init(void);
 int vmm_register_irq_entry(void *res);
 void vmm_setup_irqs(void);
 int do_irq_handler(vcpu_t *vcpu);
-void irq_mask(uint32_t irq);
-void irq_unmask(uint32_t irq);
-void virq_mask(uint32_t irq);
-void virq_unmask(uint32_t irq);
+
+void __virq_enable(uint32_t virq, int enable);
+void __irq_enable(uint32_t irq, int enable);
+
+static inline void virq_mask(uint32_t virq)
+{
+	__virq_enable(virq, 1);
+}
+
+static inline void virq_unmask(uint32_t virq)
+{
+	__virq_enable(virq, 0);
+}
+
+static inline void irq_unmask(uint32_t irq)
+{
+	__irq_enable(irq, 1);
+}
+
+static inline void irq_mask(uint32_t irq)
+{
+	__irq_enable(irq, 0);
+}
+
 
 #endif
