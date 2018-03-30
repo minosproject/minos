@@ -152,7 +152,8 @@ void switch_to_vcpu(vcpu_t *current, vcpu_t *next)
 	 * restore the next vcpu's context to the real
 	 * hardware
 	 */
-	restore_vcpu_module_state(next);
+	if ((current != next))
+		restore_vcpu_module_state(next);
 
 	/*
 	 * here need to deal the cache and tlb
