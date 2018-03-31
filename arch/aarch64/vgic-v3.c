@@ -204,13 +204,13 @@ static int vgicv3_gicd_mmio_write(struct vgicv3 *vgic,
 		break;
 	case GICD_ISENABLER...GICD_ISENABLER_END:
 		x = (offset - GICD_ISENABLER) / 4;
-		y = x * 32 + GICV3_NR_LOCAL_IRQS;
+		y = x * 32;
 		for_each_set_bit(bit, &value, 32)
 			virq_unmask(y + bit);
 		break;
 	case GICD_ICENABLER...GICD_ICENABLER_END:
 		x = (offset - GICD_ICENABLER) / 4;
-		y = x * 32 + GICV3_NR_LOCAL_IRQS;
+		y = x * 32;
 		for_each_set_bit(bit, &value, 32)
 			virq_mask(y + bit);
 		break;

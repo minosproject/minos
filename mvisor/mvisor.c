@@ -107,6 +107,7 @@ void boot_main(void)
 	smp_cpus_up();
 	enable_local_irq();
 
+	//gicv3_send_sgi(15, SGI_TO_SELF, NULL);
 	sched_vcpu();
 }
 
@@ -133,7 +134,6 @@ void boot_secondary(void)
 	enable_local_irq();
 	smp_holding_pen[cpuid] = mpidr;
 
-	//gic_send_sgi(15, SGI_TO_SELF, NULL);
 	sched_vcpu();
 }
 

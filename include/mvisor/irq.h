@@ -108,12 +108,12 @@ void __irq_enable(uint32_t irq, int enable);
 
 static inline void virq_mask(uint32_t virq)
 {
-	__virq_enable(virq, 1);
+	__virq_enable(virq, 0);
 }
 
 static inline void virq_unmask(uint32_t virq)
 {
-	__virq_enable(virq, 0);
+	__virq_enable(virq, 1);
 }
 
 static inline void irq_unmask(uint32_t irq)

@@ -77,7 +77,7 @@ int gicv3_set_irq_type(uint32_t irq, uint32_t type)
 
 	spin_lock(&gicv3_lock);
 
-	if (irq > GICV3_NR_LOCAL_IRQS)
+	if (irq >= GICV3_NR_LOCAL_IRQS)
 		base = (void *)gicd_base + GICD_ICFGR + (irq / 16) * 4;
 	else
 		base = (void *)gicr_sgi_base() + GICR_ICFGR1;
