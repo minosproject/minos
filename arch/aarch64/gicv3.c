@@ -10,6 +10,7 @@
 #include <mvisor/vcpu.h>
 #include <mvisor/panic.h>
 #include <asm/arch.h>
+#include <mvisor/cpumask.h>
 
 spinlock_t gicv3_lock;
 static void *gicd_base = (void *)0x2f000000;
@@ -123,11 +124,10 @@ static void gicv3_send_sgi_list(uint32_t sgi, cpumask_t *mask)
 	int i;
 	uint64_t list = 0;
 	uint64_t val;
+	int cpu;
 
-	for (i = 0; i < CONFIG_NR_CPUS; i++) {
-		//if ((1 << i) & (*mask))
-		//	list |= (1 << i);
-	}
+	for_each_cpu(cpu, mask)
+		list |= (1 << cpu);
 
 	/*
 	 * TBD: now only support one cluster
@@ -277,6 +277,8 @@ void gicv3_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *cpu)
 	if (sgi > 15)
 		return;
 
+	cpumask_clear(&cpus_mask);
+
 	switch (mode) {
 	case SGI_TO_OTHERS:
 		write_sysreg64(ICH_SGI_TARGET_OTHERS << ICH_SGI_IRQMODE_SHIFT |
@@ -284,7 +286,7 @@ void gicv3_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *cpu)
 		isb();
 		break;
 	case SGI_TO_SELF:
-		//cpus_mask |= (1 << get_cpu_id());
+		cpumask_set_cpu(get_cpu_id(), &cpus_mask);
 		gicv3_send_sgi_list(sgi, &cpus_mask);
 		break;
 	case SGI_TO_LIST:

@@ -10,10 +10,6 @@
 DECLARE_PER_CPU(uint64_t, cpu_id);
 extern uint64_t smp_holding_pen[];
 
-typedef struct cpumask {
-	 DECLARE_BITMAP(bits, CONFIG_NR_CPUS);
-} cpumask_t;
-
 int get_cpu_id(void);
 void smp_cpus_up(void);
 int smp_cpu_up(uint64_t mpidr_id);

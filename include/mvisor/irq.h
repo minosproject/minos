@@ -9,6 +9,7 @@
 #include <mvisor/smp.h>
 #include <mvisor/vcpu.h>
 #include <mvisor/spinlock.h>
+#include <mvisor/cpumask.h>
 
 #define MAX_IRQ_NAME_SIZE	32
 #define BAD_IRQ			(1024)

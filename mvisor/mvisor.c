@@ -107,7 +107,7 @@ void boot_main(void)
 	smp_cpus_up();
 	enable_local_irq();
 
-	//gicv3_send_sgi(15, SGI_TO_SELF, NULL);
+	gicv3_send_sgi(15, SGI_TO_SELF, NULL);
 	sched_vcpu();
 }
 
