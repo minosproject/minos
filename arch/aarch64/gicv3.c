@@ -15,6 +15,7 @@
 spinlock_t gicv3_lock;
 static void *gicd_base = (void *)0x2f000000;
 static void * __gicr_rd_base = (void *)0x2f100000;
+static int gicv3_module_id = 0xffff;
 
 static int gicv3_nr_lr = 0;
 static int gicv3_nr_pr = 0;
@@ -58,7 +59,7 @@ void gicv3_eoi_irq(uint32_t irq)
 
 void gicv3_dir_irq(uint32_t irq)
 {
-	write_sysreg32(irq, ICC_EOIR1_EL1);
+	write_sysreg32(irq, ICC_DIR_EL1);
 	isb();
 }
 
@@ -100,9 +101,9 @@ int gicv3_set_irq_priority(uint32_t irq, uint32_t pr)
 	spin_lock(&gicv3_lock);
 
 	if (irq < GICV3_NR_LOCAL_IRQS)
-		iowrite32(gicr_sgi_base() + GICR_IPRIORITYR0 + irq, pr);
+		iowrite8(gicr_sgi_base() + GICR_IPRIORITYR0 + irq, pr);
 	else
-		iowrite32(gicd_base + GICD_IPRIORITYR + irq, pr);
+		iowrite8(gicd_base + GICD_IPRIORITYR + irq, pr);
 
 	spin_unlock(&gicv3_lock);
 }
@@ -221,53 +222,38 @@ static void gicv3_write_lr(int lr, uint64_t val)
 	isb();
 }
 
-static int gicv3_send_virq(void *c, struct vcpu_irq *vcpu_irq)
+static int gicv3_send_virq(vcpu_t *vcpu, struct vcpu_irq *vcpu_irq)
 {
-#if 0
-	int i, empty = 0xff;
-	uint64_t *lr_base;
-	uint64_t value;
-	struct gic_lr *lr;
-	uint32_t h = vcpu_irq->
+	uint64_t value = 0;
+	struct gic_lr *lr = (struct gic_lr *)&value;
+	struct gic_context *c;
+	uint64_t *base;
 
-	lr = (struct gic_lr *)&value;
-
-	if (c)
-		lr_base = (uint64_t *)c;
-	/*
-	 * first find one empty list lr register
-	 */
-	for(i = 0; i < gicv3_nr_lr; i++) {
-		if (c)
-			value = lr_base[i];
-		else
-			value = gicv3_read_lr(i);
-
-		if (lr->state == 0) {
-			empty = i;
-		}
-
-		if (lr->p_intid == h)
-			return 0;
-	}
-
-	lr->v_intid = v;
-	lr->p_intid = h;
+	lr->v_intid = vcpu_irq->v_intno;
+	lr->p_intid = vcpu_irq->h_intno;
 	lr->priority = 0;
 	lr->group = 1;
-	lr->hw = h;
+	lr->hw = vcpu_irq->h_intno ? 1 : 0;
+	lr->state = 1;
 
-	if (empty) {
-		if (c)
-			lr_base[empty] = value;
-		else
-			gicv3_write_lr(empty, value);
+	if (vcpu) {
+		/*
+		 * this virq is send to the vcpu which is not
+		 * running this time, first set the correct value
+		 * in his context and return waitting for his running
+		 * time
+		 */
+		c = (struct gic_context *)get_module_data_by_id(vcpu,
+				gicv3_module_id);
+		base = (uint64_t *)c;
+		base[vcpu_irq->id] = value;
+
+		return 0;
 	}
 
-out:
+	gicv3_write_lr(vcpu_irq->id, value);
 
-#endif
-	return -EAGAIN;
+	return 0;
 }
 
 void gicv3_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *cpu)
@@ -317,7 +303,16 @@ void gicv3_unmask_irq(uint32_t irq)
 
 static int gicv3_get_irq_type(uint32_t irq)
 {
-	return 0;
+	if (irq <= 15)
+		return IRQ_TYPE_SGI;
+	else if ((irq > 15) && (irq < 32))
+		return IRQ_TYPE_PPI;
+	else if ((irq >= 32) && (irq < 1020))
+		return IRQ_TYPE_SPI;
+	else if ((irq >= 1020) && (irq < 1024))
+		return IRQ_TYPE_SPECIAL;
+	else
+		return IRQ_TYPE_BAD;
 }
 
 static void gicv3_wakeup_gicr(void)
@@ -341,7 +336,7 @@ uint32_t gicv3_get_irq_num(void)
 	return (32 * ((type & 0x1f)));
 }
 
-int gicv3_get_virq_state(void *c, struct vcpu_irq *vcpu_irq)
+int gicv3_get_virq_state(struct vcpu_irq *vcpu_irq)
 {
 	return 0;
 }
@@ -366,7 +361,7 @@ static int gicv3_gicc_init(void)
 
 static int gicv3_hyp_init(void)
 {
-	write_sysreg32(GICH_VMCR_VEOIM | GICH_VMCR_VENG1, ICH_VMCR_EL2);
+	write_sysreg32(GICH_VMCR_VENG1 | (0xff << 24), ICH_VMCR_EL2);
 	write_sysreg32(GICH_HCR_EN, ICH_HCR_EL2);
 
 	/*
@@ -424,7 +419,7 @@ static void gicv3_state_init(vcpu_t *vcpu, void *context)
 {
 	struct gic_context *c = (struct gic_context *)context;
 
-
+	gicv3_module_id = get_module_id("irq_chip");
 }
 
 void gic_init_el3(void)
@@ -582,6 +577,8 @@ static int gicv3_module_init(struct vmm_module *module)
 	module->state_init = gicv3_state_init;
 	module->state_save = gicv3_state_save;
 	module->state_restore = gicv3_state_restore;
+
+	gicv3_module_id = module->id;
 
 	return 0;
 }

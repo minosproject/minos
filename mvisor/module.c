@@ -14,13 +14,6 @@ static int module_class_nr = 0;
 
 typedef int (*module_init_fn)(struct vmm_module *);
 
-static char *vmm_module_names[] = {
-	VMM_MODULE_NAME_IRQCHIP,
-	VMM_MODULE_NAME_MMU,
-	VMM_MODULE_NAME_SYSTEM,
-	NULL,
-};
-
 int get_module_id(char *type)
 {
 	struct vmm_module *module;
@@ -49,6 +42,8 @@ static struct vmm_module *vmm_create_module(struct module_id *id)
 	strncpy(module->name, id->name, 31);
 	strncpy(module->type, id->type, 31);
 	init_list(&module->list);
+	module->id = module_class_nr;
+	module_class_nr++;
 
 	/* call init routine */
 	if (id->fn) {
@@ -186,12 +181,8 @@ int vmm_modules_init(void)
 	for (i = 0; i < size; i++) {
 		mid = (struct module_id *)base;
 		module = vmm_create_module(mid);
-		if (!module) {
+		if (!module)
 			pr_error("Can not create module\n");
-		} else {
-			module->id = i;
-			module_class_nr++;
-		}
 
 		base += sizeof(struct module_id);
 	}

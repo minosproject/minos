@@ -68,8 +68,8 @@ struct irq_chip {
 	int (*irq_set_priority)(uint32_t irq, uint32_t pr);
 	int (*get_irq_type)(uint32_t irq);
 	void (*send_sgi)(uint32_t irq, enum sgi_mode mode, cpumask_t *mask);
-	int (*send_virq)(void *context, struct vcpu_irq *vcpu_irq);
-	int (*get_virq_state)(void *context, struct vcpu_irq *vcpu_irq);
+	int (*send_virq)(vcpu_t *vcpu, struct vcpu_irq *vcpu_irq);
+	int (*get_virq_state)(struct vcpu_irq *vcpu_irq);
 	int (*init)(void);
 	int (*secondary_init)(void);
 };

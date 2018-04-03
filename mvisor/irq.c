@@ -174,22 +174,6 @@ int vmm_alloc_irqs(uint32_t start, uint32_t end, enum irq_type type)
 	return 0;
 }
 
-static int inline send_virtual_irq(vcpu_t *vcpu, struct vcpu_irq *vcpu_irq)
-{
-	void *context = NULL;
-
-	if (vcpu)
-		context = get_module_data_by_name(vcpu, VMM_MODULE_NAME_IRQCHIP);
-
-	/*
-	 * just to change some register's settings, ture
-	 * virq will trigger when return to guest vm, if
-	 * the virq is not send successful this time then
-	 * add it to the pending list for next time
-	 */
-	return irq_chip->send_virq(context, vcpu_irq);
-}
-
 static int do_handle_guest_irq(struct vmm_irq *vmm_irq, vcpu_t *vcpu)
 {
 	vm_t *vm;
@@ -225,6 +209,8 @@ static int do_handle_guest_irq(struct vmm_irq *vmm_irq, vcpu_t *vcpu)
 	vcpu_irq = &irq_struct->vcpu_irqs[index];
 	vcpu_irq->h_intno = vmm_irq->hno;
 	vcpu_irq->v_intno = vmm_irq->vno;
+	vcpu_irq->id = index;
+	vcpu_irq->state = VIRQ_STATE_PENDING;
 	set_bit(index, irq_struct->irq_bitmap);
 
 	/*
@@ -234,7 +220,9 @@ static int do_handle_guest_irq(struct vmm_irq *vmm_irq, vcpu_t *vcpu)
 	if (vcpu == vcpu_o)
 		vcpu_o = NULL;
 
-	return send_virtual_irq(vcpu_o, vcpu_irq);
+	irq_chip->send_virq(vcpu_o, vcpu_irq);
+
+	return 0;
 }
 
 static int do_handle_vmm_irq(struct vmm_irq *vmm_irq, vcpu_t *vcpu)
@@ -316,7 +304,9 @@ int do_irq_handler(vcpu_t *vcpu)
 	/*
 	 * TBD - here we need deactive the irq
 	 * for arm write the ICC_EOIR1_EL1 register
+	 * to drop the priority
 	 */
+	irq_chip->irq_eoi(irq);
 
 	switch (type) {
 	case IRQ_TYPE_SGI:
@@ -341,10 +331,8 @@ int do_irq_handler(vcpu_t *vcpu)
 		break;
 	}
 
-	irq_chip->irq_eoi(irq);
 	return ret;
 }
-
 
 static int irq_exit_from_guest(vcpu_t *vcpu, void *data)
 {
@@ -360,12 +348,10 @@ static int irq_exit_from_guest(vcpu_t *vcpu, void *data)
 	void *context;
 	struct irq_struct *irq_struct = &vcpu->irq_struct;
 
-	context = get_module_data_by_name(vcpu, VMM_MODULE_NAME_IRQCHIP);
-
 	for_each_set_bit(set_bit, irq_struct->irq_bitmap,
 			CONFIG_VCPU_MAX_ACTIVE_IRQS) {
 		vcpu_irq = (struct vcpu_irq *)&irq_struct->vcpu_irqs[set_bit];
-		status = irq_chip->get_virq_state(context, vcpu_irq);
+		status = irq_chip->get_virq_state(vcpu_irq);
 
 		/*
 		 * the virq has been handled by the VCPU
