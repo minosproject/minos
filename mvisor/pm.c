@@ -3,7 +3,5 @@
 
 void cpu_idle(void)
 {
-	while (1) {
-		wfi();
-	}
+	wfi();
 }

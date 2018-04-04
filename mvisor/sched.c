@@ -5,6 +5,8 @@
 #include <mvisor/percpu.h>
 #include <mvisor/pm.h>
 #include <mvisor/module.h>
+#include <mvisor/irq.h>
+#include <mvisor/list.h>
 
 static pcpu_t pcpus[CONFIG_NR_CPUS];
 
@@ -78,33 +80,19 @@ step2:
 
 static vcpu_t *find_vcpu_to_run(pcpu_t *pcpu)
 {
-	vcpu_t *vcpu;
-	struct list_head *list;
+	if (is_list_empty(&pcpu->ready_list))
+		return NULL;
 
-	list_for_each(&pcpu->vcpu_list, list) {
-		vcpu = list_entry(list, vcpu_t, pcpu_list);
-		if (get_vcpu_state(vcpu) == VCPU_STATE_READY)
-			return vcpu;
-	}
-
-	return NULL;
+	return list_first_entry(&pcpu->ready_list, vcpu_t, state_list);
 }
 
 int vcpu_sched_init(vcpu_t *vcpu)
 {
-	if (!vcpu)
-		return -EINVAL;
+	pcpu_t *pcpu = get_per_cpu(pcpu, vcpu->pcpu_affinity);
 
-	/*
-	 * find the boot cpu for each vm and
-	 * mark its status, boot cpu will set
-	 * to ready to run state then other vcpu
-	 * is set to STOP state to wait for bootup
-	 */
-	if (get_vcpu_id(vcpu) == 0)
-		set_vcpu_state(vcpu, VCPU_STATE_READY);
-	else
-		set_vcpu_state(vcpu, VCPU_STATE_STOP);
+	init_list(&vcpu->state_list);
+	set_vcpu_state(vcpu, VCPU_STATE_READY);
+	list_add_tail(&pcpu->ready_list, &vcpu->state_list);
 
 	return 0;
 }
@@ -114,11 +102,15 @@ void sched_vcpu(void)
 	pcpu_t *pcpu;
 	struct list_head *list;
 	vcpu_t *vcpu;
+	unsigned long flag;
 
 	pcpu = get_cpu_var(pcpu);
 
+
+
 	while (1) {
 resched:
+		local_irq_save(flag);
 		vcpu = find_vcpu_to_run(pcpu);
 
 		if ((vcpu == NULL) && (!pcpu->need_resched)) {
@@ -127,38 +119,88 @@ resched:
 			 * do not need to resched, then this
 			 * pcpu can goto idle state
 			 */
+			local_irq_restore(flag);
 			cpu_idle();
 		} else {
+			get_cpu_var(next_vcpu) = vcpu;
+			local_irq_restore(flag);
+
 			if (pcpu->need_resched)
 				goto resched;
 
-			get_cpu_var(next_vcpu) = vcpu;
 			break;
 		}
 	}
 }
 
+int vcpu_can_idle(vcpu_t *vcpu)
+{
+	/*
+	 * check whether there irq do not handled
+	 */
+	if (vcpu->irq_struct.count)
+		return 0;
+
+	if (vcpu->state != VCPU_STATE_RUNNING)
+		return  0;
+
+	return 1;
+}
+
+void vcpu_idle(vcpu_t *vcpu)
+{
+	unsigned long flag;
+	int cpuid = get_cpu_id();
+	pcpu_t *pcpu = get_per_cpu(pcpu, cpuid);
+
+	if (!vcpu_can_idle(vcpu))
+		return;
+
+	pr_debug("vcpu_idle for vcpu:%d\n", get_vcpu_id(vcpu));
+
+	local_irq_save(flag);
+
+	set_vcpu_state(vcpu, VCPU_STATE_SLEEP);
+	save_vcpu_module_state(vcpu);
+	get_per_cpu(current_vcpu, cpuid) = NULL;
+	get_per_cpu(next_vcpu, cpuid) = NULL;
+
+	local_irq_restore(flag);
+
+	sched_vcpu();
+}
+
 void switch_to_vcpu(vcpu_t *current, vcpu_t *next)
 {
+	pcpu_t *pcpu = get_cpu_var(pcpu);
+
+	disable_local_irq();
+
 	/*
 	 * if current != next and current != NULL
 	 * then need to save the current cpu context
 	 * to the current vcpu
-	 */
-	if ((current != NULL) && (current != next))
-		save_vcpu_module_state(current);
-
-	/*
 	 * restore the next vcpu's context to the real
 	 * hardware
 	 */
-	if ((current != next))
+	if (current != next) {
+		if (current != NULL) {
+			set_vcpu_state(current, VCPU_STATE_READY);
+			list_add_tail(&pcpu->ready_list, &current->state_list);
+			save_vcpu_module_state(current);
+		}
+
+		set_vcpu_state(next, VCPU_STATE_RUNNING);
+		list_del(&next->state_list);
 		restore_vcpu_module_state(next);
+	}
 
 	/*
 	 * here need to deal the cache and tlb
 	 * TBD
 	 */
+
+	enable_local_irq();
 }
 
 void vmm_pcpus_init(void)
@@ -169,6 +211,7 @@ void vmm_pcpus_init(void)
 	for (i = 0; i < CONFIG_NR_CPUS; i++) {
 		pcpu = &pcpus[i];
 		init_list(&pcpu->vcpu_list);
+		init_list(&pcpu->ready_list);
 		pcpu->pcpu_id = i;
 		get_per_cpu(pcpu, i) = pcpu;
 	}

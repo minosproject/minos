@@ -5,6 +5,7 @@
 #include <mvisor/smp.h>
 #include <asm/processer.h>
 #include <mvisor/mmio.h>
+#include <mvisor/sched.h>
 
 static int unknown_handler(vcpu_regs *reg, uint32_t esr_value)
 {
@@ -13,7 +14,11 @@ static int unknown_handler(vcpu_regs *reg, uint32_t esr_value)
 
 static int wfi_wfe_handler(vcpu_regs *reg, uint32_t esr_value)
 {
+	vcpu_t *vcpu = (vcpu_t *)reg;
 
+	vcpu_idle(vcpu);
+
+	return 0;
 }
 
 static int mcr_mrc_cp15_handler(vcpu_regs *reg, uint32_t esr_value)
@@ -91,16 +96,22 @@ static int access_system_reg_handler(vcpu_regs *reg, uint32_t esr_value)
 	unsigned long ret = 0;
 	struct esr_sysreg *sysreg = (struct esr_sysreg *)&esr_value;
 	uint32_t regindex = sysreg->reg;
+	unsigned long reg_value;
 
 	switch (esr_value & ESR_SYSREG_REGS_MASK) {
 	case ESR_SYSREG_ICC_SGI1R_EL1:
 	case ESR_SYSREG_ICC_ASGI1R_EL1:
+		pr_debug("access system reg SGI1R_EL1\n");
+		if (!esr_sysreg->read) {
+			reg_value = get_reg_value(reg, regindex);
+			vgic_send_sgi((vcpu_t *)reg, reg_value);
+		}
+		break;
+
 	case ESR_SYSREG_ICC_SGI0R_EL1:
-		pr_debug("access system reg sgi1r\n");
+		pr_debug("access system reg SGI0R_EL1\n");
 		break;
 	}
-
-	reg->elr_el2 += 4;
 
 	return ret;
 }
@@ -170,7 +181,6 @@ static int dataabort_tfl_handler(vcpu_regs *regs, uint32_t esr_value)
 		panic("unsupport data abort type this time\n");
 	}
 
-	regs->elr_el2 += 4;
 	return 0;
 }
 
@@ -326,6 +336,7 @@ void SError_from_el1_handler(vcpu_regs *data)
 	 * TBD
 	 */
 	ec->handler(data, esr_value);
+	data->elr_el2 += ec->ret_addr_adjust;
 }
 
 void SError_from_el2_handler(vcpu_regs *data)

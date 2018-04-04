@@ -124,6 +124,12 @@ void __virq_enable(uint32_t virq, int enable)
 	__irq_enable(irq, enable);
 }
 
+void send_vsgi(vcpu_t *sender, uint32_t sgi,
+		sgi_mode_t mode, cpumask_t *cpumask)
+{
+	vm_t *vm = sender->vm;
+}
+
 void vmm_setup_irqs(void)
 {
 	int i;

@@ -6,6 +6,7 @@
 #include <asm/gicv3.h>
 #include <mvisor/io.h>
 #include <mvisor/module.h>
+#include <mvisor/cpumask.h>
 
 static struct list_head gicd_list;
 static int vgic_module_id = INVAILD_MODULE_ID;
@@ -39,6 +40,43 @@ static struct vgicv3_gicd *attach_vgicd(uint32_t vmid)
 	}
 
 	return NULL;
+}
+
+void vgic_send_sgi(struct vcpu_t *vcpu, unsigned long sgi_value)
+{
+	sgi_mode_t mode;
+	uint32_t sgi;
+	cpumask_t cpumask;
+	unsigned long tmp, aff3, aff2, aff1;
+	int bit, logic_cpu;
+	vm_t *vm = vcpu->vm;
+
+	sgi = (sgi_value & (0xf << 24)) >> 24;
+	mode = sgi_value & (1 << 40) ? SGI_TO_OTHERS : SGI_TO_LIST;
+
+	if (mode == SGI_TO_LIST) {
+		tmp = sgi_value & 0xffff;
+		aff3 = (sgi_value & (0xff << 48)) >> 48;
+		aff2 = (sgi_value & (0xff << 32)) >> 32;
+		aff1 = (sgi_value & (0xff << 16)) >> 16;
+		for_each_set_bit(bit, &tmp, 16) {
+			logic_cpu = affinity_to_logic_cpu(aff3, aff2, aff1, bit);
+			cpumask_set_cpu(logic_cpu, &cpumask);
+		}
+	} else {
+		for (bit = 0; bit < vm->vcpu_nr; bit++) {
+			if (bit == vcpu->vcpu_id)
+				continue;
+			cpumask_set_cpu(bit, &cpumask);
+		}
+	}
+
+	/*
+	 * here we update the gicr releated register
+	 * for some other purpose use TBD
+	 */
+
+	send_vsgi(vcpu, sgi, mode, &cpumask);
 }
 
 static void vgicv3_state_init(vcpu_t *vcpu, void *context)

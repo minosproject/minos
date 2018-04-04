@@ -12,14 +12,6 @@
 
 #include <asm/asm_vcpu.h>
 
-typedef enum _vcpu_state_t {
-	VCPU_STATE_READY 	= 0x0001,
-	VCPU_STATE_RUNNING 	= 0x0002,
-	VCPU_STATE_SLEEP 	= 0x0004,
-	VCPU_STATE_STOP  	= 0x0008,
-	VCPU_STATE_ERROR 	= 0xffff,
-} vcpu_state_t;
-
 #define CONFIG_VCPU_MAX_ACTIVE_IRQS	(16)
 
 #define VIRQ_STATE_INACTIVE		(0x0)
@@ -59,7 +51,8 @@ typedef struct vmm_vcpu {
 	/*
 	 * below members is used to sched
 	 */
-	vcpu_state_t state;
+	int state;
+	struct list_head state_list;
 
 	void **module_context;
 	void *arch_data;

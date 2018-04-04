@@ -40,10 +40,10 @@
 #define IRQ_FLAG_AFFINITY_MASK			(0x000f0000)
 
 enum sgi_mode {
+	SGI_TO_LIST = 0,
 	SGI_TO_OTHERS,
 	SGI_TO_SELF,
-	SGI_TO_LIST,
-};
+} sgi_mode_t;
 
 enum irq_type {
 	IRQ_TYPE_SGI = 0,
