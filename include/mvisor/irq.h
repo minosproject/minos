@@ -55,6 +55,7 @@ enum irq_type {
 };
 
 struct vmm_irq;
+typedef int (*irq_handle_t)(uint32_t irq, void *data);
 
 struct irq_chip {
 	uint32_t irq_start;
@@ -63,6 +64,7 @@ struct irq_chip {
 	void (*irq_mask)(uint32_t irq);
 	void (*irq_unmask)(uint32_t irq);
 	void (*irq_eoi)(uint32_t irq);
+	void (*irq_dir)(uint32_t irq);
 	int (*irq_set_affinity)(uint32_t irq, uint32_t pcpu);
 	int (*irq_set_type)(uint32_t irq, unsigned int flow_type);
 	int (*irq_set_priority)(uint32_t irq, uint32_t pr);
@@ -89,7 +91,7 @@ struct vmm_irq {
 	spinlock_t lock;
 	char name[MAX_IRQ_NAME_SIZE];
 	unsigned long irq_count;
-	int (*irq_handler)(uint32_t irq, void *data);
+	irq_handle_t handler;
 	void *pdata;
 };
 
@@ -103,6 +105,7 @@ int vmm_irq_secondary_init(void);
 int vmm_register_irq_entry(void *res);
 void vmm_setup_irqs(void);
 int do_irq_handler(vcpu_t *vcpu);
+int request_irq(uint32_t irq, irq_handle_t handler, void *data);
 
 void __virq_enable(uint32_t virq, int enable);
 void __irq_enable(uint32_t irq, int enable);

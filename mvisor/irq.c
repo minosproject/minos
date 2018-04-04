@@ -228,18 +228,28 @@ static int do_handle_guest_irq(struct vmm_irq *vmm_irq, vcpu_t *vcpu)
 static int do_handle_vmm_irq(struct vmm_irq *vmm_irq, vcpu_t *vcpu)
 {
 	uint32_t cpuid = get_cpu_id();
+	int ret;
 
 	if (cpuid != vmm_irq->affinity_pcpu) {
 		pr_info("irq %d do not belong tho this cpu\n", vmm_irq->hno);
-		return -EINVAL;
+		ret =  -EINVAL;
+		goto out;
 	}
 
-	if (!vmm_irq->irq_handler) {
+	if (!vmm_irq->handler) {
 		pr_error("Irq is not register by VMM\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto out;
 	}
 
-	return vmm_irq->irq_handler(vmm_irq->hno, vmm_irq->pdata);
+	ret = vmm_irq->handler(vmm_irq->hno, vmm_irq->pdata);
+	if (ret)
+		pr_error("handle irq:%d fail in vmm\n", vmm_irq->hno);
+
+out:
+	irq_chip->irq_dir(vmm_irq->hno);
+
+	return ret;
 }
 
 static int do_spi_int(uint32_t irq, vcpu_t *vcpu)
@@ -332,6 +342,34 @@ int do_irq_handler(vcpu_t *vcpu)
 	}
 
 	return ret;
+}
+
+int request_irq(uint32_t irq, irq_handle_t handler, void *data)
+{
+	struct vmm_irq *vmm_irq;
+	unsigned long flag;
+
+	if ((!handler) || (irq >= irq_nums))
+		return -EINVAL;
+
+	vmm_irq = irq_table[irq];
+	if (!vmm_irq)
+		return -ENOENT;
+
+
+	/*
+	 * whether the irq is belong to vmm
+	 */
+	if (!(vmm_irq->flags & IRQ_FLAG_OWNER_MASK))
+		return -ENOENT;
+
+	spin_lock_irqsave(&vmm_irq->lock, flag);
+	vmm_irq->handler = handler;
+	vmm_irq->pdata = data;
+	irq_unmask(irq);
+	spin_unlock_irqrestore(&vmm_irq->lock, flag);
+
+	return 0;
 }
 
 static int irq_exit_from_guest(vcpu_t *vcpu, void *data)

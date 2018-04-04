@@ -542,6 +542,7 @@ static struct irq_chip gicv3_chip = {
 	.irq_mask 		= gicv3_mask_irq,
 	.irq_unmask 		= gicv3_unmask_irq,
 	.irq_eoi 		= gicv3_eoi_irq,
+	.irq_dir		= gicv3_dir_irq,
 	.irq_set_type 		= gicv3_set_irq_type,
 	.irq_set_affinity 	= gicv3_set_irq_affinity,
 	.send_sgi		= gicv3_send_sgi,
