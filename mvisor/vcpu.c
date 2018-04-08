@@ -7,6 +7,7 @@
 #include <mvisor/module.h>
 #include <mvisor/mm.h>
 #include <mvisor/bitmap.h>
+#include <mvisor/irq.h>
 
 extern unsigned char __vmm_vm_start;
 extern unsigned char __vmm_vm_end;
@@ -106,27 +107,6 @@ vcpu_t *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id)
 	return get_vcpu_in_vm(vm, vcpu_id);
 }
 
-static void vcpu_irq_struct_init(struct irq_struct *irq_struct)
-{
-	int i;
-	struct vcpu_irq *vcpu_irq;
-
-	if (!irq_struct)
-		return;
-
-	irq_struct->count = 0;
-	init_list(&irq_struct->pending_list);
-	bitmap_clear(irq_struct->irq_bitmap, 0, CONFIG_VCPU_MAX_ACTIVE_IRQS);
-
-	for (i = 0; i < CONFIG_VCPU_MAX_ACTIVE_IRQS; i++) {
-		vcpu_irq = &irq_struct->vcpu_irqs[i];
-		vcpu_irq->h_intno = 0;
-		vcpu_irq->v_intno = 0;
-		vcpu_irq->state = VIRQ_STATE_INACTIVE;
-		vcpu_irq->id = i;
-		init_list(&vcpu_irq->list);
-	}
-}
 
 static int vm_create_vcpus(vm_t *vm)
 {

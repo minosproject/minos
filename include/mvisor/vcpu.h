@@ -9,6 +9,7 @@
 #include <config/config.h>
 #include <mvisor/list.h>
 #include <mvisor/vm.h>
+#include <mvisor/spinlock.h>
 
 #include <asm/asm_vcpu.h>
 
@@ -18,10 +19,12 @@
 #define VIRQ_STATE_PENDING		(0x1)
 #define VIRQ_STATE_ACTIVE		(0x2)
 #define VIRQ_STATE_ACTIVE_AND_PENDING	(0x3)
+#define VIRQ_STATE_OFFLINE		(0x4)
 
-struct vcpu_irq {
+struct virq {
 	uint32_t h_intno;
 	uint32_t v_intno;
+	int hw;
 	int state;
 	int id;
 	struct list_head list;
@@ -29,9 +32,11 @@ struct vcpu_irq {
 
 struct irq_struct {
 	uint32_t count;
+	uint32_t irq_pending;
+	spinlock_t lock;
 	struct list_head pending_list;
 	DECLARE_BITMAP(irq_bitmap, CONFIG_VCPU_MAX_ACTIVE_IRQS);
-	struct vcpu_irq vcpu_irqs[CONFIG_VCPU_MAX_ACTIVE_IRQS];
+	struct virq virqs[CONFIG_VCPU_MAX_ACTIVE_IRQS];
 };
 
 typedef struct vmm_vcpu {

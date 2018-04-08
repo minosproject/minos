@@ -6,6 +6,7 @@
 #include <asm/processer.h>
 #include <mvisor/mmio.h>
 #include <mvisor/sched.h>
+#include <asm/vgic.h>
 
 static int unknown_handler(vcpu_regs *reg, uint32_t esr_value)
 {
@@ -102,7 +103,7 @@ static int access_system_reg_handler(vcpu_regs *reg, uint32_t esr_value)
 	case ESR_SYSREG_ICC_SGI1R_EL1:
 	case ESR_SYSREG_ICC_ASGI1R_EL1:
 		pr_debug("access system reg SGI1R_EL1\n");
-		if (!esr_sysreg->read) {
+		if (!sysreg->read) {
 			reg_value = get_reg_value(reg, regindex);
 			vgic_send_sgi((vcpu_t *)reg, reg_value);
 		}

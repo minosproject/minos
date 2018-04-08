@@ -97,7 +97,12 @@ int vcpu_sched_init(vcpu_t *vcpu)
 	return 0;
 }
 
-void sched_vcpu(void)
+void sched_vcpu(vcpu_t *vcpu, int reason)
+{
+
+}
+
+void sched(void)
 {
 	pcpu_t *pcpu;
 	struct list_head *list;
@@ -167,7 +172,7 @@ void vcpu_idle(vcpu_t *vcpu)
 
 	local_irq_restore(flag);
 
-	sched_vcpu();
+	sched();
 }
 
 void switch_to_vcpu(vcpu_t *current, vcpu_t *next)
@@ -195,6 +200,8 @@ void switch_to_vcpu(vcpu_t *current, vcpu_t *next)
 		restore_vcpu_module_state(next);
 	}
 
+	vmm_enter_to_guest(next);
+
 	/*
 	 * here need to deal the cache and tlb
 	 * TBD
@@ -216,3 +223,21 @@ void vmm_pcpus_init(void)
 		get_per_cpu(pcpu, i) = pcpu;
 	}
 }
+
+int vmm_reched_handler(uint32_t irq, void *data)
+{
+	return 0;
+}
+
+int sched_late_init(void)
+{
+	int ret;
+
+	ret = request_irq(CONFIG_VMM_RESCHED_IRQ,
+			vmm_reched_handler, NULL);
+
+	pr_debug("request reched irq with error code:%d\n", ret);
+	return 0;
+}
+
+device_initcall(sched_late_init);

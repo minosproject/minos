@@ -16,10 +16,10 @@ int smp_cpu_up(uint64_t mpidr_id);
 
 void vmm_smp_init(void);
 
-static inline uint64_t
-generate_vcpu_id(uint32_t pcpu_id, uint32_t vm_id, uint32_t vcpu_id)
+static inline int affinity_to_logic_cpu(uint32_t aff3, uint32_t aff2,
+		uint32_t aff1, uint32_t aff0)
 {
-	return ((vcpu_id) | (vm_id << 8) | (pcpu_id << 16));
+	return aff0;
 }
 
 #endif

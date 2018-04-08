@@ -13,7 +13,7 @@
 #include <mvisor/varlist.h>
 #include <mvisor/vcpu.h>
 
-typedef int (*hook_func_t)(vcpu_t *vcpu, void *data);
+typedef void (*hook_func_t)(vcpu_t *vcpu, void *data);
 
 enum vmm_hook_type {
 	VMM_HOOK_TYPE_EXIT_FROM_GUEST = 0,

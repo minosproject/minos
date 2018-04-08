@@ -7,6 +7,8 @@
 #include <mvisor/io.h>
 #include <mvisor/module.h>
 #include <mvisor/cpumask.h>
+#include <mvisor/irq.h>
+#include <asm/vgic.h>
 
 static struct list_head gicd_list;
 static int vgic_module_id = INVAILD_MODULE_ID;
@@ -16,13 +18,15 @@ struct vgicv3_gicd {
 	uint32_t gicd_typer;
 	uint32_t vmid;
 	struct list_head list;
-	spinlock_t lock;
+	spinlock_t gicd_lock;
 };
 
 struct vgicv3_gicr {
 	uint32_t gicr_ctlr;
+	uint32_t gicr_ispender;
 	unsigned long rd_base;
 	unsigned long sgi_base;
+	spinlock_t gicr_lock;
 };
 
 struct vgicv3 {
@@ -42,7 +46,7 @@ static struct vgicv3_gicd *attach_vgicd(uint32_t vmid)
 	return NULL;
 }
 
-void vgic_send_sgi(struct vcpu_t *vcpu, unsigned long sgi_value)
+void vgic_send_sgi(vcpu_t *vcpu, unsigned long sgi_value)
 {
 	sgi_mode_t mode;
 	uint32_t sgi;
@@ -50,15 +54,21 @@ void vgic_send_sgi(struct vcpu_t *vcpu, unsigned long sgi_value)
 	unsigned long tmp, aff3, aff2, aff1;
 	int bit, logic_cpu;
 	vm_t *vm = vcpu->vm;
+	struct vgicv3 *vgic;
 
 	sgi = (sgi_value & (0xf << 24)) >> 24;
-	mode = sgi_value & (1 << 40) ? SGI_TO_OTHERS : SGI_TO_LIST;
+	if (sgi >= 16) {
+		pr_error("vgic : sgi number is incorrect %d\n", sgi);
+		return;
+	}
+
+	mode = sgi_value & (1UL << 40) ? SGI_TO_OTHERS : SGI_TO_LIST;
 
 	if (mode == SGI_TO_LIST) {
 		tmp = sgi_value & 0xffff;
-		aff3 = (sgi_value & (0xff << 48)) >> 48;
-		aff2 = (sgi_value & (0xff << 32)) >> 32;
-		aff1 = (sgi_value & (0xff << 16)) >> 16;
+		aff3 = (sgi_value & (0xffUL << 48)) >> 48;
+		aff2 = (sgi_value & (0xffUL << 32)) >> 32;
+		aff1 = (sgi_value & (0xffUL << 16)) >> 16;
 		for_each_set_bit(bit, &tmp, 16) {
 			logic_cpu = affinity_to_logic_cpu(aff3, aff2, aff1, bit);
 			cpumask_set_cpu(logic_cpu, &cpumask);
@@ -75,8 +85,12 @@ void vgic_send_sgi(struct vcpu_t *vcpu, unsigned long sgi_value)
 	 * here we update the gicr releated register
 	 * for some other purpose use TBD
 	 */
+	vgic = (struct vgicv3 *)get_module_data_by_id(vcpu, vgic_module_id);
+	spin_lock(&vgic->gicr.gicr_lock);
+	vgic->gicr.gicr_ispender |= (1 << sgi);
+	spin_unlock(&vgic->gicr.gicr_lock);
 
-	send_vsgi(vcpu, sgi, mode, &cpumask);
+	send_vsgi(vcpu, sgi, &cpumask);
 }
 
 static void vgicv3_state_init(vcpu_t *vcpu, void *context)
@@ -99,6 +113,8 @@ static void vgicv3_state_init(vcpu_t *vcpu, void *context)
 	base = 0x2f100000 + (128 * 1024) * vcpu->vcpu_id;
 	gicr->rd_base = base;
 	gicr->sgi_base = base + (64 * 1024);
+	gicr->gicr_ispender = 0;
+	spin_lock_init(&gicr->gicr_lock);
 }
 
 static void vgicv3_state_save(vcpu_t *vcpu, void *context)
@@ -129,10 +145,7 @@ static void vgicv3_vm_create(vm_t *vm)
 	init_list(&gicd->list);
 	gicd->vmid = vm->vmid;
 	list_add_tail(&gicd_list, &gicd->list);
-	spin_lock_init(&gicd->lock);
-
-	if (vgic_module_id == INVAILD_MODULE_ID)
-		vgic_module_id = get_module_id("vgic");
+	spin_lock_init(&gicd->gicd_lock);
 
 	/*
 	 * init gicd TBD
@@ -173,7 +186,7 @@ static int vgicv3_gicd_mmio_read(struct vgicv3 *vgic,
 {
 	struct vgicv3_gicd *gicd = vgic->gicd;
 
-	spin_lock(&gicd->lock);
+	spin_lock(&gicd->gicd_lock);
 
 	switch (offset) {
 	case GICD_CTLR:
@@ -196,7 +209,7 @@ static int vgicv3_gicd_mmio_read(struct vgicv3 *vgic,
 		break;
 	}
 
-	spin_unlock(&gicd->lock);
+	spin_unlock(&gicd->gicd_lock);
 	return 0;
 }
 
@@ -216,6 +229,10 @@ static int vgicv3_gicr_sgi_mmio_read(struct vgicv3 *vgic,
 		*value = gicr->gicr_ctlr & ~(1 << 31);
 		break;
 
+	case GICR_ISPENDR0:
+		*value = gicr->gicr_ispender;
+		break;
+
 	default:
 		*value = 0;
 		break;
@@ -230,7 +247,7 @@ static int vgicv3_gicd_mmio_write(struct vgicv3 *vgic,
 	struct vgicv3_gicd *gicd = vgic->gicd;
 	uint32_t x, y, bit;
 
-	spin_lock(&gicd->lock);
+	spin_lock(&gicd->gicd_lock);
 
 	switch (offset) {
 	case GICD_CTLR:
@@ -254,7 +271,7 @@ static int vgicv3_gicd_mmio_write(struct vgicv3 *vgic,
 		break;
 	}
 
-	spin_unlock(&gicd->lock);
+	spin_unlock(&gicd->gicd_lock);
 	return 0;
 }
 
@@ -267,6 +284,18 @@ static int vgicv3_gicr_rd_mmio_write(struct vgicv3 *vgic,
 static int vgicv3_gicr_sgi_mmio_write(struct vgicv3 *vgic,
 		unsigned long offset, unsigned long value)
 {
+	struct vgicv3_gicr *gicr = &vgic->gicr;
+	int bit;
+
+	switch (offset) {
+	case GICR_ICPENDR0:
+		spin_lock(&gicr->gicr_lock);
+		for_each_set_bit(bit, &value, 32)
+			gicr->gicr_ispender &= ~BIT(bit);
+		spin_unlock(&gicr->gicr_lock);
+		break;
+	}
+
 	return 0;
 }
 
@@ -348,6 +377,7 @@ static int vgicv3_module_init(struct vmm_module *module)
 	module->state_save = vgicv3_state_save;
 	module->state_restore = vgicv3_state_restore;
 	module->create_vm = vgicv3_vm_create;
+	vgic_module_id = module->id;
 
 	register_mmio_emulation_handler("vgicv3", &vgicv3_mmio_ops);
 

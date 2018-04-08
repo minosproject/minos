@@ -100,6 +100,7 @@ void boot_main(void)
 	 * prepare each vm to run
 	 */
 	vmm_vms_init();
+	vmm_devices_init();
 
 	/*
 	 * wake up other cpus
@@ -107,7 +108,7 @@ void boot_main(void)
 	smp_cpus_up();
 	enable_local_irq();
 
-	sched_vcpu();
+	sched();
 }
 
 void boot_secondary(void)
@@ -133,6 +134,6 @@ void boot_secondary(void)
 	enable_local_irq();
 	smp_holding_pen[cpuid] = mpidr;
 
-	sched_vcpu();
+	sched();
 }
 

@@ -222,36 +222,20 @@ static void gicv3_write_lr(int lr, uint64_t val)
 	isb();
 }
 
-static int gicv3_send_virq(vcpu_t *vcpu, struct vcpu_irq *vcpu_irq)
+static int gicv3_send_virq(struct virq *virq)
 {
 	uint64_t value = 0;
 	struct gic_lr *lr = (struct gic_lr *)&value;
-	struct gic_context *c;
 	uint64_t *base;
 
-	lr->v_intid = vcpu_irq->v_intno;
-	lr->p_intid = vcpu_irq->h_intno;
+	lr->v_intid = virq->v_intno;
+	lr->p_intid = virq->h_intno;
 	lr->priority = 0;
 	lr->group = 1;
-	lr->hw = vcpu_irq->h_intno ? 1 : 0;
+	lr->hw = virq->hw;
 	lr->state = 1;
 
-	if (vcpu) {
-		/*
-		 * this virq is send to the vcpu which is not
-		 * running this time, first set the correct value
-		 * in his context and return waitting for his running
-		 * time
-		 */
-		c = (struct gic_context *)get_module_data_by_id(vcpu,
-				gicv3_module_id);
-		base = (uint64_t *)c;
-		base[vcpu_irq->id] = value;
-
-		return 0;
-	}
-
-	gicv3_write_lr(vcpu_irq->id, value);
+	gicv3_write_lr(virq->id, value);
 
 	return 0;
 }
@@ -336,7 +320,7 @@ uint32_t gicv3_get_irq_num(void)
 	return (32 * ((type & 0x1f)));
 }
 
-int gicv3_get_virq_state(struct vcpu_irq *vcpu_irq)
+int gicv3_get_virq_state(struct virq *virq)
 {
 	return 0;
 }

@@ -39,7 +39,7 @@
 #define IRQ_FLAG_AFFINITY_PERCPU		(0x00000000)
 #define IRQ_FLAG_AFFINITY_MASK			(0x000f0000)
 
-enum sgi_mode {
+typedef enum sgi_mode {
 	SGI_TO_LIST = 0,
 	SGI_TO_OTHERS,
 	SGI_TO_SELF,
@@ -70,8 +70,8 @@ struct irq_chip {
 	int (*irq_set_priority)(uint32_t irq, uint32_t pr);
 	int (*get_irq_type)(uint32_t irq);
 	void (*send_sgi)(uint32_t irq, enum sgi_mode mode, cpumask_t *mask);
-	int (*send_virq)(vcpu_t *vcpu, struct vcpu_irq *vcpu_irq);
-	int (*get_virq_state)(struct vcpu_irq *vcpu_irq);
+	int (*send_virq)(struct virq *virq);
+	int (*get_virq_state)(struct virq *virq);
 	int (*init)(void);
 	int (*secondary_init)(void);
 };
@@ -104,11 +104,15 @@ int vmm_irq_init(void);
 int vmm_irq_secondary_init(void);
 int vmm_register_irq_entry(void *res);
 void vmm_setup_irqs(void);
-int do_irq_handler(vcpu_t *vcpu);
+int do_irq_handler(void);
 int request_irq(uint32_t irq, irq_handle_t handler, void *data);
+void vcpu_irq_struct_init(struct irq_struct *irq_struct);
 
 void __virq_enable(uint32_t virq, int enable);
 void __irq_enable(uint32_t irq, int enable);
+int send_virq_hw(uint32_t vmid, uint32_t virq, uint32_t hirq);
+int send_virq(uint32_t vmid, uint32_t virq);
+void send_vsgi(vcpu_t *sender, uint32_t sgi, cpumask_t *cpumask);
 
 static inline void virq_mask(uint32_t virq)
 {

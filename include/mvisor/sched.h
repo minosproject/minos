@@ -12,6 +12,7 @@
 #define PCPU_AFFINITY_FAIL	(0xffff)
 
 DECLARE_PER_CPU(vcpu_t *, current_vcpu);
+#define current_vcpu()	get_cpu_var(current_vcpu)
 
 typedef enum _vcpu_state_t {
 	VCPU_STATE_READY 	= 0x0001,
@@ -39,7 +40,8 @@ static void inline set_vcpu_state(vcpu_t *vcpu, vcpu_state_t state)
 }
 
 void vmm_pcpus_init(void);
-void sched_vcpu(void);
+void sched(void);
+void sched_vcpu(vcpu_t *vcpu, int reason);
 uint32_t pcpu_affinity(vcpu_t *vcpu, uint32_t affinity);
 int vcpu_sched_init(vcpu_t *vcpu);
 void vcpu_idle(vcpu_t *vcpu);

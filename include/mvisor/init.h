@@ -51,8 +51,8 @@ typedef int (*init_call)(void);
 
 #define __section(S) __attribute__ ((__section__(#S)))
 
-int vmm_arch_init(void);
-
-int vmm_early_init(void);
+ void vmm_arch_init(void);
+ void vmm_early_init(void);
+ void vmm_devices_init(void);
 
 #endif
