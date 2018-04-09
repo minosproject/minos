@@ -240,4 +240,4 @@ int sched_late_init(void)
 	return 0;
 }
 
-device_initcall(sched_late_init);
+subsys_initcall_percpu(sched_late_init);

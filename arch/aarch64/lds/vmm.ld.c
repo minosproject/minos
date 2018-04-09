@@ -123,6 +123,10 @@ SECTIONS
 	.__init_func_6 : {
 		*(.__init_func_6)
 	}
+	__init_func_7_start = .;
+	.__init_func_7 : {
+		*(.__init_func_7)
+	}
 	__init_func_end = .;
 
 	. = ALIGN(8);

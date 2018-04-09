@@ -27,6 +27,7 @@ typedef int (*init_call)(void);
 #define __init_4	__attribute__((section(".__init_func_4")))
 #define __init_5	__attribute__((section(".__init_func_5")))
 #define __init_6	__attribute__((section(".__init_func_6")))
+#define __init_7	__attribute__((section(".__init_func_7")))
 
 #define __irq_resource  __attribute__((section(".__vmm_irq_resource")))
 #define __memory_resource  __attribute__((section(".__vmm_memory_resource")))
@@ -37,22 +38,33 @@ typedef int (*init_call)(void);
 #define arch_initcall(fn)	\
 	static init_call __init_call_##fn __init_1 = fn
 
-#define platform_initcall(fn)	\
+#define subsys_initcall(fn)	\
 	static init_call __init_call_##fn __init_2 = fn
 
-#define fs_initcall(fn)	\
+#define device_initcall(fn)	\
 	static init_call __init_call_##fn __init_3 = fn
 
-#define device_initcall(fn)	\
+#define early_initcall_percpu(fn)	\
 	static init_call __init_call_##fn __init_4 = fn
 
-#define late_initcall(fn)	\
+#define arch_initcall_percpu(fn)	\
 	static init_call __init_call_##fn __init_5 = fn
+
+#define subsys_initcall_percpu(fn)	\
+	static init_call __init_call_##fn __init_6 = fn
+
+#define device_initcall_percpu(fn)	\
+	static init_call __init_call_##fn __init_7 = fn
 
 #define __section(S) __attribute__ ((__section__(#S)))
 
- void vmm_arch_init(void);
- void vmm_early_init(void);
- void vmm_devices_init(void);
+void vmm_arch_init(void);
+void vmm_early_init(void);
+void vmm_subsys_init(void);
+void vmm_device_init(void);
+void vmm_early_init_percpu(void);
+void vmm_arch_init_percpu(void);
+void vmm_subsys_init_percpu(void);
+void vmm_device_init_percpu(void);
 
 #endif

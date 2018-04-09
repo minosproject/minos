@@ -74,7 +74,11 @@ void boot_main(void)
 	vmm_log_init();
 	pr_info("Starting mVisor ...\n");
 
+	vmm_percpus_init();
+
 	vmm_early_init();
+	vmm_early_init_percpu();
+
 	vmm_mm_init();
 	vmm_hook_init();
 
@@ -82,7 +86,8 @@ void boot_main(void)
 		panic("cpu is not cpu0");
 
 	vmm_arch_init();
-	vmm_percpus_init();
+	vmm_arch_init_percpu();
+
 	vmm_pcpus_init();
 	vmm_smp_init();
 	vmm_irq_init();
@@ -100,7 +105,12 @@ void boot_main(void)
 	 * prepare each vm to run
 	 */
 	vmm_vms_init();
-	vmm_devices_init();
+
+	vmm_subsys_init();
+	vmm_subsys_init_percpu();
+
+	vmm_device_init();
+	vmm_device_init_percpu();
 
 	/*
 	 * wake up other cpus
@@ -117,6 +127,8 @@ void boot_secondary(void)
 	uint64_t mid;
 	uint64_t mpidr;
 
+
+
 	/*
 	 * here wait up bootup cpu to wakeup us
 	 */
@@ -130,9 +142,17 @@ void boot_secondary(void)
 	get_per_cpu(cpu_id, cpuid) = mpidr;
 	pr_info("cpu-%d is up\n", cpuid);
 
+	vmm_early_init_percpu();
+	vmm_arch_init_percpu();
+
 	vmm_irq_secondary_init();
-	enable_local_irq();
+
+	vmm_subsys_init_percpu();
+	vmm_device_init_percpu();
+
 	smp_holding_pen[cpuid] = mpidr;
+
+	enable_local_irq();
 
 	sched();
 }
