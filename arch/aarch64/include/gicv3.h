@@ -19,7 +19,6 @@
 #define GICD_CTLR_ARE_NS		(1 << 4)
 #endif
 
-
 #define GICD_IROUTER_MODE_SPECIFIC	(0)
 #define GICD_IROUTER_MODE_ANY		(1 << 31)
 
@@ -119,8 +118,6 @@
 
 #define GICV3_NR_LOCAL_IRQS	(32)
 #define GICV3_NR_SGI		(16)
-
-#define SPI_OFFSET(num)	(num - 32)
 
 struct gic_context {
 	uint64_t ich_lr0_el2;

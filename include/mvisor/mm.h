@@ -5,6 +5,7 @@
 
 int vmm_mm_init(void);
 char *vmm_malloc(size_t size);
+char *vmm_zalloc(size_t size);
 char *vmm_alloc_pages(int pages);
 void vmm_free(void *addr);
 void vmm_free_pages(void *addr);

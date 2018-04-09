@@ -118,6 +118,18 @@ char *vmm_malloc(size_t size)
 	return base;
 }
 
+char *vmm_zalloc(size_t size)
+{
+	char *base;
+
+	base = vmm_malloc(size);
+	if (!base)
+		return NULL;
+
+	memset(base, 0, size);
+	return base;
+}
+
 char *vmm_alloc_pages(int pages)
 {
 	size_t request_size = pages * SIZE_4K;

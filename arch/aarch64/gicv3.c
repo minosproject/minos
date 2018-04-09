@@ -472,11 +472,10 @@ int gicv3_init(void)
 	nr_lines = 32 * ((type & 0x1f));
 
 	/* alloc LOCAL_IRQS for each cpus */
-	vmm_alloc_irqs(0, 15, IRQ_TYPE_SGI);
-	vmm_alloc_irqs(16, 31, IRQ_TYPE_PPI);
+	irq_add_local(0, 32);
 
 	/* alloc SPI irqs */
-	vmm_alloc_irqs(32, nr_lines - 1, IRQ_TYPE_SPI);
+	irq_add_spi(32, nr_lines - 1);
 
 	/* default all golbal IRQS to level, active low */
 	for (i = GICV3_NR_LOCAL_IRQS; i < nr_lines; i += 16)
@@ -531,7 +530,6 @@ static struct irq_chip gicv3_chip = {
 	.irq_set_affinity 	= gicv3_set_irq_affinity,
 	.send_sgi		= gicv3_send_sgi,
 	.get_pending_irq	= gicv3_read_irq,
-	.get_irq_type		= gicv3_get_irq_type,
 	.irq_set_priority	= gicv3_set_irq_priority,
 	.get_virq_state		= gicv3_get_virq_state,
 	.send_virq		= gicv3_send_virq,
@@ -543,12 +541,6 @@ static int gicv3_module_init(struct vmm_module *module)
 {
 	uint32_t type, nr_lines;
 	uint32_t value;
-
-	type = ioread32(gicd_base + GICD_TYPER);
-	nr_lines = 32 * ((type & 0x1f));
-
-	gicv3_chip.irq_start = 0;
-	gicv3_chip.irq_num = nr_lines;
 
 	value = read_sysreg32(ICH_VTR_EL2);
 	gicv3_nr_lr = (value & 0x3f) + 1;

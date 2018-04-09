@@ -4,6 +4,8 @@
 #include <asm/aarch64_helper.h>
 
 #define NR_LOCAL_IRQS	(32)
+#define SPI_OFFSET(n)	(n - NR_LOCAL_IRQS);
+#define LOCAL_OFFSET(n) (n)
 
 #define arch_disable_local_irq()	write_daifset(2)
 #define arch_enable_local_irq() 	write_daifclr(2)

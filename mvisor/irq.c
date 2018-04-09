@@ -6,52 +6,17 @@
 #include <config/config.h>
 #include <mvisor/device_id.h>
 #include <mvisor/module.h>
-#include <mvisor/resource.h>
 #include <mvisor/sched.h>
 
-uint32_t irq_nums;
-static struct vmm_irq **irq_table;
-typedef uint32_t (*get_nr_t)(void);
+DEFINE_PER_CPU(struct vmm_irq **, local_irqs);
 
 static struct irq_chip *irq_chip;
+static struct irq_domain *irq_domains[IRQ_DOMAIN_MAX];
 
-static uint32_t virq_to_irq(uint32_t virq)
+static int init_irq_desc(struct vmm_irq *vmm_irq,
+		struct irq_resource *config)
 {
-	int i;
-	struct vmm_irq *vmm_irq;
-
-	for (i = 0; i < irq_nums; i++) {
-		vmm_irq = irq_table[i];
-		if (!vmm_irq)
-			continue;
-
-		if (vmm_irq->vno == virq)
-			return vmm_irq->hno;
-	}
-
-	return BAD_IRQ;
-}
-
-int vmm_register_irq_entry(void *res)
-{
-	struct irq_resource *config;
-	struct vmm_irq *vmm_irq;
 	vcpu_t *vcpu;
-
-	if (res == NULL)
-		return -EINVAL;
-
-	config = (struct irq_resource *)res;
-	if ((config->hno >= irq_nums)) {
-		pr_error("Find an invalid irq %d\n", config->hno);
-		return -EINVAL;
-	}
-
-	vmm_irq = irq_table[config->hno];
-	if (!vmm_irq) {
-		pr_error("irq %d not been allocated\n", config->hno);
-		return -ENOMEM;
-	}
 
 	if (config->vmid == 0xffff) {
 		pr_info("irq %d is for vmm\n", config->hno);
@@ -80,102 +45,16 @@ int vmm_register_irq_entry(void *res)
 	return 0;
 }
 
-void __irq_enable(uint32_t irq, int enable)
+static struct vmm_irq *alloc_vmm_irq(void)
 {
-	unsigned long flag;
-	struct vmm_irq *vmm_irq;
-
-	if (irq >= irq_nums)
-		return;
-
-	vmm_irq = irq_table[irq];
-	if (!vmm_irq)
-		return;
-
-	spin_lock_irqsave(&vmm_irq->lock, flag);
-
-	if (enable) {
-		if (vmm_irq->flags & IRQ_FLAG_STATUS_MASK ==
-				IRQ_FLAG_STATUS_MASKED)
-			goto out;
-
-		irq_chip->irq_unmask(irq);
-		vmm_irq->flags &= ~IRQ_FLAG_STATUS_MASK;
-		vmm_irq->flags |= IRQ_FLAG_STATUS_UNMASKED;
-	} else {
-		if (vmm_irq->flags & IRQ_FLAG_STATUS_MASK ==
-				IRQ_FLAG_STATUS_UNMASKED)
-			goto out;
-
-		irq_chip->irq_mask(irq);
-		vmm_irq->flags &= ~IRQ_FLAG_STATUS_MASK;
-		vmm_irq->flags |= IRQ_FLAG_STATUS_MASKED;
-	}
-
-out:
-	spin_unlock_irqrestore(&vmm_irq->lock, flag);
-}
-
-void __virq_enable(uint32_t virq, int enable)
-{
-	uint32_t irq;
-
-	irq = virq_to_irq(virq);
-	if (irq == BAD_IRQ)
-		return;
-
-	__irq_enable(irq, enable);
-}
-
-void vmm_setup_irqs(void)
-{
-	int i;
-	struct vmm_irq *vmm_irq;
-
-	for (i = 0; i < irq_nums; i++) {
-		vmm_irq = irq_table[i];
-		if (!vmm_irq)
-			continue;
-
-		if (vmm_irq->flags & IRQ_FLAG_AFFINITY_VCPU) {
-			irq_chip->irq_set_type(vmm_irq->hno,
-					vmm_irq->flags & IRQ_FLAG_TYPE_MASK);
-			irq_chip->irq_set_affinity(vmm_irq->hno,
-					vmm_irq->affinity_pcpu);
-		}
-	}
-}
-
-int vmm_alloc_irqs(uint32_t start, uint32_t end, enum irq_type type)
-{
-	int i;
 	struct vmm_irq *irq;
 
-	if (start >= irq_nums)
-		return -EINVAL;
+	irq = (struct vmm_irq *)vmm_zalloc(sizeof(struct vmm_irq));
+	if (!irq)
+		return NULL;
 
-	for (i = start; i <= end; i++) {
-		if (i >= irq_nums) {
-			pr_error("Irq num not supported %d\n", i);
-			break;
-		}
-
-		irq = irq_table[i];
-		if (irq)
-			pr_warning("Irq %d has been allocted\n");
-		else
-			irq = (struct vmm_irq *)vmm_malloc(sizeof(struct vmm_irq));
-
-		memset((char *)irq, 0, sizeof(struct vmm_irq));
-		irq->hno = i;
-		irq_table[i] = irq;
-		spin_lock_init(&irq->lock);
-
-		if (type == IRQ_TYPE_SPI)
-			irq->flags |= IRQ_FLAG_AFFINITY_VCPU;
-	}
-
-	return 0;
+	spin_lock_init(&irq->lock);
+	return irq;
 }
 
 void send_sgi(uint32_t sgi, int cpu)
@@ -193,6 +72,8 @@ void send_sgi(uint32_t sgi, int cpu)
 
 	irq_chip->send_sgi(sgi, SGI_TO_LIST, &mask);
 }
+
+
 
 static int __send_virq(vcpu_t *vcpu, uint32_t vno, uint32_t hno, int hw)
 {
@@ -281,15 +162,384 @@ static int do_handle_guest_irq(struct vmm_irq *vmm_irq)
 	return _send_virq(vcpu, vmm_irq->vno, vmm_irq->hno, 1);
 }
 
+static int do_handle_vmm_irq(struct vmm_irq *vmm_irq)
+{
+	uint32_t cpuid = get_cpu_id();
+	int ret;
+
+	if (cpuid != vmm_irq->affinity_pcpu) {
+		pr_info("irq %d do not belong tho this cpu\n", vmm_irq->hno);
+		ret =  -EINVAL;
+		goto out;
+	}
+
+	if (!vmm_irq->handler) {
+		pr_error("Irq is not register by VMM\n");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	ret = vmm_irq->handler(vmm_irq->hno, vmm_irq->pdata);
+	if (ret)
+		pr_error("handle irq:%d fail in vmm\n", vmm_irq->hno);
+
+out:
+	irq_chip->irq_dir(vmm_irq->hno);
+
+	return ret;
+}
+
+
+int register_irq_domain(int type, struct irq_domain_ops *ops)
+{
+	struct irq_domain *domain;
+
+	if (type >= IRQ_TYPE_BAD)
+		return -EINVAL;
+
+	domain = (struct irq_domain *)vmm_zalloc(sizeof(struct irq_domain));
+	if (!domain)
+		return -ENOMEM;
+
+	domain->ops = ops;
+	irq_domains[type] = domain;
+}
+
+static struct vmm_irq **spi_alloc_irqs(uint32_t start, uint32_t count)
+{
+	struct vmm_irq **irqs;
+	uint32_t size;
+	uint32_t i;
+
+	size = count * sizeof(struct vmm_irq *);
+	irqs = (struct vmm_irq **)vmm_zalloc(size);
+	if (!irqs)
+		return NULL;
+
+	return irqs;
+}
+
+static struct vmm_irq *spi_get_irq_desc(struct irq_domain *d, uint32_t irq)
+{
+	if ((irq < d->start) || (irq >= (d->start + d->count)))
+		return NULL;
+
+	return (d->irqs[irq - d->start]);
+}
+
+static uint32_t spi_virq_to_irq(struct irq_domain *d, uint32_t virq)
+{
+	int i;
+	struct vmm_irq *vmm_irq;
+
+	for (i = 0; i < d->count; i++) {
+		vmm_irq = d->irqs[i];
+		if (!vmm_irq)
+			continue;
+
+		if (vmm_irq->vno == virq)
+			return vmm_irq->hno;
+	}
+
+	return BAD_IRQ;
+}
+
+static int spi_register_irq(struct irq_domain *d, struct irq_resource *res)
+{
+	struct vmm_irq *irq;
+
+	irq = alloc_vmm_irq();
+	init_irq_desc(irq, res);
+
+	d->irqs[irq->hno - d->start] = irq;
+	return 0;
+}
+
+static void spi_setup_irqs(struct irq_domain *d)
+{
+	int i;
+	struct vmm_irq *vmm_irq;
+
+	for (i = 0; i < d->count; i++) {
+		vmm_irq = d->irqs[i];
+
+		if (vmm_irq->flags & IRQ_FLAG_AFFINITY_VCPU) {
+			irq_chip->irq_set_type(vmm_irq->hno,
+					vmm_irq->flags & IRQ_FLAG_TYPE_MASK);
+			irq_chip->irq_set_affinity(vmm_irq->hno,
+					vmm_irq->affinity_pcpu);
+		}
+	}
+}
+
+static int spi_int_handler(struct irq_domain *d, struct vmm_irq *vmm_irq)
+{
+	int ret;
+
+	if (vmm_irq->flags & IRQ_FLAG_OWNER_VMM)
+		ret = do_handle_vmm_irq(vmm_irq);
+	else
+		ret = do_handle_guest_irq(vmm_irq);
+
+	return ret;
+}
+
+struct irq_domain_ops spi_domain_ops = {
+	.alloc_irqs = spi_alloc_irqs,
+	.get_irq_desc = spi_get_irq_desc,
+	.virq_to_irq = spi_virq_to_irq,
+	.register_irq = spi_register_irq,
+	.setup_irqs = spi_setup_irqs,
+	.irq_handler = spi_int_handler,
+};
+
+static struct vmm_irq **local_alloc_irqs(uint32_t start, uint32_t count)
+{
+	struct vmm_irq **irqs;
+	uint32_t size;
+	uint32_t i;
+	unsigned long addr;
+
+	/*
+	 * each cpu will have its local irqs
+	 */
+	size = count * sizeof(struct vmm_irq *) * CONFIG_NR_CPUS;
+	irqs = (struct vmm_irq **)vmm_zalloc(size);
+	if (!irqs)
+		return NULL;
+
+	addr = (unsigned long)irqs;
+	for (i = 0; i < CONFIG_NR_CPUS; i++) {
+		get_per_cpu(local_irqs, i) = (struct vmm_irq **)addr;
+		addr += count * sizeof(struct vmm_irq *);
+	}
+
+	return irqs;
+}
+
+static struct vmm_irq *local_get_irq_desc(struct irq_domain *d, uint32_t irq)
+{
+	struct vmm_irq **irqs;
+
+	if ((irq < d->start) || (irq >= (d->start + d->count)))
+		return NULL;
+
+	irqs = get_cpu_var(local_irqs);
+
+	return irqs[irq - d->start];
+}
+
+static uint32_t local_virq_to_irq(struct irq_domain *d, uint32_t virq)
+{
+	/*
+	 * vsgi and vppi and will never attach to a physical
+	 * irq TBD
+	 */
+	return BAD_IRQ;
+}
+
+static int local_register_irq(struct irq_domain *d, struct irq_resource *res)
+{
+	int i;
+	struct vmm_irq *irq;
+	struct vmm_irq **local;
+
+	for (i = 0; i < CONFIG_NR_CPUS; i++) {
+		local = get_per_cpu(local_irqs, i);
+		irq = alloc_vmm_irq();
+		init_irq_desc(irq, res);
+		local[irq->hno - d->start] = irq;
+	}
+
+	return 0;
+}
+
+static void local_setup_irqs(struct irq_domain *d)
+{
+	/*
+	 * nothing to do now the trigger will
+	 * be set when gicv3 chip init
+	 */
+}
+
+static int local_int_handler(struct irq_domain *d, struct vmm_irq *vmm_irq)
+{
+	return do_handle_vmm_irq(vmm_irq);
+}
+
+struct irq_domain_ops local_domain_ops = {
+	.alloc_irqs = local_alloc_irqs,
+	.get_irq_desc = local_get_irq_desc,
+	.virq_to_irq = local_virq_to_irq,
+	.setup_irqs = local_setup_irqs,
+	.irq_handler = local_int_handler,
+};
+
+static int irq_domain_create_irqs(struct irq_domain *d,
+		uint32_t start, uint32_t cnt)
+{
+	struct vmm_irq **irqs;
+
+	if ((cnt == 0) || (cnt >= 1024)) {
+		pr_error("%s: invaild irq cnt %d\n", __func__, cnt);
+		return -EINVAL;
+	}
+
+	irqs = d->ops->alloc_irqs(start, cnt);
+	if (!irqs)
+		return -ENOMEM;
+
+	d->start = start;
+	d->count = cnt;
+
+	return 0;
+}
+
+int irq_add_spi(uint32_t start, uint32_t cnt)
+{
+	struct irq_domain *domain = irq_domains[IRQ_DOMAIN_SPI];
+
+	if (!domain)
+		return -ENOENT;
+
+	return irq_domain_create_irqs(domain, start, cnt);
+}
+
+int irq_add_local(uint32_t start, uint32_t cnt)
+{
+	struct irq_domain *domain = irq_domains[IRQ_DOMAIN_LOCAL];
+
+	if (!domain)
+		return -ENOENT;
+
+	return irq_domain_create_irqs(domain, start, cnt);
+}
+
+static uint32_t virq_to_irq(uint32_t virq)
+{
+	int i;
+	struct irq_domain *domain;
+	uint32_t irq;
+
+	for (i = 0; i < IRQ_DOMAIN_MAX; i++) {
+		domain = irq_domains[i];
+		irq = domain->ops->virq_to_irq(domain, virq);
+		if (irq != BAD_IRQ)
+			return irq;
+	}
+
+	return BAD_IRQ;
+}
+
+static struct irq_domain *get_irq_domain(uint32_t irq)
+{
+	int i;
+	struct irq_domain *domain;
+
+	for (i = 0; i < IRQ_DOMAIN_MAX; i++) {
+		domain = irq_domains[i];
+		if ((irq >= domain->start) &&
+			(irq < domain->start + domain->count))
+			return domain;
+	}
+
+	return NULL;
+}
+
+static struct vmm_irq *get_irq_desc(uint32_t irq)
+{
+	struct irq_domain *domain;
+
+	domain = get_irq_domain(irq);
+	if (!domain)
+		return NULL;
+
+	return domain->ops->get_irq_desc(domain, irq);
+}
+
+int vmm_register_irq_entry(void *res)
+{
+	struct irq_resource *config;
+	struct vmm_irq *vmm_irq;
+	vcpu_t *vcpu;
+	struct irq_domain *domain;
+
+	if (res == NULL)
+		return -EINVAL;
+
+	config = (struct irq_resource *)res;
+	domain = get_irq_domain(config->hno);
+	if (!domain) {
+		pr_error("irq is not supported %d\n", config->hno);
+		return -EINVAL;
+	}
+
+	return domain->ops->register_irq(domain, config);
+}
+
+void __irq_enable(uint32_t irq, int enable)
+{
+	unsigned long flag;
+	struct vmm_irq *vmm_irq;
+
+	vmm_irq = get_irq_desc(irq);
+	if (!vmm_irq)
+		return;
+
+	spin_lock_irqsave(&vmm_irq->lock, flag);
+
+	if (enable) {
+		if (vmm_irq->flags & IRQ_FLAG_STATUS_MASK ==
+				IRQ_FLAG_STATUS_MASKED)
+			goto out;
+
+		irq_chip->irq_unmask(irq);
+		vmm_irq->flags &= ~IRQ_FLAG_STATUS_MASK;
+		vmm_irq->flags |= IRQ_FLAG_STATUS_UNMASKED;
+	} else {
+		if (vmm_irq->flags & IRQ_FLAG_STATUS_MASK ==
+				IRQ_FLAG_STATUS_UNMASKED)
+			goto out;
+
+		irq_chip->irq_mask(irq);
+		vmm_irq->flags &= ~IRQ_FLAG_STATUS_MASK;
+		vmm_irq->flags |= IRQ_FLAG_STATUS_MASKED;
+	}
+
+out:
+	spin_unlock_irqrestore(&vmm_irq->lock, flag);
+}
+
+void __virq_enable(uint32_t virq, int enable)
+{
+	uint32_t irq;
+
+	irq = virq_to_irq(virq);
+	if (irq == BAD_IRQ)
+		return;
+
+	__irq_enable(irq, enable);
+}
+
+void vmm_setup_irqs(void)
+{
+	int i;
+	struct irq_domain *d;
+
+	for (i = 0; i < IRQ_DOMAIN_MAX; i++) {
+		d = irq_domains[i];
+
+		if (d->ops->setup_irqs)
+			d->ops->setup_irqs(d);
+	}
+}
+
 int send_virq_hw(uint32_t vmid, uint32_t virq, uint32_t hirq)
 {
 	struct vmm_irq *vmm_irq;
 	vcpu_t *vcpu;
 
-	if (hirq >= irq_nums)
-		return -EINVAL;
-
-	vmm_irq = irq_table[hirq];
+	vmm_irq = get_irq_desc(hirq);
 	if (!vmm_irq)
 		return -ENOENT;
 
@@ -325,124 +575,26 @@ void send_vsgi(vcpu_t *sender, uint32_t sgi, cpumask_t *cpumask)
 	}
 }
 
-static int do_handle_vmm_irq(struct vmm_irq *vmm_irq)
-{
-	uint32_t cpuid = get_cpu_id();
-	int ret;
-
-	if (cpuid != vmm_irq->affinity_pcpu) {
-		pr_info("irq %d do not belong tho this cpu\n", vmm_irq->hno);
-		ret =  -EINVAL;
-		goto out;
-	}
-
-	if (!vmm_irq->handler) {
-		pr_error("Irq is not register by VMM\n");
-		ret = -EINVAL;
-		goto out;
-	}
-
-	ret = vmm_irq->handler(vmm_irq->hno, vmm_irq->pdata);
-	if (ret)
-		pr_error("handle irq:%d fail in vmm\n", vmm_irq->hno);
-
-out:
-	irq_chip->irq_dir(vmm_irq->hno);
-
-	return ret;
-}
-
-static inline int do_spi_int(struct vmm_irq *vmm_irq)
-{
-	int ret;
-
-	if (vmm_irq->flags & IRQ_FLAG_OWNER_VMM)
-		ret = do_handle_vmm_irq(vmm_irq);
-	else
-		ret = do_handle_guest_irq(vmm_irq);
-
-	return ret;
-}
-
-static inline int do_sgi_int(struct vmm_irq *vmm_irq)
-{
-	return do_handle_vmm_irq(vmm_irq);
-}
-
-static int do_ppi_int(struct vmm_irq *vmm_irq)
-{
-	return 0;
-}
-
-static int do_lpi_int(uint32_t irq)
-{
-	return 0;
-}
-
-static int do_special_int(uint32_t irq)
-{
-	return 0;
-}
 
 static int do_bad_int(uint32_t irq)
 {
+	pr_error("Handle bad irq do nothing %d\n", irq);
+	irq_chip->irq_dir(irq);
+
 	return 0;
-}
-
-static int __do_irq_handler(uint32_t irq, int type)
-{
-	int ret = 0;
-	struct vmm_irq *vmm_irq = NULL;
-
-	if ((type == IRQ_TYPE_SGI) || (type == IRQ_TYPE_PPI) ||
-			(type == IRQ_TYPE_SPI)) {
-		vmm_irq = irq_table[irq];
-		if (vmm_irq == NULL) {
-			pr_error("irq is not register\n");
-			return -EINVAL;
-		}
-	}
-
-	switch (type) {
-	case IRQ_TYPE_SGI:
-		ret = do_sgi_int(vmm_irq);
-		break;
-	case IRQ_TYPE_PPI:
-		ret = do_ppi_int(vmm_irq);
-		break;
-	case IRQ_TYPE_SPI:
-		ret = do_spi_int(vmm_irq);
-		break;
-	case IRQ_TYPE_LPI:
-		ret = do_lpi_int(irq);
-		break;
-	case IRQ_TYPE_SPECIAL:
-		ret = do_special_int(irq);
-		break;
-	case IRQ_TYPE_BAD:
-		ret = do_bad_int(irq);
-		break;
-	default:
-		break;
-	}
-
-	return ret;
 }
 
 int do_irq_handler(void)
 {
 	uint32_t irq;
-	int ret;
 	struct vmm_irq *vmm_irq;
-	int type = IRQ_TYPE_SPI;
+	struct irq_domain *d;
+	int ret = 0;
 
 	if (!irq_chip)
 		panic("irq_chip is Null when irq is triggered\n");
 
 	irq = irq_chip->get_pending_irq();
-
-	if (irq_chip->get_irq_type(irq))
-		type = irq_chip->get_irq_type(irq);
 
 	/*
 	 * TBD - here we need deactive the irq
@@ -451,7 +603,24 @@ int do_irq_handler(void)
 	 */
 	irq_chip->irq_eoi(irq);
 
-	return __do_irq_handler(irq, type);
+	d = get_irq_domain(irq);
+	if (!d) {
+		ret = -ENOENT;
+		goto error;
+	}
+
+	vmm_irq = d->ops->get_irq_desc(d, irq);
+	if (!vmm_irq) {
+		pr_error("irq is not actived %d\n", irq);
+		ret = -EINVAL;
+		goto error;
+	}
+
+	return d->ops->irq_handler(d, vmm_irq);
+
+error:
+	do_bad_int(irq);
+	return ret;
 }
 
 int request_irq(uint32_t irq, irq_handle_t handler, void *data)
@@ -459,10 +628,10 @@ int request_irq(uint32_t irq, irq_handle_t handler, void *data)
 	struct vmm_irq *vmm_irq;
 	unsigned long flag;
 
-	if ((!handler) || (irq >= irq_nums))
+	if ((!handler))
 		return -EINVAL;
 
-	vmm_irq = irq_table[irq];
+	vmm_irq = get_irq_desc(irq);
 	if (!vmm_irq)
 		return -ENOENT;
 
@@ -585,14 +754,8 @@ int vmm_irq_init(void)
 	if (!irq_chip)
 		panic("can not find the irqchip for system\n");
 
-	irq_nums = irq_chip->irq_num;
-
-	size = irq_nums * sizeof(struct vmm_irq *);
-	irq_table = (struct vmm_irq **)vmm_malloc(size);
-	if (!irq_table)
-		panic("No more memory for irq tables\n");
-
-	memset((char *)irq_table, 0, size);
+	register_irq_domain(IRQ_DOMAIN_SPI, &spi_domain_ops);
+	register_irq_domain(IRQ_DOMAIN_LOCAL, &local_domain_ops);
 
 	/*
 	 * now init the irqchip, and in the irq chip
