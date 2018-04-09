@@ -18,6 +18,8 @@ static int init_irq_desc(struct vmm_irq *vmm_irq,
 {
 	vcpu_t *vcpu;
 
+	vmm_irq->hno = config->hno;
+
 	if (config->vmid == 0xffff) {
 		pr_info("irq %d is for vmm\n", config->hno);
 		vmm_irq->flags |= IRQ_FLAG_OWNER_VMM;
@@ -33,7 +35,6 @@ static int init_irq_desc(struct vmm_irq *vmm_irq,
 	}
 
 	vmm_irq->vno = config->vno;
-	vmm_irq->hno = config->hno;
 	vmm_irq->vmid = config->vmid;
 
 	vmm_irq->affinity_vcpu = config->affinity;
@@ -41,6 +42,7 @@ static int init_irq_desc(struct vmm_irq *vmm_irq,
 	strncpy(vmm_irq->name, config->name,
 		MIN(strlen(config->name), MAX_IRQ_NAME_SIZE - 1));
 	vmm_irq->flags |= config->type;
+	vmm_irq->flags |= IRQ_FLAG_AFFINITY_VCPU;
 
 	return 0;
 }
@@ -72,8 +74,6 @@ void send_sgi(uint32_t sgi, int cpu)
 
 	irq_chip->send_sgi(sgi, SGI_TO_LIST, &mask);
 }
-
-
 
 static int __send_virq(vcpu_t *vcpu, uint32_t vno, uint32_t hno, int hw)
 {
@@ -117,7 +117,7 @@ int _send_virq(vcpu_t *vcpu, uint32_t virq, uint32_t hirq, int hw)
 	vcpu_t *vcpu_sender = current_vcpu();
 
 	ret = __send_virq(vcpu, virq, hirq, hw);
-	if (!ret)
+	if (ret)
 		goto out;
 
 	if (vcpu_sender->pcpu_affinity != vcpu->pcpu_affinity) {
@@ -126,7 +126,7 @@ int _send_virq(vcpu_t *vcpu, uint32_t virq, uint32_t hirq, int hw)
 		 * the same pcpu, then send a hw sgi to the
 		 * pcpu to do the sched work
 		 */
-		send_sgi(CONFIG_VMM_RESCHED_IRQ, vcpu_sender->pcpu_affinity);
+		send_sgi(CONFIG_VMM_RESCHED_IRQ, vcpu->pcpu_affinity);
 	} else {
 		/*
 		 * if the sender and the target are the same
@@ -194,7 +194,7 @@ int register_irq_domain(int type, struct irq_domain_ops *ops)
 {
 	struct irq_domain *domain;
 
-	if (type >= IRQ_TYPE_BAD)
+	if (type >= IRQ_DOMAIN_MAX)
 		return -EINVAL;
 
 	domain = (struct irq_domain *)vmm_zalloc(sizeof(struct irq_domain));
@@ -262,6 +262,8 @@ static void spi_setup_irqs(struct irq_domain *d)
 
 	for (i = 0; i < d->count; i++) {
 		vmm_irq = d->irqs[i];
+		if (!vmm_irq)
+			continue;
 
 		if (vmm_irq->flags & IRQ_FLAG_AFFINITY_VCPU) {
 			irq_chip->irq_set_type(vmm_irq->hno,
@@ -348,6 +350,7 @@ static int local_register_irq(struct irq_domain *d, struct irq_resource *res)
 		local = get_per_cpu(local_irqs, i);
 		irq = alloc_vmm_irq();
 		init_irq_desc(irq, res);
+		irq->affinity_pcpu = i;
 		local[irq->hno - d->start] = irq;
 	}
 
@@ -373,6 +376,7 @@ struct irq_domain_ops local_domain_ops = {
 	.virq_to_irq = local_virq_to_irq,
 	.setup_irqs = local_setup_irqs,
 	.irq_handler = local_int_handler,
+	.register_irq = local_register_irq,
 };
 
 static int irq_domain_create_irqs(struct irq_domain *d,
@@ -391,6 +395,7 @@ static int irq_domain_create_irqs(struct irq_domain *d,
 
 	d->start = start;
 	d->count = cnt;
+	d->irqs = irqs;
 
 	return 0;
 }
@@ -571,7 +576,7 @@ void send_vsgi(vcpu_t *sender, uint32_t sgi, cpumask_t *cpumask)
 
 	for_each_set_bit(cpu, cpumask->bits, vm->vcpu_nr) {
 		vcpu = vm->vcpus[cpu];
-		__send_virq(vcpu, sgi, 0, 0);
+		_send_virq(vcpu, sgi, 0, 0);
 	}
 }
 

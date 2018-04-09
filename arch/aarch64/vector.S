@@ -145,7 +145,7 @@ exception_from_el2_handler:
 	stp     x5, x6, [sp, #-16]!
 	stp     x3, x4, [sp, #-16]!
 	stp     x1, x2, [sp, #-16]!
-	str	x0, [sp, #-16]!
+	str	x0, [sp, #-8]!
 
 	blr     x29
 
@@ -158,7 +158,6 @@ exception_from_el2_handler:
 	ldp     x12, x13, [sp], #16
 	ldp     x14, x15, [sp], #16
 	ldp     x16, x17, [sp], #16
-	ldp     x18, x19, [sp], #16
 	ldp     x18, x19, [sp], #16
 	ldp     x20, x21, [sp], #16
 	ldp     x22, x23, [sp], #16

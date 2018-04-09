@@ -55,6 +55,7 @@ void vgic_send_sgi(vcpu_t *vcpu, unsigned long sgi_value)
 	int bit, logic_cpu;
 	vm_t *vm = vcpu->vm;
 	struct vgicv3 *vgic;
+	vcpu_t *target;
 
 	sgi = (sgi_value & (0xf << 24)) >> 24;
 	if (sgi >= 16) {
@@ -63,6 +64,7 @@ void vgic_send_sgi(vcpu_t *vcpu, unsigned long sgi_value)
 	}
 
 	mode = sgi_value & (1UL << 40) ? SGI_TO_OTHERS : SGI_TO_LIST;
+	cpumask_clear(&cpumask);
 
 	if (mode == SGI_TO_LIST) {
 		tmp = sgi_value & 0xffff;
@@ -85,10 +87,14 @@ void vgic_send_sgi(vcpu_t *vcpu, unsigned long sgi_value)
 	 * here we update the gicr releated register
 	 * for some other purpose use TBD
 	 */
-	vgic = (struct vgicv3 *)get_module_data_by_id(vcpu, vgic_module_id);
-	spin_lock(&vgic->gicr.gicr_lock);
-	vgic->gicr.gicr_ispender |= (1 << sgi);
-	spin_unlock(&vgic->gicr.gicr_lock);
+
+	for_each_cpu(bit, &cpumask) {
+		target = get_vcpu_in_vm(vm, bit);
+		vgic = (struct vgicv3 *)get_module_data_by_id(target, vgic_module_id);
+		spin_lock(&vgic->gicr.gicr_lock);
+		vgic->gicr.gicr_ispender |= (1 << sgi);
+		spin_unlock(&vgic->gicr.gicr_lock);
+	}
 
 	send_vsgi(vcpu, sgi, &cpumask);
 }

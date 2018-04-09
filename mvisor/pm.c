@@ -3,5 +3,5 @@
 
 void cpu_idle(void)
 {
-	wfi();
+	wfe();
 }

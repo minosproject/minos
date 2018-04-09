@@ -475,7 +475,7 @@ int gicv3_init(void)
 	irq_add_local(0, 32);
 
 	/* alloc SPI irqs */
-	irq_add_spi(32, nr_lines - 1);
+	irq_add_spi(32, nr_lines);
 
 	/* default all golbal IRQS to level, active low */
 	for (i = GICV3_NR_LOCAL_IRQS; i < nr_lines; i += 16)

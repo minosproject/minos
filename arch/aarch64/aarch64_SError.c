@@ -7,6 +7,7 @@
 #include <mvisor/mmio.h>
 #include <mvisor/sched.h>
 #include <asm/vgic.h>
+#include <mvisor/irq.h>
 
 static int unknown_handler(vcpu_regs *reg, uint32_t esr_value)
 {
@@ -319,6 +320,8 @@ void SError_from_el1_handler(vcpu_regs *data)
 
 	vmm_exit_from_guest(vcpu);
 
+	enable_local_irq();
+
 	if (get_pcpu_id(vcpu) != cpuid)
 		panic("this vcpu is not belont to the pcpu");
 
@@ -338,6 +341,8 @@ void SError_from_el1_handler(vcpu_regs *data)
 	 */
 	ec->handler(data, esr_value);
 	data->elr_el2 += ec->ret_addr_adjust;
+
+	disable_local_irq();
 }
 
 void SError_from_el2_handler(vcpu_regs *data)

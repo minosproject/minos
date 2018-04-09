@@ -179,8 +179,6 @@ void switch_to_vcpu(vcpu_t *current, vcpu_t *next)
 {
 	pcpu_t *pcpu = get_cpu_var(pcpu);
 
-	disable_local_irq();
-
 	/*
 	 * if current != next and current != NULL
 	 * then need to save the current cpu context
@@ -206,8 +204,6 @@ void switch_to_vcpu(vcpu_t *current, vcpu_t *next)
 	 * here need to deal the cache and tlb
 	 * TBD
 	 */
-
-	enable_local_irq();
 }
 
 void vmm_pcpus_init(void)
