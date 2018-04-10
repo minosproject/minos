@@ -8,19 +8,19 @@
 #include <mvisor/irq.h>
 #include <mvisor/list.h>
 
-static pcpu_t pcpus[CONFIG_NR_CPUS];
+static struct pcpu pcpus[CONFIG_NR_CPUS];
 
-DEFINE_PER_CPU(vcpu_t *, current_vcpu);
-DEFINE_PER_CPU(vcpu_t *, next_vcpu);
-DEFINE_PER_CPU(pcpu_t *, pcpu);
+DEFINE_PER_CPU(struct vcpu *, current_vcpu);
+DEFINE_PER_CPU(struct vcpu *, next_vcpu);
+DEFINE_PER_CPU(struct pcpu *, pcpu);
 
-uint32_t pcpu_affinity(vcpu_t *vcpu, uint32_t affinity)
+uint32_t pcpu_affinity(struct vcpu *vcpu, uint32_t affinity)
 {
 	int i, found;
 	uint32_t af;
-	pcpu_t *pcpu;
+	struct pcpu *pcpu;
 	struct list_head *list;
-	vcpu_t *tvcpu;
+	struct vcpu *tvcpu;
 
 	/*
 	 * first check the other vcpu belong to the same
@@ -39,7 +39,7 @@ uint32_t pcpu_affinity(vcpu_t *vcpu, uint32_t affinity)
 
 	pcpu = &pcpus[affinity];
 	list_for_each(&pcpu->vcpu_list, list) {
-		tvcpu = list_entry(list, vcpu_t, pcpu_list);
+		tvcpu = list_entry(list, struct vcpu, pcpu_list);
 		if ((vcpu->vm->vmid) ==
 				(tvcpu->vm->vmid))
 			goto step2;
@@ -60,7 +60,7 @@ step2:
 
 		pcpu = &pcpus[i];
 		list_for_each(&pcpu->vcpu_list, list) {
-			tvcpu = list_entry(list, vcpu_t, pcpu_list);
+			tvcpu = list_entry(list, struct vcpu, pcpu_list);
 			if ((vcpu->vm->vmid) ==
 					(tvcpu->vm->vmid)) {
 				found = 1;
@@ -78,17 +78,17 @@ step2:
 	return PCPU_AFFINITY_FAIL;
 }
 
-static vcpu_t *find_vcpu_to_run(pcpu_t *pcpu)
+static struct vcpu *find_vcpu_to_run(struct pcpu *pcpu)
 {
 	if (is_list_empty(&pcpu->ready_list))
 		return NULL;
 
-	return list_first_entry(&pcpu->ready_list, vcpu_t, state_list);
+	return list_first_entry(&pcpu->ready_list, struct vcpu, state_list);
 }
 
-int vcpu_sched_init(vcpu_t *vcpu)
+int vcpu_sched_init(struct vcpu *vcpu)
 {
-	pcpu_t *pcpu = get_per_cpu(pcpu, vcpu->pcpu_affinity);
+	struct pcpu *pcpu = get_per_cpu(pcpu, vcpu->pcpu_affinity);
 
 	init_list(&vcpu->state_list);
 	set_vcpu_state(vcpu, VCPU_STATE_READY);
@@ -97,16 +97,16 @@ int vcpu_sched_init(vcpu_t *vcpu)
 	return 0;
 }
 
-void sched_vcpu(vcpu_t *vcpu, int reason)
+void sched_vcpu(struct vcpu *vcpu, int reason)
 {
 
 }
 
 void sched(void)
 {
-	pcpu_t *pcpu;
+	struct pcpu *pcpu;
 	struct list_head *list;
-	vcpu_t *vcpu;
+	struct vcpu *vcpu;
 	unsigned long flag;
 
 	pcpu = get_cpu_var(pcpu);
@@ -138,7 +138,7 @@ resched:
 	}
 }
 
-int vcpu_can_idle(vcpu_t *vcpu)
+int vcpu_can_idle(struct vcpu *vcpu)
 {
 	/*
 	 * check whether there irq do not handled
@@ -152,11 +152,11 @@ int vcpu_can_idle(vcpu_t *vcpu)
 	return 1;
 }
 
-void vcpu_idle(vcpu_t *vcpu)
+void vcpu_idle(struct vcpu *vcpu)
 {
 	unsigned long flag;
 	int cpuid = get_cpu_id();
-	pcpu_t *pcpu = get_per_cpu(pcpu, cpuid);
+	struct pcpu *pcpu = get_per_cpu(pcpu, cpuid);
 
 	if (!vcpu_can_idle(vcpu))
 		return;
@@ -175,9 +175,9 @@ void vcpu_idle(vcpu_t *vcpu)
 	sched();
 }
 
-void switch_to_vcpu(vcpu_t *current, vcpu_t *next)
+void switch_to_vcpu(struct vcpu *current, struct vcpu *next)
 {
-	pcpu_t *pcpu = get_cpu_var(pcpu);
+	struct pcpu *pcpu = get_cpu_var(pcpu);
 
 	/*
 	 * if current != next and current != NULL
@@ -209,7 +209,7 @@ void switch_to_vcpu(vcpu_t *current, vcpu_t *next)
 void vmm_pcpus_init(void)
 {
 	int i;
-	pcpu_t *pcpu;
+	struct pcpu *pcpu;
 
 	for (i = 0; i < CONFIG_NR_CPUS; i++) {
 		pcpu = &pcpus[i];
@@ -220,7 +220,7 @@ void vmm_pcpus_init(void)
 	}
 }
 
-static int vcpu_need_to_run(void)
+static int vcpu_need_to_run(struct vcpu *vcpu)
 {
 	if (vcpu_has_irq_pending(vcpu))
 		return 1;
@@ -230,8 +230,8 @@ static int vcpu_need_to_run(void)
 
 int vmm_reched_handler(uint32_t irq, void *data)
 {
-	pcpu_t *pcpu = get_cpu_var(pcpu);
-	vcpu_t *vcpu;
+	struct pcpu *pcpu = get_cpu_var(pcpu);
+	struct vcpu *vcpu;
 
 	/*
 	 * ensure the pcpu's member will only modified

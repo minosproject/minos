@@ -21,19 +21,19 @@ struct vmm_module {
 	uint32_t context_size;
 	void *pdata;
 	void *context;
-	void (*state_save)(vcpu_t *vcpu, void *context);
-	void (*state_restore)(vcpu_t *vcpu, void *context);
-	void (*state_init)(vcpu_t *vcpu, void *context);
-	void (*create_vm)(vm_t *vm);
+	void (*state_save)(struct vcpu *vcpu, void *context);
+	void (*state_restore)(struct vcpu *vcpu, void *context);
+	void (*state_init)(struct vcpu *vcpu, void *context);
+	void (*create_vm)(struct vm *vm);
 };
 
-int vcpu_modules_init(vcpu_t *vcpu);
+int vcpu_modules_init(struct vcpu *vcpu);
 void *vmm_get_module_pdata(char *name, char *type);
-void *get_module_data_by_name(vcpu_t *vcpu, char *name);
-void *get_module_data_by_id(vcpu_t *vcpu, int id);
-void save_vcpu_module_state(vcpu_t *vcpu);
-void restore_vcpu_module_state(vcpu_t *vcpu);
+void *get_module_data_by_name(struct vcpu *vcpu, char *name);
+void *get_module_data_by_id(struct vcpu *vcpu, int id);
+void save_vcpu_module_state(struct vcpu *vcpu);
+void restore_vcpu_module_state(struct vcpu *vcpu);
 int get_module_id(char *type);
-void modules_create_vm(vm_t *vm);
+void modules_create_vm(struct vm *vm);
 
 #endif

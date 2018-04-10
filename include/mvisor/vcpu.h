@@ -10,39 +10,13 @@
 #include <mvisor/list.h>
 #include <mvisor/vm.h>
 #include <mvisor/spinlock.h>
-
 #include <asm/asm_vcpu.h>
+#include <mvisor/irq.h>
 
-#define CONFIG_VCPU_MAX_ACTIVE_IRQS	(16)
-
-#define VIRQ_STATE_INACTIVE		(0x0)
-#define VIRQ_STATE_PENDING		(0x1)
-#define VIRQ_STATE_ACTIVE		(0x2)
-#define VIRQ_STATE_ACTIVE_AND_PENDING	(0x3)
-#define VIRQ_STATE_OFFLINE		(0x4)
-
-struct virq {
-	uint32_t h_intno;
-	uint32_t v_intno;
-	int hw;
-	int state;
-	int id;
-	struct list_head list;
-};
-
-struct irq_struct {
-	uint32_t count;
-	uint32_t irq_pending;
-	spinlock_t lock;
-	struct list_head pending_list;
-	DECLARE_BITMAP(irq_bitmap, CONFIG_VCPU_MAX_ACTIVE_IRQS);
-	struct virq virqs[CONFIG_VCPU_MAX_ACTIVE_IRQS];
-};
-
-typedef struct vmm_vcpu {
+struct vcpu {
 	vcpu_regs regs;
 	uint32_t vcpu_id;
-	vm_t *vm;
+	struct vm *vm;
 	unsigned long entry_point;
 	uint32_t pcpu_affinity;
 	struct list_head pcpu_list;
@@ -61,31 +35,31 @@ typedef struct vmm_vcpu {
 
 	void **module_context;
 	void *arch_data;
-} vcpu_t __attribute__ ((__aligned__ (sizeof(unsigned long))));
+} __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
-static uint32_t inline get_vcpu_id(vcpu_t *vcpu)
+static uint32_t inline get_vcpu_id(struct vcpu *vcpu)
 {
 	return vcpu->vcpu_id;
 }
 
-static uint32_t inline get_vmid(vcpu_t *vcpu)
+static uint32_t inline get_vmid(struct vcpu *vcpu)
 {
 	return (vcpu->vm->vmid);
 }
 
-static uint32_t inline get_pcpu_id(vcpu_t *vcpu)
+static uint32_t inline get_pcpu_id(struct vcpu *vcpu)
 {
 	return vcpu->pcpu_affinity;
 }
 
-vcpu_t *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id);
+struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id);
 
-vm_t *get_vm_by_id(uint32_t vmid);
+struct vm *get_vm_by_id(uint32_t vmid);
 
-int arch_vm_init(vm_t *vm);
+int arch_vm_init(struct vm *vm);
 
 int vmm_create_vms(void);
 
-vcpu_t *get_vcpu_in_vm(vm_t *vm, uint32_t vcpu_id);
+struct vcpu *get_vcpu_in_vm(struct vm *vm, uint32_t vcpu_id);
 
 #endif

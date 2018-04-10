@@ -46,16 +46,16 @@ static struct vgicv3_gicd *attach_vgicd(uint32_t vmid)
 	return NULL;
 }
 
-void vgic_send_sgi(vcpu_t *vcpu, unsigned long sgi_value)
+void vgic_send_sgi(struct vcpu *vcpu, unsigned long sgi_value)
 {
 	sgi_mode_t mode;
 	uint32_t sgi;
 	cpumask_t cpumask;
 	unsigned long tmp, aff3, aff2, aff1;
 	int bit, logic_cpu;
-	vm_t *vm = vcpu->vm;
+	struct vm *vm = vcpu->vm;
 	struct vgicv3 *vgic;
-	vcpu_t *target;
+	struct vcpu *target;
 
 	sgi = (sgi_value & (0xf << 24)) >> 24;
 	if (sgi >= 16) {
@@ -99,7 +99,7 @@ void vgic_send_sgi(vcpu_t *vcpu, unsigned long sgi_value)
 	send_vsgi(vcpu, sgi, &cpumask);
 }
 
-static void vgicv3_state_init(vcpu_t *vcpu, void *context)
+static void vgicv3_state_init(struct vcpu *vcpu, void *context)
 {
 	struct vgicv3 *vgic = (struct vgicv3 *)context;
 	struct vgicv3_gicr *gicr = &vgic->gicr;
@@ -123,17 +123,17 @@ static void vgicv3_state_init(vcpu_t *vcpu, void *context)
 	spin_lock_init(&gicr->gicr_lock);
 }
 
-static void vgicv3_state_save(vcpu_t *vcpu, void *context)
+static void vgicv3_state_save(struct vcpu *vcpu, void *context)
 {
 
 }
 
-static void vgicv3_state_restore(vcpu_t *vcpu, void *context)
+static void vgicv3_state_restore(struct vcpu *vcpu, void *context)
 {
 
 }
 
-static void vgicv3_vm_create(vm_t *vm)
+static void vgicv3_vm_create(struct vm *vm)
 {
 	struct vgicv3_gicd *gicd;
 
@@ -311,7 +311,7 @@ static int vgicv3_mmio_read(vcpu_regs *regs,
 	int type;
 	unsigned long offset;
 	struct vgicv3 *vgic = (struct vgicv3 *)
-			get_module_data_by_id((vcpu_t *)regs, vgic_module_id);
+		get_module_data_by_id((struct vcpu *)regs, vgic_module_id);
 
 	type = get_address_type(vgic, address, &offset);
 	switch (type) {
@@ -338,7 +338,7 @@ static int vgicv3_mmio_write(vcpu_regs *regs,
 	int type;
 	unsigned long offset;
 	struct vgicv3 *vgic = (struct vgicv3 *)
-			get_module_data_by_id((vcpu_t *)regs, vgic_module_id);
+		get_module_data_by_id((struct vcpu *)regs, vgic_module_id);
 
 	type = get_address_type(vgic, address, &offset);
 	switch (type) {

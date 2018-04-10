@@ -47,7 +47,7 @@ int vmm_register_hook(hook_func_t fn, void *data, enum vmm_hook_type type)
 	return 0;
 }
 
-static int vmm_do_hooks(vcpu_t *vcpu, enum vmm_hook_type type)
+static int vmm_do_hooks(struct vcpu *vcpu, enum vmm_hook_type type)
 {
 	struct vmm_hook *hook;
 
@@ -57,12 +57,12 @@ static int vmm_do_hooks(vcpu_t *vcpu, enum vmm_hook_type type)
 	return 0;
 }
 
-void vmm_exit_from_guest(vcpu_t *vcpu)
+void vmm_exit_from_guest(struct vcpu *vcpu)
 {
 	vmm_do_hooks(vcpu, VMM_HOOK_TYPE_EXIT_FROM_GUEST);
 }
 
-void vmm_enter_to_guest(vcpu_t *vcpu)
+void vmm_enter_to_guest(struct vcpu *vcpu)
 {
 	vmm_do_hooks(vcpu, VMM_HOOK_TYPE_ENTER_TO_GUEST);
 }

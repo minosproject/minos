@@ -18,7 +18,7 @@ int vmm_register_memory_region(void *res)
 {
 	struct memory_region *region;
 	struct memory_resource *resource;
-	vm_t *vm;
+	struct vm *vm;
 
 	if (res == NULL)
 		return -EINVAL;
@@ -459,7 +459,7 @@ int vmm_mm_init(void)
 
 #endif
 
-void vm_mm_struct_init(vm_t *vm)
+void vm_mm_struct_init(struct vm *vm)
 {
 	struct mm_struct *mm = &vm->mm;
 
@@ -467,7 +467,7 @@ void vm_mm_struct_init(vm_t *vm)
 	mm->page_table_base = 0;
 }
 
-int vm_memory_init(vm_t *vm)
+int vm_memory_init(struct vm *vm)
 {
 	struct mm_struct *mm = &vm->mm;
 	struct memory_region *region;

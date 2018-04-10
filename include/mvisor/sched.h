@@ -11,7 +11,7 @@
 
 #define PCPU_AFFINITY_FAIL	(0xffff)
 
-DECLARE_PER_CPU(vcpu_t *, current_vcpu);
+DECLARE_PER_CPU(struct vcpu *, current_vcpu);
 #define current_vcpu()	get_cpu_var(current_vcpu)
 
 typedef enum _vcpu_state_t {
@@ -22,28 +22,28 @@ typedef enum _vcpu_state_t {
 	VCPU_STATE_ERROR 	= 0xffff,
 } vcpu_state_t;
 
-typedef struct vmm_pcpu {
+struct pcpu {
 	uint32_t pcpu_id;
 	int need_resched;
 	struct list_head vcpu_list;
 	struct list_head ready_list;
-} pcpu_t;
+};
 
-static vcpu_state_t inline get_vcpu_state(vcpu_t *vcpu)
+static vcpu_state_t inline get_vcpu_state(struct vcpu *vcpu)
 {
 	return vcpu->state;
 }
 
-static void inline set_vcpu_state(vcpu_t *vcpu, vcpu_state_t state)
+static void inline set_vcpu_state(struct vcpu *vcpu, vcpu_state_t state)
 {
 	vcpu->state = state;
 }
 
 void vmm_pcpus_init(void);
 void sched(void);
-void sched_vcpu(vcpu_t *vcpu, int reason);
-uint32_t pcpu_affinity(vcpu_t *vcpu, uint32_t affinity);
-int vcpu_sched_init(vcpu_t *vcpu);
-void vcpu_idle(vcpu_t *vcpu);
+void sched_vcpu(struct vcpu *vcpu, int reason);
+uint32_t pcpu_affinity(struct vcpu *vcpu, uint32_t affinity);
+int vcpu_sched_init(struct vcpu *vcpu);
+void vcpu_idle(struct vcpu *vcpu);
 
 #endif

@@ -26,7 +26,7 @@ struct aarch64_system_context {
 	uint64_t hcr_el2;
 } __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
-static void aarch64_system_state_init(vcpu_t *vcpu, void *c)
+static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
 {
 	struct aarch64_system_context *context =
 			(struct aarch64_system_context *)c;
@@ -40,7 +40,7 @@ static void aarch64_system_state_init(vcpu_t *vcpu, void *c)
 	context->sctlr_el1 = 0;
 }
 
-static void aarch64_system_state_save(vcpu_t *vcpu, void *c)
+static void aarch64_system_state_save(struct vcpu *vcpu, void *c)
 {
 	struct aarch64_system_context *context =
 			(struct aarch64_system_context *)c;
@@ -52,7 +52,7 @@ static void aarch64_system_state_save(vcpu_t *vcpu, void *c)
 	context->hcr_el2 = read_sysreg(HCR_EL2);
 }
 
-static void aarch64_system_state_restore(vcpu_t *vcpu, void *c)
+static void aarch64_system_state_restore(struct vcpu *vcpu, void *c)
 {
 	struct aarch64_system_context *context =
 			(struct aarch64_system_context *)c;

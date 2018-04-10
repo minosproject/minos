@@ -3,10 +3,10 @@
 
 #include <mvisor/vcpu.h>
 
-int arch_vm_init(vm_t *vm)
+int arch_vm_init(struct vm *vm)
 {
 	int i;
-	vcpu_t *vcpu;
+	struct vcpu *vcpu;
 	vcpu_regs *regs;
 
 	for (i = 0; i < vm->vcpu_nr; i++) {

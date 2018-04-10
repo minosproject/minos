@@ -7,10 +7,11 @@
 #include <mvisor/init.h>
 #include <config/config.h>
 #include <mvisor/smp.h>
-#include <mvisor/vcpu.h>
 #include <mvisor/spinlock.h>
 #include <mvisor/cpumask.h>
 #include <mvisor/resource.h>
+
+struct vcpu;
 
 #define MAX_IRQ_NAME_SIZE	32
 #define BAD_IRQ			(1024)
@@ -57,6 +58,32 @@ enum irq_type {
 
 struct vmm_irq;
 typedef int (*irq_handle_t)(uint32_t irq, void *data);
+
+#define CONFIG_VCPU_MAX_ACTIVE_IRQS	(16)
+
+#define VIRQ_STATE_INACTIVE		(0x0)
+#define VIRQ_STATE_PENDING		(0x1)
+#define VIRQ_STATE_ACTIVE		(0x2)
+#define VIRQ_STATE_ACTIVE_AND_PENDING	(0x3)
+#define VIRQ_STATE_OFFLINE		(0x4)
+
+struct virq {
+	uint32_t h_intno;
+	uint32_t v_intno;
+	int hw;
+	int state;
+	int id;
+	struct list_head list;
+};
+
+struct irq_struct {
+	uint32_t count;
+	uint32_t irq_pending;
+	spinlock_t lock;
+	struct list_head pending_list;
+	DECLARE_BITMAP(irq_bitmap, CONFIG_VCPU_MAX_ACTIVE_IRQS);
+	struct virq virqs[CONFIG_VCPU_MAX_ACTIVE_IRQS];
+};
 
 struct irq_chip {
 	uint32_t (*get_pending_irq)(void);
@@ -133,7 +160,9 @@ void __virq_enable(uint32_t virq, int enable);
 void __irq_enable(uint32_t irq, int enable);
 int send_virq_hw(uint32_t vmid, uint32_t virq, uint32_t hirq);
 int send_virq(uint32_t vmid, uint32_t virq);
-void send_vsgi(vcpu_t *sender, uint32_t sgi, cpumask_t *cpumask);
+void send_vsgi(struct vcpu *sender,
+		uint32_t sgi, cpumask_t *cpumask);
+int vcpu_has_irq_pending(struct vcpu *vcpu);
 
 static inline void virq_mask(uint32_t virq)
 {
@@ -154,5 +183,6 @@ static inline void irq_mask(uint32_t irq)
 {
 	__irq_enable(irq, 0);
 }
+
 
 #endif

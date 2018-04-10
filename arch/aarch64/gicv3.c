@@ -2,7 +2,6 @@
 #include <mvisor/io.h>
 #include <mvisor/percpu.h>
 #include <mvisor/spinlock.h>
-#include <mvisor/irq.h>
 #include <mvisor/print.h>
 #include <asm/gicv3.h>
 #include <mvisor/errno.h>
@@ -389,17 +388,17 @@ static int gicv3_gicr_init(void)
 	return 0;
 }
 
-static void gicv3_state_save(vcpu_t *vcpu, void *context)
+static void gicv3_state_save(struct vcpu *vcpu, void *context)
 {
 
 }
 
-static void gicv3_state_restore(vcpu_t *vcpu, void *context)
+static void gicv3_state_restore(struct vcpu *vcpu, void *context)
 {
 
 }
 
-static void gicv3_state_init(vcpu_t *vcpu, void *context)
+static void gicv3_state_init(struct vcpu *vcpu, void *context)
 {
 	struct gic_context *c = (struct gic_context *)context;
 

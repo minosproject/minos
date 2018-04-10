@@ -30,6 +30,6 @@
 int get_cpu_id(void);
 int arch_early_init(void);
 int arch_init(void);
-int arch_vm_init(vm_t *vm);
+int arch_vm_init(struct vm *vm);
 
 #endif

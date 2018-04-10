@@ -12,7 +12,7 @@
 extern unsigned char __vmm_vm_start;
 extern unsigned char __vmm_vm_end;
 
-static vm_t *vms[CONFIG_MAX_VM];
+static struct vm *vms[CONFIG_MAX_VM];
 static uint32_t total_vms = 0;
 
 struct list_head vm_list;
@@ -20,16 +20,16 @@ struct list_head vm_list;
 static int vmm_add_vm(vm_entry_t *vme)
 {
 	int i;
-	vm_t *vm;
+	struct vm *vm;
 
 	if (!vme)
 		return -EINVAL;
 
-	vm = (vm_t *)vmm_malloc(sizeof(vm_t));
+	vm = (struct vm *)vmm_malloc(sizeof(struct vm));
 	if (!vm)
 		return -ENOMEM;
 
-	memset((char *)vm, 0, sizeof(vm_t));
+	memset((char *)vm, 0, sizeof(struct vm));
 	vm->vmid = vme->vmid;
 	strncpy(vm->name, vme->name,
 		MIN(strlen(vme->name), VMM_VM_NAME_SIZE - 1));
@@ -74,10 +74,10 @@ static int parse_all_vms(void)
 	return 0;
 }
 
-vm_t *get_vm_by_id(uint32_t vmid)
+struct vm *get_vm_by_id(uint32_t vmid)
 {
 	int i;
-	vm_t *vm;
+	struct vm *vm;
 
 	for (i = 0; i < total_vms; i++) {
 		vm = vms[i];
@@ -88,7 +88,7 @@ vm_t *get_vm_by_id(uint32_t vmid)
 	return NULL;
 }
 
-vcpu_t *get_vcpu_in_vm(vm_t *vm, uint32_t vcpu_id)
+struct vcpu *get_vcpu_in_vm(struct vm *vm, uint32_t vcpu_id)
 {
 	if (vcpu_id >= vm->vcpu_nr)
 		return NULL;
@@ -96,9 +96,9 @@ vcpu_t *get_vcpu_in_vm(vm_t *vm, uint32_t vcpu_id)
 	return vm->vcpus[vcpu_id];
 }
 
-vcpu_t *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id)
+struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id)
 {
-	vm_t *vm;
+	struct vm *vm;
 
 	vm = get_vm_by_id(vmid);
 	if (!vm)
@@ -108,20 +108,20 @@ vcpu_t *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id)
 }
 
 
-static int vm_create_vcpus(vm_t *vm)
+static int vm_create_vcpus(struct vm *vm)
 {
 	int i;
-	vcpu_t *vcpu;
+	struct vcpu *vcpu;
 
 	if (!vm)
 		return -EINVAL;
 
 	for (i = 0; i < vm->vcpu_nr; i++) {
-		vcpu = (vcpu_t *)vmm_malloc(sizeof(vcpu_t));
+		vcpu = (struct vcpu *)vmm_malloc(sizeof(struct vcpu));
 		if (vcpu == NULL)
 			return -ENOMEM;
 
-		memset((char *)vcpu, 0, sizeof(vcpu_t));
+		memset((char *)vcpu, 0, sizeof(struct vcpu));
 
 		vcpu->vcpu_id = i;
 		vcpu->vm = vm;
@@ -145,10 +145,10 @@ static int vm_create_vcpus(vm_t *vm)
 	return 0;
 }
 
-static void vm_sched_init(vm_t *vm)
+static void vm_sched_init(struct vm *vm)
 {
 	int i;
-	vcpu_t *vcpu = NULL;
+	struct vcpu *vcpu = NULL;
 
 	for (i = 0; i < vm->vcpu_nr; i++) {
 		vcpu = vm->vcpus[i];
@@ -156,12 +156,12 @@ static void vm_sched_init(vm_t *vm)
 	}
 }
 
-static int inline vm_arch_init(vm_t *vm)
+static int inline vm_arch_init(struct vm *vm)
 {
 	return arch_vm_init(vm);
 }
 
-static int vm_modules_init(vm_t *vm)
+static int vm_modules_init(struct vm *vm)
 {
 	int i;
 
@@ -174,7 +174,7 @@ static int vm_modules_init(vm_t *vm)
 int vmm_vms_init(void)
 {
 	int i;
-	vm_t *vm;
+	struct vm *vm;
 
 	for (i = 0; i < total_vms; i++) {
 		vm = vms[i];
@@ -190,7 +190,7 @@ int vmm_vms_init(void)
 int vmm_create_vms(void)
 {
 	int i;
-	vm_t *vm;
+	struct vm *vm;
 	int ret = 0;
 
 	init_list(&vm_list);

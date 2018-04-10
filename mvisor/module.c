@@ -55,7 +55,7 @@ static struct vmm_module *vmm_create_module(struct module_id *id)
 	return module;
 }
 
-void *get_module_data_by_name(vcpu_t *vcpu, char *name)
+void *get_module_data_by_name(struct vcpu *vcpu, char *name)
 {
 	uint32_t id;
 
@@ -66,12 +66,12 @@ void *get_module_data_by_name(vcpu_t *vcpu, char *name)
 	return vcpu->module_context[id];
 }
 
-void *get_module_data_by_id(vcpu_t *vcpu, int id)
+void *get_module_data_by_id(struct vcpu *vcpu, int id)
 {
 	return vcpu->module_context[id];
 }
 
-int vcpu_modules_init(vcpu_t *vcpu)
+int vcpu_modules_init(struct vcpu *vcpu)
 {
 	struct list_head *list;
 	struct vmm_module *module;
@@ -104,7 +104,7 @@ int vcpu_modules_init(vcpu_t *vcpu)
 	return 0;
 }
 
-void modules_create_vm(vm_t *vm)
+void modules_create_vm(struct vm *vm)
 {
 	struct vmm_module *module;
 
@@ -136,7 +136,7 @@ void *vmm_get_module_pdata(char *name, char *type)
 	return pdata;
 }
 
-void restore_vcpu_module_state(vcpu_t *vcpu)
+void restore_vcpu_module_state(struct vcpu *vcpu)
 {
 	struct vmm_module *module;
 	void *context;
@@ -149,7 +149,7 @@ void restore_vcpu_module_state(vcpu_t *vcpu)
 	}
 }
 
-void save_vcpu_module_state(vcpu_t *vcpu)
+void save_vcpu_module_state(struct vcpu *vcpu)
 {
 	struct vmm_module *module;
 	void *context;

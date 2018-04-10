@@ -314,9 +314,9 @@ int el2_stage2_vmsa_init(void)
 	return 0;
 }
 
-static void vmsa_state_init(vcpu_t *vcpu, void *context)
+static void vmsa_state_init(struct vcpu *vcpu, void *context)
 {
-	vm_t *vm = vcpu->vm;
+	struct vm *vm = vcpu->vm;
 	struct vmsa_context *c = (struct vmsa_context *)context;
 
 	c->vtcr_el2 = generate_vtcr_el2();
@@ -325,7 +325,7 @@ static void vmsa_state_init(vcpu_t *vcpu, void *context)
 	c->ttbr1_el1 = 0;
 }
 
-static void vmsa_state_save(vcpu_t *vcpu, void *context)
+static void vmsa_state_save(struct vcpu *vcpu, void *context)
 {
 	struct vmsa_context *c = (struct vmsa_context *)context;
 
@@ -335,7 +335,7 @@ static void vmsa_state_save(vcpu_t *vcpu, void *context)
 	c->ttbr1_el1 = read_sysreg(TTBR1_EL1);
 }
 
-static void vmsa_state_restore(vcpu_t *vcpu, void *context)
+static void vmsa_state_restore(struct vcpu *vcpu, void *context)
 {
 	struct vmsa_context *c = (struct vmsa_context *)context;
 

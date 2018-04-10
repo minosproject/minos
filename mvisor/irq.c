@@ -16,7 +16,7 @@ static struct irq_domain *irq_domains[IRQ_DOMAIN_MAX];
 static int init_irq_desc(struct vmm_irq *vmm_irq,
 		struct irq_resource *config)
 {
-	vcpu_t *vcpu;
+	struct vcpu *vcpu;
 
 	vmm_irq->hno = config->hno;
 
@@ -75,7 +75,7 @@ void send_sgi(uint32_t sgi, int cpu)
 	irq_chip->send_sgi(sgi, SGI_TO_LIST, &mask);
 }
 
-static int __send_virq(vcpu_t *vcpu, uint32_t vno, uint32_t hno, int hw)
+static int __send_virq(struct vcpu *vcpu, uint32_t vno, uint32_t hno, int hw)
 {
 	struct irq_struct *irq_struct;
 	struct virq *virq;
@@ -111,10 +111,10 @@ static int __send_virq(vcpu_t *vcpu, uint32_t vno, uint32_t hno, int hw)
 	return 0;
 }
 
-int _send_virq(vcpu_t *vcpu, uint32_t virq, uint32_t hirq, int hw)
+int _send_virq(struct vcpu *vcpu, uint32_t virq, uint32_t hirq, int hw)
 {
 	int ret = 0;
-	vcpu_t *vcpu_sender = current_vcpu();
+	struct vcpu *vcpu_sender = current_vcpu();
 
 	ret = __send_virq(vcpu, virq, hirq, hw);
 	if (ret)
@@ -144,8 +144,8 @@ out:
 
 static int do_handle_guest_irq(struct vmm_irq *vmm_irq)
 {
-	vm_t *vm;
-	vcpu_t *vcpu;
+	struct vm *vm;
+	struct vcpu *vcpu;
 
 	vm = get_vm_by_id(vmm_irq->vmid);
 	if (!vm) {
@@ -466,7 +466,7 @@ int vmm_register_irq_entry(void *res)
 {
 	struct irq_resource *config;
 	struct vmm_irq *vmm_irq;
-	vcpu_t *vcpu;
+	struct vcpu *vcpu;
 	struct irq_domain *domain;
 
 	if (res == NULL)
@@ -542,7 +542,7 @@ void vmm_setup_irqs(void)
 int send_virq_hw(uint32_t vmid, uint32_t virq, uint32_t hirq)
 {
 	struct vmm_irq *vmm_irq;
-	vcpu_t *vcpu;
+	struct vcpu *vcpu;
 
 	vmm_irq = get_irq_desc(hirq);
 	if (!vmm_irq)
@@ -568,11 +568,11 @@ int send_virq(uint32_t vmid, uint32_t virq)
 	return _send_virq(get_vcpu_by_id(vmid, 0), virq, 0, 0);
 }
 
-void send_vsgi(vcpu_t *sender, uint32_t sgi, cpumask_t *cpumask)
+void send_vsgi(struct vcpu *sender, uint32_t sgi, cpumask_t *cpumask)
 {
 	int cpu;
-	vcpu_t *vcpu;
-	vm_t *vm = sender->vm;
+	struct vcpu *vcpu;
+	struct vm *vm = sender->vm;
 
 	for_each_set_bit(cpu, cpumask->bits, vm->vcpu_nr) {
 		vcpu = vm->vcpus[cpu];
@@ -656,7 +656,7 @@ int request_irq(uint32_t irq, irq_handle_t handler, void *data)
 	return 0;
 }
 
-static void irq_enter_to_guest(vcpu_t *vcpu, void *data)
+static void irq_enter_to_guest(struct vcpu *vcpu, void *data)
 {
 	/*
 	 * here we send the real virq to the vcpu
@@ -680,7 +680,7 @@ static void irq_enter_to_guest(vcpu_t *vcpu, void *data)
 	spin_unlock(&irq_struct->lock);
 }
 
-static void irq_exit_from_guest(vcpu_t *vcpu, void *data)
+static void irq_exit_from_guest(struct vcpu *vcpu, void *data)
 {
 	/*
 	 * here we update the states of the irq state
@@ -747,6 +747,11 @@ void vcpu_irq_struct_init(struct irq_struct *irq_struct)
 		virq->hw = 0;
 		init_list(&virq->list);
 	}
+}
+
+int vcpu_has_irq_pending(struct vcpu *vcpu)
+{
+	return (!!vcpu->irq_struct.irq_pending);
 }
 
 int vmm_irq_init(void)

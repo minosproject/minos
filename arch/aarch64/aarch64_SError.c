@@ -16,7 +16,7 @@ static int unknown_handler(vcpu_regs *reg, uint32_t esr_value)
 
 static int wfi_wfe_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-	vcpu_t *vcpu = (vcpu_t *)reg;
+	struct vcpu *vcpu = (struct vcpu *)reg;
 
 	vcpu_idle(vcpu);
 
@@ -106,7 +106,7 @@ static int access_system_reg_handler(vcpu_regs *reg, uint32_t esr_value)
 		pr_debug("access system reg SGI1R_EL1\n");
 		if (!sysreg->read) {
 			reg_value = get_reg_value(reg, regindex);
-			vgic_send_sgi((vcpu_t *)reg, reg_value);
+			vgic_send_sgi((struct vcpu *)reg, reg_value);
 		}
 		break;
 
@@ -316,7 +316,7 @@ void SError_from_el1_handler(vcpu_regs *data)
 	uint32_t ec_type;
 	ec_config_t *ec;
 	long ret;
-	vcpu_t *vcpu = (vcpu_t *)data;
+	struct vcpu *vcpu = (struct vcpu *)data;
 
 	vmm_exit_from_guest(vcpu);
 

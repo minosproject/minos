@@ -11,7 +11,6 @@ unsigned long percpu_offset[CONFIG_NR_CPUS];
 void vmm_percpus_init(void)
 {
 	int i;
-	pcpu_t *pcpu;
 	size_t size;
 
 	size = (&__percpu_end) - (&__percpu_start);

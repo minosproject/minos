@@ -9,6 +9,6 @@ void IRQ_from_el2_handler(void *data)
 void IRQ_from_el1_handler(void *data)
 {
 	pr_info("test");
-	vmm_exit_from_guest((vcpu_t *)data);
+	vmm_exit_from_guest((struct vcpu *)data);
 	do_irq_handler();
 }
