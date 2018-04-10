@@ -237,6 +237,9 @@ int vmm_reched_handler(uint32_t irq, void *data)
 	 * ensure the pcpu's member will only modified
 	 * by its own cpu thread
 	 */
+	if (is_list_empty(&pcpu->vcpu_list))
+		return 0;
+
 	list_for_each_entry(vcpu, &pcpu->vcpu_list, pcpu_list) {
 		if (get_vcpu_state(vcpu) == VCPU_STATE_SLEEP) {
 			if (vcpu_need_to_run(vcpu)) {

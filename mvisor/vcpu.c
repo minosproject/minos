@@ -126,6 +126,7 @@ static int vm_create_vcpus(struct vm *vm)
 		vcpu->vcpu_id = i;
 		vcpu->vm = vm;
 		vcpu->entry_point = vm->entry_point;
+		init_list(&vcpu->pcpu_list);
 		vcpu->pcpu_affinity = pcpu_affinity(vcpu, vm->vcpu_affinity[i]);
 		if (vcpu->pcpu_affinity == PCPU_AFFINITY_FAIL) {
 			pr_fatal("%s Can not affinity for vcpu %d\n",
@@ -138,7 +139,6 @@ static int vm_create_vcpus(struct vm *vm)
 		}
 		vm->vcpus[i] = vcpu;
 
-		init_list(&vcpu->pcpu_list);
 		vcpu_irq_struct_init(&vcpu->irq_struct);
 	}
 
