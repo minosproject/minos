@@ -147,7 +147,14 @@ exception_from_el2_handler:
 	stp     x1, x2, [sp, #-16]!
 	str	x0, [sp, #-8]!
 
+	/*
+	 * this is for stack alignment, sp must
+	 * 16bytes aligment since printf function
+	 * will access SMID register
+	 */
+	sub	sp, sp, #8
 	blr     x29
+	add	sp, sp, #8
 
 	ldp     x0, x1, [sp], #16
 	ldp     x2, x3, [sp], #16

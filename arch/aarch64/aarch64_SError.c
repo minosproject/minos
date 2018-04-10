@@ -347,6 +347,13 @@ void SError_from_el1_handler(vcpu_regs *data)
 
 void SError_from_el2_handler(vcpu_regs *data)
 {
+	uint32_t esr_value;
+	uint32_t ec_type;
+
+	esr_value = read_esr_el2();
+	ec_type = (esr_value & 0xfc000000) >> 26;
+	pr_info("ec_type is %d\n", ec_type);
+
 	while (1);
 }
 

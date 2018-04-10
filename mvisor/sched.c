@@ -220,8 +220,32 @@ void vmm_pcpus_init(void)
 	}
 }
 
+static int vcpu_need_to_run(void)
+{
+	if (vcpu_has_irq_pending(vcpu))
+		return 1;
+
+	return 0;
+}
+
 int vmm_reched_handler(uint32_t irq, void *data)
 {
+	pcpu_t *pcpu = get_cpu_var(pcpu);
+	vcpu_t *vcpu;
+
+	/*
+	 * ensure the pcpu's member will only modified
+	 * by its own cpu thread
+	 */
+	list_for_each_entry(vcpu, &pcpu->vcpu_list, pcpu_list) {
+		if (get_vcpu_state(vcpu) == VCPU_STATE_SLEEP) {
+			if (vcpu_need_to_run(vcpu)) {
+				set_vcpu_state(vcpu, VCPU_STATE_READY);
+				list_add_tail(&pcpu->ready_list, &vcpu->state_list);
+			}
+		}
+	}
+
 	return 0;
 }
 
