@@ -77,13 +77,16 @@ struct virq {
 };
 
 struct irq_struct {
-	uint32_t count;
-	uint32_t irq_pending;
+	uint32_t active_count;
+	uint32_t pending_count;
 	spinlock_t lock;
 	struct list_head pending_list;
 	DECLARE_BITMAP(irq_bitmap, CONFIG_VCPU_MAX_ACTIVE_IRQS);
 	struct virq virqs[CONFIG_VCPU_MAX_ACTIVE_IRQS];
 };
+
+#define VIRQ_ACTION_REMOVE	(0x0)
+#define VIRQ_ACTION_ADD		(0x1)
 
 struct irq_chip {
 	uint32_t (*get_pending_irq)(void);
@@ -97,6 +100,7 @@ struct irq_chip {
 	void (*send_sgi)(uint32_t irq, enum sgi_mode mode, cpumask_t *mask);
 	int (*send_virq)(struct virq *virq);
 	int (*get_virq_state)(struct virq *virq);
+	int (*update_virq)(struct virq *virq, int action);
 	int (*init)(void);
 	int (*secondary_init)(void);
 };
@@ -162,7 +166,10 @@ int send_virq_hw(uint32_t vmid, uint32_t virq, uint32_t hirq);
 int send_virq(uint32_t vmid, uint32_t virq);
 void send_vsgi(struct vcpu *sender,
 		uint32_t sgi, cpumask_t *cpumask);
-int vcpu_has_irq_pending(struct vcpu *vcpu);
+int vcpu_has_virq_pending(struct vcpu *vcpu);
+int vcpu_has_virq_active(struct vcpu *vcpu);
+int vcpu_has_virq(struct vcpu *vcpu);
+void clear_pending_virq(uint32_t irq);
 
 static inline void virq_mask(uint32_t virq)
 {
@@ -183,6 +190,5 @@ static inline void irq_mask(uint32_t irq)
 {
 	__irq_enable(irq, 0);
 }
-
 
 #endif

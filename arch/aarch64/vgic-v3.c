@@ -296,8 +296,10 @@ static int vgicv3_gicr_sgi_mmio_write(struct vgicv3 *vgic,
 	switch (offset) {
 	case GICR_ICPENDR0:
 		spin_lock(&gicr->gicr_lock);
-		for_each_set_bit(bit, &value, 32)
+		for_each_set_bit(bit, &value, 32) {
 			gicr->gicr_ispender &= ~BIT(bit);
+			clear_pending_virq(bit);
+		}
 		spin_unlock(&gicr->gicr_lock);
 		break;
 	}

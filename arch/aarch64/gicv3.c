@@ -95,6 +95,25 @@ static int gicv3_set_irq_type(uint32_t irq, uint32_t type)
 	spin_unlock(&gicv3_lock);
 }
 
+static void gicv3_clear_pending(uint32_t irq)
+{
+	uint32_t offset, bit;
+
+	spin_lock(&gicv3_lock);
+
+	if (irq >= GICV3_NR_LOCAL_IRQS) {
+		iowrite32((void *)gicr_sgi_base() + GICR_ICPENDR0, BIT(irq));
+	} else {
+		irq = irq - 32;
+		offset = irq / 32;
+		bit = offset % 32;
+		iowrite32((void *)gicd_base + GICD_ICPENDR \
+				+ (offset * 4), BIT(bit));
+	}
+
+	spin_unlock(&gicv3_lock);
+}
+
 static int gicv3_set_irq_priority(uint32_t irq, uint32_t pr)
 {
 	spin_lock(&gicv3_lock);
@@ -237,6 +256,29 @@ static int gicv3_send_virq(struct virq *virq)
 	gicv3_write_lr(virq->id, value);
 
 	return 0;
+}
+
+static int gicv3_update_virq(struct virq *virq, int action)
+{
+	switch (action) {
+	case VIRQ_ACTION_REMOVE:
+		/*
+		 * wether need to update the context value?
+		 * TBD, since the context has not been saved
+		 * so do not need to update it.
+		 *
+		 * 2: if the virq is attached to a physical irq
+		 *    need to update the GICR register ?
+		 */
+		gicv3_write_lr(virq->id, 0);
+
+		if (virq->hw)
+			gicv3_clear_pending(virq->h_intno);
+		break;
+
+	default:
+		break;
+	}
 }
 
 static void gicv3_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *cpu)
@@ -676,6 +718,7 @@ static struct irq_chip gicv3_chip = {
 	.irq_set_priority	= gicv3_set_irq_priority,
 	.get_virq_state		= gicv3_get_virq_state,
 	.send_virq		= gicv3_send_virq,
+	.update_virq		= gicv3_update_virq,
 	.init			= gicv3_init,
 	.secondary_init		= gicv3_secondary_init,
 };

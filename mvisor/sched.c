@@ -143,7 +143,7 @@ int vcpu_can_idle(struct vcpu *vcpu)
 	/*
 	 * check whether there irq do not handled
 	 */
-	if (vcpu->irq_struct.count)
+	if (vcpu_has_virq(vcpu))
 		return 0;
 
 	if (vcpu->state != VCPU_STATE_RUNNING)
@@ -222,7 +222,7 @@ void vmm_pcpus_init(void)
 
 static int vcpu_need_to_run(struct vcpu *vcpu)
 {
-	if (vcpu_has_irq_pending(vcpu))
+	if (vcpu_has_virq_pending(vcpu))
 		return 1;
 
 	return 0;

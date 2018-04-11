@@ -339,8 +339,8 @@ void SError_from_el1_handler(vcpu_regs *data)
 	 * how to deal with the return value
 	 * TBD
 	 */
-	ec->handler(data, esr_value);
 	data->elr_el2 += ec->ret_addr_adjust;
+	ec->handler(data, esr_value);
 
 	disable_local_irq();
 }
