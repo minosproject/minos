@@ -136,22 +136,15 @@ struct gic_context {
 	uint64_t ich_lr13_el2;
 	uint64_t ich_lr14_el2;
 	uint64_t ich_lr15_el2;
-	uint64_t icv_ap0r0_el1;
-	uint64_t icv_ap1r0_el1;
-	uint64_t icv_bpr0_el1;
-	uint64_t icv_bpr1_el1;
-	uint64_t icv_ctlr_el1;
-	uint64_t icv_dir_el1;
-	uint64_t icv_eoir0_el1;
-	uint64_t icv_eoir1_el1;
-	uint64_t icv_hppir0_el1;
-	uint64_t icv_hppir1_el1;
-	uint64_t icv_iar0_el1;
-	uint64_t icv_iar1_el1;
-	uint64_t icv_igrpen0_el1;
-	uint64_t icv_igrpen1_el1;
-	uint64_t icv_pmr_el1;
-	uint64_t icv_rpr_el1;
+	uint32_t ich_ap0r2_el2;
+	uint32_t ich_ap1r2_el2;
+	uint32_t ich_ap0r1_el2;
+	uint32_t ich_ap1r1_el2;
+	uint32_t ich_ap0r0_el2;
+	uint32_t ich_ap1r0_el2;
+	uint32_t icc_sre_el1;
+	uint32_t ich_vmcr_el2;
+	uint32_t ich_hcr_el2;
 } __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
 struct gic_lr {

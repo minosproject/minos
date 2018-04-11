@@ -35,7 +35,7 @@ static void gicv3_gicr_wait_for_rwp(void)
 	while (ioread32(gicr_rd_base() + GICR_CTLR) & (1 << 3));
 }
 
-void gicv3_mask_irq(uint32_t irq)
+static void gicv3_mask_irq(uint32_t irq)
 {
 	uint32_t mask = 1 << (irq % 32);
 
@@ -50,19 +50,19 @@ void gicv3_mask_irq(uint32_t irq)
 	spin_unlock(&gicv3_lock);
 }
 
-void gicv3_eoi_irq(uint32_t irq)
+static void gicv3_eoi_irq(uint32_t irq)
 {
 	write_sysreg32(irq, ICC_EOIR1_EL1);
 	isb();
 }
 
-void gicv3_dir_irq(uint32_t irq)
+static void gicv3_dir_irq(uint32_t irq)
 {
 	write_sysreg32(irq, ICC_DIR_EL1);
 	isb();
 }
 
-uint32_t gicv3_read_irq(void)
+static uint32_t gicv3_read_irq(void)
 {
 	uint32_t irq;
 
@@ -71,7 +71,7 @@ uint32_t gicv3_read_irq(void)
 	return irq;
 }
 
-int gicv3_set_irq_type(uint32_t irq, uint32_t type)
+static int gicv3_set_irq_type(uint32_t irq, uint32_t type)
 {
 	void *base;
 	uint32_t cfg, actual, edgebit;
@@ -95,7 +95,7 @@ int gicv3_set_irq_type(uint32_t irq, uint32_t type)
 	spin_unlock(&gicv3_lock);
 }
 
-int gicv3_set_irq_priority(uint32_t irq, uint32_t pr)
+static int gicv3_set_irq_priority(uint32_t irq, uint32_t pr)
 {
 	spin_lock(&gicv3_lock);
 
@@ -107,7 +107,7 @@ int gicv3_set_irq_priority(uint32_t irq, uint32_t pr)
 	spin_unlock(&gicv3_lock);
 }
 
-int gicv3_set_irq_affinity(uint32_t irq, uint32_t pcpu)
+static int gicv3_set_irq_affinity(uint32_t irq, uint32_t pcpu)
 {
 	uint64_t affinity;
 
@@ -140,7 +140,7 @@ static void gicv3_send_sgi_list(uint32_t sgi, cpumask_t *mask)
 
 static uint64_t gicv3_read_lr(int lr)
 {
-	switch ( lr ) {
+	switch (lr) {
 	case 0: return read_sysreg(ICH_LR0_EL2);
 	case 1: return read_sysreg(ICH_LR1_EL2);
 	case 2: return read_sysreg(ICH_LR2_EL2);
@@ -239,7 +239,7 @@ static int gicv3_send_virq(struct virq *virq)
 	return 0;
 }
 
-void gicv3_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *cpu)
+static void gicv3_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *cpu)
 {
 	cpumask_t cpus_mask;
 
@@ -267,7 +267,7 @@ void gicv3_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *cpu)
 	}
 }
 
-void gicv3_unmask_irq(uint32_t irq)
+static void gicv3_unmask_irq(uint32_t irq)
 {
 	uint32_t mask = 1 << (irq % 32);
 
@@ -321,7 +321,12 @@ uint32_t gicv3_get_irq_num(void)
 
 int gicv3_get_virq_state(struct virq *virq)
 {
-	return 0;
+	uint64_t value;
+
+	value = gicv3_read_lr(virq->id);
+	value = (value & 0xc000000000000000) >> 62;
+
+	return ((int)value);
 }
 
 static int gicv3_gicc_init(void)
@@ -388,21 +393,160 @@ static int gicv3_gicr_init(void)
 	return 0;
 }
 
+static void gicv3_save_lrs(struct gic_context *c, uint32_t count)
+{
+	if (count > 16)
+		panic("Unsupport LR count\n");
+
+	switch (count) {
+	case 16:
+		c->ich_lr15_el2 = read_sysreg(ICH_LR15_EL2);
+	case 15:
+		c->ich_lr14_el2 = read_sysreg(ICH_LR14_EL2);
+	case 14:
+		c->ich_lr13_el2 = read_sysreg(ICH_LR13_EL2);
+	case 13:
+		c->ich_lr12_el2 = read_sysreg(ICH_LR12_EL2);
+	case 12:
+		c->ich_lr11_el2 = read_sysreg(ICH_LR11_EL2);
+	case 11:
+		c->ich_lr10_el2 = read_sysreg(ICH_LR10_EL2);
+	case 10:
+		c->ich_lr9_el2 = read_sysreg(ICH_LR9_EL2);
+	case 9:
+		c->ich_lr8_el2 = read_sysreg(ICH_LR8_EL2);
+	case 8:
+		c->ich_lr7_el2 = read_sysreg(ICH_LR7_EL2);
+	case 7:
+		c->ich_lr6_el2 = read_sysreg(ICH_LR6_EL2);
+	case 6:
+		c->ich_lr5_el2 = read_sysreg(ICH_LR5_EL2);
+	case 5:
+		c->ich_lr4_el2 = read_sysreg(ICH_LR4_EL2);
+	case 4:
+		c->ich_lr3_el2 = read_sysreg(ICH_LR3_EL2);
+	case 3:
+		c->ich_lr2_el2 = read_sysreg(ICH_LR2_EL2);
+	case 2:
+		c->ich_lr1_el2 = read_sysreg(ICH_LR1_EL2);
+	case 1:
+		c->ich_lr0_el2 = read_sysreg(ICH_LR0_EL2);
+		break;
+	default:
+		break;
+	}
+}
+
+static void gicv3_save_aprn(struct gic_context *c, uint32_t count)
+{
+	switch (count) {
+	case 7:
+		c->ich_ap0r2_el2 = read_sysreg32(ICH_AP0R2_EL2);
+		c->ich_ap1r2_el2 = read_sysreg32(ICH_AP1R2_EL2);
+	case 6:
+		c->ich_ap0r1_el2 = read_sysreg32(ICH_AP0R1_EL2);
+		c->ich_ap1r1_el2 = read_sysreg32(ICH_AP1R1_EL2);
+	case 5:
+		c->ich_ap0r0_el2 = read_sysreg32(ICH_AP0R0_EL2);
+		c->ich_ap1r0_el2 = read_sysreg32(ICH_AP1R0_EL2);
+		break;
+	default:
+		panic("Unsupport aprn count\n");
+	}
+}
+
 static void gicv3_state_save(struct vcpu *vcpu, void *context)
 {
+	struct gic_context *c = (struct gic_context *)context;
 
+	gicv3_save_lrs(c, gicv3_nr_lr);
+	gicv3_save_aprn(c, gicv3_nr_pr);
+	c->icc_sre_el1 = read_sysreg32(ICC_SRE_EL1);
+	c->ich_vmcr_el2 = read_sysreg32(ICH_VMCR_EL2);
+	c->ich_hcr_el2 = read_sysreg32(ICH_HCR_EL2);
+}
+
+static void gicv3_restore_aprn(struct gic_context *c, uint32_t count)
+{
+	switch (count) {
+	case 7:
+		write_sysreg32(c->ich_ap0r2_el2, ICH_AP0R2_EL2);
+		write_sysreg32(c->ich_ap1r2_el2, ICH_AP1R2_EL2);
+	case 6:
+		write_sysreg32(c->ich_ap0r1_el2, ICH_AP0R1_EL2);
+		write_sysreg32(c->ich_ap1r1_el2, ICH_AP1R1_EL2);
+	case 5:
+		write_sysreg32(c->ich_ap0r0_el2, ICH_AP0R0_EL2);
+		write_sysreg32(c->ich_ap1r0_el2, ICH_AP1R0_EL2);
+		break;
+	default:
+		panic("Unsupport aprn count");
+	}
+}
+
+static void gicv3_restore_lrs(struct gic_context *c, uint32_t count)
+{
+	if (count > 16)
+		panic("Unsupport LR count");
+
+	switch (count) {
+	case 16:
+		write_sysreg(c->ich_lr15_el2, ICH_LR15_EL2);
+	case 15:
+		write_sysreg(c->ich_lr14_el2, ICH_LR14_EL2);
+	case 14:
+		write_sysreg(c->ich_lr13_el2, ICH_LR13_EL2);
+	case 13:
+		write_sysreg(c->ich_lr12_el2, ICH_LR12_EL2);
+	case 12:
+		write_sysreg(c->ich_lr11_el2, ICH_LR11_EL2);
+	case 11:
+		write_sysreg(c->ich_lr10_el2, ICH_LR10_EL2);
+	case 10:
+		write_sysreg(c->ich_lr9_el2, ICH_LR9_EL2);
+	case 9:
+		write_sysreg(c->ich_lr8_el2, ICH_LR8_EL2);
+	case 8:
+		write_sysreg(c->ich_lr7_el2, ICH_LR7_EL2);
+	case 7:
+		write_sysreg(c->ich_lr6_el2, ICH_LR6_EL2);
+	case 6:
+		write_sysreg(c->ich_lr5_el2, ICH_LR5_EL2);
+	case 5:
+		write_sysreg(c->ich_lr4_el2, ICH_LR4_EL2);
+	case 4:
+		write_sysreg(c->ich_lr3_el2, ICH_LR3_EL2);
+	case 3:
+		write_sysreg(c->ich_lr2_el2, ICH_LR2_EL2);
+	case 2:
+		write_sysreg(c->ich_lr1_el2, ICH_LR1_EL2);
+	case 1:
+		write_sysreg(c->ich_lr0_el2, ICH_LR0_EL2);
+		break;
+	default:
+		break;
+	}
 }
 
 static void gicv3_state_restore(struct vcpu *vcpu, void *context)
 {
+	struct gic_context *c = (struct gic_context *)context;
 
+	gicv3_restore_lrs(c, gicv3_nr_lr);
+	gicv3_restore_aprn(c, gicv3_nr_pr);
+	write_sysreg32(c->icc_sre_el1, ICC_SRE_EL1);
+	write_sysreg32(c->ich_vmcr_el2, ICH_VMCR_EL2);
+	write_sysreg32(c->ich_hcr_el2, ICH_HCR_EL2);
 }
 
 static void gicv3_state_init(struct vcpu *vcpu, void *context)
 {
 	struct gic_context *c = (struct gic_context *)context;
 
-	gicv3_module_id = get_module_id("irq_chip");
+	memset((char *)c, 0, sizeof(struct gic_context));
+	c->icc_sre_el1 = 0x7;
+	c->ich_vmcr_el2 = GICH_VMCR_VENG1 | (0xff << 24);
+	c->ich_hcr_el2 = GICH_HCR_EN;
 }
 
 void gic_init_el3(void)

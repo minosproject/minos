@@ -85,6 +85,37 @@ static int __send_virq(struct vcpu *vcpu, uint32_t vno, uint32_t hno, int hw)
 
 	spin_lock(&irq_struct->lock);
 
+	/*
+	 * The following cases are considered software programming
+	 * errors and result in UNPREDICTABLE behavior:
+	 *
+	 * • Having a List register entry with ICH_LR<n>_EL2.HW= 1
+	 *   which is associated with a physical interrupt, inactive
+	 *   state or in pending state in the List registers if the
+	 *   Distributor does not have the corresponding physical
+	 *   interrupt in either the active state or the active and
+	 *   pending state.
+	 * • If ICC_CTLR_EL1.EOImode == 0 or ICC_CTLR_EL3.EOImode_EL3 == 0
+	 *   then either:
+	 *   — Having an active interrupt in the List registers with a priorit
+	 *   that is not set in the corresponding Active Priorities Register.
+	 *   — Having two interrupts in the List registers in the active stat
+	 *   with the same preemption priority.>
+	 * • Having two or more interrupts with the same pINTID in the Lis
+	 *   registers for a single virtual CPU interface.
+	 */
+	if (hw) {
+		for_each_set_bit(index, irq_struct->irq_bitmap,
+				CONFIG_VCPU_MAX_ACTIVE_IRQS) {
+			virq = &irq_struct->virqs[index];
+			if (virq->h_intno == hno) {
+				pr_error("vcpu has same pirq:%d in pending/actvie state", hno);
+				spin_unlock(&irq_struct->lock);
+				return -EAGAIN;
+			}
+		}
+	}
+
 	index = find_first_zero_bit(irq_struct->irq_bitmap,
 			CONFIG_VCPU_MAX_ACTIVE_IRQS);
 	if (index == CONFIG_VCPU_MAX_ACTIVE_IRQS) {
@@ -93,6 +124,7 @@ static int __send_virq(struct vcpu *vcpu, uint32_t vno, uint32_t hno, int hw)
 		 * need to drop it ? TBD
 		 */
 		pr_error("Can not send this virq now\n");
+		spin_unlock(&irq_struct->lock);
 		return -EAGAIN;
 	}
 
