@@ -16,6 +16,8 @@ int smp_cpu_up(uint64_t mpidr_id);
 
 void vmm_smp_init(void);
 
+#define smp_processor_id()	get_cpu_id()
+
 static inline int affinity_to_logic_cpu(uint32_t aff3, uint32_t aff2,
 		uint32_t aff1, uint32_t aff0)
 {
