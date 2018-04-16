@@ -13,6 +13,11 @@
 #include <mvisor/varlist.h>
 #include <mvisor/vcpu.h>
 
+#define BUG_ON(condition)	\
+	if ((condition)) {	\
+		do { ; } while (1); \
+	}
+
 typedef void (*hook_func_t)(struct vcpu *vcpu, void *data);
 
 enum vmm_hook_type {
