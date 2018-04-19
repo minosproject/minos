@@ -2,11 +2,23 @@
 #define _MVISOR_TIME_H_
 
 #include <asm/time.h>
+#include <mvisor/stdlib.h>
 
-#define NOW()	get_sys_ticks()
+#define NOW()			get_sys_time()
+#define SYSTEM_TIME_HZ  	1000000000ULL
+#define SECONDS(s)     		((uint64_t)((s)  * 1000000000ULL))
+#define MILLISECS(ms)  		((uint64_t)((ms) * 1000000ULL))
+#define MICROSECS(us)  		((uint64_t)((us) * 1000ULL))
 
-unsigned long msecs_to_ticks(uint32_t ms);
-unsigned long nsecs_to_ticks(uint32_t ns);
+static inline unsigned long ticks_to_ns(uint64_t ticks)
+{
+	return muldiv64(ticks, SECONDS(1), 1000 * cpu_khz);
+}
+
+static inline uint64_t ns_to_ticks(unsigned long ns)
+{
+	return muldiv64(ns, 1000 * cpu_khz, SECONDS(1));
+}
 
 static inline void enable_timer(unsigned long e)
 {

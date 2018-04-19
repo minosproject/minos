@@ -4,6 +4,7 @@
 /*
  * refer to linux kernel timer code
  */
+#include <mvisor/time.h>
 
 struct timer_list {
 	struct list_head entry;
@@ -20,6 +21,11 @@ struct timers {
 	spinlock_t lock;
 };
 
-#define DEFAULT_TIMER_MARGIN	(30)
+#define DEFAULT_TIMER_MARGIN	(111111111100)
+
+void init_timer(struct timer_list *timer);
+void add_timer(struct timer_list *timer);
+int del_timer(struct timer_list *timer);
+int mod_timer(struct timer_list *timer, unsigned long expires);
 
 #endif

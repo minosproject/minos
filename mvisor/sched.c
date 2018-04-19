@@ -7,12 +7,15 @@
 #include <mvisor/module.h>
 #include <mvisor/irq.h>
 #include <mvisor/list.h>
+#include <mvisor/timer.h>
+#include <mvisor/time.h>
 
 static struct pcpu pcpus[CONFIG_NR_CPUS];
 
 DEFINE_PER_CPU(struct vcpu *, current_vcpu);
 DEFINE_PER_CPU(struct vcpu *, next_vcpu);
 DEFINE_PER_CPU(struct pcpu *, pcpu);
+DEFINE_PER_CPU(struct timer_list, sched_timer);
 
 uint32_t pcpu_affinity(struct vcpu *vcpu, uint32_t affinity)
 {
@@ -138,6 +141,14 @@ resched:
 	}
 }
 
+static void sched_timer_function(unsigned long data)
+{
+	struct timer_list *timer = &get_cpu_var(sched_timer);
+
+	pr_debug("in sched timer function\n");
+	mod_timer(timer, MILLISECS(CONFIG_SCHED_INTERVAL));
+}
+
 int vcpu_can_idle(struct vcpu *vcpu)
 {
 	/*
@@ -252,12 +263,19 @@ int vmm_reched_handler(uint32_t irq, void *data)
 int sched_late_init(void)
 {
 	int ret;
+	struct timer_list *timer;
 
 	ret = request_irq(CONFIG_VMM_RESCHED_IRQ,
 			vmm_reched_handler, NULL);
 
-	pr_debug("request reched irq with error code:%d\n", ret);
+	timer = &get_cpu_var(sched_timer);
+
+	init_timer(timer);
+	timer->function = sched_timer_function;
+	timer->expires = MILLISECS(CONFIG_SCHED_INTERVAL);
+	add_timer(timer);
+
 	return 0;
 }
 
-subsys_initcall_percpu(sched_late_init);
+device_initcall_percpu(sched_late_init);

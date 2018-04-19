@@ -14,6 +14,9 @@
 #include <mvisor/sched.h>
 #include <mvisor/smp.h>
 
+extern void softirq_init(void);
+extern void init_timers(void);
+
 struct list_head hook_lists[VMM_HOOK_TYPE_UNKNOWN];
 
 static void vmm_hook_init(void)
@@ -91,6 +94,8 @@ void boot_main(void)
 	vmm_pcpus_init();
 	vmm_smp_init();
 	vmm_irq_init();
+	softirq_init();
+	init_timers();
 	vmm_mmu_init();
 	vmm_create_vms();
 
@@ -109,14 +114,15 @@ void boot_main(void)
 	vmm_subsys_init();
 	vmm_subsys_init_percpu();
 
-	vmm_device_init();
-	vmm_device_init_percpu();
-
 	/*
 	 * wake up other cpus
 	 */
 	smp_cpus_up();
 	enable_local_irq();
+
+	vmm_device_init();
+	vmm_device_init_percpu();
+
 
 	sched();
 }
@@ -126,8 +132,6 @@ void boot_secondary(void)
 	uint32_t cpuid = get_cpu_id();
 	uint64_t mid;
 	uint64_t mpidr;
-
-
 
 	/*
 	 * here wait up bootup cpu to wakeup us
@@ -148,11 +152,12 @@ void boot_secondary(void)
 	vmm_irq_secondary_init();
 
 	vmm_subsys_init_percpu();
-	vmm_device_init_percpu();
 
 	smp_holding_pen[cpuid] = mpidr;
 
 	enable_local_irq();
+
+	vmm_device_init_percpu();
 
 	sched();
 }

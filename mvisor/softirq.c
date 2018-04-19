@@ -5,6 +5,7 @@
 #include <mvisor/mvisor.h>
 #include <mvisor/irq.h>
 #include <mvisor/softirq.h>
+#include <mvisor/smp.h>
 
 DEFINE_PER_CPU(struct list_head [NR_SOFTIRQS], softirq_work_list);
 DEFINE_PER_CPU(uint32_t, softirq_pending);
@@ -83,7 +84,13 @@ void do_softirq(void)
 
 void softirq_init(void)
 {
+	int cpu;
+	int i;
 
+	for_all_cpu(cpu) {
+		for (i = 0; i < NR_SOFTIRQS; i++)
+			init_list(&get_per_cpu(softirq_work_list[i], cpu));
+	}
 }
 
 void irq_exit(void)

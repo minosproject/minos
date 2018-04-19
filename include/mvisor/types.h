@@ -3,14 +3,23 @@
 
 #include <asm/asm_types.h>
 
-typedef __u32 uint32_t;
-typedef __s32 int32_t;
-typedef __u16 uint16_t;
-typedef __s16 int16_t;
-typedef __u8 uint8_t;
-typedef __s8 int8_t;
-typedef __u64 uint64_t;
-typedef __s64 int64_t;
+typedef __u32	u32;
+typedef __s32	s32;
+typedef __u16	u16;
+typedef __s16	s16;
+typedef __u8	u8;
+typedef __s8	s8;
+typedef __u64	u64;
+typedef __s64	s64;
+
+typedef __u32	uint32_t;
+typedef __s32	int32_t;
+typedef __u16	uint16_t;
+typedef __s16	int16_t;
+typedef __u8	uint8_t;
+typedef __s8	int8_t;
+typedef __u64	uint64_t;
+typedef __s64	int64_t;
 
 typedef unsigned long size_t;
 typedef unsigned long phy_addr_t;

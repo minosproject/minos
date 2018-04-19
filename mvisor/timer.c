@@ -33,13 +33,20 @@ static void run_timer_softirq(struct softirq_action *h)
 			timer->entry.next = NULL;
 			timers->running_timer = timer;
 			timer->function(timer->data);
+
+			/*
+			 * check whether this timer is add to list
+			 * again
+			 */
+			if (timer->entry.next != NULL)
+				expires = timer->expires;
 		} else {
-			if (expires < timer->expires)
+			if (expires > timer->expires)
 				expires = timer->expires;
 		}
 	}
 
-	if (expires != ~0) {
+	if (expires != ((unsigned long)~0)) {
 		timers->running_expires = expires;
 		enable_timer(expires);
 	}
@@ -61,18 +68,24 @@ static int detach_timer(struct timers *timers, struct timer_list *timer)
 	entry->next = NULL;
 }
 
+static inline unsigned long slack_expires(unsigned long expires)
+{
+	if (expires < 128)
+		expires = 128;
+
+	return expires + NOW();
+}
+
 int mod_timer(struct timer_list *timer, unsigned long expires)
 {
 	unsigned long flags;
-	unsigned long now;
 	struct timers *timers = &get_cpu_var(timers);
-
-	now = NOW();
-
-	timer->expires = expires;
 
 	if (timer_pending(timer) && (timer->expires == expires))
 		return 1;
+
+	expires = slack_expires(expires);
+	timer->expires = expires;
 
 	spin_lock_irqsave(&timers->lock, flags);
 
@@ -82,7 +95,8 @@ int mod_timer(struct timer_list *timer, unsigned long expires)
 	/*
 	 * reprogram the timer for next event
 	 */
-	if (timers->running_expires > expires) {
+	if ((timers->running_expires > expires) ||
+			(timers->running_expires == 0)) {
 		timers->running_expires = expires;
 		enable_timer(timers->running_expires);
 	}
