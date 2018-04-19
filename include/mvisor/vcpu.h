@@ -32,6 +32,8 @@ struct vcpu {
 	 */
 	int state;
 	struct list_head state_list;
+	unsigned long run_time;
+	unsigned long run_start;
 
 	void **module_context;
 	void *arch_data;

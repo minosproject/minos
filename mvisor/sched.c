@@ -12,10 +12,11 @@
 
 static struct pcpu pcpus[CONFIG_NR_CPUS];
 
+#define VCPU_MIN_RUN_TIME	(MILLISECS(2))
+
 DEFINE_PER_CPU(struct vcpu *, current_vcpu);
 DEFINE_PER_CPU(struct vcpu *, next_vcpu);
 DEFINE_PER_CPU(struct pcpu *, pcpu);
-DEFINE_PER_CPU(struct timer_list, sched_timer);
 
 uint32_t pcpu_affinity(struct vcpu *vcpu, uint32_t affinity)
 {
@@ -83,10 +84,23 @@ step2:
 
 static struct vcpu *find_vcpu_to_run(struct pcpu *pcpu)
 {
-	if (is_list_empty(&pcpu->ready_list))
-		return NULL;
+	unsigned long flags;
+	struct vcpu *vcpu = NULL;
 
-	return list_first_entry(&pcpu->ready_list, struct vcpu, state_list);
+	/*
+	 * TBD
+	 */
+	local_irq_save(flags);
+
+	if (is_list_empty(&pcpu->ready_list))
+		goto out;
+
+	vcpu = list_first_entry(&pcpu->ready_list,
+			struct vcpu, state_list);
+
+out:
+	local_irq_restore(flags);
+	return vcpu;
 }
 
 int vcpu_sched_init(struct vcpu *vcpu)
@@ -96,13 +110,64 @@ int vcpu_sched_init(struct vcpu *vcpu)
 	init_list(&vcpu->state_list);
 	set_vcpu_state(vcpu, VCPU_STATE_READY);
 	list_add_tail(&pcpu->ready_list, &vcpu->state_list);
+	vcpu->run_start = 0;
+	vcpu->run_time = MILLISECS(CONFIG_SCHED_INTERVAL);
 
 	return 0;
 }
 
+static inline int is_vcpu_ready(struct vcpu *vcpu)
+{
+	return (vcpu->state_list.next != NULL);
+}
+
+static inline int detach_ready_vcpu(struct vcpu *vcpu)
+{
+	if (!is_vcpu_ready(vcpu))
+		return 1;
+
+	list_del(&vcpu->state_list);
+	vcpu->state_list.next = NULL;
+}
+
+static void update_sched_info(struct vcpu *vcpu)
+{
+	unsigned long now, delta;
+
+	now = NOW();
+	delta = now - vcpu->run_start;
+
+	if (delta > vcpu->run_time)
+		vcpu->run_time = 0;
+	else
+		vcpu->run_time = vcpu->run_time - delta;
+}
+
 void sched_vcpu(struct vcpu *vcpu, int reason)
 {
+	struct vcpu *current = current_vcpu();
+	struct pcpu *pcpu = get_cpu_var(pcpu);
+	unsigned long flags;
 
+	if (vcpu == current)
+		return;
+
+	local_irq_save(flags);
+
+	update_sched_info(current);
+
+	/*
+	 * add the current vcpu to the tail of the ready
+	 * list and put the running vcpu to head
+	 */
+	list_add_tail(&pcpu->ready_list, &current->state_list);
+
+	detach_ready_vcpu(vcpu);
+	list_add(&pcpu->ready_list, &vcpu->state_list);
+
+	local_irq_restore(flags);
+
+	sched();
 }
 
 void sched(void)
@@ -114,11 +179,10 @@ void sched(void)
 
 	pcpu = get_cpu_var(pcpu);
 
-
-
 	while (1) {
 resched:
-		local_irq_save(flag);
+		pcpu->need_resched = 0;
+
 		vcpu = find_vcpu_to_run(pcpu);
 
 		if ((vcpu == NULL) && (!pcpu->need_resched)) {
@@ -127,11 +191,9 @@ resched:
 			 * do not need to resched, then this
 			 * pcpu can goto idle state
 			 */
-			local_irq_restore(flag);
 			cpu_idle();
 		} else {
 			get_cpu_var(next_vcpu) = vcpu;
-			local_irq_restore(flag);
 
 			if (pcpu->need_resched)
 				goto resched;
@@ -143,10 +205,40 @@ resched:
 
 static void sched_timer_function(unsigned long data)
 {
-	struct timer_list *timer = &get_cpu_var(sched_timer);
+	struct pcpu *pcpu = get_cpu_var(pcpu);
+	struct timer_list *timer = &pcpu->sched_timer;
+	struct vcpu *vcpu = current_vcpu();
+	unsigned long flags;
+	struct vcpu *next = vcpu;
 
-	pr_debug("in sched timer function\n");
-	mod_timer(timer, MILLISECS(CONFIG_SCHED_INTERVAL));
+	/*
+	 * if the current running vcpu is NULL
+	 * then the pcpu is in idle mode or there is
+	 * still run time for the vcpu return directly
+	 */
+	if (vcpu == NULL)
+		return;
+
+	update_sched_info(vcpu);
+
+	if ((vcpu->run_time >= VCPU_MIN_RUN_TIME))
+		goto out;
+
+	/*
+	 * just delete it from the list and add it
+	 * to the tail of the ready list
+	 */
+	local_irq_save(flags);
+	list_add_tail(&pcpu->ready_list, &vcpu->state_list);
+	local_irq_restore(flags);
+
+	sched();
+
+	next = get_cpu_var(next_vcpu);
+	next->run_time += MILLISECS(CONFIG_SCHED_INTERVAL);
+
+out:
+	mod_timer(&pcpu->sched_timer, vcpu->run_time);
 }
 
 int vcpu_can_idle(struct vcpu *vcpu)
@@ -176,7 +268,11 @@ void vcpu_idle(struct vcpu *vcpu)
 
 	local_irq_save(flag);
 
+	update_sched_info(vcpu);
+
 	set_vcpu_state(vcpu, VCPU_STATE_SLEEP);
+	detach_ready_vcpu(vcpu);
+
 	save_vcpu_module_state(vcpu);
 	get_per_cpu(current_vcpu, cpuid) = NULL;
 	get_per_cpu(next_vcpu, cpuid) = NULL;
@@ -189,6 +285,7 @@ void vcpu_idle(struct vcpu *vcpu)
 void switch_to_vcpu(struct vcpu *current, struct vcpu *next)
 {
 	struct pcpu *pcpu = get_cpu_var(pcpu);
+	unsigned long now = NOW();
 
 	/*
 	 * if current != next and current != NULL
@@ -204,8 +301,9 @@ void switch_to_vcpu(struct vcpu *current, struct vcpu *next)
 			save_vcpu_module_state(current);
 		}
 
+		next->run_start = now;
 		set_vcpu_state(next, VCPU_STATE_RUNNING);
-		list_del(&next->state_list);
+		detach_ready_vcpu(next);
 		restore_vcpu_module_state(next);
 	}
 
@@ -217,6 +315,16 @@ void switch_to_vcpu(struct vcpu *current, struct vcpu *next)
 	 */
 }
 
+static void sched_exit_from_guest(struct vcpu *vcpu, void *data)
+{
+
+}
+
+static void sched_enter_to_guest(struct vcpu *vcpu, void *data)
+{
+
+}
+
 void vmm_pcpus_init(void)
 {
 	int i;
@@ -224,11 +332,24 @@ void vmm_pcpus_init(void)
 
 	for (i = 0; i < CONFIG_NR_CPUS; i++) {
 		pcpu = &pcpus[i];
+		pcpu->state = PCPU_STATE_RUNNING;
 		init_list(&pcpu->vcpu_list);
 		init_list(&pcpu->ready_list);
 		pcpu->pcpu_id = i;
+
+		/*
+		 * init the sched timer
+		 */
+		init_timer(&pcpu->sched_timer);
+		pcpu->sched_timer.function = sched_timer_function;
+
 		get_per_cpu(pcpu, i) = pcpu;
 	}
+
+	vmm_register_hook(sched_exit_from_guest,
+			NULL, VMM_HOOK_TYPE_EXIT_FROM_GUEST);
+	vmm_register_hook(sched_enter_to_guest,
+			NULL, VMM_HOOK_TYPE_ENTER_TO_GUEST);
 }
 
 static int vcpu_need_to_run(struct vcpu *vcpu)
@@ -264,14 +385,12 @@ int sched_late_init(void)
 {
 	int ret;
 	struct timer_list *timer;
+	struct pcpu *pcpu = get_cpu_var(pcpu);
 
 	ret = request_irq(CONFIG_VMM_RESCHED_IRQ,
 			vmm_reched_handler, NULL);
 
-	timer = &get_cpu_var(sched_timer);
-
-	init_timer(timer);
-	timer->function = sched_timer_function;
+	timer = &pcpu->sched_timer;
 	timer->expires = MILLISECS(CONFIG_SCHED_INTERVAL);
 	add_timer(timer);
 

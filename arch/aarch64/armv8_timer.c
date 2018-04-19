@@ -26,7 +26,6 @@ void arch_enable_timer(unsigned long expires)
 	}
 
 	deadline = ns_to_ticks(expires) + boot_tick;
-	pr_info("the deadline is %d\n", deadline);
 	write_sysreg64(deadline, CNTHP_CVAL_EL2);
 	write_sysreg32(1 << 0, CNTHP_CTL_EL2);
 	isb();

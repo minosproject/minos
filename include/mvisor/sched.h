@@ -8,10 +8,13 @@
 #include <mvisor/vcpu.h>
 #include <mvisor/percpu.h>
 #include <mvisor/list.h>
+#include <mvisor/timer.h>
 
 #define PCPU_AFFINITY_FAIL	(0xffff)
 
 DECLARE_PER_CPU(struct vcpu *, current_vcpu);
+DECLARE_PER_CPU(struct pcpu *, pcpu);
+
 #define current_vcpu()	get_cpu_var(current_vcpu)
 
 typedef enum _vcpu_state_t {
@@ -22,9 +25,17 @@ typedef enum _vcpu_state_t {
 	VCPU_STATE_ERROR 	= 0xffff,
 } vcpu_state_t;
 
+typedef enum _pcpu_state_t {
+	PCPU_STATE_RUNNING	= 0x0,
+	PCPU_STATE_IDLE,
+	PCPU_STATE_OFFLINE,
+} pcpu_state_t;
+
 struct pcpu {
 	uint32_t pcpu_id;
 	int need_resched;
+	int state;
+	struct timer_list sched_timer;
 	struct list_head vcpu_list;
 	struct list_head ready_list;
 };

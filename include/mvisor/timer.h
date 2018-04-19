@@ -21,7 +21,7 @@ struct timers {
 	spinlock_t lock;
 };
 
-#define DEFAULT_TIMER_MARGIN	(111111111100)
+#define DEFAULT_TIMER_MARGIN	(128)
 
 void init_timer(struct timer_list *timer);
 void add_timer(struct timer_list *timer);
