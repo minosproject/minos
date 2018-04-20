@@ -664,18 +664,18 @@ int do_irq_handler(void)
 
 	irq = irq_chip->get_pending_irq();
 
+	d = get_irq_domain(irq);
+	if (!d) {
+		ret = -ENOENT;
+		goto error;
+	}
+
 	/*
 	 * TBD - here we need deactive the irq
 	 * for arm write the ICC_EOIR1_EL1 register
 	 * to drop the priority
 	 */
 	irq_chip->irq_eoi(irq);
-
-	d = get_irq_domain(irq);
-	if (!d) {
-		ret = -ENOENT;
-		goto error;
-	}
 
 	vmm_irq = d->ops->get_irq_desc(d, irq);
 	if (!vmm_irq) {
