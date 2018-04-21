@@ -27,6 +27,54 @@
 #define read_sysreg(name)     read_sysreg64(name)
 #define write_sysreg(v, name) write_sysreg64(v, name)
 
+static inline void flush_local_tlb(void)
+{
+	/* current VMID only */
+	asm volatile (
+		"dsb sy;"
+		"tlbi vmalls12e1;"
+		"dsb sy;"
+		"isb;"
+		: : : "memory"
+	);
+}
+
+static inline void flush_local_tlbis(void)
+{
+	/* current vmid only and innershareable TLBS */
+	asm volatile(
+		"dsb sy;"
+		"tlbi vmalls12e1is;"
+		"dsb sy;"
+		"isb;"
+		: : : "memory"
+	);
+}
+
+static inline void flush_all_tlb(void)
+{
+	/* flush all vmids local TLBS, non-hypervisor mode */
+	asm volatile(
+		"dsb sy;"
+		"tlbi alle1;"
+		"dsb sy;"
+		"isb;"
+		: : : "memory"
+	);
+}
+
+static inline void flush_all_tlbis(void)
+{
+	/* flush innershareable TLBS, all VMIDs, non-hypervisor mode */
+	asm volatile(
+		"dsb sy;"
+		"tlbi alle1is;"
+		"dsb sy;"
+		"isb;"
+		: : : "memory"
+	);
+}
+
 int get_cpu_id(void);
 int arch_early_init(void);
 int arch_init(void);

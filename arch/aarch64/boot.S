@@ -97,7 +97,26 @@ el2_entry_aarch64:
 	sub	x0, x0, x19, lsl #13
 	mov	sp, x0
 
+	/* invalid the dcache and flush the tlb */
+	bl	inv_unified_dcache
+	tlbi	alle1
+	isb
+
+	/* config the TCR_EL2 */
+
 	cbnz	x19, secondary_start_up
+
+	dsb	ish
+	ic	ialluis
+	dsb	ish
+	isb
+
+	/* enable the dcache and the icache */
+	mrs	x1, SCTLR_EL2
+	orr	x1, x1, #SCTLR_ELx_C
+	orr	x1, x1, #SCTLR_ELx_I
+	msr	SCTLR_EL2, x1
+	isb
 
 	ldr	x0, =__bss_start
 	mov	x1, #0
@@ -111,6 +130,13 @@ el2_entry_aarch64:
 	b	return_to_el1
 
 secondary_start_up:
+	/* enable the dcache and the icache */
+	mrs	x1, SCTLR_EL2
+	orr	x1, x1, #SCTLR_ELx_C
+	orr	x1, x1, #SCTLR_ELx_I
+	msr	SCTLR_EL2, x1
+	isb
+
 	/* here wait for boot cpu finish tht init work */
 	bl	boot_secondary
 	nop

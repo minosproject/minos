@@ -488,5 +488,8 @@ int vm_memory_init(struct vm *vm)
 			region->vir_base, region->size, region->type);
 	}
 
+	flush_all_tlb();
+
 	return 0;
 }
+

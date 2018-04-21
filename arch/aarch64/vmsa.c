@@ -5,6 +5,28 @@
 #include <mvisor/module.h>
 #include <asm/arch.h>
 
+/*
+ * a - Non-shareable
+ * 	This represents memory accessible only by a single processor or other
+ * 	agent, so memory accesses never need to be synchronized with other
+ * 	processors. This domain is not typically used in SMP systems.
+ * b - Inner shareable
+ * 	This represents a shareability domain that can be shared by multiple
+ * 	processors, but not necessarily all of the agents in the system. A
+ * 	system might have multiple Inner Shareable domains. An operation that
+ * 	affects one Inner Shareable domain does not affect other Inner Shareable
+ * 	domains in the system. An example of such a domain might be a quad-core
+ * 	Cortex-A57 cluster.
+ * c - Outer shareable
+ * 	An outer shareable (OSH) domain re-orderis shared by multiple agents
+ * 	and can consist of one or more inner shareable domains. An operation
+ * 	that affects an outer shareable domain also implicitly affects all inner
+ * 	shareable domains inside it. However, it does not otherwise behave as an
+ * 	inner shareable operation.
+ * d - Full system
+ * 	An operation on the full system (SY) affects all observers in the system.
+ */
+
 struct vmsa_context {
 	uint64_t vtcr_el2;
 	uint64_t ttbr0_el1;
@@ -300,14 +322,21 @@ int el2_stage2_vmsa_init(void)
 	 * now just support arm fvp, TBD to support more
 	 * platform
 	 */
-	uint64_t value;
+	uint64_t value, dcache, icache;
 	struct aa64mmfr0 aa64mmfr0;
 
 	value = read_id_aa64mmfr0_el1();
 	memcpy(&aa64mmfr0, &value, sizeof(uint64_t));
-	pr_debug("aa64mmfr0: pa_range:0x%x t_gran_16k:0x%x t_gran_64k:0x%x t_gran_4k:0x%x\n",
-			aa64mmfr0.pa_range, aa64mmfr0.t_gran_16k,
-			aa64mmfr0.t_gran_64k, aa64mmfr0.t_gran_4k);
+	pr_debug("aa64mmfr0: pa_range:0x%x"
+		 " t_gran_16k:0x%x t_gran_64k"
+		 ":0x%x t_gran_4k:0x%x\n",
+		 aa64mmfr0.pa_range, aa64mmfr0.t_gran_16k,
+		aa64mmfr0.t_gran_64k, aa64mmfr0.t_gran_4k);
+
+	value = read_sysreg(CTR_EL0);
+	dcache = 4 << ((value & 0xf0000) >> 16);
+	icache = 4 << ((value & 0xf));
+	pr_info("dcache_line_size:%d ichache_line_size:%d\n", dcache, icache);
 
 	stage2_tt_mem_init();
 
@@ -343,6 +372,7 @@ static void vmsa_state_restore(struct vcpu *vcpu, void *context)
 	write_sysreg(c->vttbr_el2, VTTBR_EL2);
 	write_sysreg(c->ttbr0_el1, TTBR0_EL1);
 	write_sysreg(c->ttbr1_el1, TTBR1_EL1);
+	flush_local_tlb();
 }
 
 static struct mmu_chip vmsa_mmu = {
