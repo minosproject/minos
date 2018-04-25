@@ -55,11 +55,24 @@ SECTIONS
 	.el3_stack (NOLOAD): {
 		. = ALIGN(64);
 		__el3_stack = .;
-		. = . + (CONFIG_NR_CPUS * 0x1000);
+		. = . + (CONFIG_NR_CPUS * 0x100);
 		__el3_stack_end = .;
 	}
 
 	. = ALIGN(4096);
+
+	/* 4K level1 can map 512GB memory */
+	.el2_ttb0_l1 (NOLOAD): {
+		. = ALIGN(4096);
+		__el2_ttb0_l1 = .;
+		. = . + 0x1000;
+	}
+
+	.el2_ttb0_l2_code (NOLOAD) : {
+		. = ALIGN(4096);
+		__el2_ttb0_l2_code = .;
+		. = . + 0x1000;
+	}
 
 	__percpu_start = .;
 	__percpu_cpu_0_start = .;
