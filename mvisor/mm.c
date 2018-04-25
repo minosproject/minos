@@ -472,7 +472,7 @@ int vm_memory_init(struct vm *vm)
 	struct mm_struct *mm = &vm->mm;
 	struct memory_region *region;
 
-	mm->page_table_base = mmu_alloc_page_table();
+	mm->page_table_base = mmu_alloc_guest_pt();
 	if (mm->page_table_base == 0) {
 		pr_error("No memory for vm page table\n");
 		return -ENOMEM;
@@ -484,7 +484,7 @@ int vm_memory_init(struct vm *vm)
 	}
 
 	list_for_each_entry(region, &mm->mem_list, list) {
-		mmu_map_memory(mm->page_table_base, region->mem_base,
+		mmu_map_guest_memory(mm->page_table_base, region->mem_base,
 			region->vir_base, region->size, region->type);
 	}
 

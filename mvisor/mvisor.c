@@ -74,15 +74,19 @@ void boot_main(void)
 {
 	int i;
 
-	vmm_log_init();
-	pr_info("Starting mVisor ...\n");
-
-	vmm_percpus_init();
+	/*
+	 * need first init the mem alloctor
+	 */
+	vmm_mm_init();
 
 	vmm_early_init();
 	vmm_early_init_percpu();
 
-	vmm_mm_init();
+	vmm_percpus_init();
+	vmm_log_init();
+
+	pr_info("Starting mVisor ...\n");
+
 	vmm_hook_init();
 
 	if (get_cpu_id() != 0)
@@ -133,6 +137,8 @@ void boot_secondary(void)
 	uint64_t mid;
 	uint64_t mpidr;
 
+	vmm_early_init_percpu();
+
 	/*
 	 * here wait up bootup cpu to wakeup us
 	 */
@@ -146,7 +152,6 @@ void boot_secondary(void)
 	get_per_cpu(cpu_id, cpuid) = mpidr;
 	pr_info("cpu-%d is up\n", cpuid);
 
-	vmm_early_init_percpu();
 	vmm_arch_init_percpu();
 
 	vmm_irq_secondary_init();

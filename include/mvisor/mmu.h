@@ -14,15 +14,22 @@
 #define MEM_REGION_NAME_SIZE	32
 
 struct mmu_chip {
-	int (*map_memory)(unsigned long page_table_base, unsigned long phy_base,
+	int (*map_guest_memory)(unsigned long page_table_base, unsigned long phy_base,
 			unsigned long vir_base, size_t size, int type);
-	unsigned long (*alloc_page_table)(void);
+	int (*map_host_memory)(unsigned long vir, unsigned long phy,
+			size_t size, int type);
+	unsigned long (*alloc_guest_pt)(void);
 };
 
-unsigned long mmu_alloc_page_table(void);
+unsigned long mmu_alloc_guest_pt(void);
 
-int mmu_map_memory(unsigned long page_table_base, unsigned long phy_base,
+int mmu_map_guest_memory(unsigned long page_table_base, unsigned long phy_base,
 		unsigned long vir_base, size_t size, int type);
+
+int mmu_map_host_memory(unsigned long vir,
+		unsigned long phy, size_t size, int type);
+
+int io_remap(unsigned long vir, unsigned long phy, size_t size);
 
 int vmm_mmu_init(void);
 

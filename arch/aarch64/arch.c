@@ -4,16 +4,19 @@
 #include <mvisor/module.h>
 #include <asm/arch.h>
 
-extern int el2_stage2_vmsa_init(void);
+extern int el2_stage2_init(void);
+extern int el2_stage1_init(void);
 
 int arch_early_init(void)
 {
+	el2_stage1_init();
+	el2_stage2_init();
+
 	return 0;
 }
 
 int arch_init(void)
 {
-	el2_stage2_vmsa_init();
 
 	return 0;
 }

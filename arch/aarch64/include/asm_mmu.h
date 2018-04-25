@@ -174,5 +174,4 @@
 #define TT_S1_MAIR_WB_RA  0b1110
 #define TT_S1_MAIR_WB_RWA 0b1111
 
-
 #endif
