@@ -137,10 +137,9 @@ void boot_secondary(void)
 	uint32_t cpuid = get_cpu_id();
 	uint64_t mid;
 
-	vmm_early_init_percpu();
-
-	get_per_cpu(cpu_id, cpuid) = mpidr;
 	pr_info("cpu-%d is up\n", cpuid);
+
+	vmm_early_init_percpu();
 
 	vmm_arch_init_percpu();
 

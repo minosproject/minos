@@ -42,6 +42,7 @@ struct vmsa_context {
  */
 struct mmu_config {
 	uint32_t table_offset;
+	uint32_t level1_table_size;
 	uint32_t level1_entry_map_size;
 	uint32_t level1_offset;
 	int level1_description_type;
@@ -126,12 +127,12 @@ static char *alloc_guest_level2(int pages)
 {
 	char *ret = NULL;
 
-	if (level2_size < (guest_config.level2_pages * SIZE_4K))
+	if (level2_size < (pages * SIZE_4K))
 		return NULL;
 
 	ret = level2_base;
-	level2_base += (guest_config.level2_pages * SIZE_4K);
-	level2_size -= (guest_config.level2_pages * SIZE_4K);
+	level2_base += (pages * SIZE_4K);
+	level2_size -= (pages * SIZE_4K);
 
 	return ret;
 }
@@ -284,7 +285,7 @@ static int map_level2_pages(unsigned long *tbase, unsigned long vbase,
 }
 
 static int map_mem(unsigned long t_base, unsigned long base,
-		unsigned long vir_base, size_t size,
+		unsigned long phy_base, size_t size,
 		int type, struct mmu_config *config)
 {
 	int i, ret = 0;
@@ -331,10 +332,15 @@ static int map_mem(unsigned long t_base, unsigned long base,
 			map_size = size;
 
 		map_level2_pages((unsigned long *)value, base,
-				base, map_size, type, config);
+				phy_base, map_size, type, config);
 		base += map_size;
 		size -= map_size;
+		phy_base += map_size;
+		flush_dcache_range((unsigned long)value,
+				config->level2_pages * SIZE_4K);
 	}
+
+	flush_dcache_range(t_base, config->level1_table_size);
 
 out:
 	spin_unlock(config->lock);
@@ -466,6 +472,7 @@ static int stage2_tt_mem_init(void)
 	guest_config.alloc_level2_pages = alloc_guest_level2;
 	guest_config.get_tt_description = guest_tt_description;
 	guest_config.lock = &guest_lock;
+	guest_config.level1_table_size = 64 * 1024;
 
 	return 0;
 }
@@ -488,6 +495,7 @@ int el2_stage1_init(void)
 	host_config.alloc_level2_pages = alloc_host_level2;
 	host_config.get_tt_description = host_tt_description;
 	host_config.lock = &host_lock;
+	host_config.level1_table_size = 4 * 1024;
 
 	return 0;
 }
