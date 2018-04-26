@@ -33,9 +33,28 @@ static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
 	struct aarch64_system_context *context =
 			(struct aarch64_system_context *)c;
 
+	/*
+	 * HVC : enable hyper call function
+	 * TWI : trap wfi
+	 * TWE : trap wfe
+	 * TIDCP : Trap implementation defined functionality
+	 * IMP : physical irq routing
+	 * FMO : physical firq routing
+	 * BSU_IS : Barrier Shareability upgrade
+	 * FB : force broadcast when do some tlb ins
+	 * PTW : protect table walk
+	 * TSC : trap smc ins
+	 * TACR : Trap Auxiliary Control Registers
+	 * AMO : Physical SError interrupt routing.
+	 * RW : low level is 64bit, when 0 is 32 bit
+	 * VM : enable virtualzation
+	 */
 	context->hcr_el2 = 0ul | HCR_EL2_HVC | HCR_EL2_TWI | HCR_EL2_TWE | \
 		     HCR_EL2_TIDCP | HCR_EL2_IMO | HCR_EL2_FMO | \
-		     HCR_EL2_AMO | HCR_EL2_RW | HCR_EL2_VM;
+		     HCR_EL2_BSU_IS | HCR_EL2_FB | HCR_EL2_PTW | \
+		     HCR_EL2_TSC | HCR_EL2_TACR | HCR_EL2_AMO | \
+		     HCR_EL2_RW | HCR_EL2_VM;
+
 	context->vbar_el1 = 0;
 	context->esr_el1 = 0;
 	context->vmpidr = get_vcpu_id(vcpu);
