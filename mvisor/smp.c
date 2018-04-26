@@ -4,10 +4,8 @@
 
 DEFINE_PER_CPU(uint64_t, cpu_id);
 
-uint64_t smp_holding_pen[CONFIG_NR_CPUS] = {
-	[0] = 0,
-	[1 ... (CONFIG_NR_CPUS - 1)] = 0xffff,
-};
+extern unsigned char __smp_hoding_pen;
+uint64_t *smp_holding_pen;
 
 uint32_t smp_get_cpuid(uint64_t mpidr_id)
 {
@@ -73,6 +71,8 @@ void smp_cpus_up(void)
 void vmm_smp_init(void)
 {
 	int i;
+
+	smp_holding_pen = (uint64_t *)&__smp_hoding_pen;
 
 	for (i = 0; i < CONFIG_NR_CPUS; i++)
 		get_per_cpu(cpu_id, i) = 0xffff;

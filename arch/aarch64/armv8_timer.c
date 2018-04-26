@@ -42,6 +42,8 @@ unsigned long get_sys_time()
 
 static int timers_arch_init(void)
 {
+	io_remap(0x2a430000, 0x2a430000, 64 * 1024);
+
 	if (!cpu_khz)
 		cpu_khz = ioread32(refclk_cnt_base + CNTFID0);
 

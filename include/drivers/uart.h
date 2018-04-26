@@ -52,7 +52,6 @@
 #define PL011_CR_TX_ENABLE        (0x0100)
 #define PL011_CR_RX_ENABLE        (0x0200)
 
-void uart_init(void);
 void uart_putc(char c);
 char uart_getchar(void);
 

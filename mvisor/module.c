@@ -189,5 +189,3 @@ int vmm_modules_init(void)
 
 	return 0;
 }
-
-arch_initcall(vmm_modules_init);

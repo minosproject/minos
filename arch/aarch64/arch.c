@@ -17,7 +17,6 @@ int arch_early_init(void)
 
 int arch_init(void)
 {
-
 	return 0;
 }
 

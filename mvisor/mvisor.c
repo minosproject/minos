@@ -16,6 +16,7 @@
 
 extern void softirq_init(void);
 extern void init_timers(void);
+extern int vmm_modules_init(void);
 
 struct list_head hook_lists[VMM_HOOK_TYPE_UNKNOWN];
 
@@ -72,18 +73,19 @@ void vmm_enter_to_guest(struct vcpu *vcpu)
 
 void boot_main(void)
 {
-	int i;
-
 	/*
 	 * need first init the mem alloctor
 	 */
+	vmm_log_init();
 	vmm_mm_init();
+	vmm_modules_init();
+
+	vmm_mmu_init();
 
 	vmm_early_init();
 	vmm_early_init_percpu();
 
 	vmm_percpus_init();
-	vmm_log_init();
 
 	pr_info("Starting mVisor ...\n");
 
@@ -100,7 +102,6 @@ void boot_main(void)
 	vmm_irq_init();
 	softirq_init();
 	init_timers();
-	vmm_mmu_init();
 	vmm_create_vms();
 
 	/*
@@ -138,16 +139,6 @@ void boot_secondary(void)
 	uint64_t mpidr;
 
 	vmm_early_init_percpu();
-
-	/*
-	 * here wait up bootup cpu to wakeup us
-	 */
-	mpidr = read_mpidr_el1() & MPIDR_ID_MASK;
-	for (;;) {
-		mid = smp_holding_pen[cpuid];
-		if (mpidr == mid)
-			break;
-	}
 
 	get_per_cpu(cpu_id, cpuid) = mpidr;
 	pr_info("cpu-%d is up\n", cpuid);

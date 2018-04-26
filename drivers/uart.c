@@ -1,10 +1,14 @@
 #include <mvisor/io.h>
 #include <drivers/uart.h>
+#include <mvisor/mmu.h>
+#include <mvisor/init.h>
 
 static void *base = (void *)0x1c090000;
+extern void flush_log_buf(void);
 
-void uart_init(void)
+static int uart_init(void)
 {
+	io_remap(0x1c090000, 0x1c090000, 64 * 1024);
 	iowrite32(base + UARTCR, 0x0);
 	iowrite32(base + UARTECR, 0x0);
 	iowrite32(base + UARTLCR_H, 0x0 | PL011_LCR_WORD_LENGTH_8 | \
@@ -19,6 +23,10 @@ void uart_init(void)
 	iowrite32(base + UARTCR, 0x0 | PL011_CR_UART_ENABLE | \
 			PL011_CR_TX_ENABLE | \
 			PL011_CR_RX_ENABLE);
+
+	flush_log_buf();
+
+	return 0;
 }
 
 void uart_putc(char c)
@@ -37,3 +45,5 @@ char uart_getchar(void)
 
 	return ioread32(base + UARTDR);
 }
+
+early_initcall(uart_init);

@@ -11,7 +11,7 @@
 #define MPIDR_ID_MASK	(0x000000ff00ffffff)
 
 DECLARE_PER_CPU(uint64_t, cpu_id);
-extern uint64_t smp_holding_pen[];
+extern uint64_t *smp_holding_pen;
 
 int get_cpu_id(void);
 void smp_cpus_up(void);

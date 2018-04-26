@@ -185,6 +185,21 @@ secondary_start_up:
 	dsb	sy
 	isb
 
+	bl	get_cpu_id
+	ldr	x1, =__smp_hoding_pen
+	add	x1, x1, x0, lsl #3
+	mrs	x2, MPIDR_EL1
+	ldr	x4, =0x000000ff00ffffff
+	and	x2, x2, x4
+
+wait_loop:
+	ldr	x3, [x1]
+	sub	x3, x3, x2
+	cbnz	x3, wait_loop
+
+	dsb	sy
+	isb
+
 	/* enable the dcache and the icache */
 	mrs	x1, SCTLR_EL2
 	orr	x1, x1, #SCTLR_ELx_C

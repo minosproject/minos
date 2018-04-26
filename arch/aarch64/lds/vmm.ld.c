@@ -8,7 +8,6 @@ SECTIONS
 		__code_start = .;
 		KEEP(*(__start_up))
 		KEEP(*(__el3_vectors __el2_vectors __int_handlers))
-		KEEP(*(__armv8_cpu))
 	}
 
 	.text : 
@@ -23,56 +22,13 @@ SECTIONS
 
 	. = ALIGN(8);
 
-	__vmm_module_start = .;
-	.__vmm_module : {
-		*(.__vmm_module)
+	.smp_holding_pen : {
+		__smp_hoding_pen = .;
+		. = . + (CONFIG_NR_CPUS * 8);
+		__smp_hoding_pen_end = .;
 	}
-	__vmm_module_end = .;
 
 	. = ALIGN(8);
-
-	__vmm_vm_start = .;
-	.__vmm_vm : {
-		*(.__vmm_vm)
-	}
-	__vmm_vm_end = .;
-
-	. = ALIGN(8);
-
-	__bss_start = .;
-	.bss : {*(.bss)}
-	__bss_end = .;
-
-	. = ALIGN(8);
-
-	.el2_stack (NOLOAD): {
-		. = ALIGN(64);
-		__el2_stack = .;
-		. = . + (CONFIG_NR_CPUS * 0x2000);
-		__el2_stack_end = .;
-	}
-
-	.el3_stack (NOLOAD): {
-		. = ALIGN(64);
-		__el3_stack = .;
-		. = . + (CONFIG_NR_CPUS * 0x100);
-		__el3_stack_end = .;
-	}
-
-	. = ALIGN(4096);
-
-	/* 4K level1 can map 512GB memory */
-	.el2_ttb0_l1 (NOLOAD): {
-		. = ALIGN(4096);
-		__el2_ttb0_l1 = .;
-		. = . + 0x1000;
-	}
-
-	.el2_ttb0_l2_code (NOLOAD) : {
-		. = ALIGN(4096);
-		__el2_ttb0_l2_code = .;
-		. = . + 0x1000;
-	}
 
 	__percpu_start = .;
 	__percpu_cpu_0_start = .;
@@ -89,19 +45,27 @@ SECTIONS
 	. = __percpu_cpu_0_end + __percpu_section_size * (CONFIG_NR_CPUS - 1);
 	__percpu_end = .;
 
-	.el2_stage2_ttb_l1 (NOLOAD): {
-		. = ALIGN(MMU_TTB_LEVEL1_ALIGN);
-		__el2_stage2_ttb_l1 = .;
-		. = . + (CONFIG_NR_CPUS * MMU_TTB_LEVEL1_SIZE);
-		__el2_stage2_ttb_l1_end = .;
-	}
+	. = ALIGN(8);
 
-	.el2_stage2_ttbl2 (NOLOAD): {
-		. = ALIGN(MMU_TTB_LEVEL2_ALIGN);
-		__el2_stage2_ttb_l2 = .;
-		. = . + (CONFIG_NR_CPUS * MMU_TTB_LEVEL2_SIZE);
-		__el2_stage2_ttb_l2_end = .;
+	__bss_start = .;
+	.bss : {*(.bss)}
+	__bss_end = .;
+
+	. = ALIGN(8);
+
+	__vmm_module_start = .;
+	.__vmm_module : {
+		*(.__vmm_module)
 	}
+	__vmm_module_end = .;
+
+	. = ALIGN(8);
+
+	__vmm_vm_start = .;
+	.__vmm_vm : {
+		*(.__vmm_vm)
+	}
+	__vmm_vm_end = .;
 
 	. = ALIGN(8);
 
@@ -159,6 +123,10 @@ SECTIONS
 	__init_text_end = .;
 
 	. = ALIGN(8);
+
+	__init_end = .;
+
+	. = ALIGN(8);
 	__vmm_irq_resource_start = .;
 	.__vmm_irq_resource : {
 		*(.__vmm_irq_resource)
@@ -174,7 +142,48 @@ SECTIONS
 
 	. = ALIGN(8);
 
-	__init_end = .;
+	.el2_stack (NOLOAD): {
+		. = ALIGN(64);
+		__el2_stack = .;
+		. = . + (CONFIG_NR_CPUS * 0x2000);
+		__el2_stack_end = .;
+	}
+
+	.el3_stack (NOLOAD): {
+		. = ALIGN(64);
+		__el3_stack = .;
+		. = . + (CONFIG_NR_CPUS * 0x100);
+		__el3_stack_end = .;
+	}
+
+	. = ALIGN(4096);
+
+	/* 4K level1 can map 512GB memory */
+	.el2_ttb0_l1 (NOLOAD): {
+		. = ALIGN(4096);
+		__el2_ttb0_l1 = .;
+		. = . + 0x1000;
+	}
+
+	.el2_ttb0_l2_code (NOLOAD) : {
+		. = ALIGN(4096);
+		__el2_ttb0_l2_code = .;
+		. = . + 0x1000;
+	}
+
+	.el2_stage2_ttb_l1 (NOLOAD): {
+		. = ALIGN(MMU_TTB_LEVEL1_ALIGN);
+		__el2_stage2_ttb_l1 = .;
+		. = . + (CONFIG_NR_CPUS * MMU_TTB_LEVEL1_SIZE);
+		__el2_stage2_ttb_l1_end = .;
+	}
+
+	.el2_stage2_ttbl2 (NOLOAD): {
+		. = ALIGN(MMU_TTB_LEVEL2_ALIGN);
+		__el2_stage2_ttb_l2 = .;
+		. = . + (CONFIG_NR_CPUS * MMU_TTB_LEVEL2_SIZE);
+		__el2_stage2_ttb_l2_end = .;
+	}
 
 	__code_end = .;
 }

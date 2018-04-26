@@ -36,6 +36,7 @@ struct vmsa_context {
 } __attribute__ ((__aligned__ (sizeof(unsigned long))));
 
 struct mmu_config {
+	uint32_t table_offset;
 	uint32_t level1_entry_map_size;
 	uint32_t level1_offset;
 	int level1_description_type;
@@ -252,7 +253,7 @@ static int map_level2_pages(unsigned long *tbase, unsigned long vbase,
 {
 	int i;
 	uint64_t attr;
-	uint32_t offset;
+	uint32_t offset, index;
 	unsigned long tmp;
 	struct mmu_config *config;
 
@@ -261,22 +262,22 @@ static int map_level2_pages(unsigned long *tbase, unsigned long vbase,
 	else
 		config = &guest_config;
 
+	offset = config->level2_offset;
 	attr = config->get_tt_description(type,
 			config->level2_description_type);
 
 	tmp = ALIGN(vbase, config->level1_entry_map_size);
-	offset = (vbase - tmp) >> config->level2_offset;
+	index = (vbase - tmp) >> offset;
 
-	for (i = 0; i < (size >> config->level2_offset); i++) {
-		if (*(tbase + offset) != 0)
+	for (i = 0; i < (size >> offset); i++) {
+		if (*(tbase + index) != 0)
 			continue;
 
-		*(tbase + offset) = (attr | \
-			(pbase >> config->level2_offset) << \
-			config->level2_offset);
+		*(tbase + index) = (attr | \
+			(pbase >> offset) << offset);
 		vbase += config->level2_entry_map_size;
 		pbase += config->level2_entry_map_size;
-		offset++;
+		index++;
 	}
 
 	return 0;
@@ -291,7 +292,7 @@ static int map_mem(unsigned long t_base, unsigned long base,
 	uint32_t offset;
 	uint64_t value;
 	uint64_t attr;
-	size_t map_size;
+	size_t map_size, __size;
 	unsigned long *tbase = (unsigned long *)t_base;
 	struct mmu_config *config;
 
@@ -305,6 +306,8 @@ static int map_mem(unsigned long t_base, unsigned long base,
 	base = ALIGN(base, config->level2_entry_map_size);
 	tmp = BALIGN(base + size, config->level2_entry_map_size);
 	size = tmp - base;
+	vir_base = base;
+	__size = size;
 
 	attr = config->get_tt_description(type,
 			config->level1_description_type);
@@ -323,14 +326,14 @@ static int map_mem(unsigned long t_base, unsigned long base,
 			memset((char *)tmp, 0, config->level2_pages * SIZE_4K);
 
 			*(tbase + offset) = attr | \
-				((tmp >> config->level2_offset) << \
-				 config->level2_offset);
+				((tmp >> config->table_offset) << \
+				 config->table_offset);
 			value = (uint64_t)tmp;
 		} else {
 			/* get the base address of the entry */
 			value = value & 0x0000ffffffffffff;
-			value = value >> config->level2_offset;
-			value = value << config->level2_offset;
+			value = value >> config->table_offset;
+			value = value << config->table_offset;
 		}
 
 		if (size > (config->level1_entry_map_size)) {
@@ -346,6 +349,12 @@ static int map_mem(unsigned long t_base, unsigned long base,
 		base += map_size;
 		size -= map_size;
 	}
+
+	flush_all_tlb();
+
+	if (type == MEM_TYPE_NORMAL)
+		inv_dcache_range((uint32_t *)base, __size);
+
 out:
 	spin_unlock(config->lock);
 	return ret;
@@ -431,11 +440,12 @@ static int stage2_tt_mem_init(void)
 	spin_lock_init(&guest_lock);
 
 	memset((char *)&guest_config, 0, sizeof(struct mmu_config));
+	guest_config.table_offset = 16;
 	guest_config.level1_entry_map_size = LEVEL1_ENTRY_MAP_SIZE;
 	guest_config.level1_offset = LEVEL1_OFFSET;
 	guest_config.level1_description_type = LEVEL1_DESCRIPTION_TYPE;
 	guest_config.level2_pages = LEVEL2_PAGES;
-	guest_config.level2_entry_map_size = LEVEL2_DESCRIPTION_TYPE;
+	guest_config.level2_entry_map_size = LEVEL2_ENTRY_MAP_SIZE;
 	guest_config.level2_offset = LEVEL2_OFFSET;
 	guest_config.level2_description_type = LEVEL2_DESCRIPTION_TYPE;
 	guest_config.alloc_level2_pages = alloc_guest_level2;
@@ -452,12 +462,13 @@ int el2_stage1_init(void)
 
 	memset((char *)&host_config, 0, sizeof(struct mmu_config));
 
+	host_config.table_offset = 12;
 	host_config.level1_entry_map_size = SIZE_1G;
 	host_config.level1_offset = G4K_LEVEL1_OFFSET;
 	host_config.level1_description_type = DESCRIPTION_TABLE;
 	host_config.level2_pages = 1;
 	host_config.level2_entry_map_size = SIZE_2M;
-	host_config.level2_offset = G4K_LEVEL2_OFFSET;
+	host_config.level2_offset = 21;
 	host_config.level2_description_type = DESCRIPTION_BLOCK;
 	host_config.alloc_level2_pages = alloc_host_level2;
 	host_config.get_tt_description = host_tt_description;
