@@ -48,22 +48,7 @@ func flush_dcache_range
 endfunc flush_dcache_range
 
 func inv_dcache_range
-	/* Exit early if size is zero */
-	cbz	x1, exit_loop_ivac
-	dcache_line_size x2, x3
-	add	x1, x0, x1
-	sub	x3, x2, #1
-	bic	x0, x0, x3
-loop_ivac:
-	dc	ivac, x0
-	add	x0, x0, x2
-	cmp	x0, x1
-	b.lo    loop_ivac
-	dsb	sy
-exit_loop_ivac:
-	ret
-
-//	do_dcache_maintenance_by_mva ivac
+	do_dcache_maintenance_by_mva ivac
 endfunc inv_dcache_range
 
 .macro	dcsw_op shift, fw, ls

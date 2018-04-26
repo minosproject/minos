@@ -644,7 +644,7 @@ int gicv3_init(void)
 
 	io_remap(0x2f000000, 0x2f000000, 64 * 1024);
 	io_remap(0x2f020000, 0x2f020000, 128 * 1024);
-	io_remap(0x2f100000, 0x2f100000, 1024 * 1024 * 1024);
+	io_remap(0x2f100000, 0x2f100000, 1024 * 1024);
 
 	for (i = 0; i < CONFIG_NR_CPUS; i++) {
 		rbase = __gicr_rd_base + (128 * 1024) * i;

@@ -64,8 +64,16 @@ void smp_cpus_up(void)
 {
 	int i;
 
-	for (i = 1; i < CONFIG_NR_CPUS; i++)
+	for (i = 0; i < CONFIG_NR_CPUS; i++)
 		smp_cpu_up((i << 0) | (0 << 8) | (0 << 16) | (0ul << 32));
+
+	/*
+	 * here need to flush the cache since
+	 * other cpu do not have enable the cache
+	 * so they can not see the data
+	 */
+	flush_dcache_range((unsigned long)smp_holding_pen,
+			CONFIG_NR_CPUS * sizeof(unsigned long));
 }
 
 void vmm_smp_init(void)

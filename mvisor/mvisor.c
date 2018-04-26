@@ -136,7 +136,6 @@ void boot_secondary(void)
 {
 	uint32_t cpuid = get_cpu_id();
 	uint64_t mid;
-	uint64_t mpidr;
 
 	vmm_early_init_percpu();
 
@@ -148,8 +147,6 @@ void boot_secondary(void)
 	vmm_irq_secondary_init();
 
 	vmm_subsys_init_percpu();
-
-	smp_holding_pen[cpuid] = mpidr;
 
 	enable_local_irq();
 
