@@ -166,8 +166,8 @@ static uint64_t guest_tt_description(int m_type, int d_type)
 		if (m_type == MEM_TYPE_NORMAL) {
 			attr = TT_S2_ATTR_BLOCK | TT_S2_ATTR_AP_RW | \
 			       TT_S2_ATTR_SH_INNER | TT_S2_ATTR_AF | \
-			       TT_S2_ATTR_MEMATTR_OUTER_WT | \
-			       TT_S2_ATTR_MEMATTR_NORMAL_INNER_WT;
+			       TT_S2_ATTR_MEMATTR_OUTER_WB | \
+			       TT_S2_ATTR_MEMATTR_NORMAL_INNER_WB;
 		} else {
 			attr = TT_S2_ATTR_BLOCK | TT_S2_ATTR_AP_RW | \
 			       TT_S2_ATTR_SH_INNER | TT_S2_ATTR_AF | \
@@ -182,8 +182,8 @@ static uint64_t guest_tt_description(int m_type, int d_type)
 		if (m_type == MEM_TYPE_NORMAL) {
 			attr = TT_S2_ATTR_PAGE | TT_S2_ATTR_AP_RW | \
 			       TT_S2_ATTR_SH_INNER | TT_S2_ATTR_AF | \
-			       TT_S2_ATTR_MEMATTR_OUTER_WT | \
-			       TT_S2_ATTR_MEMATTR_NORMAL_INNER_WT;
+			       TT_S2_ATTR_MEMATTR_OUTER_WB | \
+			       TT_S2_ATTR_MEMATTR_NORMAL_INNER_WB;
 		} else {
 			attr = TT_S2_ATTR_PAGE | TT_S2_ATTR_AP_RW | \
 			       TT_S2_ATTR_SH_INNER | TT_S2_ATTR_AF | \
@@ -269,6 +269,7 @@ static int map_level2_pages(unsigned long *tbase, unsigned long vbase,
 
 	tmp = ALIGN(vbase, config->level1_entry_map_size);
 	index = (vbase - tmp) >> offset;
+	tmp = index;
 
 	for (i = 0; i < (size >> offset); i++) {
 		if (*(tbase + index) != 0)
@@ -280,6 +281,9 @@ static int map_level2_pages(unsigned long *tbase, unsigned long vbase,
 		pbase += config->level2_entry_map_size;
 		index++;
 	}
+
+	flush_dcache_range((unsigned long)(tbase + tmp),
+		(size >> offset) * sizeof(unsigned long));
 
 	return 0;
 }
@@ -318,6 +322,8 @@ static int map_mem(unsigned long t_base, unsigned long base,
 				((tmp >> config->table_offset) << \
 				 config->table_offset);
 			value = (uint64_t)tmp;
+			flush_dcache_range((unsigned long)(tbase + offset),
+					sizeof(unsigned long));
 		} else {
 			/* get the base address of the entry */
 			value = value & 0x0000ffffffffffff;
@@ -336,11 +342,7 @@ static int map_mem(unsigned long t_base, unsigned long base,
 		base += map_size;
 		size -= map_size;
 		phy_base += map_size;
-		flush_dcache_range((unsigned long)value,
-				config->level2_pages * SIZE_4K);
 	}
-
-	flush_dcache_range(t_base, config->level1_table_size);
 
 out:
 	spin_unlock(config->lock);
