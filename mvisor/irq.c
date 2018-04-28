@@ -8,22 +8,22 @@
 #include <mvisor/module.h>
 #include <mvisor/sched.h>
 
-DEFINE_PER_CPU(struct vmm_irq **, local_irqs);
+DEFINE_PER_CPU(struct irq_desc **, local_irqs);
 
 static struct irq_chip *irq_chip;
 static struct irq_domain *irq_domains[IRQ_DOMAIN_MAX];
 
-static int init_irq_desc(struct vmm_irq *vmm_irq,
+static int init_irq_desc(struct irq_desc *irq_desc,
 		struct irq_resource *config)
 {
 	struct vcpu *vcpu;
 
-	vmm_irq->hno = config->hno;
+	irq_desc->hno = config->hno;
 
 	if (config->vmid == 0xffff) {
-		pr_info("irq %d is for vmm\n", config->hno);
-		vmm_irq->flags |= IRQ_FLAG_OWNER_VMM;
-		strncpy(vmm_irq->name, config->name,
+		pr_info("irq %d is for mvisor\n", config->hno);
+		irq_desc->flags |= IRQ_FLAG_OWNER_MVISOR;
+		strncpy(irq_desc->name, config->name,
 			MIN(strlen(config->name), MAX_IRQ_NAME_SIZE - 1));
 		return 0;
 	}
@@ -34,24 +34,24 @@ static int init_irq_desc(struct vmm_irq *vmm_irq,
 		return -EINVAL;;
 	}
 
-	vmm_irq->vno = config->vno;
-	vmm_irq->vmid = config->vmid;
+	irq_desc->vno = config->vno;
+	irq_desc->vmid = config->vmid;
 
-	vmm_irq->affinity_vcpu = config->affinity;
-	vmm_irq->affinity_pcpu = get_pcpu_id(vcpu);
-	strncpy(vmm_irq->name, config->name,
+	irq_desc->affinity_vcpu = config->affinity;
+	irq_desc->affinity_pcpu = get_pcpu_id(vcpu);
+	strncpy(irq_desc->name, config->name,
 		MIN(strlen(config->name), MAX_IRQ_NAME_SIZE - 1));
-	vmm_irq->flags |= config->type;
-	vmm_irq->flags |= IRQ_FLAG_AFFINITY_VCPU;
+	irq_desc->flags |= config->type;
+	irq_desc->flags |= IRQ_FLAG_AFFINITY_VCPU;
 
 	return 0;
 }
 
-static struct vmm_irq *alloc_vmm_irq(void)
+static struct irq_desc *alloc_irq_desc(void)
 {
-	struct vmm_irq *irq;
+	struct irq_desc *irq;
 
-	irq = (struct vmm_irq *)vmm_zalloc(sizeof(struct vmm_irq));
+	irq = (struct irq_desc *)mvisor_zalloc(sizeof(struct irq_desc));
 	if (!irq)
 		return NULL;
 
@@ -158,7 +158,7 @@ int _send_virq(struct vcpu *vcpu, uint32_t virq, uint32_t hirq, int hw)
 		 * the same pcpu, then send a hw sgi to the
 		 * pcpu to do the sched work
 		 */
-		send_sgi(CONFIG_VMM_RESCHED_IRQ, vcpu->pcpu_affinity);
+		send_sgi(CONFIG_MVISOR_RESCHED_IRQ, vcpu->pcpu_affinity);
 	} else {
 		/*
 		 * if the sender and the target are the same
@@ -174,49 +174,49 @@ out:
 	return ret;
 }
 
-static int do_handle_guest_irq(struct vmm_irq *vmm_irq)
+static int do_handle_guest_irq(struct irq_desc *irq_desc)
 {
 	struct vm *vm;
 	struct vcpu *vcpu;
 
-	vm = get_vm_by_id(vmm_irq->vmid);
+	vm = get_vm_by_id(irq_desc->vmid);
 	if (!vm) {
-		pr_error("Invaild vm for this irq %d\n", vmm_irq->hno);
+		pr_error("Invaild vm for this irq %d\n", irq_desc->hno);
 		return -EINVAL;
 	}
 
-	vcpu = get_vcpu_in_vm(vm, vmm_irq->affinity_vcpu);
+	vcpu = get_vcpu_in_vm(vm, irq_desc->affinity_vcpu);
 	if (vcpu == NULL) {
-		pr_error("Invaild vcpu for this irq %d\n", vmm_irq->hno);
+		pr_error("Invaild vcpu for this irq %d\n", irq_desc->hno);
 		return -EINVAL;
 	}
 
-	return _send_virq(vcpu, vmm_irq->vno, vmm_irq->hno, 1);
+	return _send_virq(vcpu, irq_desc->vno, irq_desc->hno, 1);
 }
 
-static int do_handle_vmm_irq(struct vmm_irq *vmm_irq)
+static int do_handle_host_irq(struct irq_desc *irq_desc)
 {
 	uint32_t cpuid = get_cpu_id();
 	int ret;
 
-	if (cpuid != vmm_irq->affinity_pcpu) {
-		pr_info("irq %d do not belong tho this cpu\n", vmm_irq->hno);
+	if (cpuid != irq_desc->affinity_pcpu) {
+		pr_info("irq %d do not belong tho this cpu\n", irq_desc->hno);
 		ret =  -EINVAL;
 		goto out;
 	}
 
-	if (!vmm_irq->handler) {
-		pr_error("Irq is not register by VMM\n");
+	if (!irq_desc->handler) {
+		pr_error("Irq is not register by MVISOR\n");
 		ret = -EINVAL;
 		goto out;
 	}
 
-	ret = vmm_irq->handler(vmm_irq->hno, vmm_irq->pdata);
+	ret = irq_desc->handler(irq_desc->hno, irq_desc->pdata);
 	if (ret)
-		pr_error("handle irq:%d fail in vmm\n", vmm_irq->hno);
+		pr_error("handle irq:%d fail in mvisor\n", irq_desc->hno);
 
 out:
-	irq_chip->irq_dir(vmm_irq->hno);
+	irq_chip->irq_dir(irq_desc->hno);
 
 	return ret;
 }
@@ -229,7 +229,7 @@ int register_irq_domain(int type, struct irq_domain_ops *ops)
 	if (type >= IRQ_DOMAIN_MAX)
 		return -EINVAL;
 
-	domain = (struct irq_domain *)vmm_zalloc(sizeof(struct irq_domain));
+	domain = (struct irq_domain *)mvisor_zalloc(sizeof(struct irq_domain));
 	if (!domain)
 		return -ENOMEM;
 
@@ -237,21 +237,21 @@ int register_irq_domain(int type, struct irq_domain_ops *ops)
 	irq_domains[type] = domain;
 }
 
-static struct vmm_irq **spi_alloc_irqs(uint32_t start, uint32_t count)
+static struct irq_desc **spi_alloc_irqs(uint32_t start, uint32_t count)
 {
-	struct vmm_irq **irqs;
+	struct irq_desc **irqs;
 	uint32_t size;
 	uint32_t i;
 
-	size = count * sizeof(struct vmm_irq *);
-	irqs = (struct vmm_irq **)vmm_zalloc(size);
+	size = count * sizeof(struct irq_desc *);
+	irqs = (struct irq_desc **)mvisor_zalloc(size);
 	if (!irqs)
 		return NULL;
 
 	return irqs;
 }
 
-static struct vmm_irq *spi_get_irq_desc(struct irq_domain *d, uint32_t irq)
+static struct irq_desc *spi_get_irq_desc(struct irq_domain *d, uint32_t irq)
 {
 	if ((irq < d->start) || (irq >= (d->start + d->count)))
 		return NULL;
@@ -262,15 +262,15 @@ static struct vmm_irq *spi_get_irq_desc(struct irq_domain *d, uint32_t irq)
 static uint32_t spi_virq_to_irq(struct irq_domain *d, uint32_t virq)
 {
 	int i;
-	struct vmm_irq *vmm_irq;
+	struct irq_desc *irq_desc;
 
 	for (i = 0; i < d->count; i++) {
-		vmm_irq = d->irqs[i];
-		if (!vmm_irq)
+		irq_desc = d->irqs[i];
+		if (!irq_desc)
 			continue;
 
-		if (vmm_irq->vno == virq)
-			return vmm_irq->hno;
+		if (irq_desc->vno == virq)
+			return irq_desc->hno;
 	}
 
 	return BAD_IRQ;
@@ -278,9 +278,9 @@ static uint32_t spi_virq_to_irq(struct irq_domain *d, uint32_t virq)
 
 static int spi_register_irq(struct irq_domain *d, struct irq_resource *res)
 {
-	struct vmm_irq *irq;
+	struct irq_desc *irq;
 
-	irq = alloc_vmm_irq();
+	irq = alloc_irq_desc();
 	init_irq_desc(irq, res);
 
 	d->irqs[irq->hno - d->start] = irq;
@@ -290,30 +290,30 @@ static int spi_register_irq(struct irq_domain *d, struct irq_resource *res)
 static void spi_setup_irqs(struct irq_domain *d)
 {
 	int i;
-	struct vmm_irq *vmm_irq;
+	struct irq_desc *irq_desc;
 
 	for (i = 0; i < d->count; i++) {
-		vmm_irq = d->irqs[i];
-		if (!vmm_irq)
+		irq_desc = d->irqs[i];
+		if (!irq_desc)
 			continue;
 
-		if (vmm_irq->flags & IRQ_FLAG_AFFINITY_VCPU) {
-			irq_chip->irq_set_type(vmm_irq->hno,
-					vmm_irq->flags & IRQ_FLAG_TYPE_MASK);
-			irq_chip->irq_set_affinity(vmm_irq->hno,
-					vmm_irq->affinity_pcpu);
+		if (irq_desc->flags & IRQ_FLAG_AFFINITY_VCPU) {
+			irq_chip->irq_set_type(irq_desc->hno,
+					irq_desc->flags & IRQ_FLAG_TYPE_MASK);
+			irq_chip->irq_set_affinity(irq_desc->hno,
+					irq_desc->affinity_pcpu);
 		}
 	}
 }
 
-static int spi_int_handler(struct irq_domain *d, struct vmm_irq *vmm_irq)
+static int spi_int_handler(struct irq_domain *d, struct irq_desc *irq_desc)
 {
 	int ret;
 
-	if (vmm_irq->flags & IRQ_FLAG_OWNER_VMM)
-		ret = do_handle_vmm_irq(vmm_irq);
+	if (irq_desc->flags & IRQ_FLAG_OWNER_MVISOR)
+		ret = do_handle_host_irq(irq_desc);
 	else
-		ret = do_handle_guest_irq(vmm_irq);
+		ret = do_handle_guest_irq(irq_desc);
 
 	return ret;
 }
@@ -327,9 +327,9 @@ struct irq_domain_ops spi_domain_ops = {
 	.irq_handler = spi_int_handler,
 };
 
-static struct vmm_irq **local_alloc_irqs(uint32_t start, uint32_t count)
+static struct irq_desc **local_alloc_irqs(uint32_t start, uint32_t count)
 {
-	struct vmm_irq **irqs;
+	struct irq_desc **irqs;
 	uint32_t size;
 	uint32_t i;
 	unsigned long addr;
@@ -337,23 +337,23 @@ static struct vmm_irq **local_alloc_irqs(uint32_t start, uint32_t count)
 	/*
 	 * each cpu will have its local irqs
 	 */
-	size = count * sizeof(struct vmm_irq *) * CONFIG_NR_CPUS;
-	irqs = (struct vmm_irq **)vmm_zalloc(size);
+	size = count * sizeof(struct irq_desc *) * CONFIG_NR_CPUS;
+	irqs = (struct irq_desc **)mvisor_zalloc(size);
 	if (!irqs)
 		return NULL;
 
 	addr = (unsigned long)irqs;
 	for (i = 0; i < CONFIG_NR_CPUS; i++) {
-		get_per_cpu(local_irqs, i) = (struct vmm_irq **)addr;
-		addr += count * sizeof(struct vmm_irq *);
+		get_per_cpu(local_irqs, i) = (struct irq_desc **)addr;
+		addr += count * sizeof(struct irq_desc *);
 	}
 
 	return irqs;
 }
 
-static struct vmm_irq *local_get_irq_desc(struct irq_domain *d, uint32_t irq)
+static struct irq_desc *local_get_irq_desc(struct irq_domain *d, uint32_t irq)
 {
-	struct vmm_irq **irqs;
+	struct irq_desc **irqs;
 
 	if ((irq < d->start) || (irq >= (d->start + d->count)))
 		return NULL;
@@ -375,12 +375,12 @@ static uint32_t local_virq_to_irq(struct irq_domain *d, uint32_t virq)
 static int local_register_irq(struct irq_domain *d, struct irq_resource *res)
 {
 	int i;
-	struct vmm_irq *irq;
-	struct vmm_irq **local;
+	struct irq_desc *irq;
+	struct irq_desc **local;
 
 	for (i = 0; i < CONFIG_NR_CPUS; i++) {
 		local = get_per_cpu(local_irqs, i);
-		irq = alloc_vmm_irq();
+		irq = alloc_irq_desc();
 		init_irq_desc(irq, res);
 		irq->affinity_pcpu = i;
 		local[irq->hno - d->start] = irq;
@@ -397,9 +397,9 @@ static void local_setup_irqs(struct irq_domain *d)
 	 */
 }
 
-static int local_int_handler(struct irq_domain *d, struct vmm_irq *vmm_irq)
+static int local_int_handler(struct irq_domain *d, struct irq_desc *irq_desc)
 {
-	return do_handle_vmm_irq(vmm_irq);
+	return do_handle_host_irq(irq_desc);
 }
 
 struct irq_domain_ops local_domain_ops = {
@@ -414,7 +414,7 @@ struct irq_domain_ops local_domain_ops = {
 static int irq_domain_create_irqs(struct irq_domain *d,
 		uint32_t start, uint32_t cnt)
 {
-	struct vmm_irq **irqs;
+	struct irq_desc **irqs;
 
 	if ((cnt == 0) || (cnt >= 1024)) {
 		pr_error("%s: invaild irq cnt %d\n", __func__, cnt);
@@ -483,7 +483,7 @@ static struct irq_domain *get_irq_domain(uint32_t irq)
 	return NULL;
 }
 
-static struct vmm_irq *get_irq_desc(uint32_t irq)
+static struct irq_desc *get_irq_desc(uint32_t irq)
 {
 	struct irq_domain *domain;
 
@@ -494,10 +494,10 @@ static struct vmm_irq *get_irq_desc(uint32_t irq)
 	return domain->ops->get_irq_desc(domain, irq);
 }
 
-int vmm_register_irq_entry(void *res)
+int mvisor_register_irq_entry(void *res)
 {
 	struct irq_resource *config;
-	struct vmm_irq *vmm_irq;
+	struct irq_desc *irq_desc;
 	struct vcpu *vcpu;
 	struct irq_domain *domain;
 
@@ -517,34 +517,34 @@ int vmm_register_irq_entry(void *res)
 void __irq_enable(uint32_t irq, int enable)
 {
 	unsigned long flag;
-	struct vmm_irq *vmm_irq;
+	struct irq_desc *irq_desc;
 
-	vmm_irq = get_irq_desc(irq);
-	if (!vmm_irq)
+	irq_desc = get_irq_desc(irq);
+	if (!irq_desc)
 		return;
 
-	spin_lock_irqsave(&vmm_irq->lock, flag);
+	spin_lock_irqsave(&irq_desc->lock, flag);
 
 	if (enable) {
-		if (vmm_irq->flags & IRQ_FLAG_STATUS_MASK ==
+		if (irq_desc->flags & IRQ_FLAG_STATUS_MASK ==
 				IRQ_FLAG_STATUS_MASKED)
 			goto out;
 
 		irq_chip->irq_unmask(irq);
-		vmm_irq->flags &= ~IRQ_FLAG_STATUS_MASK;
-		vmm_irq->flags |= IRQ_FLAG_STATUS_UNMASKED;
+		irq_desc->flags &= ~IRQ_FLAG_STATUS_MASK;
+		irq_desc->flags |= IRQ_FLAG_STATUS_UNMASKED;
 	} else {
-		if (vmm_irq->flags & IRQ_FLAG_STATUS_MASK ==
+		if (irq_desc->flags & IRQ_FLAG_STATUS_MASK ==
 				IRQ_FLAG_STATUS_UNMASKED)
 			goto out;
 
 		irq_chip->irq_mask(irq);
-		vmm_irq->flags &= ~IRQ_FLAG_STATUS_MASK;
-		vmm_irq->flags |= IRQ_FLAG_STATUS_MASKED;
+		irq_desc->flags &= ~IRQ_FLAG_STATUS_MASK;
+		irq_desc->flags |= IRQ_FLAG_STATUS_MASKED;
 	}
 
 out:
-	spin_unlock_irqrestore(&vmm_irq->lock, flag);
+	spin_unlock_irqrestore(&irq_desc->lock, flag);
 }
 
 void __virq_enable(uint32_t virq, int enable)
@@ -558,7 +558,7 @@ void __virq_enable(uint32_t virq, int enable)
 	__irq_enable(irq, enable);
 }
 
-void vmm_setup_irqs(void)
+void mvisor_setup_irqs(void)
 {
 	int i;
 	struct irq_domain *d;
@@ -573,17 +573,17 @@ void vmm_setup_irqs(void)
 
 int send_virq_hw(uint32_t vmid, uint32_t virq, uint32_t hirq)
 {
-	struct vmm_irq *vmm_irq;
+	struct irq_desc *irq_desc;
 	struct vcpu *vcpu;
 
-	vmm_irq = get_irq_desc(hirq);
-	if (!vmm_irq)
+	irq_desc = get_irq_desc(hirq);
+	if (!irq_desc)
 		return -ENOENT;
 
-	if (vmid != vmm_irq->vmid)
+	if (vmid != irq_desc->vmid)
 		return -EINVAL;
 
-	vcpu = get_vcpu_by_id(vmid, vmm_irq->affinity_vcpu);
+	vcpu = get_vcpu_by_id(vmid, irq_desc->affinity_vcpu);
 	if (!vcpu)
 		return -ENOENT;
 
@@ -655,7 +655,7 @@ static int do_bad_int(uint32_t irq)
 int do_irq_handler(void)
 {
 	uint32_t irq;
-	struct vmm_irq *vmm_irq;
+	struct irq_desc *irq_desc;
 	struct irq_domain *d;
 	int ret = 0;
 
@@ -677,14 +677,14 @@ int do_irq_handler(void)
 	 */
 	irq_chip->irq_eoi(irq);
 
-	vmm_irq = d->ops->get_irq_desc(d, irq);
-	if (!vmm_irq) {
+	irq_desc = d->ops->get_irq_desc(d, irq);
+	if (!irq_desc) {
 		pr_error("irq is not actived %d\n", irq);
 		ret = -EINVAL;
 		goto error;
 	}
 
-	return d->ops->irq_handler(d, vmm_irq);
+	return d->ops->irq_handler(d, irq_desc);
 
 error:
 	do_bad_int(irq);
@@ -693,26 +693,26 @@ error:
 
 int request_irq(uint32_t irq, irq_handle_t handler, void *data)
 {
-	struct vmm_irq *vmm_irq;
+	struct irq_desc *irq_desc;
 	unsigned long flag;
 
 	if ((!handler))
 		return -EINVAL;
 
-	vmm_irq = get_irq_desc(irq);
-	if (!vmm_irq)
+	irq_desc = get_irq_desc(irq);
+	if (!irq_desc)
 		return -ENOENT;
 
 	/*
-	 * whether the irq is belong to vmm
+	 * whether the irq is belong to mvisor
 	 */
-	if (!(vmm_irq->flags & IRQ_FLAG_OWNER_MASK))
+	if (!(irq_desc->flags & IRQ_FLAG_OWNER_MASK))
 		return -ENOENT;
 
-	spin_lock_irqsave(&vmm_irq->lock, flag);
-	vmm_irq->handler = handler;
-	vmm_irq->pdata = data;
-	spin_unlock_irqrestore(&vmm_irq->lock, flag);
+	spin_lock_irqsave(&irq_desc->lock, flag);
+	irq_desc->handler = handler;
+	irq_desc->pdata = data;
+	spin_unlock_irqrestore(&irq_desc->lock, flag);
 
 	irq_unmask(irq);
 
@@ -834,13 +834,13 @@ int vcpu_has_virq(struct vcpu *vcpu)
 	return (active || pending);
 }
 
-int vmm_irq_init(void)
+int mvisor_irq_init(void)
 {
 	uint32_t size;
 	char *chip_name = CONFIG_IRQ_CHIP_NAME;
 
-	irq_chip = (struct irq_chip *)vmm_get_module_pdata(chip_name,
-			VMM_MODULE_NAME_IRQCHIP);
+	irq_chip = (struct irq_chip *)mvisor_get_module_pdata(chip_name,
+			MVISOR_MODULE_NAME_IRQCHIP);
 	if (!irq_chip)
 		panic("can not find the irqchip for system\n");
 
@@ -858,15 +858,15 @@ int vmm_irq_init(void)
 	if (!irq_chip->get_pending_irq)
 		panic("No function to get irq nr\n");
 
-	vmm_register_hook(irq_exit_from_guest,
-			NULL, VMM_HOOK_TYPE_EXIT_FROM_GUEST);
-	vmm_register_hook(irq_enter_to_guest,
-			NULL, VMM_HOOK_TYPE_ENTER_TO_GUEST);
+	mvisor_register_hook(irq_exit_from_guest,
+			NULL, MVISOR_HOOK_TYPE_EXIT_FROM_GUEST);
+	mvisor_register_hook(irq_enter_to_guest,
+			NULL, MVISOR_HOOK_TYPE_ENTER_TO_GUEST);
 
 	return 0;
 }
 
-int vmm_irq_secondary_init(void)
+int irq_desc_secondary_init(void)
 {
 	if (irq_chip)
 		irq_chip->secondary_init();

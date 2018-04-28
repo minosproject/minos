@@ -4,7 +4,7 @@
 
 /* hno vno vmid affinity type name */
 struct irq_resource irq_resource_table[] __irq_resource = {
-	{13, 13, 0xffff, 0, IRQ_FLAG_TYPE_LEVEL_LOW, "vmm_reched"},
+	{13, 13, 0xffff, 0, IRQ_FLAG_TYPE_LEVEL_LOW, "mvisor_reched"},
 	{26, 26, 0xffff, 0, IRQ_FLAG_TYPE_LEVEL_LOW, "hyp timer int"},
 	{27, 27, 0xffff, 0, IRQ_FLAG_TYPE_LEVEL_LOW, "virtual timer int"},
 	{29, 29, 0xffff, 0, IRQ_FLAG_TYPE_LEVEL_LOW, "sec phy timer int"},

@@ -3,10 +3,10 @@
 
 #include <mvisor/types.h>
 
-enum vmm_resource_type {
-	VMM_RESOURCE_TYPE_MEMORY = 0,
-	VMM_RESOURCE_TYPE_IRQ,
-	VMM_RESOURCE_TYPE_UNKNOWN,
+enum mvisor_resource_type {
+	MVISOR_RESOURCE_TYPE_MEMORY = 0,
+	MVISOR_RESOURCE_TYPE_IRQ,
+	MVISOR_RESOURCE_TYPE_UNKNOWN,
 };
 
 struct memory_resource {
@@ -26,6 +26,6 @@ struct irq_resource {
 	char *name;
 };
 
-int vmm_parse_resource(void);
+int mvisor_parse_resource(void);
 
 #endif

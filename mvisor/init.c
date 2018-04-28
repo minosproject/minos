@@ -31,7 +31,7 @@ static void call_init_func(unsigned long fn_start, unsigned long fn_end)
 	}
 }
 
-void vmm_early_init(void)
+void mvisor_early_init(void)
 {
 	arch_early_init();
 
@@ -39,7 +39,7 @@ void vmm_early_init(void)
 			(unsigned long)&__init_func_1_start);
 }
 
-void vmm_arch_init(void)
+void mvisor_arch_init(void)
 {
 	arch_init();
 
@@ -47,37 +47,37 @@ void vmm_arch_init(void)
 			(unsigned long)&__init_func_2_start);
 }
 
-void vmm_subsys_init(void)
+void mvisor_subsys_init(void)
 {
 	call_init_func((unsigned long)&__init_func_2_start,
 			(unsigned long)&__init_func_3_start);
 }
 
-void vmm_device_init(void)
+void mvisor_device_init(void)
 {
 	call_init_func((unsigned long)&__init_func_3_start,
 			(unsigned long)&__init_func_4_start);
 }
 
-void vmm_early_init_percpu(void)
+void mvisor_early_init_percpu(void)
 {
 	call_init_func((unsigned long)&__init_func_4_start,
 			(unsigned long)&__init_func_5_start);
 }
 
-void vmm_arch_init_percpu(void)
+void mvisor_arch_init_percpu(void)
 {
 	call_init_func((unsigned long)&__init_func_5_start,
 			(unsigned long)&__init_func_6_start);
 }
 
-void vmm_subsys_init_percpu(void)
+void mvisor_subsys_init_percpu(void)
 {
 	call_init_func((unsigned long)&__init_func_6_start,
 			(unsigned long)&__init_func_7_start);
 }
 
-void vmm_device_init_percpu(void)
+void mvisor_device_init_percpu(void)
 {
 	call_init_func((unsigned long)&__init_func_7_start,
 			(unsigned long)&__init_func_end);

@@ -20,22 +20,22 @@
 
 typedef void (*hook_func_t)(struct vcpu *vcpu, void *data);
 
-enum vmm_hook_type {
-	VMM_HOOK_TYPE_EXIT_FROM_GUEST = 0,
-	VMM_HOOK_TYPE_ENTER_TO_GUEST,
-	VMM_HOOK_TYPE_CREATE_VM,
-	VMM_HOOK_TYPE_UNKNOWN,
+enum mvisor_hook_type {
+	MVISOR_HOOK_TYPE_EXIT_FROM_GUEST = 0,
+	MVISOR_HOOK_TYPE_ENTER_TO_GUEST,
+	MVISOR_HOOK_TYPE_CREATE_VM,
+	MVISOR_HOOK_TYPE_UNKNOWN,
 };
 
-struct vmm_hook {
+struct mvisor_hook {
 	hook_func_t fn;
 	void *data;
 	struct list_head list;
 };
 
-void vmm_exit_from_guest(struct vcpu *vcpu);
-void vmm_enter_to_guest(struct vcpu *vcpu);
-int vmm_register_hook(hook_func_t fn,
-	void *data, enum vmm_hook_type type);
+void mvisor_exit_from_guest(struct vcpu *vcpu);
+void mvisor_enter_to_guest(struct vcpu *vcpu);
+int mvisor_register_hook(hook_func_t fn,
+	void *data, enum mvisor_hook_type type);
 
 #endif

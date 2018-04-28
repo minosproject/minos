@@ -50,7 +50,7 @@ static void inline set_vcpu_state(struct vcpu *vcpu, vcpu_state_t state)
 	vcpu->state = state;
 }
 
-void vmm_pcpus_init(void);
+void mvisor_pcpus_init(void);
 void sched(void);
 void sched_vcpu(struct vcpu *vcpu, int reason);
 uint32_t pcpu_affinity(struct vcpu *vcpu, uint32_t affinity);

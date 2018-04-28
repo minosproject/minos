@@ -17,7 +17,7 @@ int get_cpu_id(void);
 void smp_cpus_up(void);
 int smp_cpu_up(uint64_t mpidr_id);
 
-void vmm_smp_init(void);
+void mvisor_smp_init(void);
 
 #define smp_processor_id()	get_cpu_id()
 #define for_all_cpu(cpu)	\

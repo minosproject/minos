@@ -53,19 +53,19 @@ SECTIONS
 
 	. = ALIGN(8);
 
-	__vmm_module_start = .;
-	.__vmm_module : {
-		*(.__vmm_module)
+	__mvisor_module_start = .;
+	.__mvisor_module : {
+		*(.__mvisor_module)
 	}
-	__vmm_module_end = .;
+	__mvisor_module_end = .;
 
 	. = ALIGN(8);
 
-	__vmm_vm_start = .;
-	.__vmm_vm : {
-		*(.__vmm_vm)
+	__mvisor_vm_start = .;
+	.__mvisor_vm : {
+		*(.__mvisor_vm)
 	}
-	__vmm_vm_end = .;
+	__mvisor_vm_end = .;
 
 	. = ALIGN(8);
 
@@ -127,18 +127,18 @@ SECTIONS
 	__init_end = .;
 
 	. = ALIGN(8);
-	__vmm_irq_resource_start = .;
-	.__vmm_irq_resource : {
-		*(.__vmm_irq_resource)
+	__irq_desc_resource_start = .;
+	.__irq_desc_resource : {
+		*(.__irq_desc_resource)
 	}
-	__vmm_irq_resource_end = .;
+	__irq_desc_resource_end = .;
 
 	. = ALIGN(8);
-	__vmm_memory_resource_start = .;
-	.__vmm_memory_resource : {
-		*(.__vmm_memory_resource)
+	__mvisor_memory_resource_start = .;
+	.__mvisor_memory_resource : {
+		*(.__mvisor_memory_resource)
 	}
-	__vmm_memory_resource_end = .;
+	__mvisor_memory_resource_end = .;
 
 	. = ALIGN(8);
 

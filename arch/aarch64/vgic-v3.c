@@ -142,7 +142,7 @@ static void vgicv3_vm_create(struct vm *vm)
 	 * one vgic for each vm since gicr is percpu
 	 * but gicd is shared so created it here
 	 */
-	gicd = (struct vgicv3_gicd*)vmm_malloc(sizeof(struct vgicv3_gicd));
+	gicd = (struct vgicv3_gicd*)mvisor_malloc(sizeof(struct vgicv3_gicd));
 	if (!gicd)
 		panic("No more memory for gicd\n");
 
@@ -375,7 +375,7 @@ static struct mmio_ops vgicv3_mmio_ops = {
 	.check = vgicv3_mmio_check,
 };
 
-static int vgicv3_module_init(struct vmm_module *module)
+static int vgicv3_module_init(struct mvisor_module *module)
 {
 	init_list(&gicd_list);
 
@@ -392,5 +392,5 @@ static int vgicv3_module_init(struct vmm_module *module)
 	return 0;
 }
 
-VMM_MODULE_DECLARE(vgic_v3, "vgic-v3",
+MVISOR_MODULE_DECLARE(vgic_v3, "vgic-v3",
 		"vgic", (void *)vgicv3_module_init);

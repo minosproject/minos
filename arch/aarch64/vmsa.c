@@ -199,7 +199,7 @@ static uint64_t guest_tt_description(int m_type, int d_type)
 
 static char *alloc_host_level2(int pages)
 {
-	return vmm_alloc_pages(pages);
+	return mvisor_alloc_pages(pages);
 }
 
 static uint64_t host_tt_description(int m_type, int d_type)
@@ -567,7 +567,7 @@ static struct mmu_chip vmsa_mmu = {
 	.alloc_guest_pt 	= alloc_guest_pt,
 };
 
-static int vmsa_module_init(struct vmm_module *module)
+static int vmsa_module_init(struct mvisor_module *module)
 {
 	module->context_size = sizeof(struct vmsa_context);
 	module->pdata = (void *)&vmsa_mmu;
@@ -578,5 +578,5 @@ static int vmsa_module_init(struct vmm_module *module)
 	return 0;
 }
 
-VMM_MODULE_DECLARE(vmsa, "armv8-mmu",
-	VMM_MODULE_NAME_MMU, (void *)vmsa_module_init);
+MVISOR_MODULE_DECLARE(vmsa, "armv8-mmu",
+	MVISOR_MODULE_NAME_MMU, (void *)vmsa_module_init);

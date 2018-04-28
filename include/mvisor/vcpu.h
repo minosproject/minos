@@ -60,7 +60,7 @@ struct vm *get_vm_by_id(uint32_t vmid);
 
 int arch_vm_init(struct vm *vm);
 
-int vmm_create_vms(void);
+int mvisor_create_vms(void);
 
 struct vcpu *get_vcpu_in_vm(struct vm *vm, uint32_t vcpu_id);
 

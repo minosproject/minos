@@ -34,6 +34,6 @@ int mmu_map_host_memory(unsigned long vir,
 		unsigned long phy, size_t size, int type);
 
 int io_remap(unsigned long vir, unsigned long phy, size_t size);
-int vmm_mmu_init(void);
+int mvisor_mmu_init(void);
 
 #endif

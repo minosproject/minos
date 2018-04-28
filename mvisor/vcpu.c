@@ -9,15 +9,15 @@
 #include <mvisor/bitmap.h>
 #include <mvisor/irq.h>
 
-extern unsigned char __vmm_vm_start;
-extern unsigned char __vmm_vm_end;
+extern unsigned char __mvisor_vm_start;
+extern unsigned char __mvisor_vm_end;
 
 static struct vm *vms[CONFIG_MAX_VM];
 static uint32_t total_vms = 0;
 
 struct list_head vm_list;
 
-static int vmm_add_vm(vm_entry_t *vme)
+static int mvisor_add_vm(vm_entry_t *vme)
 {
 	int i;
 	struct vm *vm;
@@ -25,14 +25,14 @@ static int vmm_add_vm(vm_entry_t *vme)
 	if (!vme)
 		return -EINVAL;
 
-	vm = (struct vm *)vmm_malloc(sizeof(struct vm));
+	vm = (struct vm *)mvisor_malloc(sizeof(struct vm));
 	if (!vm)
 		return -ENOMEM;
 
 	memset((char *)vm, 0, sizeof(struct vm));
 	vm->vmid = vme->vmid;
 	strncpy(vm->name, vme->name,
-		MIN(strlen(vme->name), VMM_VM_NAME_SIZE - 1));
+		MIN(strlen(vme->name), MVISOR_VM_NAME_SIZE - 1));
 	vm->vcpu_nr = MIN(vme->nr_vcpu, CONFIG_VM_MAX_VCPU);
 	vm->boot_vm = (boot_vm_t)vme->boot_vm;
 	vm->mmu_on = vme->mmu_on;
@@ -54,8 +54,8 @@ static int parse_all_vms(void)
 {
 	int i;
 	vm_entry_t *vme;
-	size_t size = (&__vmm_vm_end) - (&__vmm_vm_start);
-	unsigned long *start = (unsigned long *)(&__vmm_vm_start);
+	size_t size = (&__mvisor_vm_end) - (&__mvisor_vm_start);
+	unsigned long *start = (unsigned long *)(&__mvisor_vm_start);
 
 	if (size == 0) {
 		pr_error("No VM is found\n");
@@ -67,7 +67,7 @@ static int parse_all_vms(void)
 
 	for (i = 0; i < size; i++) {
 		vme = (vm_entry_t *)(*start);
-		vmm_add_vm(vme);
+		mvisor_add_vm(vme);
 		start++;
 	}
 
@@ -117,7 +117,7 @@ static int vm_create_vcpus(struct vm *vm)
 		return -EINVAL;
 
 	for (i = 0; i < vm->vcpu_nr; i++) {
-		vcpu = (struct vcpu *)vmm_malloc(sizeof(struct vcpu));
+		vcpu = (struct vcpu *)mvisor_malloc(sizeof(struct vcpu));
 		if (vcpu == NULL)
 			return -ENOMEM;
 
@@ -171,7 +171,7 @@ static int vm_modules_init(struct vm *vm)
 	return 0;
 }
 
-int vmm_vms_init(void)
+int mvisor_vms_init(void)
 {
 	int i;
 	struct vm *vm;
@@ -187,7 +187,7 @@ int vmm_vms_init(void)
 	return 0;
 }
 
-int vmm_create_vms(void)
+int mvisor_create_vms(void)
 {
 	int i;
 	struct vm *vm;

@@ -85,7 +85,7 @@ static void aarch64_system_state_restore(struct vcpu *vcpu, void *c)
 	write_sysreg(context->hcr_el2, HCR_EL2);
 }
 
-static int aarch64_system_init(struct vmm_module *module)
+static int aarch64_system_init(struct mvisor_module *module)
 {
 	module->context_size = sizeof(struct aarch64_system_context);
 	module->pdata = NULL;
@@ -96,5 +96,5 @@ static int aarch64_system_init(struct vmm_module *module)
 	return 0;
 }
 
-VMM_MODULE_DECLARE(aarch64_system, "aarch64-system",
-	VMM_MODULE_NAME_SYSTEM, (void *)aarch64_system_init);
+MVISOR_MODULE_DECLARE(aarch64_system, "aarch64-system",
+	MVISOR_MODULE_NAME_SYSTEM, (void *)aarch64_system_init);

@@ -11,9 +11,9 @@
 #include <mvisor/mmu.h>
 #include <mvisor/mm.h>
 
-#define VMM_VM_NAME_SIZE	32
+#define MVISOR_VM_NAME_SIZE	32
 
-struct vmm_vcpu;
+struct mvisor_vcpu;
 
 struct os {
 
@@ -30,7 +30,7 @@ struct vm {
 	uint32_t index;
 	uint32_t vcpu_affinity[CONFIG_VM_MAX_VCPU];
 	unsigned long entry_point;
-	char name[VMM_VM_NAME_SIZE];
+	char name[MVISOR_VM_NAME_SIZE];
 	struct vcpu *vcpus[CONFIG_VM_MAX_VCPU];
 	struct mm_struct mm;
 	struct os os;
@@ -42,9 +42,9 @@ struct vm {
 	boot_vm_t boot_vm;
 } __attribute__((__aligned__ (8)));
 
-struct vm *vmm_get_vm(uint32_t vmid);
+struct vm *mvisor_get_vm(uint32_t vmid);
 
-int vmm_vms_init(void);
+int mvisor_vms_init(void);
 void vm_mm_struct_init(struct vm *vm);
 int vm_memory_init(struct vm *vm);
 

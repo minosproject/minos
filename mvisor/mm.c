@@ -14,7 +14,7 @@ extern unsigned char __code_end;
 
 struct list_head shared_mem_list;
 
-int vmm_register_memory_region(void *res)
+int mvisor_register_memory_region(void *res)
 {
 	struct memory_region *region;
 	struct memory_resource *resource;
@@ -25,7 +25,7 @@ int vmm_register_memory_region(void *res)
 
 	resource = (struct memory_resource *)res;
 	region = (struct memory_region *)
-		vmm_malloc(sizeof(struct memory_region));
+		mvisor_malloc(sizeof(struct memory_region));
 	if (!region) {
 		pr_error("No memory for new memory region\n");
 		return -ENOMEM;
@@ -38,7 +38,7 @@ int vmm_register_memory_region(void *res)
 	memset((char *)region, 0, sizeof(struct memory_region));
 
 	/*
-	 * vmm no using phy --> phy mapping
+	 * mvisor no using phy --> phy mapping
 	 */
 	region->vir_base = resource->mem_base;
 	region->mem_base = resource->mem_base;
@@ -62,7 +62,7 @@ int vmm_register_memory_region(void *res)
 		if (!vm) {
 			pr_error("Can not find the vm for the vmid:%d\n",
 					resource->vmid);
-			vmm_free(region);
+			mvisor_free(region);
 			return -EINVAL;
 		}
 
@@ -79,7 +79,7 @@ static unsigned long free_mem_size = 0;
 static spinlock_t mem_block_lock;
 static char *free_4k_base = 0;
 
-int vmm_mm_init(void)
+int mvisor_mm_init(void)
 {
 	size_t size;
 
@@ -96,7 +96,7 @@ int vmm_mm_init(void)
 	init_list(&shared_mem_list);
 }
 
-char *vmm_malloc(size_t size)
+char *mvisor_malloc(size_t size)
 {
 	size_t request_size;
 	char *base;
@@ -118,11 +118,11 @@ char *vmm_malloc(size_t size)
 	return base;
 }
 
-char *vmm_zalloc(size_t size)
+char *mvisor_zalloc(size_t size)
 {
 	char *base;
 
-	base = vmm_malloc(size);
+	base = mvisor_malloc(size);
 	if (!base)
 		return NULL;
 
@@ -130,7 +130,7 @@ char *vmm_zalloc(size_t size)
 	return base;
 }
 
-char *vmm_alloc_pages(int pages)
+char *mvisor_alloc_pages(int pages)
 {
 	size_t request_size = pages * SIZE_4K;
 	char *base;
@@ -153,14 +153,14 @@ char *vmm_alloc_pages(int pages)
 	return base;
 }
 
-void vmm_free(void *addr)
+void mvisor_free(void *addr)
 {
-	panic("vmm_free not support on MM_SIMPLE mode\n");
+	panic("mvisor_free not support on MM_SIMPLE mode\n");
 }
 
-void vmm_free_pages(void *addr)
+void mvisor_free_pages(void *addr)
 {
-	panic("vmm_free_pages not supported on MM_SIMPLE mode\n");
+	panic("mvisor_free_pages not supported on MM_SIMPLE mode\n");
 }
 
 #else
@@ -242,10 +242,10 @@ static int add_memory_section(unsigned long mem_base,
 static void parse_system_regions(void)
 {
 	int i;
-	struct vmm_memory_region *regions;
-	struct vmm_memory_region *region;
+	struct mvisor_memory_region *regions;
+	struct mvisor_memory_region *region;
 
-	regions = (struct vmm_memory_region *)get_memory_regions();
+	regions = (struct mvisor_memory_region *)get_memory_regions();
 	if (regions = NULL)
 		panic("No memory config for system\n");
 
@@ -440,12 +440,12 @@ void *get_free_pages(int count)
 	return base;
 }
 
-char *vmm_malloc(size_t size)
+char *mvisor_malloc(size_t size)
 {
 	return NULL;
 }
 
-int vmm_mm_init(void)
+int mvisor_mm_init(void)
 {
 	memset((char *)mm_pool, 0, sizeof(struct mm_pool));
 	spin_lock_init(&mm_pool->lock);

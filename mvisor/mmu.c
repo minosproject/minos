@@ -40,12 +40,12 @@ int io_remap(unsigned long vir, unsigned long phy, size_t size)
 	return mmu_chip->map_host_memory(vir, phy, size, MEM_TYPE_IO);
 }
 
-int vmm_mmu_init(void)
+int mvisor_mmu_init(void)
 {
 	char *chip_name = CONFIG_MMU_CHIP_NAME;
 
-	mmu_chip = (struct mmu_chip *)vmm_get_module_pdata(chip_name,
-			VMM_MODULE_NAME_MMU);
+	mmu_chip = (struct mmu_chip *)mvisor_get_module_pdata(chip_name,
+			MVISOR_MODULE_NAME_MMU);
 	if (!mmu_chip)
 		panic("can not find the mmuchip for system\n");
 

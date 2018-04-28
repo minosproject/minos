@@ -5,18 +5,18 @@
 #include <mvisor/vcpu.h>
 #include <mvisor/spinlock.h>
 
-extern unsigned char __vmm_module_start;
-extern unsigned char __vmm_module_end;
+extern unsigned char __mvisor_module_start;
+extern unsigned char __mvisor_module_end;
 
 static struct list_head module_list;
 static struct spinlock module_lock;
 static int module_class_nr = 0;
 
-typedef int (*module_init_fn)(struct vmm_module *);
+typedef int (*module_init_fn)(struct mvisor_module *);
 
 int get_module_id(char *type)
 {
-	struct vmm_module *module;
+	struct mvisor_module *module;
 
 	list_for_each_entry(module, &module_list, list) {
 		if (strcmp(module->type, type) == 0)
@@ -26,19 +26,19 @@ int get_module_id(char *type)
 	return INVAILD_MODULE_ID;
 }
 
-static struct vmm_module *vmm_create_module(struct module_id *id)
+static struct mvisor_module *mvisor_create_module(struct module_id *id)
 {
-	struct vmm_module *module;
+	struct mvisor_module *module;
 	module_init_fn fn;
 
-	module = (struct vmm_module *)
-		vmm_malloc(sizeof(struct vmm_module));
+	module = (struct mvisor_module *)
+		mvisor_malloc(sizeof(struct mvisor_module));
 	if (!module) {
-		pr_error("No more memory for vmm_module\n");
+		pr_error("No more memory for mvisor_module\n");
 		return NULL;
 	}
 
-	memset((char *)module, 0, sizeof(struct vmm_module));
+	memset((char *)module, 0, sizeof(struct mvisor_module));
 	strncpy(module->name, id->name, 31);
 	strncpy(module->type, id->type, 31);
 	init_list(&module->list);
@@ -74,7 +74,7 @@ void *get_module_data_by_id(struct vcpu *vcpu, int id)
 int vcpu_modules_init(struct vcpu *vcpu)
 {
 	struct list_head *list;
-	struct vmm_module *module;
+	struct mvisor_module *module;
 	void *data;
 	int size;
 
@@ -83,16 +83,16 @@ int vcpu_modules_init(struct vcpu *vcpu)
 	 * context's context data
 	 */
 	size = module_class_nr * sizeof(void *);
-	vcpu->module_context = (void **)vmm_malloc(size);
+	vcpu->module_context = (void **)mvisor_malloc(size);
 	if (!vcpu->module_context)
 		panic("No more memory for vcpu module cotnext\n");
 
 	memset((char *)vcpu->module_context, 0, size);
 
 	list_for_each(&module_list, list) {
-		module = list_entry(list, struct vmm_module, list);
+		module = list_entry(list, struct mvisor_module, list);
 		if (module->context_size) {
-			data = (void *)vmm_malloc(module->context_size);
+			data = (void *)mvisor_malloc(module->context_size);
 			memset((char *)data, 0, size);
 			vcpu->module_context[module->id] = data;
 
@@ -106,7 +106,7 @@ int vcpu_modules_init(struct vcpu *vcpu)
 
 void modules_create_vm(struct vm *vm)
 {
-	struct vmm_module *module;
+	struct mvisor_module *module;
 
 	list_for_each_entry(module, &module_list, list) {
 		if (module->create_vm)
@@ -114,16 +114,16 @@ void modules_create_vm(struct vm *vm)
 	}
 }
 
-void *vmm_get_module_pdata(char *name, char *type)
+void *mvisor_get_module_pdata(char *name, char *type)
 {
 	struct list_head *list;
 	void *pdata = NULL;
-	struct vmm_module *module;
+	struct mvisor_module *module;
 
 	spin_lock(&module_lock);
 
 	list_for_each(&module_list, list) {
-		module = list_entry(list, struct vmm_module, list);
+		module = list_entry(list, struct mvisor_module, list);
 		if ((strcmp(module->type, type) == 0) &&
 			(strcmp(module->name, name) == 0)) {
 			pdata = module->pdata;
@@ -138,7 +138,7 @@ void *vmm_get_module_pdata(char *name, char *type)
 
 void restore_vcpu_module_state(struct vcpu *vcpu)
 {
-	struct vmm_module *module;
+	struct mvisor_module *module;
 	void *context;
 
 	list_for_each_entry(module, &module_list, list) {
@@ -151,7 +151,7 @@ void restore_vcpu_module_state(struct vcpu *vcpu)
 
 void save_vcpu_module_state(struct vcpu *vcpu)
 {
-	struct vmm_module *module;
+	struct mvisor_module *module;
 	void *context;
 
 	list_for_each_entry(module, &module_list, list) {
@@ -162,25 +162,25 @@ void save_vcpu_module_state(struct vcpu *vcpu)
 	}
 }
 
-int vmm_modules_init(void)
+int mvisor_modules_init(void)
 {
 	int32_t i;
 	uint64_t base, end;
 	uint32_t size;
 	struct module_id *mid;
-	struct vmm_module *module;
+	struct mvisor_module *module;
 
 	init_list(&module_list);
 	spin_lock_init(&module_lock);
 
-	base = (uint64_t)&__vmm_module_start;
-	end = (uint64_t)&__vmm_module_end;
-	size = (&__vmm_module_end - &__vmm_module_start) /
+	base = (uint64_t)&__mvisor_module_start;
+	end = (uint64_t)&__mvisor_module_end;
+	size = (&__mvisor_module_end - &__mvisor_module_start) /
 			sizeof(struct module_id);
 
 	for (i = 0; i < size; i++) {
 		mid = (struct module_id *)base;
-		module = vmm_create_module(mid);
+		module = mvisor_create_module(mid);
 		if (!module)
 			pr_error("Can not create module\n");
 

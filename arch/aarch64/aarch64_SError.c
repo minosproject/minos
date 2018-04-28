@@ -318,7 +318,7 @@ void SError_from_el1_handler(vcpu_regs *data)
 	long ret;
 	struct vcpu *vcpu = (struct vcpu *)data;
 
-	vmm_exit_from_guest(vcpu);
+	mvisor_exit_from_guest(vcpu);
 
 	enable_local_irq();
 

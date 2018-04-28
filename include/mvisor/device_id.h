@@ -10,9 +10,9 @@ struct module_id {
 	void *fn;
 };
 
-#define VMM_MODULE_DECLARE(mname, mn, t, init_fn) \
-	static const struct module_id vmm_module_match_##mname \
-	__section(.__vmm_module) = { \
+#define MVISOR_MODULE_DECLARE(mname, mn, t, init_fn) \
+	static const struct module_id mvisor_module_match_##mname \
+	__section(.__mvisor_module) = { \
 		.name = mn, \
 		.type = t, \
 		.fn = init_fn, \

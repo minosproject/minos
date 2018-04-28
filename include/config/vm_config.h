@@ -4,7 +4,7 @@
 #include <mvisor/types.h>
 #include <config/config.h>
 
-typedef struct vmm_vm_entry {
+typedef struct mvisor_vm_entry {
 	uint32_t vmid;
 	char *name;
 	uint64_t entry_point;
@@ -20,9 +20,9 @@ void *get_memory_regions(void);
 int get_irq_config_size(void);
 void *get_irq_config_table(void);
 
-#define __vmm_vm__	__attribute__((section(".__vmm_vm")))
+#define __mvisor_vm__	__attribute__((section(".__mvisor_vm")))
 
-#define register_vm_entry(vmm_data) \
-	static struct vmm_vm_entry *__vmm_vm_##vmm_data __vmm_vm__ = &vmm_data
+#define register_vm_entry(mvisor_data) \
+	static struct mvisor_vm_entry *__mvisor_vm_##mvisor_data __mvisor_vm__ = &mvisor_data
 
 #endif

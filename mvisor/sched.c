@@ -307,7 +307,7 @@ void switch_to_vcpu(struct vcpu *current, struct vcpu *next)
 		restore_vcpu_module_state(next);
 	}
 
-	vmm_enter_to_guest(next);
+	mvisor_enter_to_guest(next);
 
 	/*
 	 * here need to deal the cache and tlb
@@ -325,7 +325,7 @@ static void sched_enter_to_guest(struct vcpu *vcpu, void *data)
 
 }
 
-void vmm_pcpus_init(void)
+void mvisor_pcpus_init(void)
 {
 	int i;
 	struct pcpu *pcpu;
@@ -346,10 +346,10 @@ void vmm_pcpus_init(void)
 		get_per_cpu(pcpu, i) = pcpu;
 	}
 
-	vmm_register_hook(sched_exit_from_guest,
-			NULL, VMM_HOOK_TYPE_EXIT_FROM_GUEST);
-	vmm_register_hook(sched_enter_to_guest,
-			NULL, VMM_HOOK_TYPE_ENTER_TO_GUEST);
+	mvisor_register_hook(sched_exit_from_guest,
+			NULL, MVISOR_HOOK_TYPE_EXIT_FROM_GUEST);
+	mvisor_register_hook(sched_enter_to_guest,
+			NULL, MVISOR_HOOK_TYPE_ENTER_TO_GUEST);
 }
 
 static int vcpu_need_to_run(struct vcpu *vcpu)
@@ -360,7 +360,7 @@ static int vcpu_need_to_run(struct vcpu *vcpu)
 	return 0;
 }
 
-int vmm_reched_handler(uint32_t irq, void *data)
+int mvisor_reched_handler(uint32_t irq, void *data)
 {
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 	struct vcpu *vcpu;
@@ -387,8 +387,8 @@ int sched_late_init(void)
 	struct timer_list *timer;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	ret = request_irq(CONFIG_VMM_RESCHED_IRQ,
-			vmm_reched_handler, NULL);
+	ret = request_irq(CONFIG_MVISOR_RESCHED_IRQ,
+			mvisor_reched_handler, NULL);
 
 	timer = &pcpu->sched_timer;
 	timer->expires = MILLISECS(CONFIG_SCHED_INTERVAL);

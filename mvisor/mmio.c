@@ -31,7 +31,7 @@ int register_mmio_emulation_handler(char *name, struct mmio_ops *ops)
 		return -EINVAL;
 
 	handler = (struct mmio_handler *)
-		vmm_malloc(sizeof(struct mmio_handler));
+		mvisor_malloc(sizeof(struct mmio_handler));
 	if (!handler)
 		return -ENOMEM;
 

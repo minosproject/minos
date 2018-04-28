@@ -29,8 +29,8 @@ typedef int (*init_call)(void);
 #define __init_6	__attribute__((section(".__init_func_6")))
 #define __init_7	__attribute__((section(".__init_func_7")))
 
-#define __irq_resource  __attribute__((section(".__vmm_irq_resource")))
-#define __memory_resource  __attribute__((section(".__vmm_memory_resource")))
+#define __irq_resource  __attribute__((section(".__irq_desc_resource")))
+#define __memory_resource  __attribute__((section(".__mvisor_memory_resource")))
 
 #define early_initcall(fn)	\
 	static init_call __init_call_##fn __init_0 = fn
@@ -58,13 +58,13 @@ typedef int (*init_call)(void);
 
 #define __section(S) __attribute__ ((__section__(#S)))
 
-void vmm_arch_init(void);
-void vmm_early_init(void);
-void vmm_subsys_init(void);
-void vmm_device_init(void);
-void vmm_early_init_percpu(void);
-void vmm_arch_init_percpu(void);
-void vmm_subsys_init_percpu(void);
-void vmm_device_init_percpu(void);
+void mvisor_arch_init(void);
+void mvisor_early_init(void);
+void mvisor_subsys_init(void);
+void mvisor_device_init(void);
+void mvisor_early_init_percpu(void);
+void mvisor_arch_init_percpu(void);
+void mvisor_subsys_init_percpu(void);
+void mvisor_device_init_percpu(void);
 
 #endif

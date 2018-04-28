@@ -34,7 +34,7 @@ struct vcpu;
 #define IRQ_FLAG_STATUS_MASK			(0x00000f00)
 
 #define IRQ_FLAG_OWNER_GUEST			(0x00000000)
-#define IRQ_FLAG_OWNER_VMM			(0x00001000)
+#define IRQ_FLAG_OWNER_MVISOR			(0x00001000)
 #define IRQ_FLAG_OWNER_MASK			(0x0000f000)
 
 #define IRQ_FLAG_AFFINITY_VCPU			(0x00010000)
@@ -56,7 +56,7 @@ enum irq_type {
 	IRQ_TYPE_BAD,
 };
 
-struct vmm_irq;
+struct irq_desc;
 typedef int (*irq_handle_t)(uint32_t irq, void *data);
 
 #define CONFIG_VCPU_MAX_ACTIVE_IRQS	(16)
@@ -106,11 +106,11 @@ struct irq_chip {
 };
 
 /*
- * if a irq is handled by vmm, then need to register
+ * if a irq is handled by mvisor, then need to register
  * the irq handler otherwise it will return the vnum
  * to the handler and pass the virq to the vm
  */
-struct vmm_irq {
+struct irq_desc {
 	uint32_t hno;
 	uint32_t vno;
 	uint32_t vmid;
@@ -132,28 +132,28 @@ enum irq_domain_type {
 
 struct irq_domain;
 struct irq_domain_ops {
-	struct vmm_irq **(*alloc_irqs)(uint32_t s, uint32_t c);
+	struct irq_desc **(*alloc_irqs)(uint32_t s, uint32_t c);
 	int (*register_irq)(struct irq_domain *domain, struct irq_resource *res);
-	struct vmm_irq *(*get_irq_desc)(struct irq_domain *d, uint32_t irq);
+	struct irq_desc *(*get_irq_desc)(struct irq_domain *d, uint32_t irq);
 	uint32_t (*virq_to_irq)(struct irq_domain *d, uint32_t virq);
 	void (*setup_irqs)(struct irq_domain *d);
-	int (*irq_handler)(struct irq_domain *d, struct vmm_irq *irq);
+	int (*irq_handler)(struct irq_domain *d, struct irq_desc *irq);
 };
 
 struct irq_domain {
 	uint32_t start;
 	uint32_t count;
-	struct vmm_irq **irqs;
+	struct irq_desc **irqs;
 	struct irq_domain_ops *ops;
 };
 
 #define enable_local_irq() arch_enable_local_irq()
 #define disable_local_irq() arch_disable_local_irq()
 
-int vmm_irq_init(void);
-int vmm_irq_secondary_init(void);
-int vmm_register_irq_entry(void *res);
-void vmm_setup_irqs(void);
+int mvisor_irq_init(void);
+int irq_desc_secondary_init(void);
+int mvisor_register_irq_entry(void *res);
+void mvisor_setup_irqs(void);
 int do_irq_handler(void);
 int request_irq(uint32_t irq, irq_handle_t handler, void *data);
 void vcpu_irq_struct_init(struct irq_struct *irq_struct);

@@ -7,13 +7,13 @@
 
 #include <mvisor/device_id.h>
 
-#define VMM_MODULE_NAME_IRQCHIP		"irq_chip"
-#define VMM_MODULE_NAME_MMU		"mmu"
-#define VMM_MODULE_NAME_SYSTEM		"system"
+#define MVISOR_MODULE_NAME_IRQCHIP		"irq_chip"
+#define MVISOR_MODULE_NAME_MMU		"mmu"
+#define MVISOR_MODULE_NAME_SYSTEM		"system"
 
 #define INVAILD_MODULE_ID		(0xffff)
 
-struct vmm_module {
+struct mvisor_module {
 	char name[32];
 	char type[32];
 	int id;
@@ -28,7 +28,7 @@ struct vmm_module {
 };
 
 int vcpu_modules_init(struct vcpu *vcpu);
-void *vmm_get_module_pdata(char *name, char *type);
+void *mvisor_get_module_pdata(char *name, char *type);
 void *get_module_data_by_name(struct vcpu *vcpu, char *name);
 void *get_module_data_by_id(struct vcpu *vcpu, int id);
 void save_vcpu_module_state(struct vcpu *vcpu);

@@ -3,7 +3,7 @@
 
 #include <config/config.h>
 
-typedef enum _vmm_ec_t {
+typedef enum _mvisor_ec_t {
 	EC_UNKNOWN		= 0x00,
 #define EC_UNKNOWN		(0x00)
 	EC_WFI_WFE		= 0x01,
@@ -74,7 +74,7 @@ typedef enum _vmm_ec_t {
 #define EC_VCTOR_CATCH		(0x3A)
 	EC_BRK_INS		= 0x3C,
 #define EC_BRK_INS		(0x3C)
-} vmm_ec_t;
+} mvisor_ec_t;
 
 #define EC_TYPE_AARCH64		(0x1)
 #define EC_TYPE_AARCH32		(0X2)
@@ -83,7 +83,7 @@ typedef enum _vmm_ec_t {
 typedef int (*ec_handler_t)(vcpu_regs *reg, uint32_t esr_value);
 
 typedef struct _ec_config_t {
-	vmm_ec_t type;
+	mvisor_ec_t type;
 	int aarch;
 	ec_handler_t handler;
 	int32_t ret_addr_adjust;

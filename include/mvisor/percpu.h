@@ -7,7 +7,7 @@
 extern int get_cpu_id();
 extern unsigned long percpu_offset[];
 
-void vmm_percpus_init(void);
+void mvisor_percpus_init(void);
 
 #define DEFINE_PER_CPU(type, name) \
 	__attribute__((__section__(".__percpu"))) __typeof__(type) per_cpu_##name

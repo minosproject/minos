@@ -27,7 +27,7 @@ struct log_buffer {
 static struct log_buffer log_buffer;
 static int uart_init_done = 0;
 
-void vmm_log_init(void)
+void mvisor_log_init(void)
 {
 	spin_lock_init(&log_buffer.buffer_lock);
 	log_buffer.head = 0;

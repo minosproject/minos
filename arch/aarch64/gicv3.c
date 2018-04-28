@@ -727,7 +727,7 @@ static struct irq_chip gicv3_chip = {
 	.secondary_init		= gicv3_secondary_init,
 };
 
-static int gicv3_module_init(struct vmm_module *module)
+static int gicv3_module_init(struct mvisor_module *module)
 {
 	uint32_t type, nr_lines;
 	uint32_t value;
@@ -750,5 +750,5 @@ static int gicv3_module_init(struct vmm_module *module)
 	return 0;
 }
 
-VMM_MODULE_DECLARE(gicv3, "gicv3",
+MVISOR_MODULE_DECLARE(gicv3, "gicv3",
 	"irq_chip", (void *)gicv3_module_init);

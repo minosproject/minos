@@ -76,7 +76,7 @@ void smp_cpus_up(void)
 			CONFIG_NR_CPUS * sizeof(unsigned long));
 }
 
-void vmm_smp_init(void)
+void mvisor_smp_init(void)
 {
 	int i;
 

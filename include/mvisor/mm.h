@@ -3,14 +3,14 @@
 
 #include <mvisor/list.h>
 
-int vmm_mm_init(void);
-char *vmm_malloc(size_t size);
-char *vmm_zalloc(size_t size);
-char *vmm_alloc_pages(int pages);
-void vmm_free(void *addr);
-void vmm_free_pages(void *addr);
+int mvisor_mm_init(void);
+char *mvisor_malloc(size_t size);
+char *mvisor_zalloc(size_t size);
+char *mvisor_alloc_pages(int pages);
+void mvisor_free(void *addr);
+void mvisor_free_pages(void *addr);
 
-int vmm_register_memory_region(void *res);
+int mvisor_register_memory_region(void *res);
 
 struct memory_region {
 	int type;
@@ -25,9 +25,9 @@ struct mm_struct {
 	struct list_head mem_list;
 };
 
-static inline char *vmm_alloc_page(void)
+static inline char *mvisor_alloc_page(void)
 {
-	return vmm_alloc_pages(1);
+	return mvisor_alloc_pages(1);
 }
 
 #endif

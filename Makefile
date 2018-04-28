@@ -13,26 +13,26 @@ INCLUDE_DIR 	:= include/mvisor/*.h include/asm/*.h include/config/*.h include/dr
 #INCLUDE_DIR 	:=
 
 CCFLAG 		:= --static -nostdlib -fno-builtin -g -march=armv8-a -I$(PWD)/include
-LDS 		:= arch/$(ARCH)/lds/vmm.ld.c
+LDS 		:= arch/$(ARCH)/lds/mvisor.ld.c
 
 OUT 		:= out
 OUT_CORE 	= $(OUT)/mvisor
 OUT_ARCH 	= $(OUT)/$(ARCH)
-OUT_VMM_VMS	= $(OUT)/vmm_vms
+OUT_MVISOR_VMS	= $(OUT)/mvisor_vms
 OUT_DRIVERS	= $(OUT)/drivers
-TARGET_LDS	= $(OUT)/vmm.lds
+TARGET_LDS	= $(OUT)/mvisor.lds
 
-vmm_elf 	:= $(OUT)/vmm.elf
-vmm_bin 	:= $(OUT)/vmm.bin
-vmm_dump 	:= $(OUT)/vmm.s
+mvisor_elf 	:= $(OUT)/mvisor.elf
+mvisor_bin 	:= $(OUT)/mvisor.bin
+mvisor_dump 	:= $(OUT)/mvisor.s
 
 SRC_ARCH_C	:= $(wildcard arch/$(ARCH)/*.c)
 SRC_ARCH_S	:= $(wildcard arch/$(ARCH)/*.S)
 SRC_CORE	:= $(wildcard mvisor/*.c)
-SRC_VMM_VMS	:= $(wildcard vmm_vms/*.c)
+SRC_MVISOR_VMS	:= $(wildcard mvisor_vms/*.c)
 SRC_DRIVERS	:= $(wildcard drivers/*.c)
 
-VPATH		:= mvisor:arch/$(ARCH):vmm_vms:drivers
+VPATH		:= mvisor:arch/$(ARCH):mvisor_vms:drivers
 
 LDFLAG 		:= -T$(TARGET_LDS) -Map=$(OUT)/linkmap.txt
 
@@ -47,27 +47,27 @@ _OBJ_ARCH	+= $(addprefix $(OUT_ARCH)/, $(patsubst %.c,%.o, $(notdir $(SRC_ARCH_C
 _OBJ_ARCH	+= $(addprefix $(OUT_ARCH)/, $(patsubst %.S,%.o, $(notdir $(SRC_ARCH_S))))
 OBJ_ARCH	= $(subst out/$(ARCH)/boot.o,,$(_OBJ_ARCH))
 OBJ_CORE	+= $(addprefix $(OUT_CORE)/, $(patsubst %.c,%.o, $(notdir $(SRC_CORE))))
-OBJ_VMM_VMS	+= $(addprefix $(OUT_VMM_VMS)/, $(patsubst %.c,%.o, $(notdir $(SRC_VMM_VMS))))
+OBJ_MVISOR_VMS	+= $(addprefix $(OUT_MVISOR_VMS)/, $(patsubst %.c,%.o, $(notdir $(SRC_MVISOR_VMS))))
 OBJ_DRIVERS	+= $(addprefix $(OUT_DRIVERS)/, $(patsubst %.c,%.o, $(notdir $(SRC_DRIVERS))))
 
-OBJECT		= $(OUT_ARCH)/boot.o $(OBJ_ARCH) $(OBJ_CORE) $(OBJ_VMM_VMS) $(OBJ_DRIVERS)
+OBJECT		= $(OUT_ARCH)/boot.o $(OBJ_ARCH) $(OBJ_CORE) $(OBJ_MVISOR_VMS) $(OBJ_DRIVERS)
 
-all: $(OUT) $(OUT_CORE) $(OUT_ARCH) $(OUT_DRIVERS)  $(OUT_VMM_VMS) $(vmm_bin)
+all: $(OUT) $(OUT_CORE) $(OUT_ARCH) $(OUT_DRIVERS)  $(OUT_MVISOR_VMS) $(mvisor_bin)
 
-$(vmm_bin) : $(vmm_elf)
-	$(QUIET) $(OBJ_COPY) -O binary $(vmm_elf) $(vmm_bin)
-	$(QUIET) $(OBJ_DUMP) $(vmm_elf) -D > $(vmm_dump)
+$(mvisor_bin) : $(mvisor_elf)
+	$(QUIET) $(OBJ_COPY) -O binary $(mvisor_elf) $(mvisor_bin)
+	$(QUIET) $(OBJ_DUMP) $(mvisor_elf) -D > $(mvisor_dump)
 
-$(vmm_elf) : $(OBJECT) $(TARGET_LDS)
+$(mvisor_elf) : $(OBJECT) $(TARGET_LDS)
 	@echo Linking $@
-	$(QUIET) $(LD) $(LDFLAG) -o $(vmm_elf) $(OBJECT) $(LDPATH)
+	$(QUIET) $(LD) $(LDFLAG) -o $(mvisor_elf) $(OBJECT) $(LDPATH)
 	@echo Done.
 
 $(TARGET_LDS) : $(LDS) $(INCLUDE_DIR)
 	@echo Generate LDS file
 	$(QUIET) $(CC) $(CCFLAG) -E -P $(LDS) -o $(TARGET_LDS)
 
-$(OUT) $(OUT_CORE) $(OUT_ARCH) $(OUT_VMM_VMS) $(OUT_DRIVERS):
+$(OUT) $(OUT_CORE) $(OUT_ARCH) $(OUT_MVISOR_VMS) $(OUT_DRIVERS):
 	@ mkdir -p $@
 
 $(OUT_ARCH)/%.o: %.c $(INCLUDE_DIR)
@@ -86,7 +86,7 @@ $(OUT_CORE)/%.o: %.c $(INCLUDE_DIR)
 	$(PROGRESS)
 	$(QUIET) $(CC) $(CCFLAG) -c $< -o $@
 
-$(OUT_VMM_VMS)/%.o: %.c $(INCLUDE_DIR)
+$(OUT_MVISOR_VMS)/%.o: %.c $(INCLUDE_DIR)
 	$(PROGRESS)
 	$(QUIET) $(CC) $(CCFLAG) -c $< -o $@
 

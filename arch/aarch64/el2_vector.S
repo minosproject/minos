@@ -4,7 +4,7 @@
 	.global el2_vectors
 
 	.section __el2_vectors, "ax"
-	.align 11
+	.align 10
 
 	.macro EXCEPTION_FROM_EL1 func
 	stp 	x4, x5, [sp, #-16]!

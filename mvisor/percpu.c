@@ -8,7 +8,7 @@ extern unsigned char __percpu_section_size;
 
 unsigned long percpu_offset[CONFIG_NR_CPUS];
 
-void vmm_percpus_init(void)
+void mvisor_percpus_init(void)
 {
 	int i;
 	size_t size;
