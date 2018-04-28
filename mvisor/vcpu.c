@@ -19,7 +19,6 @@ struct list_head vm_list;
 
 static int mvisor_add_vm(vm_entry_t *vme)
 {
-	int i;
 	struct vm *vm;
 
 	if (!vme)
@@ -189,7 +188,6 @@ int mvisor_vms_init(void)
 
 int mvisor_create_vms(void)
 {
-	int i;
 	struct vm *vm;
 	int ret = 0;
 
@@ -198,9 +196,9 @@ int mvisor_create_vms(void)
 	if (ret)
 		panic("parsing the vm fail\n");
 
-	for (i = 0; i < total_vms; i++) {
-		vm_mm_struct_init(vms[i]);
-		vm_create_vcpus(vms[i]);
+	for_each_vm(vm) {
+		vm_mm_struct_init(vm);
+		vm_create_vcpus(vm);
 	}
 
 	return 0;

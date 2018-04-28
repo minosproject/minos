@@ -9,14 +9,11 @@ uint64_t *smp_holding_pen;
 
 uint32_t smp_get_cpuid(uint64_t mpidr_id)
 {
-	uint32_t smp_id;
-	uint8_t aff0, aff1, aff2, aff3;
+	uint8_t aff0, aff1;
 
 	mpidr_id &= MPIDR_ID_MASK;
 	aff0 = (uint8_t)(mpidr_id);
 	aff1 = (uint8_t)(mpidr_id >> 8);
-	aff2 = (uint8_t)(mpidr_id >> 16);
-	aff3 = (uint8_t)(mpidr_id >> 32);
 
 	/*
 	 * now assume there are only one cluster
@@ -24,7 +21,7 @@ uint32_t smp_get_cpuid(uint64_t mpidr_id)
 	 * fvp there is one cluster, so the aff0 value
 	 * is the cpuid
 	 */
-	return (uint32_t)aff0;
+	return (uint32_t)(aff1 * 4 + aff0);
 }
 
 int smp_cpu_up(uint64_t mpidr_id)

@@ -33,28 +33,28 @@ typedef int (*init_call)(void);
 #define __memory_resource  __attribute__((section(".__mvisor_memory_resource")))
 
 #define early_initcall(fn)	\
-	static init_call __init_call_##fn __init_0 = fn
+	static init_call __attribute__((unused)) __init_call_##fn __init_0 = fn
 
 #define arch_initcall(fn)	\
-	static init_call __init_call_##fn __init_1 = fn
+	static init_call __attribute__((unused)) __init_call_##fn __init_1 = fn
 
 #define subsys_initcall(fn)	\
-	static init_call __init_call_##fn __init_2 = fn
+	static init_call __attribute__((unused)) __init_call_##fn __init_2 = fn
 
 #define device_initcall(fn)	\
-	static init_call __init_call_##fn __init_3 = fn
+	static init_call __attribute__((unused)) __init_call_##fn __init_3 = fn
 
 #define early_initcall_percpu(fn)	\
-	static init_call __init_call_##fn __init_4 = fn
+	static init_call __attribute__((unused)) __init_call_##fn __init_4 = fn
 
 #define arch_initcall_percpu(fn)	\
-	static init_call __init_call_##fn __init_5 = fn
+	static init_call __attribute__((unused)) __init_call_##fn __init_5 = fn
 
 #define subsys_initcall_percpu(fn)	\
-	static init_call __init_call_##fn __init_6 = fn
+	static init_call __attribute__((unused)) __init_call_##fn __init_6 = fn
 
 #define device_initcall_percpu(fn)	\
-	static init_call __init_call_##fn __init_7 = fn
+	static init_call __attribute__((unused)) __init_call_##fn __init_7 = fn
 
 #define __section(S) __attribute__ ((__section__(#S)))
 

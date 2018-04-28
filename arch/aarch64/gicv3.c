@@ -74,7 +74,7 @@ static uint32_t gicv3_read_irq(void)
 static int gicv3_set_irq_type(uint32_t irq, uint32_t type)
 {
 	void *base;
-	uint32_t cfg, actual, edgebit;
+	uint32_t cfg, edgebit;
 
 	spin_lock(&gicv3_lock);
 
@@ -93,6 +93,8 @@ static int gicv3_set_irq_type(uint32_t irq, uint32_t type)
 	iowrite32(base, cfg);
 
 	spin_unlock(&gicv3_lock);
+
+	return 0;
 }
 
 static void gicv3_clear_pending(uint32_t irq)
@@ -124,6 +126,8 @@ static int gicv3_set_irq_priority(uint32_t irq, uint32_t pr)
 		iowrite8(gicd_base + GICD_IPRIORITYR + irq, pr);
 
 	spin_unlock(&gicv3_lock);
+
+	return 0;
 }
 
 static int gicv3_set_irq_affinity(uint32_t irq, uint32_t pcpu)
@@ -136,11 +140,12 @@ static int gicv3_set_irq_affinity(uint32_t irq, uint32_t pcpu)
 	spin_lock(&gicv3_lock);
 	iowrite64(gicd_base + GICD_IROUTER + irq * 8, affinity);
 	spin_unlock(&gicv3_lock);
+
+	return 0;
 }
 
 static void gicv3_send_sgi_list(uint32_t sgi, cpumask_t *mask)
 {
-	int i;
 	uint64_t list = 0;
 	uint64_t val;
 	int cpu;
@@ -244,7 +249,6 @@ static int gicv3_send_virq(struct virq *virq)
 {
 	uint64_t value = 0;
 	struct gic_lr *lr = (struct gic_lr *)&value;
-	uint64_t *base;
 
 	lr->v_intid = virq->v_intno;
 	lr->p_intid = virq->h_intno;
@@ -279,6 +283,8 @@ static int gicv3_update_virq(struct virq *virq, int action)
 	default:
 		break;
 	}
+
+	return 0;
 }
 
 static void gicv3_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *cpu)
@@ -324,20 +330,6 @@ static void gicv3_unmask_irq(uint32_t irq)
 	}
 
 	spin_unlock(&gicv3_lock);
-}
-
-static int gicv3_get_irq_type(uint32_t irq)
-{
-	if (irq <= 15)
-		return IRQ_TYPE_SGI;
-	else if ((irq > 15) && (irq < 32))
-		return IRQ_TYPE_PPI;
-	else if ((irq >= 32) && (irq < 1020))
-		return IRQ_TYPE_SPI;
-	else if ((irq >= 1020) && (irq < 1024))
-		return IRQ_TYPE_SPECIAL;
-	else
-		return IRQ_TYPE_BAD;
 }
 
 static void gicv3_wakeup_gicr(void)
@@ -409,7 +401,6 @@ static int gicv3_gicr_init(void)
 {
 	int i;
 	uint64_t pr;
-	uint64_t reg_value;
 
 	gicv3_wakeup_gicr();
 
@@ -609,7 +600,7 @@ void gic_init_el3(void)
 		gicv3_gicd_wait_for_rwp();
 	} else {
 		val = (1 << 4) | (1 << 5);
-		while (ioread32(gicd_base + GICD_CTLR) & (val) != val);
+		while ((ioread32(gicd_base + GICD_CTLR) & (val)) != val);
 	}
 
 	/* wake up GIC-R */
@@ -697,6 +688,8 @@ int gicv3_init(void)
 	gicv3_hyp_init();
 
 	spin_unlock(&gicv3_lock);
+
+	return 0;
 }
 
 int gicv3_secondary_init(void)
@@ -708,6 +701,8 @@ int gicv3_secondary_init(void)
 	gicv3_hyp_init();
 
 	spin_unlock(&gicv3_lock);
+
+	return 0;
 }
 
 static struct irq_chip gicv3_chip = {
@@ -729,7 +724,6 @@ static struct irq_chip gicv3_chip = {
 
 static int gicv3_module_init(struct mvisor_module *module)
 {
-	uint32_t type, nr_lines;
 	uint32_t value;
 
 	value = read_sysreg32(ICH_VTR_EL2);

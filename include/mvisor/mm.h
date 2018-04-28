@@ -3,7 +3,7 @@
 
 #include <mvisor/list.h>
 
-int mvisor_mm_init(void);
+void mvisor_mm_init(void);
 char *mvisor_malloc(size_t size);
 char *mvisor_zalloc(size_t size);
 char *mvisor_alloc_pages(int pages);

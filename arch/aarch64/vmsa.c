@@ -292,12 +292,12 @@ static int map_mem(unsigned long t_base, unsigned long base,
 		unsigned long phy_base, size_t size,
 		int type, struct mmu_config *config)
 {
-	int i, ret = 0;
+	int ret = 0;
 	unsigned long tmp;
 	uint32_t offset;
 	uint64_t value;
 	uint64_t attr;
-	size_t map_size, __size;
+	size_t map_size;
 	unsigned long *tbase = (unsigned long *)t_base;
 
 	spin_lock(config->lock);
@@ -402,7 +402,7 @@ int map_guest_mem(unsigned long tt, unsigned long vir,
 	tmp = BALIGN(vir_base + size, config->level2_entry_map_size);
 	size = tmp - vir_base;
 
-	ret = map_mem(tt, vir, phy, size, type, config);
+	ret = map_mem(tt, vir_base, phy_base, size, type, config);
 	if (ret) {
 		pr_error("map host 0x%x->0x%x size:%x failed\n",
 				vir, phy, size);
@@ -450,8 +450,8 @@ static uint64_t generate_vttbr_el2(uint32_t vmid, unsigned long base)
 
 static int stage2_tt_mem_init(void)
 {
-	level1_base = &__el2_stage2_ttb_l1;
-	level2_base = &__el2_stage2_ttb_l2;
+	level1_base = (char *)&__el2_stage2_ttb_l1;
+	level2_base = (char *)&__el2_stage2_ttb_l2;
 	level1_size = &__el2_stage2_ttb_l1_end - &__el2_stage2_ttb_l1;
 	level2_size = &__el2_stage2_ttb_l2_end - &__el2_stage2_ttb_l2;
 

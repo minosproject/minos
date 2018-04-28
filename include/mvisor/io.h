@@ -23,22 +23,22 @@ static inline uint64_t __raw_readll(const volatile void *addr)
 	return *(const volatile uint64_t *)addr;
 }
 
-static void __raw_writeb(volatile void *addr, uint8_t b)
+static inline void __raw_writeb(volatile void *addr, uint8_t b)
 {
 	*(volatile uint8_t *)addr = b;
 }
 
-static void __raw_writew(volatile void *addr, uint16_t w)
+static inline void __raw_writew(volatile void *addr, uint16_t w)
 {
 	*(volatile uint16_t *)addr = w;
 }
 
-static void __raw_writel(volatile void *addr, uint32_t l)
+static inline void __raw_writel(volatile void *addr, uint32_t l)
 {
 	*(volatile uint32_t *)addr = l;
 }
 
-static void __raw_writell(volatile void *addr, uint64_t ll)
+static inline void __raw_writell(volatile void *addr, uint64_t ll)
 {
 	*(volatile uint64_t *)addr = ll;
 }

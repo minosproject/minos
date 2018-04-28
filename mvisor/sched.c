@@ -21,7 +21,6 @@ DEFINE_PER_CPU(struct pcpu *, pcpu);
 uint32_t pcpu_affinity(struct vcpu *vcpu, uint32_t affinity)
 {
 	int i, found;
-	uint32_t af;
 	struct pcpu *pcpu;
 	struct list_head *list;
 	struct vcpu *tvcpu;
@@ -33,19 +32,10 @@ uint32_t pcpu_affinity(struct vcpu *vcpu, uint32_t affinity)
 	if (affinity >= CONFIG_NR_CPUS)
 		goto step2;
 
-	/*
-	 * idle vcpu for each pcpu
-	 */
-	if (vcpu->vm == NULL) {
-		list_add_tail(&pcpu->vcpu_list, &vcpu->pcpu_list);
-		return affinity;
-	}
-
 	pcpu = &pcpus[affinity];
 	list_for_each(&pcpu->vcpu_list, list) {
 		tvcpu = list_entry(list, struct vcpu, pcpu_list);
-		if ((vcpu->vm->vmid) ==
-				(tvcpu->vm->vmid))
+		if ((vcpu->vm->vmid) == (tvcpu->vm->vmid))
 			goto step2;
 	}
 
@@ -128,6 +118,8 @@ static inline int detach_ready_vcpu(struct vcpu *vcpu)
 
 	list_del(&vcpu->state_list);
 	vcpu->state_list.next = NULL;
+
+	return 0;
 }
 
 static void update_sched_info(struct vcpu *vcpu)
@@ -173,9 +165,7 @@ void sched_vcpu(struct vcpu *vcpu, int reason)
 void sched(void)
 {
 	struct pcpu *pcpu;
-	struct list_head *list;
 	struct vcpu *vcpu;
-	unsigned long flag;
 
 	pcpu = get_cpu_var(pcpu);
 
@@ -206,7 +196,6 @@ resched:
 static void sched_timer_function(unsigned long data)
 {
 	struct pcpu *pcpu = get_cpu_var(pcpu);
-	struct timer_list *timer = &pcpu->sched_timer;
 	struct vcpu *vcpu = current_vcpu();
 	unsigned long flags;
 	struct vcpu *next = vcpu;
@@ -259,7 +248,6 @@ void vcpu_idle(struct vcpu *vcpu)
 {
 	unsigned long flag;
 	int cpuid = get_cpu_id();
-	struct pcpu *pcpu = get_per_cpu(pcpu, cpuid);
 
 	if (!vcpu_can_idle(vcpu))
 		return;
@@ -383,11 +371,10 @@ int mvisor_reched_handler(uint32_t irq, void *data)
 
 int sched_late_init(void)
 {
-	int ret;
 	struct timer_list *timer;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	ret = request_irq(CONFIG_MVISOR_RESCHED_IRQ,
+	request_irq(CONFIG_MVISOR_RESCHED_IRQ,
 			mvisor_reched_handler, NULL);
 
 	timer = &pcpu->sched_timer;

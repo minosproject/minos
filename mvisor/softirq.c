@@ -48,12 +48,9 @@ static void __do_softirq(void)
 {
 	struct softirq_action *h;
 	uint32_t pending;
-	int cpu;
 
 	pending = local_softirq_pending();
-	cpu = smp_processor_id();
 
-restart:
 	set_softirq_pending(0);
 	//enable_local_irq();
 	h = softirq_vec;

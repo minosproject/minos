@@ -42,6 +42,9 @@ struct vm {
 	boot_vm_t boot_vm;
 } __attribute__((__aligned__ (8)));
 
+#define for_each_vm(vm)	\
+	list_for_each_entry(vm, &vm_list, vm_list)
+
 struct vm *mvisor_get_vm(uint32_t vmid);
 
 int mvisor_vms_init(void);

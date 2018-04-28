@@ -11,7 +11,7 @@
 
 static int unknown_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int wfi_wfe_handler(vcpu_regs *reg, uint32_t esr_value)
@@ -25,72 +25,72 @@ static int wfi_wfe_handler(vcpu_regs *reg, uint32_t esr_value)
 
 static int mcr_mrc_cp15_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int mcrr_mrrc_cp15_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int mcr_mrc_cp14_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int ldc_stc_cp14_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int access_simd_reg_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int mcr_mrc_cp10_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int mrrc_cp14_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int illegal_exe_state_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int svc_aarch32_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int hvc_aarch32_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int smc_aarch32_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int svc_aarch64_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int hvc_aarch64_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int smc_aarch64_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int access_system_reg_handler(vcpu_regs *reg, uint32_t esr_value)
@@ -120,17 +120,17 @@ static int access_system_reg_handler(vcpu_regs *reg, uint32_t esr_value)
 
 static int insabort_tfl_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int insabort_twe_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int misaligned_pc_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int get_faulting_ipa(unsigned long vaddr)
@@ -188,72 +188,72 @@ static int dataabort_tfl_handler(vcpu_regs *regs, uint32_t esr_value)
 
 static int dataabort_twe_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int stack_misalign_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int floating_aarch32_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int floating_aarch64_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int serror_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int breakpoint_tfl_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int breakpoint_twe_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int software_step_tfl_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int software_step_twe_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int watchpoint_tfl_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int watchpoint_twe_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int bkpt_ins_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int vctor_catch_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static int brk_ins_handler(vcpu_regs *reg, uint32_t esr_value)
 {
-
+	return 0;
 }
 
 static ec_config_t ec_config_table[] = {
@@ -315,7 +315,6 @@ void SError_from_el1_handler(vcpu_regs *data)
 	uint32_t esr_value;
 	uint32_t ec_type;
 	ec_config_t *ec;
-	long ret;
 	struct vcpu *vcpu = (struct vcpu *)data;
 
 	mvisor_exit_from_guest(vcpu);
@@ -330,10 +329,8 @@ void SError_from_el1_handler(vcpu_regs *data)
 	pr_debug("value of esr_el2 ec:0x%x il:0x%x iss:0x%x\n", ec_type);
 
 	ec = get_ec_config(ec_type);
-	if (ec == NULL) {
-		ret = -EINVAL;
-		return;
-	}
+	if (ec == NULL)
+		goto out;
 
 	/*
 	 * how to deal with the return value
@@ -342,6 +339,7 @@ void SError_from_el1_handler(vcpu_regs *data)
 	data->elr_el2 += ec->ret_addr_adjust;
 	ec->handler(data, esr_value);
 
+out:
 	disable_local_irq();
 }
 

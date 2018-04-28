@@ -12,7 +12,7 @@ QUIET ?= @
 INCLUDE_DIR 	:= include/mvisor/*.h include/asm/*.h include/config/*.h include/drivers/*.h
 #INCLUDE_DIR 	:=
 
-CCFLAG 		:= --static -nostdlib -fno-builtin -g -march=armv8-a -I$(PWD)/include
+CCFLAG 		:= -Wall --static -nostdlib -fno-builtin -g -march=armv8-a -I$(PWD)/include
 LDS 		:= arch/$(ARCH)/lds/mvisor.ld.c
 
 OUT 		:= out

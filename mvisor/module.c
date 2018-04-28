@@ -165,7 +165,7 @@ void save_vcpu_module_state(struct vcpu *vcpu)
 int mvisor_modules_init(void)
 {
 	int32_t i;
-	uint64_t base, end;
+	unsigned long base, end;
 	uint32_t size;
 	struct module_id *mid;
 	struct mvisor_module *module;
@@ -173,10 +173,9 @@ int mvisor_modules_init(void)
 	init_list(&module_list);
 	spin_lock_init(&module_lock);
 
-	base = (uint64_t)&__mvisor_module_start;
-	end = (uint64_t)&__mvisor_module_end;
-	size = (&__mvisor_module_end - &__mvisor_module_start) /
-			sizeof(struct module_id);
+	base = (unsigned long)&__mvisor_module_start;
+	end = (unsigned long)&__mvisor_module_end;
+	size = (end - base) / sizeof(struct module_id);
 
 	for (i = 0; i < size; i++) {
 		mid = (struct module_id *)base;

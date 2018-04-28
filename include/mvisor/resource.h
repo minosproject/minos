@@ -26,6 +26,6 @@ struct irq_resource {
 	char *name;
 };
 
-int mvisor_parse_resource(void);
+void mvisor_parse_resource(void);
 
 #endif

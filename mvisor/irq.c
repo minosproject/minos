@@ -235,13 +235,14 @@ int register_irq_domain(int type, struct irq_domain_ops *ops)
 
 	domain->ops = ops;
 	irq_domains[type] = domain;
+
+	return 0;
 }
 
 static struct irq_desc **spi_alloc_irqs(uint32_t start, uint32_t count)
 {
 	struct irq_desc **irqs;
 	uint32_t size;
-	uint32_t i;
 
 	size = count * sizeof(struct irq_desc *);
 	irqs = (struct irq_desc **)mvisor_zalloc(size);
@@ -497,8 +498,6 @@ static struct irq_desc *get_irq_desc(uint32_t irq)
 int mvisor_register_irq_entry(void *res)
 {
 	struct irq_resource *config;
-	struct irq_desc *irq_desc;
-	struct vcpu *vcpu;
 	struct irq_domain *domain;
 
 	if (res == NULL)
@@ -526,7 +525,7 @@ void __irq_enable(uint32_t irq, int enable)
 	spin_lock_irqsave(&irq_desc->lock, flag);
 
 	if (enable) {
-		if (irq_desc->flags & IRQ_FLAG_STATUS_MASK ==
+		if ((irq_desc->flags & IRQ_FLAG_STATUS_MASK) ==
 				IRQ_FLAG_STATUS_MASKED)
 			goto out;
 
@@ -534,7 +533,7 @@ void __irq_enable(uint32_t irq, int enable)
 		irq_desc->flags &= ~IRQ_FLAG_STATUS_MASK;
 		irq_desc->flags |= IRQ_FLAG_STATUS_UNMASKED;
 	} else {
-		if (irq_desc->flags & IRQ_FLAG_STATUS_MASK ==
+		if ((irq_desc->flags & IRQ_FLAG_STATUS_MASK) ==
 				IRQ_FLAG_STATUS_UNMASKED)
 			goto out;
 
@@ -836,7 +835,6 @@ int vcpu_has_virq(struct vcpu *vcpu)
 
 int mvisor_irq_init(void)
 {
-	uint32_t size;
 	char *chip_name = CONFIG_IRQ_CHIP_NAME;
 
 	irq_chip = (struct irq_chip *)mvisor_get_module_pdata(chip_name,

@@ -72,7 +72,7 @@ static int __mvisor_parse_resource(unsigned long start,
 	return ret;
 }
 
-int mvisor_parse_resource(void)
+void mvisor_parse_resource(void)
 {
 	int i;
 	size_t size;

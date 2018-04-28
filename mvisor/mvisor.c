@@ -135,7 +135,6 @@ void boot_main(void)
 void boot_secondary(void)
 {
 	uint32_t cpuid = get_cpu_id();
-	uint64_t mid;
 
 	pr_info("cpu-%d is up\n", cpuid);
 

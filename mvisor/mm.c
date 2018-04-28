@@ -79,7 +79,7 @@ static unsigned long free_mem_size = 0;
 static spinlock_t mem_block_lock;
 static char *free_4k_base = 0;
 
-int mvisor_mm_init(void)
+void mvisor_mm_init(void)
 {
 	size_t size;
 

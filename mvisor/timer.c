@@ -66,6 +66,8 @@ static int detach_timer(struct timers *timers, struct timer_list *timer)
 
 	list_del(entry);
 	entry->next = NULL;
+
+	return 0;
 }
 
 static inline unsigned long slack_expires(unsigned long expires)
