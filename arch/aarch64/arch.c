@@ -26,7 +26,7 @@ struct aarch64_system_context {
 	uint64_t vmpidr;
 	uint64_t sctlr_el1;
 	uint64_t hcr_el2;
-} __attribute__ ((__aligned__ (sizeof(unsigned long))));
+}__align(sizeof(unsigned long));
 
 static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
 {

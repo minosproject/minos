@@ -26,6 +26,9 @@ struct irq_resource {
 	char *name;
 };
 
+#define __irq_resource  __used __section(".__irq_desc_resource")
+#define __memory_resource  __used __section(".__mvisor_memory_resource")
+
 void mvisor_parse_resource(void);
 
 #endif

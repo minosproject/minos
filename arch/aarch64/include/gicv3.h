@@ -145,7 +145,7 @@ struct gic_context {
 	uint32_t icc_sre_el1;
 	uint32_t ich_vmcr_el2;
 	uint32_t ich_hcr_el2;
-} __attribute__ ((__aligned__ (sizeof(unsigned long))));
+} __align(sizeof(unsigned long));
 
 struct gic_lr {
 	uint64_t v_intid : 32;

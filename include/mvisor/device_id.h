@@ -11,7 +11,7 @@ struct module_id {
 };
 
 #define MVISOR_MODULE_DECLARE(mname, mn, t, init_fn) \
-	static const struct module_id __attribute__((unused)) \
+	static const struct module_id __used \
 	mvisor_module_match_##mname __section(.__mvisor_module) = { \
 		.name = mn, \
 		.type = t, \

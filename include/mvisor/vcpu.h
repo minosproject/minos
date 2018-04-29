@@ -37,7 +37,7 @@ struct vcpu {
 
 	void **module_context;
 	void *arch_data;
-} __attribute__ ((__aligned__ (sizeof(unsigned long))));
+} __align(sizeof(unsigned long));
 
 static uint32_t inline get_vcpu_id(struct vcpu *vcpu)
 {

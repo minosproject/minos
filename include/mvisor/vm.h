@@ -40,7 +40,7 @@ struct vm {
 	 * to control the memory access
 	 */
 	boot_vm_t boot_vm;
-} __attribute__((__aligned__ (8)));
+} __align(sizeof(unsigned long));
 
 #define for_each_vm(vm)	\
 	list_for_each_entry(vm, &vm_list, vm_list)

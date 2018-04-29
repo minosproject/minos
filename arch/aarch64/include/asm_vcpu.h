@@ -40,7 +40,7 @@ typedef struct aarch64_vcpu_regs {
 	uint64_t spsr_el2;
 	uint64_t nzcv;
 	uint64_t esr_el2;
-} vcpu_regs __attribute__ ((__aligned__ (sizeof(unsigned long))));
+} vcpu_regs __align(sizeof(unsigned long));
 
 static inline unsigned long
 get_reg_value(vcpu_regs *regs, uint32_t index)

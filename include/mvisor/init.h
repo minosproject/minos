@@ -17,46 +17,29 @@ struct cmdline {
 
 typedef int (*init_call)(void);
 
-#define __init_data __attribute__((section(".__init_data_section")))
-#define __init_text __attribute__((section(".__init_text")))
+#define __init_data 	__section(".__init_data_section")
+#define __init_text 	__section(".__init_text")
 
-#define __init_0	__attribute__((section(".__init_func_0")))
-#define __init_1	__attribute__((section(".__init_func_1")))
-#define __init_2	__attribute__((section(".__init_func_2")))
-#define __init_3	__attribute__((section(".__init_func_3")))
-#define __init_4	__attribute__((section(".__init_func_4")))
-#define __init_5	__attribute__((section(".__init_func_5")))
-#define __init_6	__attribute__((section(".__init_func_6")))
-#define __init_7	__attribute__((section(".__init_func_7")))
+#define __init_0	__section(".__init_func_0")
+#define __init_1	__section(".__init_func_1")
+#define __init_2	__section(".__init_func_2")
+#define __init_3	__section(".__init_func_3")
+#define __init_4	__section(".__init_func_4")
+#define __init_5	__section(".__init_func_5")
+#define __init_6	__section(".__init_func_6")
+#define __init_7	__section(".__init_func_7")
 
-#define __irq_resource  __attribute__((section(".__irq_desc_resource")))
-#define __memory_resource  __attribute__((section(".__mvisor_memory_resource")))
+#define __define_initcall(fn, id)	\
+	static init_call __init_call_##fn __used __init_##id = fn
 
-#define early_initcall(fn)	\
-	static init_call __attribute__((unused)) __init_call_##fn __init_0 = fn
-
-#define arch_initcall(fn)	\
-	static init_call __attribute__((unused)) __init_call_##fn __init_1 = fn
-
-#define subsys_initcall(fn)	\
-	static init_call __attribute__((unused)) __init_call_##fn __init_2 = fn
-
-#define device_initcall(fn)	\
-	static init_call __attribute__((unused)) __init_call_##fn __init_3 = fn
-
-#define early_initcall_percpu(fn)	\
-	static init_call __attribute__((unused)) __init_call_##fn __init_4 = fn
-
-#define arch_initcall_percpu(fn)	\
-	static init_call __attribute__((unused)) __init_call_##fn __init_5 = fn
-
-#define subsys_initcall_percpu(fn)	\
-	static init_call __attribute__((unused)) __init_call_##fn __init_6 = fn
-
-#define device_initcall_percpu(fn)	\
-	static init_call __attribute__((unused)) __init_call_##fn __init_7 = fn
-
-#define __section(S) __attribute__ ((__section__(#S)))
+#define early_initcall(fn) 		__define_initcall(fn, 0)
+#define arch_initcall(fn) 		__define_initcall(fn, 1)
+#define subsys_initcall(fn) 		__define_initcall(fn, 2)
+#define device_initcall(fn)		__define_initcall(fn, 3)
+#define early_initcall_percpu(fn) 	__define_initcall(fn, 4)
+#define arch_initcall_percpu(fn)	__define_initcall(fn, 5)
+#define subsys_initcall_percpu(fn)	__define_initcall(fn, 6)
+#define device_initcall_percpu(fn)	__define_initcall(fn, 7)
 
 void mvisor_arch_init(void);
 void mvisor_early_init(void);

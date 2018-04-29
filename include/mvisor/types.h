@@ -2,6 +2,7 @@
 #define _MVISOR_TYPES_H_
 
 #include <asm/asm_types.h>
+#include <mvisor/compiler.h>
 
 typedef __u32	u32;
 typedef __s32	s32;

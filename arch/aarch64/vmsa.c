@@ -33,7 +33,7 @@ struct vmsa_context {
 	uint64_t ttbr0_el1;
 	uint64_t ttbr1_el1;
 	uint64_t vttbr_el2;
-} __attribute__ ((__aligned__ (sizeof(unsigned long))));
+}__align(sizeof(unsigned long));
 
 /*
  * now using two level page table in host
