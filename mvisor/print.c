@@ -5,6 +5,7 @@
 #include <mvisor/spinlock.h>
 #include <config/config.h>
 #include <drivers/uart.h>
+#include <mvisor/smp.h>
 
 #define PRINTF_DEC		0X0001
 #define PRINTF_HEX		0x0002
@@ -188,20 +189,27 @@ static int update_log_buffer(char *buf, int printed)
 
 static char buffer[1024];
 
-int level_print(const char *fmt, ...)
+int level_print(char *fmt, ...)
 {
 	char ch;
 	va_list arg;
 	int printed, i;
 	char *buf;
 
-	ch = *fmt;
+	ch = fmt[2];
 	if (is_digit(ch)) {
 		ch = ch - '0';
 		if(ch > CONFIG_LOG_LEVEL)
 			return 0;
-		fmt++;
 	}
+
+	/*
+	 * after to handle the level we change
+	 * the level to the current CPU
+	 */
+	i = smp_processor_id();
+	fmt[1] = (i / 10) + '0';
+	fmt[2] = (i % 10) + '0';
 
 	/*
 	 * TBD need to check the length of fmt
