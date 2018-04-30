@@ -526,7 +526,7 @@ void __irq_enable(uint32_t irq, int enable)
 
 	if (enable) {
 		if ((irq_desc->flags & IRQ_FLAG_STATUS_MASK) ==
-				IRQ_FLAG_STATUS_MASKED)
+				IRQ_FLAG_STATUS_UNMASKED)
 			goto out;
 
 		irq_chip->irq_unmask(irq);
@@ -534,7 +534,7 @@ void __irq_enable(uint32_t irq, int enable)
 		irq_desc->flags |= IRQ_FLAG_STATUS_UNMASKED;
 	} else {
 		if ((irq_desc->flags & IRQ_FLAG_STATUS_MASK) ==
-				IRQ_FLAG_STATUS_UNMASKED)
+				IRQ_FLAG_STATUS_MASKED)
 			goto out;
 
 		irq_chip->irq_mask(irq);
