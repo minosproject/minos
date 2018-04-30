@@ -16,6 +16,14 @@ static struct memory_resource mem_regions[] __memory_resource = {
 	},
 
 	{
+		.mem_base = 0xa0000000,
+		.mem_end  = 0xb0000000,
+		.type = 0,
+		.vmid = 1,
+		.name = "dram",
+	},
+
+	{
 		.mem_base = 0x1C090000,
 		.mem_end  = 0x1C0A0000,
 		.type = 1,
@@ -24,11 +32,11 @@ static struct memory_resource mem_regions[] __memory_resource = {
 	},
 
 	{
-		.mem_base = 0xa0000000,
-		.mem_end = 0xa4000000,
-		.type = 2,
-		.vmid = 0xffff,
-		.name = "shared01",
+		.mem_base = 0x1C090000,
+		.mem_end  = 0x1C0A0000,
+		.type = 1,
+		.vmid = 1,
+		.name = "uart0",
 	},
 
 	{

@@ -21,4 +21,15 @@ vm_entry_t vm_os1 = {
 	.mmu_on		= 1,
 };
 
+vm_entry_t vm_os2 = {
+	.vmid		= 1,
+	.name 		= "os2",
+	.nr_vcpu 	= 4,
+	.entry_point 	= 0xa0000000,
+	.vcpu_affinity 	= {0},
+	.boot_vm 	= os1_boot_vm,
+	.mmu_on		= 1,
+};
+
 register_vm_entry(vm_os1);
+register_vm_entry(vm_os2);

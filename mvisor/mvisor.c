@@ -13,6 +13,7 @@
 #include <mvisor/init.h>
 #include <mvisor/sched.h>
 #include <mvisor/smp.h>
+#include <mvisor/atomic.h>
 
 extern void softirq_init(void);
 extern void init_timers(void);
