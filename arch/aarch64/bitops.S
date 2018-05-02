@@ -22,6 +22,8 @@
  *     bits 31:5 word offset
  * x1: address
  */
+	.section __asm_code, "ax"
+
 	.macro	bitop, name, instr
 .global \name
 \name:

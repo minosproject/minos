@@ -3,7 +3,7 @@
 
 	.macro func _name, align=2
 	.cfi_sections .debug_frame
-	.section .text.\_name, "ax"
+	.section __asm_code, "ax"
 	.type \_name, %function
 	.func \_name
 	.cfi_startproc

@@ -5,9 +5,12 @@ SECTIONS
 {
 	.vectors 0x80000000:
 	{
+		/*
+		 * put all asm code into this section
+		 */
 		__code_start = .;
 		KEEP(*(__start_up))
-		KEEP(*(__el3_vectors __el2_vectors __int_handlers))
+		KEEP(*(__el3_vectors __el2_vectors __int_handlers __asm_code))
 	}
 
 	.text : 
