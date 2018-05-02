@@ -4,98 +4,83 @@ CC 		:= $(CROSS_COMPILE)gcc
 LD 		:= $(CROSS_COMPILE)ld
 OBJ_COPY	:= $(CROSS_COMPILE)objcopy
 OBJ_DUMP 	:= $(CROSS_COMPILE)objdump
+
+PLATFORM	:= fvp
+TARGET		:= mvisor
+
 QUIET ?= @
 
-#PLATFORM	:= fvp
-#BOARD		:= armv8-fvp
+include build/$(PLATFORM).mk
 
-INCLUDE_DIR 	:= include/mvisor/*.h include/asm/*.h include/config/*.h include/drivers/*.h
-#INCLUDE_DIR 	:=
+src_dir-y			+= mvisor arch/$(ARCH) mvisor_vms
+src_dir-$(CONFIG_UART_PL011)	+= drivers/pl011
+src_dir-$(CONFIG_LIBFDT)	+= external/libfdt
 
-CCFLAG 		:= -Wall --static -nostdlib -fno-builtin -g -march=armv8-a -I$(PWD)/include
-LDS 		:= arch/$(ARCH)/lds/mvisor.ld.c
+inc_dir-y			+= include/mvisor include/asm include/config
+inc_dir-$(CONFIG_LIBFDT)	+= include/libfdt
 
-OUT 		:= out
-OUT_CORE 	= $(OUT)/mvisor
-OUT_ARCH 	= $(OUT)/$(ARCH)
-OUT_MVISOR_VMS	= $(OUT)/mvisor_vms
-OUT_DRIVERS	= $(OUT)/drivers
-TARGET_LDS	= $(OUT)/mvisor.lds
+inc_h-y		= $(shell find $(inc_dir-y) -type f -name "*.h")
+inc_s-y		+= $(shell find $(inc_dir-y) -type f -name "*.S")
+src_c-y		= $(shell find $(src_dir-y) -type f -name "*.c")
+src_s-y		+= $(shell find $(src_dir-y) -type f -name "*.S")
 
-mvisor_elf 	:= $(OUT)/mvisor.elf
-mvisor_bin 	:= $(OUT)/mvisor.bin
-mvisor_dump 	:= $(OUT)/mvisor.s
-
-SRC_ARCH_C	:= $(wildcard arch/$(ARCH)/*.c)
-SRC_ARCH_S	:= $(wildcard arch/$(ARCH)/*.S)
-SRC_CORE	:= $(wildcard mvisor/*.c)
-SRC_MVISOR_VMS	:= $(wildcard mvisor_vms/*.c)
-SRC_DRIVERS	:= $(wildcard drivers/*.c)
-
-VPATH		:= mvisor:arch/$(ARCH):mvisor_vms:drivers
-
-LDFLAG 		:= -T$(TARGET_LDS) -Map=$(OUT)/linkmap.txt
+LDS_SRC		= lds/$(ARCH).ld.c
 
 .SUFFIXES:
 .SUFFIXES: .S .c
+
+OUT		:= out
+TARGET_ELF	:= $(OUT)/$(TARGET).elf
+TARGET_BIN	:= $(OUT)/$(TARGET).bin
+TARGET_LDS	:= $(OUT)/$(ARCH).lds
+TARGET_DUMP	:= $(OUT)/mvisor.s
+
+INCLUDE_DIR 	:= $(inc_dir-y)
+CCFLAG 		:= -Wall --static -nostdlib -fno-builtin -g \
+		   -march=armv8-a -I$(PWD)/include
+LDFLAG 		:= -T$(TARGET_LDS) -Map=$(OUT)/linkmap.txt
+
+obj-out-dir	:= $(addprefix $(OUT)/, $(src_dir-y))
+
+VPATH		:= $(src_dir-y)
+
+objs		= $(src_c-y:%.c=$(OUT)/%.o)
+objs-s		= $(src_s-y:%.S=$(OUT)/%.O)
 
 ifeq ($(QUIET),@)
 PROGRESS = @echo Compiling $< ...
 endif
 
-_OBJ_ARCH	+= $(addprefix $(OUT_ARCH)/, $(patsubst %.c,%.o, $(notdir $(SRC_ARCH_C))))
-_OBJ_ARCH	+= $(addprefix $(OUT_ARCH)/, $(patsubst %.S,%.o, $(notdir $(SRC_ARCH_S))))
-OBJ_ARCH	= $(subst out/$(ARCH)/boot.o,,$(_OBJ_ARCH))
-OBJ_CORE	+= $(addprefix $(OUT_CORE)/, $(patsubst %.c,%.o, $(notdir $(SRC_CORE))))
-OBJ_MVISOR_VMS	+= $(addprefix $(OUT_MVISOR_VMS)/, $(patsubst %.c,%.o, $(notdir $(SRC_MVISOR_VMS))))
-OBJ_DRIVERS	+= $(addprefix $(OUT_DRIVERS)/, $(patsubst %.c,%.o, $(notdir $(SRC_DRIVERS))))
+all: $(obj-out-dir) $(TARGET_BIN)
 
-OBJECT		= $(OUT_ARCH)/boot.o $(OBJ_ARCH) $(OBJ_CORE) $(OBJ_MVISOR_VMS) $(OBJ_DRIVERS)
+$(TARGET_BIN) : $(TARGET_ELF)
+	$(QUIET) $(OBJ_COPY) -O binary $(TARGET_ELF) $(TARGET_BIN)
+	$(QUIET) $(OBJ_DUMP) $(TARGET_ELF) -D > $(TARGET_DUMP)
+	$(QUIET) echo "Build done sucessfully"
 
-all: $(OUT) $(OUT_CORE) $(OUT_ARCH) $(OUT_DRIVERS)  $(OUT_MVISOR_VMS) $(mvisor_bin)
+$(TARGET_ELF) : $(objs) $(objs-s) $(TARGET_LDS)
+	@ echo Linking $@ ...
+	$(QUIET) $(LD) $(LDFLAG) -o $(TARGET_ELF) $(objs-s) $(objs) $(LDPATH)
+	@ echo Linking done
 
-$(mvisor_bin) : $(mvisor_elf)
-	$(QUIET) $(OBJ_COPY) -O binary $(mvisor_elf) $(mvisor_bin)
-	$(QUIET) $(OBJ_DUMP) $(mvisor_elf) -D > $(mvisor_dump)
+$(TARGET_LDS) : $(LDS_SRC)
+	@ echo Generate LDS file ...
+	$(QUIET) $(CC) $(CCFLAG) -E -P $(LDS_SRC) -o $(TARGET_LDS)
+	@ echo Generate LDS file done
 
-$(mvisor_elf) : $(OBJECT) $(TARGET_LDS)
-	@echo Linking $@
-	$(QUIET) $(LD) $(LDFLAG) -o $(mvisor_elf) $(OBJECT) $(LDPATH)
-	@echo Done.
-
-$(TARGET_LDS) : $(LDS) $(INCLUDE_DIR)
-	@echo Generate LDS file
-	$(QUIET) $(CC) $(CCFLAG) -E -P $(LDS) -o $(TARGET_LDS)
-
-$(OUT) $(OUT_CORE) $(OUT_ARCH) $(OUT_MVISOR_VMS) $(OUT_DRIVERS):
+$(obj-out-dir) :
 	@ mkdir -p $@
 
-$(OUT_ARCH)/%.o: %.c $(INCLUDE_DIR)
+$(OUT)/%.o : %.c $(INCLUDE_DIR)
 	$(PROGRESS)
 	$(QUIET) $(CC) $(CCFLAG) -c $< -o $@
 
-$(OUT_ARCH)/boot.o: arch/$(ARCH)/boot.S $(INCLUDE_DIR)
-	$(PROGRESS)
-	$(QUIET) $(CC) $(CCFLAG) -c arch/$(ARCH)/boot.S -o $@
-
-$(OUT_ARCH)/%.o: %.S $(INCLUDE_DIR) 
+$(OUT)/%.O : %.S $(INCLUDE_DIR)
 	$(PROGRESS)
 	$(QUIET) $(CC) $(CCFLAG) -c $< -o $@
 
-$(OUT_CORE)/%.o: %.c $(INCLUDE_DIR)
-	$(PROGRESS)
-	$(QUIET) $(CC) $(CCFLAG) -c $< -o $@
-
-$(OUT_MVISOR_VMS)/%.o: %.c $(INCLUDE_DIR)
-	$(PROGRESS)
-	$(QUIET) $(CC) $(CCFLAG) -c $< -o $@
-
-$(OUT_DRIVERS)/%.o: %.c $(INCLUDE_DIR)
-	$(PROGRESS)
-	$(QUIET) $(CC) $(CCFLAG) -c $< -o $@
-
-.PHONY: clean run app
+.PHONY: clean
 
 clean:
 	@ rm -rf out
-	@ echo "All build has been cleaned"
+	@ echo "All build objects have been cleaned"

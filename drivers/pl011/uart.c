@@ -1,5 +1,5 @@
 #include <mvisor/io.h>
-#include <drivers/uart.h>
+#include <drivers/pl011.h>
 #include <mvisor/mmu.h>
 #include <mvisor/init.h>
 

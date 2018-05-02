@@ -4,7 +4,7 @@
 #include <mvisor/print.h>
 #include <mvisor/spinlock.h>
 #include <config/config.h>
-#include <drivers/uart.h>
+#include <drivers/pl011.h>
 #include <mvisor/smp.h>
 
 #define PRINTF_DEC		0X0001
