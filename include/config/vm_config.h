@@ -11,7 +11,7 @@ typedef struct mvisor_vm_entry {
 	uint32_t nr_vcpu;
 	uint32_t vcpu_affinity[CONFIG_VM_MAX_VCPU];
 	uint32_t mmu_on;
-	void *boot_vm;
+	void *boot_vcpu;
 } vm_entry_t __align(sizeof(unsigned long));
 
 uint32_t get_mem_config_size(void);

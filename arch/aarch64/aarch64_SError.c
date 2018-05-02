@@ -85,6 +85,10 @@ static int svc_aarch64_handler(vcpu_regs *reg, uint32_t esr_value)
 
 static int hvc_aarch64_handler(vcpu_regs *reg, uint32_t esr_value)
 {
+	/* always return success now */
+
+	reg->x0 = 0;
+
 	return 0;
 }
 
@@ -180,7 +184,9 @@ static int dataabort_tfl_handler(vcpu_regs *regs, uint32_t esr_value)
 		}
 		break;
 	default:
-		panic("unsupport data abort type this time\n");
+		pr_info("unsupport data abort type this time %d\n",
+				dabt->dfsc & ~FSC_LL_MASK);
+		break;
 	}
 
 	return 0;

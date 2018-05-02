@@ -129,6 +129,7 @@ void boot_main(void)
 	mvisor_device_init();
 	mvisor_device_init_percpu();
 
+	mvisor_boot_vms();
 
 	sched();
 }

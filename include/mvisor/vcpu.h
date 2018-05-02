@@ -54,14 +54,11 @@ static uint32_t inline get_pcpu_id(struct vcpu *vcpu)
 	return vcpu->pcpu_affinity;
 }
 
-struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id);
-
 struct vm *get_vm_by_id(uint32_t vmid);
-
 int arch_vm_init(struct vm *vm);
-
 int mvisor_create_vms(void);
-
+void mvisor_boot_vms(void);
 struct vcpu *get_vcpu_in_vm(struct vm *vm, uint32_t vcpu_id);
+struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id);
 
 #endif

@@ -33,7 +33,7 @@ static int mvisor_add_vm(vm_entry_t *vme)
 	strncpy(vm->name, vme->name,
 		MIN(strlen(vme->name), MVISOR_VM_NAME_SIZE - 1));
 	vm->vcpu_nr = MIN(vme->nr_vcpu, CONFIG_VM_MAX_VCPU);
-	vm->boot_vm = (boot_vm_t)vme->boot_vm;
+	vm->boot_vcpu = (boot_vcpu_t)vme->boot_vcpu;
 	vm->mmu_on = vme->mmu_on;
 	vm->entry_point = vme->entry_point;
 	memcpy(vm->vcpu_affinity, vme->vcpu_affinity,
@@ -144,7 +144,7 @@ static int vm_create_vcpus(struct vm *vm)
 	return 0;
 }
 
-static void vm_sched_init(struct vm *vm)
+static void inline vm_sched_init(struct vm *vm)
 {
 	int i;
 	struct vcpu *vcpu = NULL;
@@ -155,19 +155,31 @@ static void vm_sched_init(struct vm *vm)
 	}
 }
 
-static int inline vm_arch_init(struct vm *vm)
+static void inline vm_arch_init(struct vm *vm)
 {
-	return arch_vm_init(vm);
+	arch_vm_init(vm);
 }
 
-static int vm_modules_init(struct vm *vm)
+static void inline vm_modules_init(struct vm *vm)
 {
 	int i;
 
 	for (i = 0; i < vm->vcpu_nr; i++)
 		vcpu_modules_init(vm->vcpus[i]);
+}
 
-	return 0;
+void mvisor_boot_vms(void)
+{
+	int i;
+	struct vcpu *vcpu;
+	struct vm *vm;
+
+	for_each_vm(vm) {
+		for (i = 0; i < vm->vcpu_nr; i++) {
+			vcpu = vm->vcpus[i];
+			vm->boot_vcpu(vcpu);
+		}
+	}
 }
 
 int mvisor_vms_init(void)

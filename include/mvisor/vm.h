@@ -19,7 +19,7 @@ struct os {
 
 };
 
-typedef int (*boot_vm_t)(void *arg);
+typedef void (*boot_vcpu_t)(void *arg);
 
 extern struct list_head vm_list;
 
@@ -39,7 +39,7 @@ struct vm {
 	 * each vm may have its own stage2 memory map
 	 * to control the memory access
 	 */
-	boot_vm_t boot_vm;
+	boot_vcpu_t boot_vcpu;
 } __align(sizeof(unsigned long));
 
 #define for_each_vm(vm)	\
