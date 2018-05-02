@@ -1,7 +1,7 @@
 	.global el3_vectors
 
 	.section __el3_vectors, "ax"
-	.align 10
+	.align 11
 
 el3_vectors:
 c0sync3: b c0sync3
