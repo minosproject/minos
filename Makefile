@@ -58,7 +58,7 @@ $(TARGET_BIN) : $(TARGET_ELF)
 	$(QUIET) $(OBJ_DUMP) $(TARGET_ELF) -D > $(TARGET_DUMP)
 	$(QUIET) echo "Build done sucessfully"
 
-$(TARGET_ELF) : $(objs) $(objs-s) $(TARGET_LDS)
+$(TARGET_ELF) : include/asm  $(objs) $(objs-s) $(TARGET_LDS)
 	@ echo Linking $@ ...
 	$(QUIET) $(LD) $(LDFLAG) -o $(TARGET_ELF) $(objs-s) $(objs) $(LDPATH)
 	@ echo Linking done
@@ -70,6 +70,10 @@ $(TARGET_LDS) : $(LDS_SRC)
 
 $(obj-out-dir) :
 	@ mkdir -p $@
+
+include/asm :
+	@ echo Link asm-$(ARCH) to include/asm ...
+	@ ln -s asm-$(ARCH) include/asm
 
 $(OUT)/%.o : %.c $(INCLUDE_DIR)
 	$(PROGRESS)
@@ -83,4 +87,5 @@ $(OUT)/%.O : %.S $(INCLUDE_DIR)
 
 clean:
 	@ rm -rf out
+	@ rm include/asm
 	@ echo "All build objects have been cleaned"
