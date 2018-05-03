@@ -45,3 +45,4 @@ uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c)
 	res.l.low = div64_u64(((mod_64(rh, c) << 32) + (rl & 0xffffffff)), c);
 	return res.ll;
 }
+

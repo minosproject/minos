@@ -2,6 +2,7 @@
 #define _STRING_H
 
 #include <mvisor/types.h>
+#include <mvisor/varlist.h>
 
 long absolute(long num);
 long num_to_str(char *buf, unsigned int num, int bdho);
@@ -22,6 +23,8 @@ void *memmove(void *dest, const void *src, size_t n);
 size_t strnlen(const char *s, size_t maxlen);
 void *memcpy(void *dest, const void *src, size_t n);
 void *memchr(const void *s, int c, size_t n);
+int vsprintf(char *buf, const char *fmt, va_list arg);
+int sprintf(char *str, const char *format, ...);
 
 static inline int is_digit(char ch)
 {

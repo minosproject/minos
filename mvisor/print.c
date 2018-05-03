@@ -7,14 +7,6 @@
 #include <drivers/pl011.h>
 #include <mvisor/smp.h>
 
-#define PRINTF_DEC		0X0001
-#define PRINTF_HEX		0x0002
-#define PRINTF_OCT		0x0004
-#define PRINTF_BIN		0x0008
-#define PRINTF_MASK		(0x0f)
-#define PRINTF_UNSIGNED		0X0010
-#define PRINTF_SIGNED		0x0020
-
 #define LOG_BUFFER_SIZE		(8192)
 
 struct log_buffer {
@@ -47,112 +39,6 @@ void flush_log_buf(void)
 		uart_putc(log_buffer.buf[i]);
 
 	uart_init_done = 1;
-}
-
-int numbric(char *buf, unsigned long num, int flag)
-{
-	int len = 0;
-
-	switch (flag & PRINTF_MASK) {
-		case PRINTF_DEC:
-			if (flag &PRINTF_SIGNED)
-				len = itoa(buf, (signed long)num);
-			else
-				len = uitoa(buf, num);
-			break;
-		case PRINTF_HEX:
-			len = hextoa(buf, num);
-			break;
-		case PRINTF_OCT:
-			len = octtoa(buf, num);
-			break;
-		case PRINTF_BIN:
-			len = bintoa(buf, num);
-			break;
-		default:
-			break;
-	}
-
-	return len;
-}
-
-/*
- *for this function if the size over than 1024
- *this will cause an overfolow error,we will fix
- *this bug later
- */
-int vsprintf(char *buf, const char *fmt, va_list arg)
-{
-	char *str;
-	int len;
-	char *tmp;
-	signed long number;
-	unsigned long unumber;
-	int flag = 0;
-
-	if (buf == NULL)
-		return -1;
-
-	for (str = buf; *fmt; fmt++) {
-
-		if (*fmt != '%') {
-			*str++ = *fmt;
-			continue;
-		}
-
-		fmt++;
-		switch (*fmt) {
-			case 'd':
-				flag |= PRINTF_DEC | PRINTF_SIGNED;
-				break;
-			case 'x':
-				flag |= PRINTF_HEX | PRINTF_UNSIGNED;
-				break;
-			case 'u':
-				flag |= PRINTF_DEC | PRINTF_UNSIGNED;
-				break;
-			case 's':
-				len = strlen(tmp = va_arg(arg, char *));
-				strncpy(str, tmp, len);
-				str += len;
-				continue;
-				break;
-			case 'c':
-				*str = (char)(va_arg(arg, int));
-				str++;
-				continue;
-				break;
-			case 'o':
-				flag |= PRINTF_DEC | PRINTF_SIGNED;
-				break;
-			case '%':
-				*str = '%';
-				str++;
-				continue;
-				break;
-			default:
-				*str = '%';
-				*(str+1) = *fmt;
-				str += 2;
-				continue;
-				break;
-		}
-
-		if(flag & PRINTF_UNSIGNED){
-			unumber = va_arg(arg, unsigned long);
-			len = numbric(str, unumber, flag);
-		} else {
-
-			number = va_arg(arg, signed long);
-			len = numbric(str, number, flag);
-		}
-		str+=len;
-		flag = 0;
-	}
-
-	*str = 0;
-
-	return str-buf;
 }
 
 static int update_log_buffer(char *buf, int printed)

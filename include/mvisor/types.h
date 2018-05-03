@@ -95,4 +95,7 @@ typedef void (*void_func_t)(void);
 #define _AC(X,Y)	__AC(X,Y)
 #define _AT(T,X)	((T)(X))
 
+#define INT_MAX 	(2147483647)
+#define INT_MIN		(-2147483648)
+
 #endif

@@ -11,4 +11,6 @@ int level_print(char *fmt, ...);
 #define pr_error(...)	level_print("[01]ERROR : " __VA_ARGS__)
 #define pr_fatal(...)	level_print("[00]FATAL : " __VA_ARGS__)
 
+#define printf(...)	level_print("[03]INFO  : " __VA_ARGS__)
+
 #endif
