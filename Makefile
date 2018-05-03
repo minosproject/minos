@@ -15,9 +15,11 @@ include build/$(PLATFORM).mk
 src_dir-y			+= mvisor arch/$(ARCH) mvisor_vms
 src_dir-$(CONFIG_UART_PL011)	+= drivers/pl011
 src_dir-$(CONFIG_LIBFDT)	+= external/libfdt
+src_dir-$(CONFIG_JSON_SJSON)	+= external/sjson
 
 inc_dir-y			+= include/mvisor include/asm include/config
 inc_dir-$(CONFIG_LIBFDT)	+= include/libfdt
+inc_dir-$(CONFIG_JSON_SJSON)	+= include/sjson
 
 inc_h-y		= $(shell find $(inc_dir-y) -type f -name "*.h")
 inc_s-y		+= $(shell find $(inc_dir-y) -type f -name "*.S")
