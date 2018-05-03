@@ -48,12 +48,13 @@
  *     OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  *     EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include "libfdt_env.h"
+#include <libfdt/libfdt_env.h>
 
-#include <fdt.h>
-#include <libfdt.h>
+#include <libfdt/fdt.h>
+#include <libfdt/libfdt.h>
 
 #include "libfdt_internal.h"
+#include <mvisor/string.h>
 
 int fdt_check_header(const void *fdt)
 {
