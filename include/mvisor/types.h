@@ -25,6 +25,8 @@ typedef __s64	int64_t;
 typedef unsigned long size_t;
 typedef unsigned long phy_addr_t;
 
+typedef unsigned long uintptr_t;
+
 #define MAX(a, b)	a > b ? a : b
 #define MIN(a, b)	a < b ? a : b
 #define max(a, b)	a > b ? a : b

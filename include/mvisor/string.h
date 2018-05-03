@@ -10,15 +10,22 @@ long uitoa(char *buf, unsigned long num);
 long hextoa(char *buf, unsigned long num);
 long octtoa(char *buf, unsigned long num);
 long bintoa(char *buf, unsigned long num);
-int strlen(char *buf);
+size_t strlen(const char *s);
 char *strcpy(char *des, char *src);
 char *strncpy(char *des, char *src, int len);
-int is_digit(char ch);
 int strcmp(const char *src, const char *dst);
 int memcmp(const char *src, const char *dst, size_t size);
 int strncmp(const char *src, const char *dst, int n);
 char *strchr(char *src, char ch);
-int memcpy(void *target, void *source, int size);
-extern void memset(char *base, char ch, int size);
+void memset(char *base, char ch, int size);
+void *memmove(void *dest, const void *src, size_t n);
+size_t strnlen(const char *s, size_t maxlen);
+void *memcpy(void *dest, const void *src, size_t n);
+void *memchr(const void *s, int c, size_t n);
+
+static inline int is_digit(char ch)
+{
+	return ((ch <= '9') && (ch >= '0'));
+}
 
 #endif

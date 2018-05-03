@@ -71,6 +71,22 @@ long bintoa(char *buf, unsigned long num)
 	return num_to_str(buf, num, 2);
 }
 
+char *strncpy(char *des, char *src, int len)
+{
+	char *tmp = des;
+	int i;
+
+	if (des == NULL || src == NULL)
+		return NULL;
+
+	for (i = 0; i < len; i++) {
+		des[i] = src[i];
+	}
+
+	return tmp;
+}
+
+#if 0
 int strlen(char *buf)
 {
 	int len = 0;
@@ -95,26 +111,6 @@ char *strcpy(char *des, char *src)
 	while ((*des++=*src++) != '\0');
 
 	return tmp;
-}
-
-char *strncpy(char *des, char *src, int len)
-{
-	char *tmp = des;
-	int i;
-
-	if (des == NULL || src == NULL)
-		return NULL;
-
-	for (i = 0; i < len; i++) {
-		des[i] = src[i];
-	}
-
-	return tmp;
-}
-
-int is_digit(char ch)
-{
-	return ((ch <= '9') && (ch >= '0'));
 }
 
 int strcmp(const char *src, const char *dst)
@@ -171,7 +167,6 @@ int strncmp(const char *src, const char *dst, int n)
 	return (ret);
 }
 
-#if 0
 
 #ifndef CONFIG_HAS_ARCH_STRCHR
 char *strchr(char *src, char ch)
