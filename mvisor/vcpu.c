@@ -2,12 +2,12 @@
 #include <mvisor/vm.h>
 #include <mvisor/vcpu.h>
 #include <mvisor/sched.h>
-#include <config/vm_config.h>
 #include <config/config.h>
 #include <mvisor/module.h>
 #include <mvisor/mm.h>
 #include <mvisor/bitmap.h>
 #include <mvisor/irq.h>
+#include <mvisor/mvisor_config.h>
 
 extern unsigned char __mvisor_vm_start;
 extern unsigned char __mvisor_vm_end;
@@ -17,7 +17,7 @@ static uint32_t total_vms = 0;
 
 struct list_head vm_list;
 
-static int mvisor_add_vm(vm_entry_t *vme)
+static int mvisor_add_vm(struct mvisor_vmtag *vme)
 {
 	struct vm *vm;
 
@@ -32,10 +32,11 @@ static int mvisor_add_vm(vm_entry_t *vme)
 	vm->vmid = vme->vmid;
 	strncpy(vm->name, vme->name,
 		MIN(strlen(vme->name), MVISOR_VM_NAME_SIZE - 1));
+	strncpy(vm->os_type, vme->type,
+		MIN(strlen(vme->type), OS_TYPE_SIZE - 1));
 	vm->vcpu_nr = MIN(vme->nr_vcpu, CONFIG_VM_MAX_VCPU);
-	vm->boot_vcpu = (boot_vcpu_t)vme->boot_vcpu;
 	vm->mmu_on = vme->mmu_on;
-	vm->entry_point = vme->entry_point;
+	vm->entry_point = vme->entry;
 	memcpy(vm->vcpu_affinity, vme->vcpu_affinity,
 			sizeof(uint32_t) * CONFIG_VM_MAX_VCPU);
 
@@ -52,23 +53,17 @@ static int mvisor_add_vm(vm_entry_t *vme)
 static int parse_all_vms(void)
 {
 	int i;
-	vm_entry_t *vme;
-	size_t size = (&__mvisor_vm_end) - (&__mvisor_vm_start);
-	unsigned long *start = (unsigned long *)(&__mvisor_vm_start);
+	struct mvisor_vmtag *vmtags = mv_config->vmtags;
 
-	if (size == 0) {
+	if (mv_config->nr_vmtag == 0) {
 		pr_error("No VM is found\n");
 		return -ENOENT;
 	}
 
-	size = size / sizeof(vm_entry_t *);
-	pr_debug("Found %d VMs config\n", size);
+	pr_debug("Found %d VMs config\n", mv_config->nr_vmtag);
 
-	for (i = 0; i < size; i++) {
-		vme = (vm_entry_t *)(*start);
-		mvisor_add_vm(vme);
-		start++;
-	}
+	for (i = 0; i < mv_config->nr_vmtag; i++)
+		mvisor_add_vm(&vmtags[i]);
 
 	return 0;
 }
@@ -170,6 +165,7 @@ static void inline vm_modules_init(struct vm *vm)
 
 void mvisor_boot_vms(void)
 {
+#if 0
 	int i;
 	struct vcpu *vcpu;
 	struct vm *vm;
@@ -177,9 +173,10 @@ void mvisor_boot_vms(void)
 	for_each_vm(vm) {
 		for (i = 0; i < vm->vcpu_nr; i++) {
 			vcpu = vm->vcpus[i];
-			vm->boot_vcpu(vcpu);
+			/* TO BE DONE */
 		}
 	}
+#endif
 }
 
 int mvisor_vms_init(void)

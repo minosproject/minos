@@ -6,24 +6,23 @@
 #include <config/config.h>
 #include <mvisor/spinlock.h>
 #include <mvisor/mvisor.h>
-#include <config/vm_config.h>
-#include <mvisor/resource.h>
 
 extern unsigned char __code_start;
 extern unsigned char __code_end;
 
 struct list_head shared_mem_list;
 
-int mvisor_register_memory_region(void *res)
+int mvisor_register_memory_region(struct mvisor_memtag *res)
 {
 	struct memory_region *region;
-	struct memory_resource *resource;
 	struct vm *vm;
 
 	if (res == NULL)
 		return -EINVAL;
 
-	resource = (struct memory_resource *)res;
+	if (!res->enable)
+		return -EAGAIN;
+
 	region = (struct memory_region *)
 		mvisor_malloc(sizeof(struct memory_region));
 	if (!region) {
@@ -32,36 +31,36 @@ int mvisor_register_memory_region(void *res)
 	}
 
 	pr_debug("register memory region: 0x%x 0x%x %d %d %s\n",
-			resource->mem_base, resource->mem_end,
-			resource->type, resource->vmid, resource->name);
+			res->mem_base, res->mem_end, res->type,
+			res->vmid, res->name);
 
 	memset((char *)region, 0, sizeof(struct memory_region));
 
 	/*
 	 * mvisor no using phy --> phy mapping
 	 */
-	region->vir_base = resource->mem_base;
-	region->mem_base = resource->mem_base;
-	region->size = resource->mem_end - resource->mem_base;
+	region->vir_base = res->mem_base;
+	region->mem_base = res->mem_base;
+	region->size = res->mem_end - res->mem_base + 1;
 
 	init_list(&region->list);
 
 	/*
 	 * shared memory is for all vm to ipc purpose
 	 */
-	if (resource->type == 0x2) {
+	if (res->type == 0x2) {
 		region->type = MEM_TYPE_NORMAL;
 		list_add(&shared_mem_list, &region->list);
 	} else {
-		if (resource->type == 0x0)
+		if (res->type == 0x0)
 			region->type = MEM_TYPE_NORMAL;
 		else
 			region->type = MEM_TYPE_IO;
 
-		vm = get_vm_by_id(resource->vmid);
+		vm = get_vm_by_id(res->vmid);
 		if (!vm) {
 			pr_error("Can not find the vm for the vmid:%d\n",
-					resource->vmid);
+					res->vmid);
 			mvisor_free(region);
 			return -EINVAL;
 		}

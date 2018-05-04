@@ -8,7 +8,6 @@
 #include <mvisor/mm.h>
 #include <asm/arch.h>
 #include <mvisor/vcpu.h>
-#include <mvisor/resource.h>
 #include <mvisor/pm.h>
 #include <mvisor/init.h>
 #include <mvisor/sched.h>
@@ -18,6 +17,9 @@
 extern void softirq_init(void);
 extern void init_timers(void);
 extern int mvisor_modules_init(void);
+
+extern struct mvisor_config mvisor_config;
+struct mvisor_config *mv_config = &mvisor_config;
 
 struct list_head hook_lists[MVISOR_HOOK_TYPE_UNKNOWN];
 
@@ -70,6 +72,33 @@ void mvisor_exit_from_guest(struct vcpu *vcpu)
 void mvisor_enter_to_guest(struct vcpu *vcpu)
 {
 	mvisor_do_hooks(vcpu, MVISOR_HOOK_TYPE_ENTER_TO_GUEST);
+}
+
+static void mvisor_parse_irqtags(void)
+{
+	int i;
+	size_t size = mv_config->nr_irqtag;
+	struct mvisor_irqtag *irqtags = mv_config->irqtags;
+
+	for (i = 0; i < size; i++)
+		mvisor_register_irq_entry(&irqtags[i]);
+}
+
+static void mvisor_parse_memtags(void)
+{
+	int i;
+	size_t size = mv_config->nr_memtag;
+	struct mvisor_memtag *memtags = mv_config->memtags;
+
+	for (i = 0; i < size; i++)
+		mvisor_register_memory_region(&memtags[i]);
+
+}
+
+void mvisor_parse_resource(void)
+{
+	mvisor_parse_irqtags();
+	mvisor_parse_memtags();
 }
 
 void boot_main(void)

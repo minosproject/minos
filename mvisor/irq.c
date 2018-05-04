@@ -1,6 +1,5 @@
 #include <mvisor/mvisor.h>
 #include <mvisor/irq.h>
-#include <config/vm_config.h>
 #include <mvisor/vcpu.h>
 #include <mvisor/mm.h>
 #include <config/config.h>
@@ -14,13 +13,16 @@ static struct irq_chip *irq_chip;
 static struct irq_domain *irq_domains[IRQ_DOMAIN_MAX];
 
 static int init_irq_desc(struct irq_desc *irq_desc,
-		struct irq_resource *config)
+		struct mvisor_irqtag *config)
 {
 	struct vcpu *vcpu;
 
+	if (!config->enable)
+		return -EAGAIN;
+
 	irq_desc->hno = config->hno;
 
-	if (config->vmid == 0xffff) {
+	if (config->owner) {
 		pr_info("irq %d is for mvisor\n", config->hno);
 		irq_desc->flags |= IRQ_FLAG_OWNER_MVISOR;
 		strncpy(irq_desc->name, config->name,
@@ -277,7 +279,7 @@ static uint32_t spi_virq_to_irq(struct irq_domain *d, uint32_t virq)
 	return BAD_IRQ;
 }
 
-static int spi_register_irq(struct irq_domain *d, struct irq_resource *res)
+static int spi_register_irq(struct irq_domain *d, struct mvisor_irqtag *res)
 {
 	struct irq_desc *irq;
 
@@ -373,7 +375,7 @@ static uint32_t local_virq_to_irq(struct irq_domain *d, uint32_t virq)
 	return BAD_IRQ;
 }
 
-static int local_register_irq(struct irq_domain *d, struct irq_resource *res)
+static int local_register_irq(struct irq_domain *d, struct mvisor_irqtag *res)
 {
 	int i;
 	struct irq_desc *irq;
@@ -495,15 +497,13 @@ static struct irq_desc *get_irq_desc(uint32_t irq)
 	return domain->ops->get_irq_desc(domain, irq);
 }
 
-int mvisor_register_irq_entry(void *res)
+int mvisor_register_irq_entry(struct mvisor_irqtag *config)
 {
-	struct irq_resource *config;
 	struct irq_domain *domain;
 
-	if (res == NULL)
+	if (config == NULL)
 		return -EINVAL;
 
-	config = (struct irq_resource *)res;
 	domain = get_irq_domain(config->hno);
 	if (!domain) {
 		pr_error("irq is not supported %d\n", config->hno);

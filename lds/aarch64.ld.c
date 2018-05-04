@@ -132,7 +132,7 @@ SECTIONS
 	. = ALIGN(16);
 	__mvisor_config_data = .;
 	.__mvisor_config : {
-		*(._mvisor_config)
+		*(.__mvisor_config)
 	}
 	__mvisor_config_data_end = .;
 	. = ALIGN(16);

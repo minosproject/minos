@@ -11,6 +11,7 @@
 #include <mvisor/panic.h>
 #include <mvisor/smp.h>
 #include <mvisor/varlist.h>
+#include <mvisor/mvisor_config.h>
 #include <mvisor/vcpu.h>
 
 #define BUG_ON(condition)	\
@@ -37,5 +38,7 @@ void mvisor_exit_from_guest(struct vcpu *vcpu);
 void mvisor_enter_to_guest(struct vcpu *vcpu);
 int mvisor_register_hook(hook_func_t fn,
 	void *data, enum mvisor_hook_type type);
+
+extern struct mvisor_config *mv_config;
 
 #endif

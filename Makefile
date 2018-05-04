@@ -12,7 +12,7 @@ QUIET ?= @
 
 include build/$(PLATFORM).mk
 
-src_dir-y			+= mvisor arch/$(ARCH) mvisor_vms
+src_dir-y			+= mvisor arch/$(ARCH)
 src_dir-$(CONFIG_UART_PL011)	+= drivers/pl011
 src_dir-$(CONFIG_LIBFDT)	+= external/libfdt
 src_dir-$(CONFIG_JSON_SJSON)	+= external/sjson
@@ -49,6 +49,8 @@ VPATH		:= $(src_dir-y)
 objs		= $(src_c-y:%.c=$(OUT)/%.o)
 objs-s		= $(src_s-y:%.S=$(OUT)/%.O)
 
+obj-config	= $(OUT)/$(PLATFORM)_config.o
+
 ifeq ($(QUIET),@)
 PROGRESS = @echo Compiling $< ...
 endif
@@ -60,9 +62,9 @@ $(TARGET_BIN) : $(TARGET_ELF)
 	$(QUIET) $(OBJ_DUMP) $(TARGET_ELF) -D > $(TARGET_DUMP)
 	$(QUIET) echo "Build done sucessfully"
 
-$(TARGET_ELF) : include/asm  $(objs) $(objs-s) $(TARGET_LDS)
+$(TARGET_ELF) : include/asm include/config/config.h $(objs) $(objs-s) $(obj-config) $(TARGET_LDS)
 	@ echo Linking $@ ...
-	$(QUIET) $(LD) $(LDFLAG) -o $(TARGET_ELF) $(objs-s) $(objs) $(LDPATH)
+	$(QUIET) $(LD) $(LDFLAG) -o $(TARGET_ELF) $(objs-s) $(objs) $(obj-config) $(LDPATH)
 	@ echo Linking done
 
 $(TARGET_LDS) : $(LDS_SRC)
@@ -77,6 +79,14 @@ include/asm :
 	@ echo Link asm-$(ARCH) to include/asm ...
 	@ ln -s asm-$(ARCH) include/asm
 
+include/config/config.h:
+	@ echo Link config/$(PLATFORM)/$(PLATFORM)_config.h to include/config/config.h ...
+	@  ln -s ../../config/$(PLATFORM)/$(PLATFORM)_config.h include/config/config.h
+
+$(obj-config): $(OUT)/$(PLATFORM)_config.c
+	$(PROGRESS)
+	$(QUIET) $(CC) $(CCFLAG) -c $< -o $@
+
 $(OUT)/%.o : %.c $(INCLUDE_DIR)
 	$(PROGRESS)
 	$(QUIET) $(CC) $(CCFLAG) -c $< -o $@
@@ -85,9 +95,22 @@ $(OUT)/%.O : %.S $(INCLUDE_DIR)
 	$(PROGRESS)
 	$(QUIET) $(CC) $(CCFLAG) -c $< -o $@
 
+$(OUT)/$(PLATFORM)_config.c : $(OUT)/$(PLATFORM).json
+	@ echo "\n****** Generate $(PLATFORM)_config.c ******"
+	$(QUIET) python3 tools/generate_mvconfig.py $< $@
+	@ echo "****** Generate $(PLATFORM)_config.c done ******\n"
+
+$(OUT)/$(PLATFORM).json : config/$(PLATFORM)/$(PLATFORM).json.cc config/$(PLATFORM)/$(PLATFORM)_config.h config/$(PLATFORM)/*.cc
+	$(PROGRESS)
+	$(QUIET) $(CC) $(CCFLAG) -E -P config/$(PLATFORM)/$(PLATFORM).json.cc -o $(OUT)/$(PLATFORM).json
+
 .PHONY: clean
 
 clean:
+	@ echo "removing objs and out directory ..."
 	@ rm -rf out
-	@ rm include/asm
+	@ echo "removing include/asm directory ..."
+	@ rm -rf include/asm
+	@ echo "removing include/config/config.h ..."
+	@ rm -rf include/config/config.h
 	@ echo "All build objects have been cleaned"

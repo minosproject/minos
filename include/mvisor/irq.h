@@ -9,9 +9,10 @@
 #include <mvisor/smp.h>
 #include <mvisor/spinlock.h>
 #include <mvisor/cpumask.h>
-#include <mvisor/resource.h>
+#include <mvisor/mvisor_config.h>
 
 struct vcpu;
+struct mvisor_irqtag;
 
 #define MAX_IRQ_NAME_SIZE	32
 #define BAD_IRQ			(1024)
@@ -133,7 +134,7 @@ enum irq_domain_type {
 struct irq_domain;
 struct irq_domain_ops {
 	struct irq_desc **(*alloc_irqs)(uint32_t s, uint32_t c);
-	int (*register_irq)(struct irq_domain *domain, struct irq_resource *res);
+	int (*register_irq)(struct irq_domain *domain, struct mvisor_irqtag *res);
 	struct irq_desc *(*get_irq_desc)(struct irq_domain *d, uint32_t irq);
 	uint32_t (*virq_to_irq)(struct irq_domain *d, uint32_t virq);
 	void (*setup_irqs)(struct irq_domain *d);
@@ -152,7 +153,7 @@ struct irq_domain {
 
 int mvisor_irq_init(void);
 int irq_desc_secondary_init(void);
-int mvisor_register_irq_entry(void *res);
+int mvisor_register_irq_entry(struct mvisor_irqtag *res);
 void mvisor_setup_irqs(void);
 int do_irq_handler(void);
 int request_irq(uint32_t irq, irq_handle_t handler, void *data);

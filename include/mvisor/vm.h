@@ -12,6 +12,7 @@
 #include <mvisor/mm.h>
 
 #define MVISOR_VM_NAME_SIZE	32
+#define OS_TYPE_SIZE		32
 
 struct mvisor_vcpu;
 
@@ -19,7 +20,6 @@ struct os {
 
 };
 
-typedef void (*boot_vcpu_t)(void *arg);
 
 extern struct list_head vm_list;
 
@@ -31,6 +31,7 @@ struct vm {
 	uint32_t vcpu_affinity[CONFIG_VM_MAX_VCPU];
 	unsigned long entry_point;
 	char name[MVISOR_VM_NAME_SIZE];
+	char os_type[OS_TYPE_SIZE];
 	struct vcpu *vcpus[CONFIG_VM_MAX_VCPU];
 	struct mm_struct mm;
 	struct os os;
@@ -39,7 +40,6 @@ struct vm {
 	 * each vm may have its own stage2 memory map
 	 * to control the memory access
 	 */
-	boot_vcpu_t boot_vcpu;
 } __align(sizeof(unsigned long));
 
 #define for_each_vm(vm)	\

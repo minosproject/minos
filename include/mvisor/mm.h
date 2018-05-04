@@ -3,6 +3,8 @@
 
 #include <mvisor/list.h>
 
+struct mvisor_memtag;
+
 void mvisor_mm_init(void);
 char *mvisor_malloc(size_t size);
 char *mvisor_zalloc(size_t size);
@@ -10,7 +12,7 @@ char *mvisor_alloc_pages(int pages);
 void mvisor_free(void *addr);
 void mvisor_free_pages(void *addr);
 
-int mvisor_register_memory_region(void *res);
+int mvisor_register_memory_region(struct mvisor_memtag *res);
 
 struct memory_region {
 	int type;
