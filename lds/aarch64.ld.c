@@ -129,21 +129,13 @@ SECTIONS
 
 	__init_end = .;
 
-	. = ALIGN(8);
-	__irq_desc_resource_start = .;
-	.__irq_desc_resource : {
-		*(.__irq_desc_resource)
+	. = ALIGN(16);
+	__mvisor_config_data = .;
+	.__mvisor_config : {
+		*(._mvisor_config)
 	}
-	__irq_desc_resource_end = .;
-
-	. = ALIGN(8);
-	__mvisor_memory_resource_start = .;
-	.__mvisor_memory_resource : {
-		*(.__mvisor_memory_resource)
-	}
-	__mvisor_memory_resource_end = .;
-
-	. = ALIGN(8);
+	__mvisor_config_data_end = .;
+	. = ALIGN(16);
 
 	.el2_stack (NOLOAD): {
 		. = ALIGN(64);
