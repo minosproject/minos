@@ -12,6 +12,36 @@ char *mvisor_alloc_pages(int pages);
 void mvisor_free(void *addr);
 void mvisor_free_pages(void *addr);
 
+static inline char *malloc(size_t size)
+{
+	return mvisor_malloc(size);
+}
+
+static inline char *zalloc(size_t size)
+{
+	return mvisor_zalloc(size);
+}
+
+static inline char *get_free_pages(int pages)
+{
+	return mvisor_alloc_pages(pages);
+}
+
+static inline void free(void *addr)
+{
+	mvisor_free(addr);
+}
+
+static inline void free_pages(void *addr)
+{
+	mvisor_free_pages(addr);
+}
+
+static inline char *get_free_page(void)
+{
+	return mvisor_alloc_pages(1);
+}
+
 int mvisor_register_memory_region(struct mvisor_memtag *res);
 
 struct memory_region {

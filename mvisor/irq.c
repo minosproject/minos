@@ -864,7 +864,7 @@ int mvisor_irq_init(void)
 	return 0;
 }
 
-int irq_desc_secondary_init(void)
+int irq_secondary_init(void)
 {
 	if (irq_chip)
 		irq_chip->secondary_init();

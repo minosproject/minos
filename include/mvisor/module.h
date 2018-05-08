@@ -8,7 +8,7 @@
 #include <mvisor/device_id.h>
 
 #define MVISOR_MODULE_NAME_IRQCHIP		"irq_chip"
-#define MVISOR_MODULE_NAME_MMU		"mmu"
+#define MVISOR_MODULE_NAME_MMU			"mmu"
 #define MVISOR_MODULE_NAME_SYSTEM		"system"
 
 #define INVAILD_MODULE_ID		(0xffff)

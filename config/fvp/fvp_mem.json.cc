@@ -33,7 +33,7 @@
 		"mem_end": "0x0bffffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "nor flash0"
@@ -43,7 +43,7 @@
 		"mem_end": "0x0fffffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "nor flash1"
@@ -53,7 +53,7 @@
 		"mem_end": "0x17ffffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "psram"
@@ -63,7 +63,7 @@
 		"mem_end": "0x19ffffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "vram"
@@ -73,7 +73,7 @@
 		"mem_end": "0x1affffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "eth smsc 91c111"
@@ -83,7 +83,7 @@
 		"mem_end": "0x1bffffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "usb"
@@ -93,7 +93,7 @@
 		"mem_end": "0x1c01ffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "ve sys reg"
@@ -103,17 +103,17 @@
 		"mem_end": "0x1c02ffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
-		"name": "boot rom"
+		"name": "system controller, sp810"
 	},
 	{
 		"mem_base": "0x1c040000",
 		"mem_end": "0x1c04ffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "aaci pl041"
@@ -123,7 +123,7 @@
 		"mem_end": "0x1c05ffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "mci pl041"
@@ -133,7 +133,7 @@
 		"mem_end": "0x1c06ffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "keyboard pl050"
@@ -143,7 +143,7 @@
 		"mem_end": "0x1c07ffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "mouse pl050"
@@ -153,7 +153,7 @@
 		"mem_end": "0x1c09ffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "uart0, pl011"
@@ -163,7 +163,7 @@
 		"mem_end": "0x1c0affff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "uart1, pl011"
@@ -173,7 +173,7 @@
 		"mem_end": "0x1c0bffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "uart2, pl011"
@@ -183,7 +183,7 @@
 		"mem_end": "0x1c0cffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "uart3, pl011"
@@ -193,7 +193,7 @@
 		"mem_end": "0x1c0dffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "vfs2"
@@ -203,7 +203,7 @@
 		"mem_end": "0x1c0fffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "watchdog"
@@ -213,7 +213,7 @@
 		"mem_end": "0x1c10ffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "power controller"
@@ -223,7 +223,7 @@
 		"mem_end": "0x1c11ffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "timer0 sp804"
@@ -233,7 +233,7 @@
 		"mem_end": "0x1c12ffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "timer1 sp804"
@@ -243,7 +243,7 @@
 		"mem_end": "0x1c13ffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "virtio blk dev"
@@ -253,7 +253,7 @@
 		"mem_end": "0x1c17ffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "rtc pl031"
@@ -263,7 +263,7 @@
 		"mem_end": "0x1c1affff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "cf card"
@@ -273,7 +273,7 @@
 		"mem_end": "0x1c1fffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "color lcd pl111"
@@ -283,7 +283,7 @@
 		"mem_end": "0x1f000fff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "nosec rom"
@@ -522,17 +522,17 @@
 		"mem_end": "0x7ff60fff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "HD LCD"
 	},
 	{
-		"mem_base": "0x90000000",
-		"mem_end": "0xa0000000",
+		"mem_base": "0x80000000",
+		"mem_end": "0xc0000000",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 0,
 		"vmid": 0,
 		"name": "dram"

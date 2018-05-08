@@ -273,10 +273,11 @@ static int map_level2_pages(unsigned long *tbase, unsigned long vbase,
 
 	for (i = 0; i < (size >> offset); i++) {
 		if (*(tbase + index) != 0)
-			continue;
+			goto again;
 
 		*(tbase + index) = (attr | \
 			(pbase >> offset) << offset);
+again:
 		vbase += config->level2_entry_map_size;
 		pbase += config->level2_entry_map_size;
 		index++;
@@ -384,7 +385,7 @@ static int map_host_mem(unsigned long vir, unsigned long phy,
 				vir, phy, size);
 	} else {
 		flush_all_tlb();
-		inv_dcache_range(vir_base, size);
+		//inv_dcache_range(vir_base, size);
 	}
 
 	return ret;
@@ -417,8 +418,8 @@ static uint64_t generate_vtcr_el2(void)
 
 	value |= (0x20 << 0);	// t0sz = 0x20 32bits vaddr
 	value |= (0x01 << 6);	// SL0: 64kb/16 start at level2 4k start at level1
-	value |= (0x0 << 8);	// Normal memory, Inner Non-cacheable
-	value |= (0x0 << 10);	// Normal memory, Outer Non-cacheable
+	value |= (0x1 << 8);	// Normal memory, Inner WBWA
+	value |= (0x1 << 10);	// Normal memory, Outer WBWA
 	value |= (0x3 << 12);	// Inner Shareable
 
 	// TG0

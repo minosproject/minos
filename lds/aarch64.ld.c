@@ -3,7 +3,7 @@
 ENTRY(_start)
 SECTIONS
 {
-	.vectors 0x80000000:
+	.vectors 0xc0000000:
 	{
 		/*
 		 * put all asm code into this section
@@ -72,6 +72,30 @@ SECTIONS
 
 	. = ALIGN(8);
 
+	__mvisor_serror_desc_start = .;
+	.__mvisor_serror_desc : {
+		*(.__mvisor_serror_desc)
+	}
+	__mvisor_serror_desc_end = .;
+
+	. = ALIGN(8);
+
+	__mvisor_smc_handler_start = .;
+	.__mvisor_smc_handler : {
+		*(.__mvisor_smc_handler)
+	}
+	__mvisor_smc_handler_end = .;
+
+	. = ALIGN(8);
+
+	__mvisor_hvc_handler_start = .;
+	.__mvisor_jvc_handler : {
+		*(.__mvisor_hvc_handler)
+	}
+	__mvisor_hvc_handler_end = .;
+
+	. = ALIGN(8);
+
 	__init_start = .;
 
 	__init_func_start = .;
@@ -106,6 +130,14 @@ SECTIONS
 	__init_func_7_start = .;
 	.__init_func_7 : {
 		*(.__init_func_7)
+	}
+	__init_func_8_start = .;
+	.__init_func_8 : {
+		*(.__init_func_8)
+	}
+	__init_func_9_start = .;
+	.__init_func_9 : {
+		*(.__init_func_9)
 	}
 	__init_func_end = .;
 

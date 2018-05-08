@@ -18,10 +18,10 @@ DECLARE_PER_CPU(struct pcpu *, pcpu);
 #define current_vcpu()	get_cpu_var(current_vcpu)
 
 typedef enum _vcpu_state_t {
-	VCPU_STATE_READY 	= 0x0001,
+	VCPU_STATE_ONLINE 	= 0x0001,
 	VCPU_STATE_RUNNING 	= 0x0002,
 	VCPU_STATE_SLEEP 	= 0x0004,
-	VCPU_STATE_STOP  	= 0x0008,
+	VCPU_STATE_OFFLINE  	= 0x0008,
 	VCPU_STATE_ERROR 	= 0xffff,
 } vcpu_state_t;
 
@@ -56,5 +56,8 @@ void sched_vcpu(struct vcpu *vcpu, int reason);
 uint32_t pcpu_affinity(struct vcpu *vcpu, uint32_t affinity);
 int vcpu_sched_init(struct vcpu *vcpu);
 void vcpu_idle(struct vcpu *vcpu);
-
+void vcpu_online(struct vcpu *vcpu);
+void vcpu_offline(struct vcpu *vcpu);
+int vcpu_power_on(struct vcpu *caller, int cpuid,
+		unsigned long entry, unsigned long unsed);
 #endif

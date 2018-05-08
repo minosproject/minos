@@ -492,3 +492,14 @@ int vm_memory_init(struct vm *vm)
 	return 0;
 }
 
+static int mvisor_memory_init(void)
+{
+	/* map all the memory space to el2 space */
+	mmu_map_host_memory(CONFIG_RAM_START_ADDRESS,
+			CONFIG_RAM_START_ADDRESS,
+			CONFIG_RAM_SIZE, MEM_TYPE_NORMAL);
+
+	return 0;
+}
+
+subsys_initcall(mvisor_memory_init);

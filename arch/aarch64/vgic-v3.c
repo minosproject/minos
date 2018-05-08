@@ -210,6 +210,9 @@ static int vgicv3_gicd_mmio_read(struct vgicv3 *vgic,
 	case GICD_ICENABLER...GICD_ICENABLER_END:
 		*value = 0;
 		break;
+	case GICD_PIDR2:
+		*value = ioread32((void *)0x2f000000 + GICD_PIDR2);
+		break;
 	default:
 		*value = 0;
 		break;
@@ -222,6 +225,20 @@ static int vgicv3_gicd_mmio_read(struct vgicv3 *vgic,
 static int vgicv3_gicr_rd_mmio_read(struct vgicv3 *vgic,
 		unsigned long offset, unsigned long *value)
 {
+	struct vgicv3_gicr *gicr = &vgic->gicr;
+
+	switch (offset) {
+	case GICR_PIDR2:
+		*value = 0x3 << 4;
+		break;
+	case GICR_TYPER:
+		*value = ioread64((void *)(gicr->rd_base + offset));
+		break;
+	default:
+		*value = 0;
+		break;
+	}
+
 	return 0;
 }
 
@@ -234,11 +251,12 @@ static int vgicv3_gicr_sgi_mmio_read(struct vgicv3 *vgic,
 	case GICR_CTLR:
 		*value = gicr->gicr_ctlr & ~(1 << 31);
 		break;
-
 	case GICR_ISPENDR0:
 		*value = gicr->gicr_ispender;
 		break;
-
+	case GICR_PIDR2:
+		*value = 0x3 << 4;
+		break;
 	default:
 		*value = 0;
 		break;

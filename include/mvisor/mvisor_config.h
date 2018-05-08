@@ -11,6 +11,7 @@ struct mvisor_vmtag {
 	int nr_vcpu;
 	unsigned long entry;
 	int mmu_on;
+	unsigned long setup_data;
 	int vcpu_affinity[4];
 };
 

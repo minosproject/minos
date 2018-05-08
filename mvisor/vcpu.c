@@ -8,6 +8,7 @@
 #include <mvisor/bitmap.h>
 #include <mvisor/irq.h>
 #include <mvisor/mvisor_config.h>
+#include <mvisor/os.h>
 
 extern unsigned char __mvisor_vm_start;
 extern unsigned char __mvisor_vm_end;
@@ -15,7 +16,7 @@ extern unsigned char __mvisor_vm_end;
 static struct vm *vms[CONFIG_MAX_VM];
 static uint32_t total_vms = 0;
 
-struct list_head vm_list;
+LIST_HEAD(vm_list);
 
 static int mvisor_add_vm(struct mvisor_vmtag *vme)
 {
@@ -37,6 +38,7 @@ static int mvisor_add_vm(struct mvisor_vmtag *vme)
 	vm->vcpu_nr = MIN(vme->nr_vcpu, CONFIG_VM_MAX_VCPU);
 	vm->mmu_on = vme->mmu_on;
 	vm->entry_point = vme->entry;
+	vm->setup_data = vme->setup_data;
 	memcpy(vm->vcpu_affinity, vme->vcpu_affinity,
 			sizeof(uint32_t) * CONFIG_VM_MAX_VCPU);
 
@@ -165,7 +167,6 @@ static void inline vm_modules_init(struct vm *vm)
 
 void mvisor_boot_vms(void)
 {
-#if 0
 	int i;
 	struct vcpu *vcpu;
 	struct vm *vm;
@@ -173,19 +174,17 @@ void mvisor_boot_vms(void)
 	for_each_vm(vm) {
 		for (i = 0; i < vm->vcpu_nr; i++) {
 			vcpu = vm->vcpus[i];
-			/* TO BE DONE */
+			vm->os->ops->vcpu_init(vcpu);
 		}
 	}
-#endif
 }
 
 int mvisor_vms_init(void)
 {
-	int i;
 	struct vm *vm;
 
-	for (i = 0; i < total_vms; i++) {
-		vm = vms[i];
+	for_each_vm(vm) {
+		vm->os = get_vm_os(vm->os_type);
 		vm_memory_init(vm);
 		vm_sched_init(vm);
 		vm_arch_init(vm);
@@ -198,11 +197,8 @@ int mvisor_vms_init(void)
 int mvisor_create_vms(void)
 {
 	struct vm *vm;
-	int ret = 0;
 
-	init_list(&vm_list);
-	ret = parse_all_vms();
-	if (ret)
+	if (parse_all_vms())
 		panic("parsing the vm fail\n");
 
 	for_each_vm(vm) {

@@ -9,6 +9,7 @@
 #include <mvisor/list.h>
 #include <mvisor/timer.h>
 #include <mvisor/time.h>
+#include <mvisor/os.h>
 
 static struct pcpu pcpus[CONFIG_NR_CPUS];
 
@@ -72,6 +73,11 @@ step2:
 	return PCPU_AFFINITY_FAIL;
 }
 
+void pcpu_resched(int pcpu_id)
+{
+	send_sgi(CONFIG_MVISOR_RESCHED_IRQ, pcpu_id);
+}
+
 static struct vcpu *find_vcpu_to_run(struct pcpu *pcpu)
 {
 	unsigned long flags;
@@ -93,13 +99,84 @@ out:
 	return vcpu;
 }
 
-int vcpu_sched_init(struct vcpu *vcpu)
+void vcpu_online(struct vcpu *vcpu)
 {
+	int state;
+	unsigned long flags;
 	struct pcpu *pcpu = get_per_cpu(pcpu, vcpu->pcpu_affinity);
 
-	init_list(&vcpu->state_list);
-	set_vcpu_state(vcpu, VCPU_STATE_READY);
+	local_irq_save(flags);
+
+	state = get_vcpu_state(vcpu);
+
+	if (state != VCPU_STATE_OFFLINE) {
+		pr_warning("vcpu already online vmid:%d vcpu_id:%d\n",
+				vcpu->vm->vmid, get_vcpu_id(vcpu));
+		goto out;
+	}
+
+	set_vcpu_state(vcpu, VCPU_STATE_ONLINE);
 	list_add_tail(&pcpu->ready_list, &vcpu->state_list);
+
+out:
+	local_irq_restore(flags);
+}
+
+void vcpu_offline(struct vcpu *vcpu)
+{
+	int state;
+	unsigned long flags;
+
+	local_irq_save(flags);
+
+	state = get_vcpu_state(vcpu);
+
+	if (state == VCPU_STATE_OFFLINE) {
+		pr_warning("vcpu already offline vmid:%d vcpu_id:%d\n",
+				vcpu->vm->vmid, get_vcpu_id(vcpu));
+		goto out;
+	}
+
+	set_vcpu_state(vcpu, VCPU_STATE_OFFLINE);
+	if (state == VCPU_STATE_ONLINE)
+	list_del(&vcpu->state_list);
+
+out:
+	local_irq_restore(flags);
+}
+
+int vcpu_power_on(struct vcpu *caller, int cpuid,
+		unsigned long entry, unsigned long unsed)
+{
+	struct vcpu *vcpu;
+	struct os *os = caller->vm->os;
+
+	vcpu = get_vcpu_by_id(caller->vm->vmid, cpuid);
+	if (!vcpu)
+		return -ENOENT;
+
+	if (get_vcpu_state(vcpu) != VCPU_STATE_OFFLINE)
+		return -EINVAL;
+
+	os->ops->vcpu_power_on(vcpu, entry);
+
+	/*
+	 * resched the pcpu since it may have in the
+	 * wfi or wfe state, or need to sched the new
+	 * vcpu as soon as possible
+	 *
+	 * vcpu belong the the same vm will not
+	 * at the same pcpu
+	 */
+	pcpu_resched(vcpu->pcpu_affinity);
+
+	return 0;
+}
+
+int vcpu_sched_init(struct vcpu *vcpu)
+{
+	init_list(&vcpu->state_list);
+	set_vcpu_state(vcpu, VCPU_STATE_OFFLINE);
 	vcpu->run_start = 0;
 	vcpu->run_time = MILLISECS(CONFIG_SCHED_INTERVAL);
 
@@ -284,7 +361,7 @@ void switch_to_vcpu(struct vcpu *current, struct vcpu *next)
 	 */
 	if (current != next) {
 		if (current != NULL) {
-			set_vcpu_state(current, VCPU_STATE_READY);
+			set_vcpu_state(current, VCPU_STATE_ONLINE);
 			list_add_tail(&pcpu->ready_list, &current->state_list);
 			save_vcpu_module_state(current);
 		}
@@ -360,7 +437,7 @@ int mvisor_reched_handler(uint32_t irq, void *data)
 	list_for_each_entry(vcpu, &pcpu->vcpu_list, pcpu_list) {
 		if (get_vcpu_state(vcpu) == VCPU_STATE_SLEEP) {
 			if (vcpu_need_to_run(vcpu)) {
-				set_vcpu_state(vcpu, VCPU_STATE_READY);
+				set_vcpu_state(vcpu, VCPU_STATE_ONLINE);
 				list_add_tail(&pcpu->ready_list, &vcpu->state_list);
 			}
 		}

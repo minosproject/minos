@@ -15,11 +15,7 @@
 #define OS_TYPE_SIZE		32
 
 struct mvisor_vcpu;
-
-struct os {
-
-};
-
+struct os;
 
 extern struct list_head vm_list;
 
@@ -30,11 +26,12 @@ struct vm {
 	uint32_t index;
 	uint32_t vcpu_affinity[CONFIG_VM_MAX_VCPU];
 	unsigned long entry_point;
+	unsigned long setup_data;
 	char name[MVISOR_VM_NAME_SIZE];
 	char os_type[OS_TYPE_SIZE];
 	struct vcpu *vcpus[CONFIG_VM_MAX_VCPU];
 	struct mm_struct mm;
-	struct os os;
+	struct os *os;
 	struct list_head vm_list;
 	/*
 	 * each vm may have its own stage2 memory map

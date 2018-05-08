@@ -60,6 +60,7 @@
 #define GICD_CPENDSGIR			(0x0f10)
 #define GICD_SPENDSGIR			(0x0f20)
 #define GICD_IROUTER			(0x6000)
+#define GICD_PIDR2			(0xffe8)
 
 #define GICR_CTLR			(0x0000)
 #define GICR_IIDR			(0x0004)
@@ -89,6 +90,7 @@
 #define GICR_ICFGR1			(0x0c04)
 #define GICR_IGRPMODR0			(0x0d00)
 #define GICR_NSACR			(0x0e00)
+#define GICR_PIDR2			(0xffe8)
 
 #define GICH_VMCR_VENG0			(1 << 0)
 #define GICH_VMCR_VENG1			(1 << 1)

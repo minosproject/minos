@@ -13,6 +13,7 @@
 #include <mvisor/varlist.h>
 #include <mvisor/mvisor_config.h>
 #include <mvisor/vcpu.h>
+#include <mvisor/errno.h>
 
 #define BUG_ON(condition)	\
 	if ((condition)) {	\

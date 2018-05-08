@@ -79,10 +79,10 @@ static int timers_init(void)
 
 	request_irq(HYP_TIMER_INT, timer_interrupt_handler, NULL);
 	//request_irq(PHYS_TIMER_NONSEC_INT, timer_interrupt_handler, NULL);
-	request_irq(VIRT_TIMER_INT, vtimer_interrupt_handler, NULL);
+	//request_irq(VIRT_TIMER_INT, vtimer_interrupt_handler, NULL);
 
 	return 0;
 }
 
-subsys_initcall_percpu(timers_init);
+module_initcall_percpu(timers_init);
 arch_initcall(timers_arch_init);

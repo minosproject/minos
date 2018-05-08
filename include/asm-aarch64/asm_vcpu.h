@@ -53,6 +53,10 @@ get_reg_value(vcpu_regs *regs, uint32_t index)
 	return *(base + index);
 }
 
+#define set_reg_value(regs, index, value)	\
+	*((uint64_t *)regs + index) = value
+
+#if 0
 static inline void
 set_reg_value(vcpu_regs *regs, uint32_t index, unsigned long value)
 {
@@ -63,5 +67,6 @@ set_reg_value(vcpu_regs *regs, uint32_t index, unsigned long value)
 
 	*(base + index) = value;
 }
+#endif
 
 #endif

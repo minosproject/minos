@@ -152,7 +152,7 @@ struct irq_domain {
 #define disable_local_irq() arch_disable_local_irq()
 
 int mvisor_irq_init(void);
-int irq_desc_secondary_init(void);
+int irq_secondary_init(void);
 int mvisor_register_irq_entry(struct mvisor_irqtag *res);
 void mvisor_setup_irqs(void);
 int do_irq_handler(void);
@@ -171,6 +171,7 @@ int vcpu_has_virq_pending(struct vcpu *vcpu);
 int vcpu_has_virq_active(struct vcpu *vcpu);
 int vcpu_has_virq(struct vcpu *vcpu);
 void clear_pending_virq(uint32_t irq);
+void send_sgi(uint32_t sgi, int cpu);
 
 static inline void virq_mask(uint32_t virq)
 {

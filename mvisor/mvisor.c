@@ -132,6 +132,10 @@ void boot_main(void)
 	mvisor_irq_init();
 	softirq_init();
 	init_timers();
+
+	mvisor_subsys_init();
+	mvisor_subsys_init_percpu();
+
 	mvisor_create_vms();
 
 	/*
@@ -144,10 +148,10 @@ void boot_main(void)
 	/*
 	 * prepare each vm to run
 	 */
-	mvisor_vms_init();
+	mvisor_module_init();
+	mvisor_module_init_percpu();
 
-	mvisor_subsys_init();
-	mvisor_subsys_init_percpu();
+	mvisor_vms_init();
 
 	/*
 	 * wake up other cpus
@@ -173,9 +177,11 @@ void boot_secondary(void)
 
 	mvisor_arch_init_percpu();
 
-	irq_desc_secondary_init();
+	irq_secondary_init();
 
 	mvisor_subsys_init_percpu();
+
+	mvisor_module_init_percpu();
 
 	enable_local_irq();
 

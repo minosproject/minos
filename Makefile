@@ -12,12 +12,12 @@ QUIET ?= @
 
 include build/$(PLATFORM).mk
 
-src_dir-y			+= mvisor arch/$(ARCH)
+src_dir-y			+= mvisor arch/$(ARCH) platform/$(PLATFORM)
 src_dir-$(CONFIG_UART_PL011)	+= drivers/pl011
 src_dir-$(CONFIG_LIBFDT)	+= external/libfdt
 src_dir-$(CONFIG_JSON_SJSON)	+= external/sjson
 
-inc_dir-y			+= include/mvisor include/asm include/config
+inc_dir-y			+= include/mvisor include/asm include/config config/$(PLATFORM)
 inc_dir-$(CONFIG_LIBFDT)	+= include/libfdt
 inc_dir-$(CONFIG_JSON_SJSON)	+= include/sjson
 

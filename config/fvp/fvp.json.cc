@@ -2,7 +2,7 @@
 {
 	"version": "0.0.1",
 	"platform": "armv8-fvp",
-	"mem_base": "0x80000000",
+	"mem_base": "0xc0000000",
 	"size": "64MB",
 
 	"vmtags": [{
@@ -10,13 +10,15 @@
 			"name": "linux-01",
 			"type": "linux",
 			"nr_vcpu": 4,
-			"entry": "0x90000000",
+			"entry": "0x80080000",
 			"vcpu0_affinity": 0,
 			"vcpu1_affinity": 1,
 			"vcpu2_affinity": 2,
 			"vcpu3_affinity": 3,
+			"setup_data": "0x9fe00000",
 			"mmu_on": 1
-		},
+		}
+#if 0
 		{
 			"vmid": 1,
 			"name": "os1",
@@ -27,8 +29,10 @@
 			"vcpu1_affinity": 0,
 			"vcpu2_affinity": 2,
 			"vcpu3_affinity": 3,
+			"setup_data": "0xd0000000",
 			"mmu_on": 1
 		}
+#endif
 	],
 	#include "fvp_irq.json.cc"
 	#include "fvp_mem.json.cc"

@@ -28,6 +28,8 @@ typedef int (*init_call)(void);
 #define __init_5	__section(".__init_func_5")
 #define __init_6	__section(".__init_func_6")
 #define __init_7	__section(".__init_func_7")
+#define __init_8	__section(".__init_func_8")
+#define __init_9	__section(".__init_func_9")
 
 #define __define_initcall(fn, id)	\
 	static init_call __init_call_##fn __used __init_##id = fn
@@ -35,19 +37,23 @@ typedef int (*init_call)(void);
 #define early_initcall(fn) 		__define_initcall(fn, 0)
 #define arch_initcall(fn) 		__define_initcall(fn, 1)
 #define subsys_initcall(fn) 		__define_initcall(fn, 2)
-#define device_initcall(fn)		__define_initcall(fn, 3)
-#define early_initcall_percpu(fn) 	__define_initcall(fn, 4)
-#define arch_initcall_percpu(fn)	__define_initcall(fn, 5)
-#define subsys_initcall_percpu(fn)	__define_initcall(fn, 6)
-#define device_initcall_percpu(fn)	__define_initcall(fn, 7)
+#define module_initcall(fn) 		__define_initcall(fn, 3)
+#define device_initcall(fn)		__define_initcall(fn, 4)
+#define early_initcall_percpu(fn) 	__define_initcall(fn, 5)
+#define arch_initcall_percpu(fn)	__define_initcall(fn, 6)
+#define subsys_initcall_percpu(fn)	__define_initcall(fn, 7)
+#define module_initcall_percpu(fn)		__define_initcall(fn, 8)
+#define device_initcall_percpu(fn)	__define_initcall(fn, 9)
 
 void mvisor_arch_init(void);
 void mvisor_early_init(void);
 void mvisor_subsys_init(void);
+void mvisor_module_init(void);
 void mvisor_device_init(void);
 void mvisor_early_init_percpu(void);
 void mvisor_arch_init_percpu(void);
 void mvisor_subsys_init_percpu(void);
+void mvisor_module_init_percpu(void);
 void mvisor_device_init_percpu(void);
 
 #endif
