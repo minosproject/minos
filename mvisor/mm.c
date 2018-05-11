@@ -30,7 +30,7 @@ int mvisor_register_memory_region(struct mvisor_memtag *res)
 		return -ENOMEM;
 	}
 
-	pr_debug("register memory region: 0x%x 0x%x %d %d %s\n",
+	pr_info("register memory region: 0x%x 0x%x %d %d %s\n",
 			res->mem_base, res->mem_end, res->type,
 			res->vmid, res->name);
 

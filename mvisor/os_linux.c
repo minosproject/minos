@@ -18,6 +18,7 @@ static void linux_vcpu_power_on(struct vcpu *vcpu, unsigned long entry)
 	vcpu->regs.x1 = 0;
 	vcpu->regs.x2 = 0;
 	vcpu->regs.x3 = 0;
+	vcpu_online(vcpu);
 }
 
 struct os_ops linux_os_ops = {

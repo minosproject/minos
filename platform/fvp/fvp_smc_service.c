@@ -32,7 +32,7 @@ static int fvp_std_smc_handler(vcpu_regs *c,
 		break;
 	}
 
-	SVC_RET1(c, 0, 0);
+	SVC_RET1(c, 0, PSCI_RET_SUCCESS);
 }
 
 DEFINE_SMC_HANDLER("std_smc_desc", SVC_STYPE_STDSMC,

@@ -9,6 +9,7 @@
 #include <asm/vgic.h>
 #include <mvisor/irq.h>
 #include <asm/svccc.h>
+#include <asm/vtimer.h>
 
 extern unsigned char __mvisor_serror_desc_start;
 extern unsigned char __mvisor_serror_desc_end;
@@ -140,6 +141,12 @@ static int access_system_reg_handler(vcpu_regs *reg, uint32_t esr_value)
 	case ESR_SYSREG_ICC_SGI0R_EL1:
 		pr_debug("access system reg SGI0R_EL1\n");
 		break;
+
+	case ESR_SYSREG_CNTPCT_EL0:
+	case ESR_SYSREG_CNTP_TVAL_EL0:
+	case ESR_SYSREG_CNTP_CTL_EL0:
+	case ESR_SYSREG_CNTP_CVAL_EL0:
+		return vtimer_sysreg_simulation(reg, esr_value);
 	}
 
 	return ret;
@@ -187,7 +194,7 @@ static int dataabort_tfl_handler(vcpu_regs *regs, uint32_t esr_value)
 
 	vaddr = read_sysreg(FAR_EL2);
 	paddr = get_faulting_ipa(vaddr);
-	pr_debug("fault address is %x %x\n", vaddr, paddr);
+	//pr_info("fault address is %x %x\n", vaddr, paddr);
 
 	/*
 	 * dfsc contain the fault type of the dataabort
@@ -199,7 +206,7 @@ static int dataabort_tfl_handler(vcpu_regs *regs, uint32_t esr_value)
 			value = get_reg_value(regs, dabt->reg);
 
 		ret = do_mmio_emulation(regs, dabt->write, paddr, &value);
-		if (!ret) {
+		if (ret) {
 			pr_warning("handle mmio read/write fail\n");
 		} else {
 			if (!dabt->write)

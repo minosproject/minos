@@ -49,6 +49,9 @@ static void run_timer_softirq(struct softirq_action *h)
 	if (expires != ((unsigned long)~0)) {
 		timers->running_expires = expires;
 		enable_timer(expires);
+	} else {
+		/* there is no more timer on the cpu */
+		timers->running_expires = 0;
 	}
 }
 
@@ -72,10 +75,7 @@ static int detach_timer(struct timers *timers, struct timer_list *timer)
 
 static inline unsigned long slack_expires(unsigned long expires)
 {
-	if (expires < 128)
-		expires = 128;
-
-	return expires + NOW();
+	return expires;
 }
 
 int mod_timer(struct timer_list *timer, unsigned long expires)
@@ -123,6 +123,9 @@ int del_timer(struct timer_list *timer)
 {
 	unsigned long flags;
 	struct timers *timers = timer->timers;
+
+	if (timer->entry.next == NULL)
+		return 0;
 
 	spin_lock_irqsave(&timers->lock, flags);
 	detach_timer(timers, timer);

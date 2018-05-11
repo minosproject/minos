@@ -14,7 +14,7 @@ struct mmio_ops {
 	int (*read)(vcpu_regs *regs, unsigned long address,
 			unsigned long *read_value);
 	int (*write)(vcpu_regs *regs, unsigned long address,
-			unsigned long write_value);
+			unsigned long *write_value);
 	int (*check)(vcpu_regs *regs, unsigned long address);
 };
 

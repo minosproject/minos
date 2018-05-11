@@ -362,7 +362,7 @@
 		"mem_end": "0x2a81ffff",
 		"host": 0,
 		"sectype": "S",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "ap_refclk_cntctl"
@@ -382,7 +382,7 @@
 		"mem_end": "0x2a83ffff",
 		"host": 0,
 		"sectype": "S/NS",
-		"enable": 0,
+		"enable": 1,
 		"type": 1,
 		"vmid": 0,
 		"name": "ap_refclk_cntbase1"

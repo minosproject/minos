@@ -21,7 +21,7 @@ static void call_init_func(unsigned long fn_start, unsigned long fn_end)
 	int size, i;
 
 	size = (fn_end - fn_start) / sizeof(init_call);
-	pr_info("call init func : 0x%x 0x%x %d\n", fn_start, fn_end, size);
+	pr_debug("call init func : 0x%x 0x%x %d\n", fn_start, fn_end, size);
 
 	if (size <= 0)
 		return;

@@ -193,6 +193,9 @@ static inline int detach_ready_vcpu(struct vcpu *vcpu)
 	if (!is_vcpu_ready(vcpu))
 		return 1;
 
+	if (vcpu->state_list.next == NULL)
+		return 1;
+
 	list_del(&vcpu->state_list);
 	vcpu->state_list.next = NULL;
 
@@ -223,13 +226,16 @@ void sched_vcpu(struct vcpu *vcpu, int reason)
 
 	local_irq_save(flags);
 
-	update_sched_info(current);
+	if (current) {
+		update_sched_info(current);
 
-	/*
-	 * add the current vcpu to the tail of the ready
-	 * list and put the running vcpu to head
-	 */
-	list_add_tail(&pcpu->ready_list, &current->state_list);
+		/*
+		 * * add the current vcpu to the tail of the ready
+		 * * list and put the running vcpu to head
+		 *
+		 */
+		list_add_tail(&pcpu->ready_list, &current->state_list);
+	}
 
 	detach_ready_vcpu(vcpu);
 	list_add(&pcpu->ready_list, &vcpu->state_list);
@@ -304,7 +310,7 @@ static void sched_timer_function(unsigned long data)
 	next->run_time += MILLISECS(CONFIG_SCHED_INTERVAL);
 
 out:
-	mod_timer(&pcpu->sched_timer, vcpu->run_time);
+	mod_timer(&pcpu->sched_timer, NOW() + vcpu->run_time);
 }
 
 int vcpu_can_idle(struct vcpu *vcpu)
@@ -455,7 +461,7 @@ int sched_late_init(void)
 			mvisor_reched_handler, NULL);
 
 	timer = &pcpu->sched_timer;
-	timer->expires = MILLISECS(CONFIG_SCHED_INTERVAL);
+	timer->expires = NOW() + MILLISECS(CONFIG_SCHED_INTERVAL);
 	add_timer(timer);
 
 	return 0;

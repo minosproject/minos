@@ -23,7 +23,7 @@ static int init_irq_desc(struct irq_desc *irq_desc,
 	irq_desc->hno = config->hno;
 
 	if (config->owner) {
-		pr_info("irq %d is for mvisor\n", config->hno);
+		pr_debug("irq %d is for mvisor\n", config->hno);
 		irq_desc->flags |= IRQ_FLAG_OWNER_MVISOR;
 		strncpy(irq_desc->name, config->name,
 			MIN(strlen(config->name), MAX_IRQ_NAME_SIZE - 1));
@@ -154,7 +154,8 @@ int _send_virq(struct vcpu *vcpu, uint32_t virq, uint32_t hirq, int hw)
 	if (ret)
 		goto out;
 
-	if (vcpu_sender->pcpu_affinity != vcpu->pcpu_affinity) {
+	if (vcpu_sender && (vcpu_sender->pcpu_affinity
+				!= vcpu->pcpu_affinity)) {
 		/*
 		 * if the sender and the target are not
 		 * the same pcpu, then send a hw sgi to the
@@ -589,7 +590,7 @@ int send_virq_hw(uint32_t vmid, uint32_t virq, uint32_t hirq)
 	return _send_virq(vcpu, virq, hirq, 1);
 }
 
-int send_virq(uint32_t vmid, uint32_t virq)
+int send_virq_to_vm(uint32_t vmid, uint32_t virq)
 {
 	/*
 	 * default all the virq do not attached to
@@ -597,6 +598,11 @@ int send_virq(uint32_t vmid, uint32_t virq)
 	 * of a vm
 	 */
 	return _send_virq(get_vcpu_by_id(vmid, 0), virq, 0, 0);
+}
+
+int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq)
+{
+	return _send_virq(vcpu, virq, 0, 0);
 }
 
 void send_vsgi(struct vcpu *sender, uint32_t sgi, cpumask_t *cpumask)

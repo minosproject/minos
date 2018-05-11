@@ -4,12 +4,9 @@
 #include <mvisor/io.h>
 #include <mvisor/stdlib.h>
 #include <mvisor/softirq.h>
-
-#define CNTCR		0x000
-#define CNTSR		0x004
-#define CNTCV_L		0x008
-#define CNTCV_H		0x00c
-#define CNTFID0		0x020
+#include <asm/vtimer.h>
+#include <mvisor/sched.h>
+#include <mvisor/module.h>
 
 uint32_t cpu_khz = 0;
 uint64_t boot_tick = 0;
@@ -42,6 +39,7 @@ unsigned long get_sys_time()
 
 static int timers_arch_init(void)
 {
+	io_remap(0x2a810000, 0x2a810000, 64 * 1024);
 	io_remap(0x2a430000, 0x2a430000, 64 * 1024);
 
 	if (!cpu_khz)
@@ -66,20 +64,29 @@ static int timer_interrupt_handler(uint32_t irq, void *data)
 
 static int vtimer_interrupt_handler(uint32_t irq, void *data)
 {
+	struct vcpu *vcpu = current_vcpu();
+	struct vtimer_context *c = (struct vtimer_context *)
+		get_module_data_by_id(vcpu, vtimer_module_id);
+	struct vtimer *vtimer = &c->virt_timer;
+
+	vtimer->cnt_ctl = read_sysreg32(CNTV_CTL_EL0);
+	write_sysreg32(vtimer->cnt_ctl | CNT_CTL_IMASK, CNTV_CTL_EL0);
+	send_virq_to_vcpu(vcpu, vtimer->virq);
+
 	return 0;
 }
 
 static int timers_init(void)
 {
 	write_sysreg64(0, CNTVOFF_EL2);
-	write_sysreg32(1 << 2, CNTHCTL_EL2);
+	write_sysreg32(1 << 0, CNTHCTL_EL2);
 	write_sysreg32(0, CNTP_CTL_EL0);
 	write_sysreg32(0, CNTHP_CTL_EL2);
 	isb();
 
 	request_irq(HYP_TIMER_INT, timer_interrupt_handler, NULL);
-	//request_irq(PHYS_TIMER_NONSEC_INT, timer_interrupt_handler, NULL);
-	//request_irq(VIRT_TIMER_INT, vtimer_interrupt_handler, NULL);
+	request_irq(PHYS_TIMER_NONSEC_INT, timer_interrupt_handler, NULL);
+	request_irq(VIRT_TIMER_INT, vtimer_interrupt_handler, NULL);
 
 	return 0;
 }

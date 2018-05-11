@@ -33,6 +33,9 @@ struct vm {
 	struct mm_struct mm;
 	struct os *os;
 	struct list_head vm_list;
+
+	unsigned long time_offset;
+
 	/*
 	 * each vm may have its own stage2 memory map
 	 * to control the memory access

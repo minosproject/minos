@@ -277,14 +277,12 @@ static int map_level2_pages(unsigned long *tbase, unsigned long vbase,
 
 		*(tbase + index) = (attr | \
 			(pbase >> offset) << offset);
+
 again:
 		vbase += config->level2_entry_map_size;
 		pbase += config->level2_entry_map_size;
 		index++;
 	}
-
-	flush_dcache_range((unsigned long)(tbase + tmp),
-		(size >> offset) * sizeof(unsigned long));
 
 	return 0;
 }
@@ -340,6 +338,10 @@ static int map_mem(unsigned long t_base, unsigned long base,
 
 		map_level2_pages((unsigned long *)value, base,
 				phy_base, map_size, type, config);
+
+		flush_dcache_range(value,
+			config->level2_pages * SIZE_4K);
+
 		base += map_size;
 		size -= map_size;
 		phy_base += map_size;

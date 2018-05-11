@@ -164,7 +164,8 @@ int irq_add_local(uint32_t start, uint32_t cnt);
 void __virq_enable(uint32_t virq, int enable);
 void __irq_enable(uint32_t irq, int enable);
 int send_virq_hw(uint32_t vmid, uint32_t virq, uint32_t hirq);
-int send_virq(uint32_t vmid, uint32_t virq);
+int send_virq_to_vm(uint32_t vmid, uint32_t virq);
+int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq);
 void send_vsgi(struct vcpu *sender,
 		uint32_t sgi, cpumask_t *cpumask);
 int vcpu_has_virq_pending(struct vcpu *vcpu);

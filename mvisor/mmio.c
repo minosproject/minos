@@ -13,10 +13,9 @@ int do_mmio_emulation(vcpu_regs *regs, int write,
 	list_for_each_entry(handler, &mmio_handler_list, list) {
 		if (handler->ops->check(regs, address)) {
 			if (write)
-				handler->ops->write(regs, address, *value);
+				return handler->ops->write(regs, address, value);
 			else
-				handler->ops->read(regs, address, value);
-			break;
+				return handler->ops->read(regs, address, value);
 		}
 	}
 
