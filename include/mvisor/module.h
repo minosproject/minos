@@ -27,6 +27,9 @@ struct mvisor_module {
 	void (*create_vm)(struct vm *vm);
 };
 
+void *get_module_data(unsigned long s, unsigned long e,
+		int (*check)(struct module_id *module));
+
 int vcpu_modules_init(struct vcpu *vcpu);
 void *mvisor_get_module_pdata(char *name, char *type);
 void *get_module_data_by_name(struct vcpu *vcpu, char *name);

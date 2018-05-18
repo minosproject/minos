@@ -74,9 +74,8 @@ void vgic_send_sgi(struct vcpu *vcpu, unsigned long sgi_value)
 		spin_lock(&gicr->gicr_lock);
 		gicr->gicr_ispender |= (1 << sgi);
 		spin_unlock(&gicr->gicr_lock);
+		send_virq_to_vcpu(target, sgi);
 	}
-
-	send_vsgi(vcpu, sgi, &cpumask);
 }
 
 static void vgic_state_init(struct vcpu *vcpu, void *context)
@@ -157,49 +156,41 @@ static void vgic_vm_create(struct vm *vm)
 	gicd->gicd_typer = ioread32((void *)gicd->base + GICD_TYPER);
 }
 
-static struct vgic_gicr *address_to_gicr(struct vgic_gicd *gicd,
-		unsigned long address, int *type, unsigned long *offset)
+static int address_to_gicr(struct vgic_gicr *gicr,
+		unsigned long address, unsigned long *offset)
 {
-	struct vgic_gicr *gicr;
+	if ((address >= gicr->rd_base) &&
+		(address < (gicr->rd_base + SIZE_64K))) {
 
-	list_for_each_entry(gicr, &gicd->gicr_list, list) {
-		if ((address >= gicr->rd_base) &&
-			(address < (gicr->rd_base + SIZE_64K))) {
-
-			*type = GIC_TYPE_GICR_RD;
-			*offset = address - gicr->rd_base;
-			return gicr;
-		}
-
-		if ((address >= gicr->sgi_base) &&
-			(address < (gicr->sgi_base + SIZE_64K))) {
-
-			*type = GIC_TYPE_GICR_SGI;
-			*offset = address - gicr->sgi_base;
-			return gicr;
-		}
-
-		if ((address >= gicr->vlpi_base) &&
-			(address < (gicr->vlpi_base + SIZE_64K))) {
-
-			*type = GIC_TYPE_GICR_VLPI;
-			*offset = address - gicr->vlpi_base;
-			return gicr;
-		}
+		*offset = address - gicr->rd_base;
+		return GIC_TYPE_GICR_RD;
 	}
 
-	return NULL;
+	if ((address >= gicr->sgi_base) &&
+		(address < (gicr->sgi_base + SIZE_64K))) {
+
+		*offset = address - gicr->sgi_base;
+		return GIC_TYPE_GICR_SGI;
+	}
+
+	if ((address >= gicr->vlpi_base) &&
+		(address < (gicr->vlpi_base + SIZE_64K))) {
+
+		*offset = address - gicr->vlpi_base;
+		return GIC_TYPE_GICR_VLPI;
+	}
+
+	return GIC_TYPE_INVAILD;
 }
 
-static int vgic_gicd_mmio(struct vcpu *vcpu, struct vgic_gicd *gicd,
-		int read, unsigned long offset, unsigned long *value)
+static int vgic_gicd_mmio_read(struct vcpu *vcpu,
+			struct vgic_gicd *gicd,
+			unsigned long offset,
+			unsigned long *value)
 {
-	uint32_t x, y, bit;
-
 	spin_lock(&gicd->gicd_lock);
 
-	if (read) {
-		switch (offset) {
+	switch (offset) {
 		case GICD_CTLR:
 			*value = gicd->gicd_ctlr & ~(1 << 31);
 			break;
@@ -221,33 +212,54 @@ static int vgic_gicd_mmio(struct vcpu *vcpu, struct vgic_gicd *gicd,
 		default:
 			*value = 0;
 			break;
-		}
-	} else {
-		switch (offset) {
-		case GICD_CTLR:
-			gicd->gicd_ctlr = *value;
-			break;
-		case GICD_TYPER:
-			break;
-		case GICD_STATUSR:
-			break;
-		case GICD_ISENABLER...GICD_ISENABLER_END:
-			x = (offset - GICD_ISENABLER) / 4;
-			y = x * 32;
-			for_each_set_bit(bit, value, 32)
-				virq_unmask(y + bit);
-			break;
-		case GICD_ICENABLER...GICD_ICENABLER_END:
-			x = (offset - GICD_ICENABLER) / 4;
-			y = x * 32;
-			for_each_set_bit(bit, value, 32)
-				virq_mask(y + bit);
-			break;
-		}
 	}
 
 	spin_unlock(&gicd->gicd_lock);
 	return 0;
+}
+
+static int vgic_gicd_mmio_write(struct vcpu *vcpu,
+			struct vgic_gicd *gicd,
+			unsigned long offset,
+			unsigned long *value)
+{
+	uint32_t x, y, bit;
+
+	spin_lock(&gicd->gicd_lock);
+
+	switch (offset) {
+	case GICD_CTLR:
+		gicd->gicd_ctlr = *value;
+		break;
+	case GICD_TYPER:
+		break;
+	case GICD_STATUSR:
+		break;
+	case GICD_ISENABLER...GICD_ISENABLER_END:
+		x = (offset - GICD_ISENABLER) / 4;
+		y = x * 32;
+		for_each_set_bit(bit, value, 32)
+			virq_unmask(y + bit);
+		break;
+	case GICD_ICENABLER...GICD_ICENABLER_END:
+		x = (offset - GICD_ICENABLER) / 4;
+		y = x * 32;
+		for_each_set_bit(bit, value, 32)
+			virq_mask(y + bit);
+		break;
+	}
+
+	spin_unlock(&gicd->gicd_lock);
+	return 0;
+}
+
+static int vgic_gicd_mmio(struct vcpu *vcpu, struct vgic_gicd *gicd,
+		int read, unsigned long offset, unsigned long *value)
+{
+	if (read)
+		return vgic_gicd_mmio_read(vcpu, gicd, offset, value);
+	else
+		return vgic_gicd_mmio_write(vcpu, gicd, offset, value);
 }
 
 static int vgic_gicr_rd_mmio(struct vcpu *vcpu, struct vgic_gicr *gicr,
@@ -318,11 +330,19 @@ static int vgic_check_gicr_access(struct vcpu *vcpu, struct vgic_gicr *gicr,
 			int type, unsigned long offset)
 {
 	if (get_vcpu_id(vcpu) != gicr->vcpu_id) {
-		switch (offset) {
-		case GICR_TYPER:
-		case GICR_PIDR2:
-			return 1;
-		default:
+		if (type == GIC_TYPE_GICR_RD) {
+			switch (offset) {
+			case GICR_TYPER:
+			case GICR_PIDR2:
+				return 1;
+			default:
+				return 0;
+			}
+		} else if (type == GIC_TYPE_GICR_SGI) {
+			return 0;
+		} else if (type == GIC_TYPE_GICR_VLPI) {
+			return 0;
+		} else {
 			return 0;
 		}
 	}
@@ -339,26 +359,33 @@ static int vgic_mmio_handler(vcpu_regs *regs, int read,
 	struct vgic_gicr *gicr = NULL;
 	struct vcpu *vcpu = (struct vcpu *)regs;
 
-	list_for_each_entry(gicd, &gicd_list, list) {
-		if (gicd->vmid == get_vmid(vcpu)) {
-			if ((address >= gicd->base) &&
-					(address < gicd->end)) {
-				type = GIC_TYPE_GICD;
-				offset = address - gicd->base;
-			} else {
-				gicr = address_to_gicr(gicd, address, &type, &offset);
-				if (!gicr) {
-					pr_error("invaild gicr type and address\n");
-					return -EINVAL;
-				}
-			}
+	gicr = (struct vgic_gicr *)
+		get_module_data_by_id(vcpu, vgic_module_id);
+	gicd = gicr->gicd;
 
-			break;
+	if ((address >= gicd->base) && (address < gicd->end)) {
+		type = GIC_TYPE_GICD;
+		offset = address - gicd->base;
+	} else {
+		type = address_to_gicr(gicr, address, &offset);
+		if (type != GIC_TYPE_INVAILD)
+			goto out;
+
+		/*
+		 * may access other vcpu's gicr register
+		 */
+		list_for_each_entry(gicr, &gicd->gicr_list, list) {
+			type = address_to_gicr(gicr, address, &offset);
+			if (type != GIC_TYPE_INVAILD)
+				goto out;
 		}
 	}
 
-	if (type == GIC_TYPE_INVAILD)
+out:
+	if (type == GIC_TYPE_INVAILD) {
+		pr_error("invaild gicr type and address\n");
 		return -EINVAL;
+	}
 
 	if (type != GIC_TYPE_GICD) {
 		if (!vgic_check_gicr_access(vcpu, gicr, type, offset))
@@ -425,4 +452,4 @@ static int vgic_module_init(struct mvisor_module *module)
 	return 0;
 }
 
-MVISOR_MODULE_DECLARE(vgic, "vgic", "vgic", (void *)vgic_module_init);
+MVISOR_MODULE_DECLARE(vgic, "vgic", (void *)vgic_module_init);

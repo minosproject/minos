@@ -14,6 +14,30 @@ static int module_class_nr = 0;
 
 typedef int (*module_init_fn)(struct mvisor_module *);
 
+void *get_module_data(unsigned long s, unsigned long e,
+		int (*check)(struct module_id *module))
+{
+	int i, count;
+	struct module_id *module;
+
+	if (e <= s)
+		return NULL;
+
+	count = (e - s) / sizeof(struct module_id);
+	if (count == 0)
+		return NULL;
+
+	for (i = 0; i < count; i++) {
+		module = (struct module_id *)s;
+		if (check(module))
+			return module->data;
+
+		s += sizeof(struct module_id);
+	}
+
+	return NULL;
+}
+
 int get_module_id(char *type)
 {
 	struct mvisor_module *module;
@@ -46,8 +70,8 @@ static struct mvisor_module *mvisor_create_module(struct module_id *id)
 	module_class_nr++;
 
 	/* call init routine */
-	if (id->fn) {
-		fn = (module_init_fn)id->fn;
+	if (id->data) {
+		fn = (module_init_fn)id->data;
 		fn(module);
 	}
 

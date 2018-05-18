@@ -839,12 +839,21 @@ int vcpu_has_virq(struct vcpu *vcpu)
 	return (active || pending);
 }
 
+static int check_irqchip(struct module_id *module)
+{
+	return (!(strcmp(module->name, CONFIG_IRQ_CHIP_NAME)));
+}
+
 int mvisor_irq_init(void)
 {
-	char *chip_name = CONFIG_IRQ_CHIP_NAME;
+	extern unsigned char __mvisor_irqchip_start;
+	extern unsigned char __mvisor_irqchip_end;
+	unsigned long s, e;
 
-	irq_chip = (struct irq_chip *)mvisor_get_module_pdata(chip_name,
-			MVISOR_MODULE_NAME_IRQCHIP);
+	s = (unsigned long)&__mvisor_irqchip_start;
+	e = (unsigned long)&__mvisor_irqchip_end;
+
+	irq_chip = (struct irq_chip *)get_module_data(s, e, check_irqchip);
 	if (!irq_chip)
 		panic("can not find the irqchip for system\n");
 

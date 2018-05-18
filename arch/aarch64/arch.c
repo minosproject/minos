@@ -96,5 +96,5 @@ static int aarch64_system_init(struct mvisor_module *module)
 	return 0;
 }
 
-MVISOR_MODULE_DECLARE(aarch64_system, "aarch64-system",
-	MVISOR_MODULE_NAME_SYSTEM, (void *)aarch64_system_init);
+MVISOR_MODULE_DECLARE(aarch64_system,
+	"aarch64-system", (void *)aarch64_system_init);

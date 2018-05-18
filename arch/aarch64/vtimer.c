@@ -198,4 +198,4 @@ static int vtimer_module_init(struct mvisor_module *module)
 }
 
 MVISOR_MODULE_DECLARE(armv8_vtimer, "armv8-vtimer",
-		"vtimer", (void *)vtimer_module_init);
+		(void *)vtimer_module_init);

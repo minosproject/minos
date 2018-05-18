@@ -628,6 +628,7 @@ int gicv3_init(void)
 	uint32_t nr_lines;
 	void *rbase;
 	uint64_t pr;
+	uint32_t value;
 
 	pr_info("*** gicv3 init ***\n");
 
@@ -636,6 +637,13 @@ int gicv3_init(void)
 	io_remap(0x2f000000, 0x2f000000, 64 * 1024);
 	io_remap(0x2f020000, 0x2f020000, 128 * 1024);
 	io_remap(0x2f100000, 0x2f100000, 1024 * 1024);
+
+	value = read_sysreg32(ICH_VTR_EL2);
+	gicv3_nr_lr = (value & 0x3f) + 1;
+	gicv3_nr_pr = ((value >> 29) & 0x7) + 1;
+
+	if (!((gicv3_nr_pr > 4) && (gicv3_nr_pr < 8)))
+		panic("GICv3: Invalid number of priority bits\n");
 
 	for (i = 0; i < CONFIG_NR_CPUS; i++) {
 		rbase = __gicr_rd_base + (128 * 1024) * i;
@@ -724,17 +732,8 @@ static struct irq_chip gicv3_chip = {
 
 static int gicv3_module_init(struct mvisor_module *module)
 {
-	uint32_t value;
-
-	value = read_sysreg32(ICH_VTR_EL2);
-	gicv3_nr_lr = (value & 0x3f) + 1;
-	gicv3_nr_pr = ((value >> 29) & 0x7) + 1;
-
-	if (!((gicv3_nr_pr > 4) && (gicv3_nr_pr < 8)))
-		panic("GICv3: Invalid number of priority bits\n");
-
 	module->context_size = sizeof(struct gic_context);
-	module->pdata = (void *)&gicv3_chip;
+	module->pdata = NULL;
 	module->state_init = gicv3_state_init;
 	module->state_save = gicv3_state_save;
 	module->state_restore = gicv3_state_restore;
@@ -744,5 +743,5 @@ static int gicv3_module_init(struct mvisor_module *module)
 	return 0;
 }
 
-MVISOR_MODULE_DECLARE(gicv3, "gicv3",
-	"irq_chip", (void *)gicv3_module_init);
+MVISOR_MODULE_DECLARE(gicv3, "gicv3-module", (void *)gicv3_module_init);
+IRQCHIP_DECLARE(gicv3_chip, "gicv3", (void *)&gicv3_chip);

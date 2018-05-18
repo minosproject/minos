@@ -83,6 +83,7 @@
 #define ESR_SYSREG_DCISW          ESR_SYSREG(1,0,c7,c6,2)
 #define ESR_SYSREG_DCCSW          ESR_SYSREG(1,0,c7,c10,2)
 #define ESR_SYSREG_DCCISW         ESR_SYSREG(1,0,c7,c14,2)
+#define ESR_SYSREG_DCZVA	  ESR_SYSREG(1,3,c7,c4,1)
 
 #define ESR_SYSREG_MDSCR_EL1      ESR_SYSREG(2,0,c0,c2,2)
 #define ESR_SYSREG_MDRAR_EL1      ESR_SYSREG(2,0,c1,c0,0)

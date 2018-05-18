@@ -64,6 +64,22 @@ SECTIONS
 
 	. = ALIGN(8);
 
+	__mvisor_irqchip_start = .;
+	.__mvisor_irqchip : {
+		*(.__mvisor_irqchip)
+	}
+	__mvisor_irqchip_end = .;
+
+	. = ALIGN(8);
+
+	__mvisor_mmuchip_start = .;
+	.__mvisor_mmuchip : {
+		*(.__mvisor_mmuchip)
+	}
+	__mvisor_mmuchip_end = .;
+
+	. = ALIGN(8);
+
 	__mvisor_vm_start = .;
 	.__mvisor_vm : {
 		*(.__mvisor_vm)

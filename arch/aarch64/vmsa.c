@@ -573,7 +573,7 @@ static struct mmu_chip vmsa_mmu = {
 static int vmsa_module_init(struct mvisor_module *module)
 {
 	module->context_size = sizeof(struct vmsa_context);
-	module->pdata = (void *)&vmsa_mmu;
+	module->pdata = NULL;
 	module->state_init = vmsa_state_init;
 	module->state_save = vmsa_state_save;
 	module->state_restore = vmsa_state_restore;
@@ -581,5 +581,5 @@ static int vmsa_module_init(struct mvisor_module *module)
 	return 0;
 }
 
-MVISOR_MODULE_DECLARE(vmsa, "armv8-mmu",
-	MVISOR_MODULE_NAME_MMU, (void *)vmsa_module_init);
+MVISOR_MODULE_DECLARE(vmsa, "armv8-mmu", (void *)vmsa_module_init);
+MMUCHIP_DECLARE(armv8_mmu, "armv8-mmu", (void *)&vmsa_mmu);

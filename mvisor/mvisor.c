@@ -107,19 +107,18 @@ void boot_main(void)
 	 * need first init the mem alloctor
 	 */
 	mvisor_log_init();
-	mvisor_mm_init();
-	mvisor_modules_init();
 
+	pr_info("Starting mVisor ...\n");
+
+	mvisor_mm_init();
 	mvisor_mmu_init();
+
+	mvisor_hook_init();
 
 	mvisor_early_init();
 	mvisor_early_init_percpu();
 
 	mvisor_percpus_init();
-
-	pr_info("Starting mVisor ...\n");
-
-	mvisor_hook_init();
 
 	if (get_cpu_id() != 0)
 		panic("cpu is not cpu0");
@@ -132,6 +131,8 @@ void boot_main(void)
 	mvisor_irq_init();
 	softirq_init();
 	init_timers();
+
+	mvisor_modules_init();
 
 	mvisor_subsys_init();
 	mvisor_subsys_init_percpu();
