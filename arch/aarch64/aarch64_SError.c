@@ -207,7 +207,7 @@ static int dataabort_tfl_handler(vcpu_regs *regs, uint32_t esr_value)
 
 		ret = do_mmio_emulation(regs, dabt->write, paddr, &value);
 		if (ret) {
-			pr_warning("handle mmio read/write fail\n");
+			pr_warning("handle mmio read/write fail 0x%x\n", paddr);
 		} else {
 			if (!dabt->write)
 				set_reg_value(regs, dabt->reg, value);

@@ -1,12 +1,13 @@
 #include <mvisor/mvisor.h>
 #include <mvisor/os.h>
+#include <mvisor/sched.h>
 
 LIST_HEAD(os_list);
 struct os *default_os;
 
 static void default_vcpu_init(struct vcpu *vcpu)
 {
-
+	vcpu_online(vcpu);
 }
 
 struct os_ops default_os_ops = {
