@@ -81,7 +81,7 @@ static inline unsigned long slack_expires(unsigned long expires)
 int mod_timer(struct timer_list *timer, unsigned long expires)
 {
 	unsigned long flags;
-	struct timers *timers = &get_cpu_var(timers);
+	struct timers *timers = timer->timers;
 
 	if (timer_pending(timer) && (timer->expires == expires))
 		return 1;
@@ -108,6 +108,18 @@ int mod_timer(struct timer_list *timer, unsigned long expires)
 	return 0;
 }
 
+void init_timer_on_cpu(struct timer_list *timer, int cpu)
+{
+	BUG_ON(!timer);
+
+	init_list(&timer->entry);
+	timer->entry.next = NULL;
+	timer->expires = 0;
+	timer->function = NULL;
+	timer->data = 0;
+	timer->timers = &get_per_cpu(timers, cpu);
+}
+
 void init_timer(struct timer_list *timer)
 {
 	BUG_ON(!timer);
@@ -117,6 +129,7 @@ void init_timer(struct timer_list *timer)
 	timer->expires = 0;
 	timer->function = NULL;
 	timer->data = 0;
+	timer->timers = &get_cpu_var(timers);
 }
 
 int del_timer(struct timer_list *timer)

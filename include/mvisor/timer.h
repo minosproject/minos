@@ -26,6 +26,7 @@ struct timers {
 #define DEFAULT_TIMER_MARGIN	(128)
 
 void init_timer(struct timer_list *timer);
+void init_timer_on_cpu(struct timer_list *timer, int cpu);
 void add_timer(struct timer_list *timer);
 int del_timer(struct timer_list *timer);
 int mod_timer(struct timer_list *timer, unsigned long expires);
