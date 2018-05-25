@@ -4,10 +4,10 @@
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
-#ifndef _MVISOR_ARMV8_H_
-#define _MVISOR_ARMV8_H_
+#ifndef _MINOS_ARMV8_H_
+#define _MINOS_ARMV8_H_
 
-#include <mvisor/types.h>
+#include <minos/types.h>
 #include <asm/aarch64_common.h>
 #include <asm/gic_reg.h>
 

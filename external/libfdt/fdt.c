@@ -54,7 +54,7 @@
 #include <libfdt/libfdt.h>
 
 #include "libfdt_internal.h"
-#include <mvisor/string.h>
+#include <minos/string.h>
 
 int fdt_check_header(const void *fdt)
 {

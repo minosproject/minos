@@ -1,7 +1,7 @@
-#include <mvisor/io.h>
+#include <minos/io.h>
 #include <drivers/pl011.h>
-#include <mvisor/mmu.h>
-#include <mvisor/init.h>
+#include <minos/mmu.h>
+#include <minos/init.h>
 
 static void *base = (void *)0x1c090000;
 extern void flush_log_buf(void);

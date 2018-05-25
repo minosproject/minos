@@ -1,5 +1,5 @@
-#ifndef _MVISOR_VGIC_H_
-#define _MVISOR_VGIC_H_
+#ifndef _MINOS_VGIC_H_
+#define _MINOS_VGIC_H_
 
 struct vgic_gicd {
 	uint32_t gicd_ctlr;

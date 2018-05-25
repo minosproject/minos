@@ -1,16 +1,16 @@
-#include <mvisor/mvisor.h>
+#include <minos/minos.h>
 #include <asm/svccc.h>
-#include <mvisor/string.h>
+#include <minos/string.h>
 
-extern unsigned char __mvisor_hvc_handler_start;
-extern unsigned char __mvisor_hvc_handler_end;
-extern unsigned char __mvisor_smc_handler_start;
-extern unsigned char __mvisor_smc_handler_end;
+extern unsigned char __hvc_handler_start;
+extern unsigned char __hvc_handler_end;
+extern unsigned char __smc_handler_start;
+extern unsigned char __smc_handler_end;
 
 static struct svc_desc *smc_descs[SVC_STYPE_MAX];
 static struct svc_desc *hvc_descs[SVC_STYPE_MAX];
 
-int do_svc_handler(vcpu_regs *regs, uint32_t svc_id, uint64_t *args, int smc)
+int do_svc_handler(gp_regs *regs, uint32_t svc_id, uint64_t *args, int smc)
 {
 	uint16_t type;
 	struct svc_desc **table;
@@ -74,10 +74,10 @@ static int svc_service_init(void)
 	memset((char *)smc_descs, 0, sizeof(struct svc_desc *) * SVC_STYPE_MAX);
 	memset((char *)hvc_descs, 0, sizeof(struct svc_desc *) * SVC_STYPE_MAX);
 
-	parse_svc_desc((unsigned long)&__mvisor_hvc_handler_start,
-			(unsigned long)&__mvisor_hvc_handler_end, hvc_descs);
-	parse_svc_desc((unsigned long)&__mvisor_smc_handler_start,
-			(unsigned long)&__mvisor_smc_handler_end, smc_descs);
+	parse_svc_desc((unsigned long)&__hvc_handler_start,
+			(unsigned long)&__hvc_handler_end, hvc_descs);
+	parse_svc_desc((unsigned long)&__smc_handler_start,
+			(unsigned long)&__smc_handler_end, smc_descs);
 
 	return 0;
 }

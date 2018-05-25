@@ -1,8 +1,56 @@
-#ifndef _MVISOR_ARCH_AARCH64_H_
-#define _MVISOR_ARCH_AARCH64_H_
+#ifndef _MINOS_ARCH_AARCH64_H_
+#define _MINOS_ARCH_AARCH64_H_
 
+#include <minos/types.h>
 #include <asm/aarch64_helper.h>
-#include <mvisor/vm.h>
+
+typedef struct aarch64_regs {
+	uint64_t x0;
+	uint64_t x1;
+	uint64_t x2;
+	uint64_t x3;
+	uint64_t x4;
+	uint64_t x5;
+	uint64_t x6;
+	uint64_t x7;
+	uint64_t x8;
+	uint64_t x9;
+	uint64_t x10;
+	uint64_t x11;
+	uint64_t x12;
+	uint64_t x13;
+	uint64_t x14;
+	uint64_t x15;
+	uint64_t x16;
+	uint64_t x17;
+	uint64_t x18;
+	uint64_t x19;
+	uint64_t x20;
+	uint64_t x21;
+	uint64_t x22;
+	uint64_t x23;
+	uint64_t x24;
+	uint64_t x25;
+	uint64_t x26;
+	uint64_t x27;
+	uint64_t x28;
+	uint64_t x29;
+	uint64_t x30_lr;
+	uint64_t sp_elx;
+	uint64_t elr_elx;
+	uint64_t spsr_elx;
+	uint64_t nzcv;
+	uint64_t esr_elx;
+} gp_regs __align(sizeof(uint64_t));
+
+#define stack_to_gp_regs(base) \
+	(gp_regs *)(base - sizeof(gp_regs))
+
+#define get_reg_value(regs, index)	\
+	*((uint64_t *)regs + index)
+
+#define set_reg_value(regs, index, value)	\
+	*((uint64_t *)regs + index) = value
 
 #define read_sysreg32(name) ({                          \
     uint32_t _r;                                        \
@@ -74,10 +122,5 @@ static inline void flush_all_tlbis(void)
 		: : : "memory"
 	);
 }
-
-int get_cpu_id(void);
-int arch_early_init(void);
-int arch_init(void);
-int arch_vm_init(struct vm *vm);
 
 #endif

@@ -1,5 +1,5 @@
-#ifndef _MVISOR_POWER_H_
-#define _MVISOR_POWER_H_
+#ifndef _MINOS_POWER_H_
+#define _MINOS_POWER_H_
 
 #define PPOFFR	(0x00)
 #define PPONR	(0x04)

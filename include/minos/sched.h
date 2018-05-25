@@ -1,0 +1,61 @@
+/*
+ * created by Le MIn 2017/12/09
+ */
+
+#ifndef _MINOS_SCHED_H_
+#define _MINOS_SCHED_H_
+
+#include <virt/vcpu.h>
+#include <minos/percpu.h>
+#include <minos/list.h>
+#include <minos/timer.h>
+#include <minos/task.h>
+
+#define PCPU_AFFINITY_FAIL	(0xffff)
+
+DECLARE_PER_CPU(struct pcpu *, pcpu);
+DECLARE_PER_CPU(struct task *, percpu_current_task);
+DECLARE_PER_CPU(struct task *, percpu_next_task);
+
+#define current_task	get_cpu_var(percpu_current_task)
+#define next_task	get_cpu_var(percpu_next_task)
+
+#define current_vcpu	(struct vcpu *)current_task->pdata
+
+typedef enum _pcpu_state_t {
+	PCPU_STATE_RUNNING	= 0x0,
+	PCPU_STATE_IDLE,
+	PCPU_STATE_OFFLINE,
+} pcpu_state_t;
+
+struct pcpu {
+	uint32_t pcpu_id;
+	int need_resched;
+	int state;
+	int pids;
+
+	spinlock_t lock;
+
+	/*
+	 * member to get the highest priority
+	 * 64 * 8 = 512 priority and max on pcpu
+	 * can have max 512 tasks or vcpu
+	 */
+	uint64_t ready_group;
+	uint8_t ready_tbl[64];
+	struct task *task_table[64 * 8];
+	struct list_head task_list;
+
+	struct timer_list sched_timer;
+	struct list_head vcpu_list;
+	struct list_head ready_list;
+};
+
+void pcpus_init(void);
+void sched(void);
+void pcpu_add_task(int cpu, struct task *task);
+void set_task_ready(struct task *task);
+void sched_task(struct task *task, int reason);
+int sched_init(void);
+
+#endif

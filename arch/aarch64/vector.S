@@ -14,7 +14,7 @@ exception_from_el1_handler:
 	stp	x0, x1, [sp, #-16]!
 
 	//find_running_vcpu
-	ldr	x0, =per_cpu_current_vcpu
+	ldr	x0, =per_cpu_percpu_current_task
 	mrs	x1, mpidr_el1
 	ubfx	x1, x1, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
 	ldr	x2, =percpu_offset
@@ -65,8 +65,8 @@ exception_from_el1_handler:
 
 	.global return_to_el1
 return_to_el1:
-	ldr	x5, =per_cpu_current_vcpu
-	ldr	x4, =per_cpu_next_vcpu
+	ldr	x5, =per_cpu_percpu_current_task
+	ldr	x4, =per_cpu_percpu_next_task
 	mrs	x1, mpidr_el1
 	ubfx	x1, x1, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
 	ldr	x2, =percpu_offset

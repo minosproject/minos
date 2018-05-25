@@ -1,27 +1,28 @@
 #include <asm/aarch64_helper.h>
-#include <mvisor/vcpu.h>
+#include <virt/vcpu.h>
 #include <asm/exception.h>
-#include <mvisor/mvisor.h>
-#include <mvisor/smp.h>
+#include <minos/minos.h>
+#include <minos/smp.h>
 #include <asm/processer.h>
-#include <mvisor/mmio.h>
-#include <mvisor/sched.h>
+#include <minos/mmio.h>
+#include <minos/sched.h>
 #include <asm/vgic.h>
-#include <mvisor/irq.h>
+#include <minos/irq.h>
 #include <asm/svccc.h>
 #include <asm/vtimer.h>
+#include <virt/virt.h>
 
-extern unsigned char __mvisor_serror_desc_start;
-extern unsigned char __mvisor_serror_desc_end;
+extern unsigned char __serror_desc_start;
+extern unsigned char __serror_desc_end;
 
 static struct serror_desc *serror_descs[MAX_SERROR_TYPE] __align_cache_line;
 
-static int unknown_handler(vcpu_regs *reg, uint32_t esr_value)
+static int unknown_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int wfi_wfe_handler(vcpu_regs *reg, uint32_t esr_value)
+static int wfi_wfe_handler(gp_regs *reg, uint32_t esr_value)
 {
 	struct vcpu *vcpu = (struct vcpu *)reg;
 
@@ -30,67 +31,67 @@ static int wfi_wfe_handler(vcpu_regs *reg, uint32_t esr_value)
 	return 0;
 }
 
-static int mcr_mrc_cp15_handler(vcpu_regs *reg, uint32_t esr_value)
+static int mcr_mrc_cp15_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int mcrr_mrrc_cp15_handler(vcpu_regs *reg, uint32_t esr_value)
+static int mcrr_mrrc_cp15_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int mcr_mrc_cp14_handler(vcpu_regs *reg, uint32_t esr_value)
+static int mcr_mrc_cp14_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int ldc_stc_cp14_handler(vcpu_regs *reg, uint32_t esr_value)
+static int ldc_stc_cp14_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int access_simd_reg_handler(vcpu_regs *reg, uint32_t esr_value)
+static int access_simd_reg_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int mcr_mrc_cp10_handler(vcpu_regs *reg, uint32_t esr_value)
+static int mcr_mrc_cp10_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int mrrc_cp14_handler(vcpu_regs *reg, uint32_t esr_value)
+static int mrrc_cp14_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int illegal_exe_state_handler(vcpu_regs *reg, uint32_t esr_value)
+static int illegal_exe_state_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int armsvc_aarch32_handler(vcpu_regs *reg, uint32_t esr_value)
+static int armsvc_aarch32_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int hvc_aarch32_handler(vcpu_regs *reg, uint32_t esr_value)
+static int hvc_aarch32_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int smc_aarch32_handler(vcpu_regs *reg, uint32_t esr_value)
+static int smc_aarch32_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int armsvc_aarch64_handler(vcpu_regs *reg, uint32_t esr_value)
+static int armsvc_aarch64_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static inline int svc_aarch64_handler(vcpu_regs *reg, uint32_t esr_value, int smc)
+static inline int svc_aarch64_handler(gp_regs *reg, uint32_t esr_value, int smc)
 {
 	int fast;
 	uint32_t id;
@@ -106,22 +107,22 @@ static inline int svc_aarch64_handler(vcpu_regs *reg, uint32_t esr_value, int sm
 	memcpy((void *)args, (void *)&reg->x1, 6 * sizeof(uint64_t));
 
 	if (!fast)
-		enable_local_irq();
+		local_irq_enable();
 
 	return do_svc_handler(reg, id, args, smc);
 }
 
-static int hvc_aarch64_handler(vcpu_regs *reg, uint32_t esr_value)
+static int hvc_aarch64_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return svc_aarch64_handler(reg, esr_value, 0);
 }
 
-static int smc_aarch64_handler(vcpu_regs *reg, uint32_t esr_value)
+static int smc_aarch64_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return svc_aarch64_handler(reg, esr_value, 1);
 }
 
-static int access_system_reg_handler(vcpu_regs *reg, uint32_t esr_value)
+static int access_system_reg_handler(gp_regs *reg, uint32_t esr_value)
 {
 	unsigned long ret = 0;
 	struct esr_sysreg *sysreg = (struct esr_sysreg *)&esr_value;
@@ -152,17 +153,17 @@ static int access_system_reg_handler(vcpu_regs *reg, uint32_t esr_value)
 	return ret;
 }
 
-static int insabort_tfl_handler(vcpu_regs *reg, uint32_t esr_value)
+static int insabort_tfl_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int insabort_twe_handler(vcpu_regs *reg, uint32_t esr_value)
+static int insabort_twe_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int misaligned_pc_handler(vcpu_regs *reg, uint32_t esr_value)
+static int misaligned_pc_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
@@ -184,7 +185,7 @@ static int get_faulting_ipa(unsigned long vaddr)
 	return ipa;
 }
 
-static int dataabort_tfl_handler(vcpu_regs *regs, uint32_t esr_value)
+static int dataabort_tfl_handler(gp_regs *regs, uint32_t esr_value)
 {
 	struct esr_dabt *dabt = (struct esr_dabt *)&esr_value;
 	unsigned long vaddr;
@@ -222,72 +223,72 @@ static int dataabort_tfl_handler(vcpu_regs *regs, uint32_t esr_value)
 	return 0;
 }
 
-static int dataabort_twe_handler(vcpu_regs *reg, uint32_t esr_value)
+static int dataabort_twe_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int stack_misalign_handler(vcpu_regs *reg, uint32_t esr_value)
+static int stack_misalign_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int floating_aarch32_handler(vcpu_regs *reg, uint32_t esr_value)
+static int floating_aarch32_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int floating_aarch64_handler(vcpu_regs *reg, uint32_t esr_value)
+static int floating_aarch64_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int serror_handler(vcpu_regs *reg, uint32_t esr_value)
+static int serror_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int breakpoint_tfl_handler(vcpu_regs *reg, uint32_t esr_value)
+static int breakpoint_tfl_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int breakpoint_twe_handler(vcpu_regs *reg, uint32_t esr_value)
+static int breakpoint_twe_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int software_step_tfl_handler(vcpu_regs *reg, uint32_t esr_value)
+static int software_step_tfl_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int software_step_twe_handler(vcpu_regs *reg, uint32_t esr_value)
+static int software_step_twe_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int watchpoint_tfl_handler(vcpu_regs *reg, uint32_t esr_value)
+static int watchpoint_tfl_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int watchpoint_twe_handler(vcpu_regs *reg, uint32_t esr_value)
+static int watchpoint_twe_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int bkpt_ins_handler(vcpu_regs *reg, uint32_t esr_value)
+static int bkpt_ins_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int vctor_catch_handler(vcpu_regs *reg, uint32_t esr_value)
+static int vctor_catch_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int brk_ins_handler(vcpu_regs *reg, uint32_t esr_value)
+static int brk_ins_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
 }
@@ -396,7 +397,7 @@ DEFINE_SERROR_DESC(EC_VCTOR_CATCH, EC_TYPE_AARCH32,
 DEFINE_SERROR_DESC(EC_BRK_INS, EC_TYPE_AARCH64,
 		brk_ins_handler, 1, 4);
 
-void SError_from_el1_handler(vcpu_regs *data)
+void SError_from_el1_handler(gp_regs *data)
 {
 	int cpuid = get_cpu_id();
 	uint32_t esr_value;
@@ -404,12 +405,12 @@ void SError_from_el1_handler(vcpu_regs *data)
 	struct serror_desc *ec;
 	struct vcpu *vcpu = (struct vcpu *)data;
 
-	mvisor_exit_from_guest(vcpu);
+	exit_from_guest(vcpu);
 
 	if (get_pcpu_id(vcpu) != cpuid)
 		panic("this vcpu is not belont to the pcpu");
 
-	esr_value = data->esr_el2;
+	esr_value = data->esr_elx;
 	ec_type = (esr_value & 0xfc000000) >> 26;
 
 	ec = serror_descs[ec_type];
@@ -417,20 +418,20 @@ void SError_from_el1_handler(vcpu_regs *data)
 		goto out;
 
 	if (ec->irq_safe)
-		enable_local_irq();
+		local_irq_enable();
 
 	/*
 	 * how to deal with the return value
 	 * TBD
 	 */
-	data->elr_el2 += ec->ret_addr_adjust;
+	data->elr_elx += ec->ret_addr_adjust;
 	ec->handler(data, esr_value);
 
 out:
-	disable_local_irq();
+	local_irq_disable();
 }
 
-void SError_from_el2_handler(vcpu_regs *data)
+void SError_from_el2_handler(gp_regs *data)
 {
 	uint32_t esr_value;
 	uint32_t ec_type;
@@ -451,8 +452,8 @@ static int aarch64_serror_init(void)
 	memset((char *)serror_descs, 0, MAX_SERROR_TYPE
 			* sizeof(struct serror_desc *));
 
-	start = (unsigned long)&__mvisor_serror_desc_start;
-	end = (unsigned long)&__mvisor_serror_desc_end;
+	start = (unsigned long)&__serror_desc_start;
+	end = (unsigned long)&__serror_desc_end;
 	size = (end - start) / sizeof(struct serror_desc);
 	desc = (struct serror_desc *)start;
 

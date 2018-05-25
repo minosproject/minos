@@ -1,7 +1,7 @@
 #ifndef _ASM_GENERIC_BITOPS_H_
 #define _ASM_GENERIC_BITOPS_H_
 
-#include <mvisor/types.h>
+#include <minos/types.h>
 
 /**
  * __ffs - find first bit in word.

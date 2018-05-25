@@ -1,5 +1,5 @@
-#ifndef _MVISOR_GIC_REG_H_
-#define _MVISOR_GIC_REG_H_
+#ifndef _MINOS_GIC_REG_H_
+#define _MINOS_GIC_REG_H_
 
 /*
  * Mapping of MSR and MRS to physical and virtual CPU interface registers

@@ -37,7 +37,7 @@ def parse_vcpu_affinity(data):
 
 patten = [
     {
-        'struct_name': "mvisor_vmtag",
+        'struct_name': "vmtag",
         'member_name': 'vmtags',
         'json_name': 'vmtags',
         'type' : 'ARRAY',
@@ -54,7 +54,7 @@ patten = [
         ]
     },
     {
-        'struct_name': 'mvisor_irqtag',
+        'struct_name': 'irqtag',
         'member_name': 'irqtags',
         'type': 'ARRAY',
         'static': True,
@@ -70,7 +70,7 @@ patten = [
         ]
     },
     {
-        'struct_name': 'mvisor_memtag',
+        'struct_name': 'memtag',
         'member_name': 'memtags',
         'json_name': "memtags",
         'type' : 'ARRAY',
@@ -87,8 +87,8 @@ patten = [
         ]
     },
     {
-        'struct_name': "mvisor_config",
-        'member_name': "mvisor_config",
+        'struct_name': "minos_config",
+        'member_name': "minos_config",
         'json_name': None,
         'type': "NORMAL",
         'static': False,
@@ -172,12 +172,12 @@ def parse_one_member(member_items, data):
     return c
 
 
-def parse_mvisor_struct(struct, jdata):
+def parse_struct(struct, jdata):
     c = ""
     if struct['static']:
         c += 'static '
 
-    c += "struct " + struct['struct_name'] + ' __section(.__mvisor_config) ' + struct['member_name']
+    c += "struct " + struct['struct_name'] + ' __section(.__config) ' + struct['member_name']
 
     if struct['type'] is 'ARRAY':
         c += '[] '
@@ -202,8 +202,8 @@ def parse_mvisor_struct(struct, jdata):
 
 
 def generate_mvconfig(json_data):
-    content = "#include <mvisor/mvisor_config.h>\n"
-    content += "#include <mvisor/compiler.h>\n\n"
+    content = "#include <minos/minos_config.h>\n"
+    content += "#include <minos/compiler.h>\n\n"
 
     for struct in patten:
         if struct['json_name']:
@@ -211,7 +211,7 @@ def generate_mvconfig(json_data):
         else:
             jdata = json_data
         print("Parsing " + struct['struct_name'] + " ...")
-        content += parse_mvisor_struct(struct, jdata)
+        content += parse_struct(struct, jdata)
 
     return content
 

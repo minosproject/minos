@@ -1,5 +1,5 @@
-#ifndef _MVISOR_AARCH64_IRQ_H_
-#define _MVISOR_AARCH64_IRQ_H_
+#ifndef _MINOS_AARCH64_IRQ_H_
+#define _MINOS_AARCH64_IRQ_H_
 
 #include <asm/aarch64_helper.h>
 

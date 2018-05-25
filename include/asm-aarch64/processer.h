@@ -1,7 +1,7 @@
-#ifndef _MVISOR_PROCESSER_H_
-#define _MVISOR_PROCESSER_H_
+#ifndef _MINOS_PROCESSER_H_
+#define _MINOS_PROCESSER_H_
 
-#include <mvisor/types.h>
+#include <minos/types.h>
 
 #define HPFAR_MASK	GENMASK(39, 4)
 

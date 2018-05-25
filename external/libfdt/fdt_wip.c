@@ -55,7 +55,7 @@
 
 #include "libfdt_internal.h"
 
-#include <mvisor/string.h>
+#include <minos/string.h>
 
 int fdt_setprop_inplace_namelen_partial(void *fdt, int nodeoffset,
 					const char *name, int namelen,

@@ -1,5 +1,5 @@
-#ifndef _MVISOR_EXCEPTION_H_
-#define _MVISOR_EXCEPTION_H_
+#ifndef _MINOS_EXCEPTION_H_
+#define _MINOS_EXCEPTION_H_
 
 #include <config/config.h>
 
@@ -45,7 +45,7 @@
 #define EC_TYPE_AARCH32		(0X2)
 #define EC_TYPE_BOTH		(0x3)
 
-typedef int (*serror_handler_t)(vcpu_regs *reg, uint32_t esr_value);
+typedef int (*serror_handler_t)(gp_regs *reg, uint32_t esr_value);
 
 struct serror_desc {
 	int type;
@@ -57,7 +57,7 @@ struct serror_desc {
 
 #define DEFINE_SERROR_DESC(t, arch, h, is, raa)		\
 	static struct serror_desc serror_desc_##t 	\
-	__section(".__mvisor_serror_desc") __used = {	\
+	__section(".__serror_desc") __used = {	\
 		.type = t, 	\
 		.aarch = arch, 	\
 		.handler = h,	\

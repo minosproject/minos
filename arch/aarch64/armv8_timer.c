@@ -1,12 +1,12 @@
-#include <mvisor/mvisor.h>
-#include <mvisor/time.h>
-#include <mvisor/init.h>
-#include <mvisor/io.h>
-#include <mvisor/stdlib.h>
-#include <mvisor/softirq.h>
+#include <minos/minos.h>
+#include <minos/time.h>
+#include <minos/init.h>
+#include <minos/io.h>
+#include <minos/stdlib.h>
+#include <minos/softirq.h>
 #include <asm/vtimer.h>
-#include <mvisor/sched.h>
-#include <mvisor/module.h>
+#include <minos/sched.h>
+#include <virt/vmodule.h>
 
 uint32_t cpu_khz = 0;
 uint64_t boot_tick = 0;
@@ -64,9 +64,9 @@ static int timer_interrupt_handler(uint32_t irq, void *data)
 
 static int vtimer_interrupt_handler(uint32_t irq, void *data)
 {
-	struct vcpu *vcpu = current_vcpu();
+	struct vcpu *vcpu = current_vcpu;
 	struct vtimer_context *c = (struct vtimer_context *)
-		get_module_data_by_id(vcpu, vtimer_module_id);
+		get_vmodule_data_by_id(vcpu, vtimer_vmodule_id);
 	struct vtimer *vtimer = &c->virt_timer;
 
 	vtimer->cnt_ctl = read_sysreg32(CNTV_CTL_EL0);

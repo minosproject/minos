@@ -1,6 +1,6 @@
-#include <mvisor/mvisor.h>
+#include <minos/minos.h>
 #include <asm/power.h>
-#include <mvisor/io.h>
+#include <minos/io.h>
 
 static void *pc_base = (void *)0x1c10000;
 

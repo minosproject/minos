@@ -1,10 +1,10 @@
-#include <mvisor/mvisor.h>
-#include <mvisor/mmu.h>
+#include <minos/minos.h>
+#include <minos/mmu.h>
 #include <config/config.h>
-#include <mvisor/vcpu.h>
-#include <mvisor/module.h>
+#include <virt/vcpu.h>
+#include <virt/vmodule.h>
 #include <asm/arch.h>
-#include <mvisor/mm.h>
+#include <minos/mm.h>
 
 /*
  * a - Non-shareable
@@ -199,7 +199,7 @@ static uint64_t guest_tt_description(int m_type, int d_type)
 
 static char *alloc_host_level2(int pages)
 {
-	return mvisor_alloc_pages(pages);
+	return get_free_pages(pages);
 }
 
 static uint64_t host_tt_description(int m_type, int d_type)
@@ -570,16 +570,16 @@ static struct mmu_chip vmsa_mmu = {
 	.alloc_guest_pt 	= alloc_guest_pt,
 };
 
-static int vmsa_module_init(struct mvisor_module *module)
+static int vmsa_vmodule_init(struct vmodule *vmodule)
 {
-	module->context_size = sizeof(struct vmsa_context);
-	module->pdata = NULL;
-	module->state_init = vmsa_state_init;
-	module->state_save = vmsa_state_save;
-	module->state_restore = vmsa_state_restore;
+	vmodule->context_size = sizeof(struct vmsa_context);
+	vmodule->pdata = NULL;
+	vmodule->state_init = vmsa_state_init;
+	vmodule->state_save = vmsa_state_save;
+	vmodule->state_restore = vmsa_state_restore;
 
 	return 0;
 }
 
-MVISOR_MODULE_DECLARE(vmsa, "armv8-mmu", (void *)vmsa_module_init);
+MINOS_MODULE_DECLARE(vmsa, "armv8-mmu", (void *)vmsa_vmodule_init);
 MMUCHIP_DECLARE(armv8_mmu, "armv8-mmu", (void *)&vmsa_mmu);

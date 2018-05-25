@@ -51,7 +51,7 @@
  *     OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  *     EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <mvisor/types.h>
+#include <minos/types.h>
 
 #ifdef __CHECKER__
 #define __force __attribute__((force))

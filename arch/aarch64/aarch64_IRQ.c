@@ -1,6 +1,7 @@
-#include <mvisor/mvisor.h>
-#include <mvisor/irq.h>
-#include <mvisor/softirq.h>
+#include <minos/minos.h>
+#include <minos/irq.h>
+#include <minos/softirq.h>
+#include <virt/virt.h>
 
 void IRQ_from_el2_handler(void *data)
 {
@@ -10,7 +11,7 @@ void IRQ_from_el2_handler(void *data)
 
 void IRQ_from_el1_handler(void *data)
 {
-	mvisor_exit_from_guest((struct vcpu *)data);
+	exit_from_guest((struct vcpu *)data);
 
 	/*
 	 * keep irq disabled in EL2

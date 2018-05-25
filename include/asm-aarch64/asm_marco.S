@@ -1,5 +1,5 @@
-#ifndef _MVISOR_ASM_MARCO_H_
-#define _MVISOR_ASM_MARCO_H_
+#ifndef _MINOS_ASM_MARCO_H_
+#define _MINOS_ASM_MARCO_H_
 
 	.macro func _name, align=2
 	.cfi_sections .debug_frame

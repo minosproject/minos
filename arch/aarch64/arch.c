@@ -1,7 +1,7 @@
 #include <asm/aarch64_common.h>
 #include <asm/aarch64_helper.h>
-#include <mvisor/vcpu.h>
-#include <mvisor/module.h>
+#include <virt/vcpu.h>
+#include <virt/vmodule.h>
 #include <asm/arch.h>
 
 extern int el2_stage2_init(void);
@@ -15,7 +15,7 @@ int arch_early_init(void)
 	return 0;
 }
 
-int arch_init(void)
+int __arch_init(void)
 {
 	return 0;
 }
@@ -23,6 +23,7 @@ int arch_init(void)
 struct aarch64_system_context {
 	uint64_t vbar_el1;
 	uint64_t esr_el1;
+	uint64_t sp_el1;
 	uint64_t vmpidr;
 	uint64_t sctlr_el1;
 	uint64_t hcr_el2;
@@ -85,16 +86,16 @@ static void aarch64_system_state_restore(struct vcpu *vcpu, void *c)
 	write_sysreg(context->hcr_el2, HCR_EL2);
 }
 
-static int aarch64_system_init(struct mvisor_module *module)
+static int aarch64_system_init(struct vmodule *vmodule)
 {
-	module->context_size = sizeof(struct aarch64_system_context);
-	module->pdata = NULL;
-	module->state_init = aarch64_system_state_init;
-	module->state_save = aarch64_system_state_save;
-	module->state_restore = aarch64_system_state_restore;
+	vmodule->context_size = sizeof(struct aarch64_system_context);
+	vmodule->pdata = NULL;
+	vmodule->state_init = aarch64_system_state_init;
+	vmodule->state_save = aarch64_system_state_save;
+	vmodule->state_restore = aarch64_system_state_restore;
 
 	return 0;
 }
 
-MVISOR_MODULE_DECLARE(aarch64_system,
+MINOS_MODULE_DECLARE(aarch64_system,
 	"aarch64-system", (void *)aarch64_system_init);

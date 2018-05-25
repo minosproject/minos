@@ -56,59 +56,67 @@ SECTIONS
 
 	. = ALIGN(8);
 
-	__mvisor_module_start = .;
-	.__mvisor_module : {
-		*(.__mvisor_module)
+	__vmodule_start = .;
+	.__vmodule : {
+		*(.__vmodule)
 	}
-	__mvisor_module_end = .;
+	__vmodule_end = .;
 
 	. = ALIGN(8);
 
-	__mvisor_irqchip_start = .;
-	.__mvisor_irqchip : {
-		*(.__mvisor_irqchip)
+	__irqchip_start = .;
+	.__irqchip : {
+		*(.__irqchip)
 	}
-	__mvisor_irqchip_end = .;
+	__irqchip_end = .;
 
 	. = ALIGN(8);
 
-	__mvisor_mmuchip_start = .;
-	.__mvisor_mmuchip : {
-		*(.__mvisor_mmuchip)
+	__mmuchip_start = .;
+	.__mmuchip : {
+		*(.__mmuchip)
 	}
-	__mvisor_mmuchip_end = .;
+	__mmuchip_end = .;
 
 	. = ALIGN(8);
 
-	__mvisor_vm_start = .;
-	.__mvisor_vm : {
-		*(.__mvisor_vm)
+	__vm_start = .;
+	.__vm : {
+		*(.__vm)
 	}
-	__mvisor_vm_end = .;
+	__vm_end = .;
 
 	. = ALIGN(8);
 
-	__mvisor_serror_desc_start = .;
-	.__mvisor_serror_desc : {
-		*(.__mvisor_serror_desc)
+	__serror_desc_start = .;
+	.__serror_desc : {
+		*(.__serror_desc)
 	}
-	__mvisor_serror_desc_end = .;
+	__serror_desc_end = .;
 
 	. = ALIGN(8);
 
-	__mvisor_smc_handler_start = .;
-	.__mvisor_smc_handler : {
-		*(.__mvisor_smc_handler)
+	__smc_handler_start = .;
+	.__smc_handler : {
+		*(.__smc_handler)
 	}
-	__mvisor_smc_handler_end = .;
+	__smc_handler_end = .;
 
 	. = ALIGN(8);
 
-	__mvisor_hvc_handler_start = .;
-	.__mvisor_jvc_handler : {
-		*(.__mvisor_hvc_handler)
+	__hvc_handler_start = .;
+	.__hvc_handler : {
+		*(.__hvc_handler)
 	}
-	__mvisor_hvc_handler_end = .;
+	__hvc_handler_end = .;
+
+	. = ALIGN(8);
+
+	__static_task_info_start = .;
+	.__static_task_info : {
+		*(.__static_task_info)
+	}
+	__static_task_info_end = .;
 
 	. = ALIGN(8);
 
@@ -178,11 +186,11 @@ SECTIONS
 	__init_end = .;
 
 	. = ALIGN(16);
-	__mvisor_config_data = .;
-	.__mvisor_config : {
-		*(.__mvisor_config)
+	__config_data_start = .;
+	.__config : {
+		*(.__config)
 	}
-	__mvisor_config_data_end = .;
+	__config_data_end = .;
 	. = ALIGN(16);
 
 	.el2_stack (NOLOAD): {

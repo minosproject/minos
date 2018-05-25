@@ -137,9 +137,9 @@ el2_entry_aarch64:
 	bl	memset
 
 	mov	x0, x22
-	ldr	x1, = CONFIG_MVISOR_START_ADDRESS
-	ldr	x2, = CONFIG_MVISOR_START_ADDRESS
-	ldr	x3, = CONFIG_MVISOR_RAM_SIZE
+	ldr	x1, = CONFIG_MINOS_START_ADDRESS
+	ldr	x2, = CONFIG_MINOS_START_ADDRESS
+	ldr	x3, = CONFIG_MINOS_RAM_SIZE
 
 	/* set up the level 1 page table assume
 	 the code size is less than 1G */
@@ -148,7 +148,7 @@ el2_entry_aarch64:
 	str	x4, [x21, x23, lsl #3]
 
 	/* set up the level 2 page table */
-	bl	map_mvisor_memory
+	bl	map_memory
 	dsb	ish
 
 	/* enable the mmu and disable the aligment check */
@@ -219,7 +219,7 @@ wait_loop:
 	   x1 - the virtual address
 	   x2 - the physical address
 	   x3 - the size */
-map_mvisor_memory:
+map_memory:
 	/* check aligment */
 	ldr	x4, =0xffffffffffe00000
 	and	x1, x1, x4
@@ -228,7 +228,7 @@ map_mvisor_memory:
 	add	x3, x3, x7
 	and	x3, x3, x4
 
-	/* 1G region, assume all the mvisor memory
+	/* 1G region, assume all the minos memory
 	   are in the same 1G region, other CASE
 	   TBD and get the index in the page table */
 	and	x5, x1, #0x3fffffff

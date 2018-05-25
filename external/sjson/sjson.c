@@ -19,8 +19,8 @@
  *
  */
 
-#include <mvisor/types.h>
-#include <mvisor/string.h>
+#include <minos/types.h>
+#include <minos/string.h>
 #include <sjson/sjson.h>
 
 #define _FABS(d)	((double)(d)>0.0 ? (double)(d) : (double)-(d))

@@ -1,5 +1,5 @@
-#ifndef _MVISOR_AARCH64_TYPES_H_
-#define _MVISOR_AARCH64_TYPES_H_
+#ifndef _MINOS_AARCH64_TYPES_H_
+#define _MINOS_AARCH64_TYPES_H_
 
 typedef unsigned long		__u64;
 typedef unsigned int		__u32;

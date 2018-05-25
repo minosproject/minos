@@ -1,7 +1,7 @@
-#ifndef _MVISOR_ASM_VTIMER_H_
-#define _MVISOR_ASM_VTIMER_H_
+#ifndef _MINOS_ASM_VTIMER_H_
+#define _MINOS_ASM_VTIMER_H_
 
-#include <mvisor/timer.h>
+#include <minos/timer.h>
 
 struct vcpu;
 
@@ -37,8 +37,8 @@ struct vtimer_context {
 	unsigned long offset;
 };
 
-extern int vtimer_module_id;
+extern int vtimer_vmodule_id;
 
-int vtimer_sysreg_simulation(vcpu_regs *reg, uint32_t esr_value);
+int vtimer_sysreg_simulation(gp_regs *reg, uint32_t esr_value);
 
 #endif

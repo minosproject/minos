@@ -1,20 +1,20 @@
-#include <mvisor/types.h>
-#include <mvisor/io.h>
-#include <mvisor/percpu.h>
-#include <mvisor/spinlock.h>
-#include <mvisor/print.h>
+#include <minos/types.h>
+#include <minos/io.h>
+#include <minos/percpu.h>
+#include <minos/spinlock.h>
+#include <minos/print.h>
 #include <asm/gicv3.h>
-#include <mvisor/errno.h>
-#include <mvisor/module.h>
-#include <mvisor/vcpu.h>
-#include <mvisor/panic.h>
+#include <minos/errno.h>
+#include <virt/vmodule.h>
+#include <virt/vcpu.h>
+#include <minos/panic.h>
 #include <asm/arch.h>
-#include <mvisor/cpumask.h>
+#include <minos/cpumask.h>
 
 spinlock_t gicv3_lock;
 static void *gicd_base = (void *)0x2f000000;
 static void * __gicr_rd_base = (void *)0x2f100000;
-static int gicv3_module_id = 0xffff;
+static int gicv3_vmodule_id = 0xffff;
 
 static int gicv3_nr_lr = 0;
 static int gicv3_nr_pr = 0;
@@ -730,18 +730,18 @@ static struct irq_chip gicv3_chip = {
 	.secondary_init		= gicv3_secondary_init,
 };
 
-static int gicv3_module_init(struct mvisor_module *module)
+static int gicv3_vmodule_init(struct vmodule *vmodule)
 {
-	module->context_size = sizeof(struct gic_context);
-	module->pdata = NULL;
-	module->state_init = gicv3_state_init;
-	module->state_save = gicv3_state_save;
-	module->state_restore = gicv3_state_restore;
+	vmodule->context_size = sizeof(struct gic_context);
+	vmodule->pdata = NULL;
+	vmodule->state_init = gicv3_state_init;
+	vmodule->state_save = gicv3_state_save;
+	vmodule->state_restore = gicv3_state_restore;
 
-	gicv3_module_id = module->id;
+	gicv3_vmodule_id = vmodule->id;
 
 	return 0;
 }
 
-MVISOR_MODULE_DECLARE(gicv3, "gicv3-module", (void *)gicv3_module_init);
+MINOS_MODULE_DECLARE(gicv3, "gicv3-vmodule", (void *)gicv3_vmodule_init);
 IRQCHIP_DECLARE(gicv3_chip, "gicv3", (void *)&gicv3_chip);

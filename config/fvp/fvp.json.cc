@@ -38,6 +38,6 @@
 	#include "fvp_mem.json.cc"
 
 	"others" : {
-		"comments": "mvisor config json data"
+		"comments": "minos config json data"
 	}
 }

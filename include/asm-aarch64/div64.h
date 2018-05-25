@@ -17,7 +17,7 @@
  *       beware of side effects!
  */
 
-#include <mvisor/types.h>
+#include <minos/types.h>
 
 #if BITS_PER_LONG == 64
 

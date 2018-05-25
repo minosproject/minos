@@ -1,5 +1,5 @@
-#ifndef _MVISOR_ASM_TIME_H_
-#define _MVISOR_ASM_TIME_H_
+#ifndef _MINOS_ASM_TIME_H_
+#define _MINOS_ASM_TIME_H_
 
 #define HYP_TIMER_INT			(26)
 #define VIRT_TIMER_INT			(27)

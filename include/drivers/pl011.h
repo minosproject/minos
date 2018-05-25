@@ -1,5 +1,5 @@
-#ifndef _MVISOR_ARM_FVP_UART_H_
-#define _MVISOR_ARM_FVP_UART_H_
+#ifndef _MINOS_ARM_FVP_UART_H_
+#define _MINOS_ARM_FVP_UART_H_
 
 #define UARTDR		0x0
 #define UARTECR		0x4

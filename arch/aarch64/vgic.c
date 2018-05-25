@@ -1,17 +1,17 @@
-#include <mvisor/mvisor.h>
+#include <minos/minos.h>
 #include <asm/arch.h>
-#include <mvisor/module.h>
-#include <mvisor/mmio.h>
-#include <mvisor/irq.h>
+#include <virt/vmodule.h>
+#include <minos/mmio.h>
+#include <minos/irq.h>
 #include <asm/gicv3.h>
-#include <mvisor/io.h>
-#include <mvisor/module.h>
-#include <mvisor/cpumask.h>
-#include <mvisor/irq.h>
+#include <minos/io.h>
+#include <virt/vmodule.h>
+#include <minos/cpumask.h>
+#include <minos/irq.h>
 #include <asm/vgic.h>
 
 static struct list_head gicd_list;
-static int vgic_module_id = INVAILD_MODULE_ID;
+static int vgic_vmodule_id = INVAILD_MODULE_ID;
 
 static struct vgic_gicd *attach_vgicd(uint32_t vmid)
 {
@@ -70,7 +70,7 @@ void vgic_send_sgi(struct vcpu *vcpu, unsigned long sgi_value)
 	for_each_cpu(bit, &cpumask) {
 		target = get_vcpu_in_vm(vm, bit);
 		gicr = (struct vgic_gicr *)
-			get_module_data_by_id(target, vgic_module_id);
+			get_vmodule_data_by_id(target, vgic_vmodule_id);
 		spin_lock(&gicr->gicr_lock);
 		gicr->gicr_ispender |= (1 << sgi);
 		spin_unlock(&gicr->gicr_lock);
@@ -132,7 +132,7 @@ static void vgic_vm_create(struct vm *vm)
 	 * one vgic for each vm since gicr is percpu
 	 * but gicd is shared so created it here
 	 */
-	gicd = (struct vgic_gicd*)mvisor_malloc(sizeof(struct vgic_gicd));
+	gicd = (struct vgic_gicd*)malloc(sizeof(struct vgic_gicd));
 	if (!gicd)
 		panic("No more memory for gicd\n");
 
@@ -350,7 +350,7 @@ static int vgic_check_gicr_access(struct vcpu *vcpu, struct vgic_gicr *gicr,
 	return 1;
 }
 
-static int vgic_mmio_handler(vcpu_regs *regs, int read,
+static int vgic_mmio_handler(gp_regs *regs, int read,
 		unsigned long address, unsigned long *value)
 {
 	int type = GIC_TYPE_INVAILD;
@@ -360,7 +360,7 @@ static int vgic_mmio_handler(vcpu_regs *regs, int read,
 	struct vcpu *vcpu = (struct vcpu *)regs;
 
 	gicr = (struct vgic_gicr *)
-		get_module_data_by_id(vcpu, vgic_module_id);
+		get_vmodule_data_by_id(vcpu, vgic_vmodule_id);
 	gicd = gicr->gicd;
 
 	if ((address >= gicd->base) && (address < gicd->end)) {
@@ -409,19 +409,19 @@ out:
 	return 0;
 }
 
-static int vgic_mmio_read(vcpu_regs *regs,
+static int vgic_mmio_read(gp_regs *regs,
 		unsigned long address, unsigned long *read_value)
 {
 	return vgic_mmio_handler(regs, 1, address, read_value);
 }
 
-static int vgic_mmio_write(vcpu_regs *regs,
+static int vgic_mmio_write(gp_regs *regs,
 		unsigned long address, unsigned long *write_value)
 {
 	return vgic_mmio_handler(regs, 0, address, write_value);
 }
 
-static int vgic_mmio_check(vcpu_regs *regs, unsigned long address)
+static int vgic_mmio_check(gp_regs *regs, unsigned long address)
 {
 	if ((address >= 0x2f000000) && (address < 0x2f2000000))
 		return 1;
@@ -435,21 +435,21 @@ static struct mmio_ops vgic_mmio_ops = {
 	.check = vgic_mmio_check,
 };
 
-static int vgic_module_init(struct mvisor_module *module)
+static int vgic_vmodule_init(struct vmodule *vmodule)
 {
 	init_list(&gicd_list);
 
-	module->context_size = sizeof(struct vgic_gicr);
-	module->pdata = NULL;
-	module->state_init = vgic_state_init;
-	module->state_save = vgic_state_save;
-	module->state_restore = vgic_state_restore;
-	module->create_vm = vgic_vm_create;
-	vgic_module_id = module->id;
+	vmodule->context_size = sizeof(struct vgic_gicr);
+	vmodule->pdata = NULL;
+	vmodule->state_init = vgic_state_init;
+	vmodule->state_save = vgic_state_save;
+	vmodule->state_restore = vgic_state_restore;
+	vmodule->create_vm = vgic_vm_create;
+	vgic_vmodule_id = vmodule->id;
 
 	register_mmio_emulation_handler("vgic", &vgic_mmio_ops);
 
 	return 0;
 }
 
-MVISOR_MODULE_DECLARE(vgic, "vgic", (void *)vgic_module_init);
+MINOS_MODULE_DECLARE(vgic, "vgic", (void *)vgic_vmodule_init);

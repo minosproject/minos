@@ -1,5 +1,5 @@
-#ifndef _MVISOR_GICV3_H_
-#define _MVISOR_GICV3_H_
+#ifndef _MINOS_GICV3_H_
+#define _MINOS_GICV3_H_
 
 #include <asm/gic_reg.h>
 

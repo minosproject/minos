@@ -55,7 +55,7 @@
 
 #include "libfdt_internal.h"
 
-#include <mvisor/string.h>
+#include <minos/string.h>
 
 static int _fdt_nodename_eq(const void *fdt, int offset,
 			    const char *s, int len)

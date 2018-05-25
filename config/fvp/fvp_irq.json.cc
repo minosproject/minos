@@ -7,7 +7,7 @@
 		"vmid": 0,
 		"affinity": 0,
 		"type": 8,
-		"name": "mvisor resched"
+		"name": "minos resched"
 	},
 	{
 		"vno": 22,

@@ -1,9 +1,10 @@
-#include <mvisor/mvisor.h>
+#include <minos/minos.h>
 #include <asm/svccc.h>
-#include <mvisor/sched.h>
-#include <mvisor/psci.h>
+#include <minos/sched.h>
+#include <minos/psci.h>
+#include <virt/virt.h>
 
-static int fvp_std_smc_handler(vcpu_regs *c,
+static int fvp_std_smc_handler(gp_regs *c,
 		uint32_t id, uint64_t *args)
 {
 	int ret;

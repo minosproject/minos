@@ -6,18 +6,18 @@ OBJ_COPY	:= $(CROSS_COMPILE)objcopy
 OBJ_DUMP 	:= $(CROSS_COMPILE)objdump
 
 PLATFORM	:= fvp
-TARGET		:= mvisor
+TARGET		:= minos
 
 QUIET ?= @
 
 include build/$(PLATFORM).mk
 
-src_dir-y			+= mvisor arch/$(ARCH) platform/$(PLATFORM)
+src_dir-y			+= minos virt arch/$(ARCH) platform/$(PLATFORM)
 src_dir-$(CONFIG_UART_PL011)	+= drivers/pl011
 src_dir-$(CONFIG_LIBFDT)	+= external/libfdt
 src_dir-$(CONFIG_JSON_SJSON)	+= external/sjson
 
-inc_dir-y			+= include/mvisor include/asm include/config config/$(PLATFORM)
+inc_dir-y			+= include/minos include/virt include/asm include/config config/$(PLATFORM)
 inc_dir-$(CONFIG_LIBFDT)	+= include/libfdt
 inc_dir-$(CONFIG_JSON_SJSON)	+= include/sjson
 
@@ -35,7 +35,7 @@ OUT		:= out
 TARGET_ELF	:= $(OUT)/$(TARGET).elf
 TARGET_BIN	:= $(OUT)/$(TARGET).bin
 TARGET_LDS	:= $(OUT)/$(ARCH).lds
-TARGET_DUMP	:= $(OUT)/mvisor.s
+TARGET_DUMP	:= $(OUT)/minos.s
 
 INCLUDE_DIR 	:= $(inc_dir-y)
 CCFLAG 		:= -Wall --static -nostdlib -fno-builtin -g \

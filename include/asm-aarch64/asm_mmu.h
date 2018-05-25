@@ -4,8 +4,8 @@
 // Copyright(c) 2012-2016 ARM Ltd.  All Rights Reserved
 //
 
-#ifndef _MVISOR_AARCH64_MMU_H_
-#define _MVISOR_AARCH64_MMU_H_
+#ifndef _MINOS_AARCH64_MMU_H_
+#define _MINOS_AARCH64_MMU_H_
 
 //
 // Translation Control Register fields

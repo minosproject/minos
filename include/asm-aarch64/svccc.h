@@ -1,7 +1,7 @@
-#ifndef _MVISOR_ASM_SVCCC_H_
-#define _MVISOR_ASM_SVCCC_H_
+#ifndef _MINOS_ASM_SVCCC_H_
+#define _MINOS_ASM_SVCCC_H_
 
-#include <asm/asm_vcpu.h>
+#include <asm/arch.h>
 
 #define SVC_CTYPE_MASK			(0x80000000)
 #define SVC_BTYPE_MASK			(0x40000000)
@@ -62,7 +62,7 @@
 	return r;			\
 }
 
-typedef int (*svc_handler_t)(vcpu_regs *c, uint32_t id, uint64_t *args);
+typedef int (*svc_handler_t)(gp_regs *c, uint32_t id, uint64_t *args);
 
 struct svc_desc {
 	char *name;
@@ -73,7 +73,7 @@ struct svc_desc {
 
 #define DEFINE_SMC_HANDLER(n, start, end, h)	\
 	static struct svc_desc __smc_##handler __used \
-	__section(".__mvisor_smc_handler") = {	\
+	__section(".__smc_handler") = {	\
 		.name = n,	\
 		.type_start = start, \
 		.type_end = end, \
@@ -82,23 +82,23 @@ struct svc_desc {
 
 #define DEFINE_HVC_HANDLER(n, start, end, h)	\
 	static struct svc_desc __hvc_##handler __used \
-	__section(".__mvisor_hvc_handler") = {	\
+	__section(".__hvc_handler") = {	\
 		.name = n,	\
 		.type_start = start, \
 		.type_end = end, \
 		.handler = h, \
 	}
 
-int do_svc_handler(vcpu_regs *regs, uint32_t svc_id,
+int do_svc_handler(gp_regs *regs, uint32_t svc_id,
 		uint64_t *args, int smc);
 
-static int inline do_smc_handler(vcpu_regs *regs,
+static int inline do_smc_handler(gp_regs *regs,
 		uint32_t svc_id, uint64_t *args)
 {
 	return do_svc_handler(regs, svc_id, args, 1);
 }
 
-static int inline do_hvc_handler(vcpu_regs *regs,
+static int inline do_hvc_handler(gp_regs *regs,
 		uint32_t svc_id, uint64_t *args)
 {
 	return do_svc_handler(regs, svc_id, args, 0);
