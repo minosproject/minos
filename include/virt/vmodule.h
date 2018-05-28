@@ -31,7 +31,6 @@ void *get_vmodule_data(unsigned long s, unsigned long e,
 		int (*check)(struct module_id *vmodule));
 
 int vcpu_vmodules_init(struct vcpu *vcpu);
-void *get_vmodule_pdata(char *name, char *type);
 void *get_vmodule_data_by_name(struct vcpu *vcpu, char *name);
 void *get_vmodule_data_by_id(struct vcpu *vcpu, int id);
 void save_vcpu_vmodule_state(struct vcpu *vcpu);

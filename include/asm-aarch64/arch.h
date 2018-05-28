@@ -5,6 +5,9 @@
 #include <asm/aarch64_helper.h>
 
 typedef struct aarch64_regs {
+	uint64_t elr_elx;
+	uint64_t spsr_elx;
+	uint64_t esr_elx;
 	uint64_t x0;
 	uint64_t x1;
 	uint64_t x2;
@@ -35,13 +38,37 @@ typedef struct aarch64_regs {
 	uint64_t x27;
 	uint64_t x28;
 	uint64_t x29;
-	uint64_t x30_lr;
-	uint64_t sp_elx;
-	uint64_t elr_elx;
-	uint64_t spsr_elx;
-	uint64_t nzcv;
-	uint64_t esr_elx;
+	uint64_t lr;
 } gp_regs __align(sizeof(uint64_t));
+
+#define NR_LOCAL_IRQS	(32)
+#define SPI_OFFSET(n)	(n - NR_LOCAL_IRQS);
+#define LOCAL_OFFSET(n) (n)
+
+#define arch_disable_local_irq()	write_daifset(2)
+#define arch_enable_local_irq() 	write_daifclr(2)
+
+static inline unsigned long arch_save_irqflags(void)
+{
+	return	read_daif();
+}
+
+static inline void arch_restore_irqflags(unsigned long flags)
+{
+	write_daif(flags);
+}
+
+#define local_irq_save(flag) \
+	do { \
+		flag = arch_save_irqflags(); \
+		arch_disable_local_irq(); \
+	} while (0)
+
+#define local_irq_restore(flag) \
+	do { \
+		arch_restore_irqflags(flag); \
+	} while (0)
+
 
 #define stack_to_gp_regs(base) \
 	(gp_regs *)(base - sizeof(gp_regs))

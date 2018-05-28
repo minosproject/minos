@@ -3,9 +3,32 @@
 #include <virt/vcpu.h>
 #include <virt/vmodule.h>
 #include <asm/arch.h>
+#include <minos/task.h>
 
 extern int el2_stage2_init(void);
 extern int el2_stage1_init(void);
+
+void arch_init_task(struct task *task, void *entry)
+{
+	gp_regs *regs;
+
+	regs = stack_to_gp_regs(task->stack_base);
+	memset((char *)regs, 0, sizeof(gp_regs));
+
+	regs->elr_elx = (uint64_t)entry;
+
+	if (task->task_type == TASK_TYPE_VCPU) {
+		regs->spsr_elx = AARCH64_SPSR_EL1h | AARCH64_SPSR_F | \
+				 AARCH64_SPSR_I | AARCH64_SPSR_A;
+
+	} else {
+		regs->spsr_elx = AARCH64_SPSR_EL2h | AARCH64_SPSR_F | \
+				 AARCH64_SPSR_I | AARCH64_SPSR_A;
+
+	}
+
+	task->stack_base -= sizeof(gp_regs);
+}
 
 int arch_early_init(void)
 {
@@ -60,6 +83,7 @@ static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
 	context->esr_el1 = 0;
 	context->vmpidr = get_vcpu_id(vcpu);
 	context->sctlr_el1 = 0;
+	context->sp_el1 = 0;
 }
 
 static void aarch64_system_state_save(struct vcpu *vcpu, void *c)
@@ -72,6 +96,7 @@ static void aarch64_system_state_save(struct vcpu *vcpu, void *c)
 	context->vmpidr = read_sysreg(VMPIDR_EL2);
 	context->sctlr_el1 = read_sysreg(SCTLR_EL1);
 	context->hcr_el2 = read_sysreg(HCR_EL2);
+	context->sp_el1 = read_sysreg(SP_EL1);
 }
 
 static void aarch64_system_state_restore(struct vcpu *vcpu, void *c)
@@ -84,6 +109,7 @@ static void aarch64_system_state_restore(struct vcpu *vcpu, void *c)
 	write_sysreg(context->vmpidr, VMPIDR_EL2);
 	write_sysreg(context->sctlr_el1, SCTLR_EL1);
 	write_sysreg(context->hcr_el2, HCR_EL2);
+	write_sysreg(context->sp_el1, SP_EL1);
 }
 
 static int aarch64_system_init(struct vmodule *vmodule)

@@ -1,14 +1,20 @@
 #include <minos/minos.h>
 #include <virt/vmodule.h>
+#include <minos/sched.h>
+#include <minos/arch.h>
 
-void exit_from_guest(struct vcpu *vcpu)
+extern void virqs_init(void);
+
+void exit_from_guest(gp_regs *regs)
 {
-	do_hooks(vcpu, MINOS_HOOK_TYPE_EXIT_FROM_GUEST);
+	do_hooks(current_task, (void *)regs,
+			MINOS_HOOK_TYPE_EXIT_FROM_GUEST);
 }
 
-void enter_to_guest(struct vcpu *vcpu)
+void enter_to_guest(gp_regs *regs)
 {
-	do_hooks(vcpu, MINOS_HOOK_TYPE_ENTER_TO_GUEST);
+	do_hooks(current_task, (void *)regs,
+			MINOS_HOOK_TYPE_ENTER_TO_GUEST);
 }
 
 static inline int is_vcpu_ready(struct vcpu *vcpu)
@@ -58,18 +64,6 @@ void vcpu_idle(struct vcpu *vcpu)
 {
 }
 
-void switch_to_vcpu(struct vcpu *current, struct vcpu *next)
-{
-
-	/*
-	 * if current != next and current != NULL
-	 * then need to save the current cpu context
-	 * to the current vcpu
-	 * restore the next vcpu's context to the real
-	 * hardware
-	 */
-}
-
 #if 0
 
 static int vcpu_need_to_run(struct vcpu *vcpu)
@@ -91,4 +85,5 @@ void hypervisor_init(void)
 {
 	vmodules_init();
 	create_vms();
+	virqs_init();
 }

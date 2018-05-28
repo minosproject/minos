@@ -1,8 +1,11 @@
 #ifndef __MINOS_VIRT_H_
 #define __MINOS_VIRT_H_
 
-void exit_from_guest(struct vcpu *vcpu);
-void enter_to_guest(struct vcpu *vcpu);
+#include <virt/vcpu.h>
+#include <minos/arch.h>
+
+void exit_from_guest(gp_regs *regs);
+void enter_to_guest(gp_regs *regs);
 
 void vcpu_idle(struct vcpu *vcpu);
 void vcpu_online(struct vcpu *vcpu);

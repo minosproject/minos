@@ -10,7 +10,9 @@
 #include <minos/list.h>
 #include <virt/vm.h>
 #include <minos/spinlock.h>
-#include <minos/irq.h>
+#include <minos/task.h>
+#include <minos/cpumask.h>
+#include <virt/virq.h>
 
 #define VCPU_TASK_DEFAULT_STACK_SIZE	(SIZE_4K * 2)
 
@@ -23,7 +25,7 @@ struct vcpu {
 	 * member to record the irq list which the
 	 * vcpu is handling now
 	 */
-	struct irq_struct irq_struct;
+	struct virq_struct virq_struct;
 
 	void **vmodule_context;
 	void *arch_data;
@@ -50,5 +52,10 @@ int create_vms(void);
 void boot_vms(void);
 struct vcpu *get_vcpu_in_vm(struct vm *vm, uint32_t vcpu_id);
 struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id);
+
+static inline int get_vcpu_affinity(struct vcpu *vcpu)
+{
+	return vcpu->task->affinity;
+}
 
 #endif

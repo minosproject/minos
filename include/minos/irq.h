@@ -2,20 +2,16 @@
 #define _MINOS_IRQ_H_
 
 #include <minos/types.h>
-#include <asm/asm_irq.h>
+#include <minos/arch.h>
 #include <minos/device_id.h>
 #include <minos/init.h>
 #include <config/config.h>
 #include <minos/smp.h>
 #include <minos/spinlock.h>
 #include <minos/cpumask.h>
-#include <minos/minos_config.h>
-
-struct vcpu;
-struct irqtag;
 
 #define MAX_IRQ_NAME_SIZE	32
-#define BAD_IRQ			(1024)
+#define BAD_IRQ			(1023)
 
 #define IRQ_FLAG_TYPE_NONE           		(0x00000000)
 #define IRQ_FLAG_TYPE_EDGE_RISING    		(0x00000001)
@@ -34,14 +30,6 @@ struct irqtag;
 #define IRQ_FLAG_STATUS_UNMASKED		(0x00000100)
 #define IRQ_FLAG_STATUS_MASK			(0x00000f00)
 
-#define IRQ_FLAG_OWNER_GUEST			(0x00000000)
-#define IRQ_FLAG_OWNER_MINOS			(0x00001000)
-#define IRQ_FLAG_OWNER_MASK			(0x0000f000)
-
-#define IRQ_FLAG_AFFINITY_VCPU			(0x00010000)
-#define IRQ_FLAG_AFFINITY_PERCPU		(0x00000000)
-#define IRQ_FLAG_AFFINITY_MASK			(0x000f0000)
-
 typedef enum sgi_mode {
 	SGI_TO_LIST = 0,
 	SGI_TO_OTHERS,
@@ -54,40 +42,22 @@ enum irq_type {
 	IRQ_TYPE_SPI,
 	IRQ_TYPE_LPI,
 	IRQ_TYPE_SPECIAL,
-	IRQ_TYPE_BAD,
+	IRQ_TYPE_MAX,
+};
+
+enum irq_domain_type {
+	IRQ_DOMAIN_SGI = 0,
+	IRQ_DOMAIN_SPI,
+	IRQ_DOMAIN_PPI,
+	IRQ_DOMAIN_LPI,
+	IRQ_DOMAIN_SPECIAL,
+	IRQ_DOMAIN_MAX,
 };
 
 struct irq_desc;
+struct virq;
+
 typedef int (*irq_handle_t)(uint32_t irq, void *data);
-
-#define CONFIG_VCPU_MAX_ACTIVE_IRQS	(16)
-
-#define VIRQ_STATE_INACTIVE		(0x0)
-#define VIRQ_STATE_PENDING		(0x1)
-#define VIRQ_STATE_ACTIVE		(0x2)
-#define VIRQ_STATE_ACTIVE_AND_PENDING	(0x3)
-#define VIRQ_STATE_OFFLINE		(0x4)
-
-struct virq {
-	uint32_t h_intno;
-	uint32_t v_intno;
-	int hw;
-	int state;
-	int id;
-	struct list_head list;
-};
-
-struct irq_struct {
-	uint32_t active_count;
-	uint32_t pending_count;
-	spinlock_t lock;
-	struct list_head pending_list;
-	DECLARE_BITMAP(irq_bitmap, CONFIG_VCPU_MAX_ACTIVE_IRQS);
-	struct virq virqs[CONFIG_VCPU_MAX_ACTIVE_IRQS];
-};
-
-#define VIRQ_ACTION_REMOVE	(0x0)
-#define VIRQ_ACTION_ADD		(0x1)
 
 struct irq_chip {
 	uint32_t (*get_pending_irq)(void);
@@ -113,37 +83,26 @@ struct irq_chip {
  */
 struct irq_desc {
 	uint32_t hno;
-	uint32_t vno;
-	uint32_t vmid;
-	uint32_t affinity_vcpu;
-	uint32_t affinity_pcpu;
+	uint32_t affinity;
 	uint32_t flags;
 	spinlock_t lock;
-	char name[MAX_IRQ_NAME_SIZE];
 	unsigned long irq_count;
 	irq_handle_t handler;
 	void *pdata;
-};
-
-enum irq_domain_type {
-	IRQ_DOMAIN_SPI = 0,
-	IRQ_DOMAIN_LOCAL,
-	IRQ_DOMAIN_MAX,
+	char name[MAX_IRQ_NAME_SIZE];
 };
 
 struct irq_domain;
 struct irq_domain_ops {
-	struct irq_desc **(*alloc_irqs)(uint32_t s, uint32_t c);
-	int (*register_irq)(struct irq_domain *domain, struct irqtag *res);
+	struct irq_desc **(*alloc_irqs)(uint32_t s, uint32_t c, int type);
 	struct irq_desc *(*get_irq_desc)(struct irq_domain *d, uint32_t irq);
-	uint32_t (*virq_to_irq)(struct irq_domain *d, uint32_t virq);
-	void (*setup_irqs)(struct irq_domain *d);
 	int (*irq_handler)(struct irq_domain *d, struct irq_desc *irq);
 };
 
 struct irq_domain {
 	uint32_t start;
 	uint32_t count;
+	int type;
 	struct irq_desc **irqs;
 	struct irq_domain_ops *ops;
 };
@@ -153,36 +112,28 @@ struct irq_domain {
 
 int irq_init(void);
 int irq_secondary_init(void);
-int register_irq_entry(struct irqtag *res);
 void setup_irqs(void);
 int do_irq_handler(void);
-int request_irq(uint32_t irq, irq_handle_t handler, void *data);
-void vcpu_irq_struct_init(struct irq_struct *irq_struct);
-int irq_add_spi(uint32_t start, uint32_t cnt);
-int irq_add_local(uint32_t start, uint32_t cnt);
 
-void __virq_enable(uint32_t virq, int enable);
+int request_irq(uint32_t irq, irq_handle_t handler,
+		unsigned long flags,
+		const char *name, void *data);
+
+int irq_alloc_spi(uint32_t start, uint32_t cnt);
+int irq_alloc_sgi(uint32_t start, uint32_t cnt);
+int irq_alloc_ppi(uint32_t start, uint32_t cnt);
+int irq_alloc_lpi(uint32_t start, uint32_t cnt);
+int irq_alloc_special(uint32_t start, uint32_t cnt);
+
 void __irq_enable(uint32_t irq, int enable);
-int send_virq_hw(uint32_t vmid, uint32_t virq, uint32_t hirq);
-int send_virq_to_vm(uint32_t vmid, uint32_t virq);
-int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq);
-void send_vsgi(struct vcpu *sender,
-		uint32_t sgi, cpumask_t *cpumask);
-int vcpu_has_virq_pending(struct vcpu *vcpu);
-int vcpu_has_virq_active(struct vcpu *vcpu);
-int vcpu_has_virq(struct vcpu *vcpu);
-void clear_pending_virq(uint32_t irq);
 void send_sgi(uint32_t sgi, int cpu);
 
-static inline void virq_mask(uint32_t virq)
-{
-	__virq_enable(virq, 0);
-}
+void irq_update_virq(struct virq *virq, int action);
+int irq_get_virq_state(struct virq *virq);
+void irq_send_virq(struct virq *virq);
 
-static inline void virq_unmask(uint32_t virq)
-{
-	__virq_enable(virq, 1);
-}
+void irq_set_affinity(uint32_t irq, int cpu);
+void irq_set_type(uint32_t irq, int type);
 
 static inline void irq_unmask(uint32_t irq)
 {

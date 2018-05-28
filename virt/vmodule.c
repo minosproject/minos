@@ -14,30 +14,6 @@ static int vmodule_class_nr = 0;
 
 typedef int (*vmodule_init_fn)(struct vmodule *);
 
-void *get_vmodule_data(unsigned long s, unsigned long e,
-		int (*check)(struct module_id *vmodule))
-{
-	int i, count;
-	struct module_id *vmodule;
-
-	if (e <= s)
-		return NULL;
-
-	count = (e - s) / sizeof(struct module_id);
-	if (count == 0)
-		return NULL;
-
-	for (i = 0; i < count; i++) {
-		vmodule = (struct module_id *)s;
-		if (check(vmodule))
-			return vmodule->data;
-
-		s += sizeof(struct module_id);
-	}
-
-	return NULL;
-}
-
 int get_vmodule_id(char *type)
 {
 	struct vmodule *vmodule;

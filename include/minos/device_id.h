@@ -12,7 +12,7 @@ struct module_id {
 
 #define MINOS_MODULE_DECLARE(mname, mn, init_fn) \
 	static const struct module_id __used \
-	vmodule_match_##mname __section(.__vmodule) = { \
+	module_match_##mname __section(.__vmodule) = { \
 		.name = mn, \
 		.type = "vmodule", \
 		.data = init_fn, \
@@ -20,7 +20,7 @@ struct module_id {
 
 #define IRQCHIP_DECLARE(mname, mn, irqchip) \
 	static const struct module_id __used \
-	vmodule_match_##mname __section(.__irqchip) = { \
+	module_match_##mname __section(.__irqchip) = { \
 		.name = mn, \
 		.type = "irqchip", \
 		.data = irqchip, \
@@ -28,7 +28,7 @@ struct module_id {
 
 #define MMUCHIP_DECLARE(mname, mn, mmuchip) \
 	static const struct module_id __used \
-	vmodule_match_##mname __section(.__mmuchip) = { \
+	module_match_##mname __section(.__mmuchip) = { \
 		.name = mn, \
 		.type = "mmuchip", \
 		.data = mmuchip, \

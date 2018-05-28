@@ -7,6 +7,7 @@
 #include <minos/timer.h>
 #include <minos/softirq.h>
 #include <minos/time.h>
+#include <minos/arch.h>
 
 DEFINE_PER_CPU(struct timers, timers);
 

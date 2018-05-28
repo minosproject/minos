@@ -7,6 +7,7 @@
 #include <asm/vtimer.h>
 #include <minos/sched.h>
 #include <virt/vmodule.h>
+#include <minos/irq.h>
 
 uint32_t cpu_khz = 0;
 uint64_t boot_tick = 0;
@@ -84,9 +85,14 @@ static int timers_init(void)
 	write_sysreg32(0, CNTHP_CTL_EL2);
 	isb();
 
-	request_irq(HYP_TIMER_INT, timer_interrupt_handler, NULL);
-	request_irq(PHYS_TIMER_NONSEC_INT, timer_interrupt_handler, NULL);
-	request_irq(VIRT_TIMER_INT, vtimer_interrupt_handler, NULL);
+	request_irq(HYP_TIMER_INT, timer_interrupt_handler,
+			0, "hyp timer int", NULL);
+
+	request_irq(PHYS_TIMER_NONSEC_INT, timer_interrupt_handler,
+			0, "nonsec timer int", NULL);
+
+	request_irq(VIRT_TIMER_INT, vtimer_interrupt_handler,
+			0, "virt timer int", NULL);
 
 	return 0;
 }

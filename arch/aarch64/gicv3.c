@@ -10,6 +10,7 @@
 #include <minos/panic.h>
 #include <asm/arch.h>
 #include <minos/cpumask.h>
+#include <minos/irq.h>
 
 spinlock_t gicv3_lock;
 static void *gicd_base = (void *)0x2f000000;
@@ -660,10 +661,11 @@ int gicv3_init(void)
 	nr_lines = 32 * ((type & 0x1f));
 
 	/* alloc LOCAL_IRQS for each cpus */
-	irq_add_local(0, 32);
+	irq_alloc_sgi(0, 16);
+	irq_alloc_ppi(16, 16);
 
 	/* alloc SPI irqs */
-	irq_add_spi(32, nr_lines);
+	irq_alloc_spi(32, nr_lines);
 
 	/* default all golbal IRQS to level, active low */
 	for (i = GICV3_NR_LOCAL_IRQS; i < nr_lines; i += 16)

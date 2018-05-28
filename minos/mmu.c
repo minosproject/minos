@@ -54,7 +54,7 @@ int mmu_init(void)
 	s = (unsigned long)&__mmuchip_start;
 	e = (unsigned long)&__mmuchip_end;
 
-	mmu_chip = (struct mmu_chip *)get_vmodule_data(s, e, check_mmuchip);
+	mmu_chip = (struct mmu_chip *)get_module_pdata(s, e, check_mmuchip);
 	if (!mmu_chip)
 		panic("can not find the mmuchip for system\n");
 

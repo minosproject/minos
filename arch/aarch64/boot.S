@@ -178,8 +178,6 @@ el2_entry_aarch64:
 
 	bl	boot_main
 	nop
-	isb
-	b	return_to_el1
 
 secondary_start_up:
 	dsb	sy
@@ -212,8 +210,6 @@ wait_loop:
 	/* here wait for boot cpu finish tht init work */
 	bl	boot_secondary
 	nop
-	isb
-	b return_to_el1
 
 	/* x0 - level 2 table address
 	   x1 - the virtual address

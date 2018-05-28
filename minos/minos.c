@@ -13,6 +13,7 @@
 #include <minos/sched.h>
 #include <minos/smp.h>
 #include <minos/atomic.h>
+#include <minos/minos_config.h>
 
 extern void softirq_init(void);
 extern void init_timers(void);
@@ -32,7 +33,7 @@ static void hooks_init(void)
 		init_list(&hook_lists[i]);
 }
 
-int register_hook(hook_func_t fn, void *data, enum hook_type type)
+int register_hook(hook_func_t fn, enum hook_type type)
 {
 	struct hook *hook;
 
@@ -47,7 +48,6 @@ int register_hook(hook_func_t fn, void *data, enum hook_type type)
 
 	memset((char *)hook, 0, sizeof(struct hook));
 	hook->fn = fn;
-	hook->data = data;
 	init_list(&hook->list);
 
 	list_add_tail(&hook_lists[type], &hook->list);
@@ -55,24 +55,14 @@ int register_hook(hook_func_t fn, void *data, enum hook_type type)
 	return 0;
 }
 
-int do_hooks(struct vcpu *vcpu, enum hook_type type)
+int do_hooks(struct task *task, void *context, enum hook_type type)
 {
 	struct hook *hook;
 
 	list_for_each_entry(hook, &hook_lists[type], list)
-		hook->fn(vcpu, hook->data);
+		hook->fn(task, context);
 
 	return 0;
-}
-
-static void parse_irqtags(void)
-{
-	int i;
-	size_t size = mv_config->nr_irqtag;
-	struct irqtag *irqtags = mv_config->irqtags;
-
-	for (i = 0; i < size; i++)
-		register_irq_entry(&irqtags[i]);
 }
 
 static void parse_memtags(void)
@@ -88,8 +78,31 @@ static void parse_memtags(void)
 
 void parse_resource(void)
 {
-	parse_irqtags();
 	parse_memtags();
+}
+
+void *get_module_pdata(unsigned long s, unsigned long e,
+		int (*check)(struct module_id *module))
+{
+	int i, count;
+	struct module_id *module;
+
+	if (e <= s)
+		return NULL;
+
+	count = (e - s) / sizeof(struct module_id);
+	if (count == 0)
+		return NULL;
+
+	for (i = 0; i < count; i++) {
+		module = (struct module_id *)s;
+		if (check(module))
+			return module->data;
+
+		s += sizeof(struct module_id);
+	}
+
+	return NULL;
 }
 
 void boot_main(void)

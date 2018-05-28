@@ -3,6 +3,7 @@
 #include <minos/sched.h>
 #include <minos/arch.h>
 #include <virt/virt.h>
+#include <minos/init.h>
 
 static void linux_vcpu_init(struct vcpu *vcpu)
 {

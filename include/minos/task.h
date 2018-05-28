@@ -62,8 +62,9 @@ struct task_info {
 };
 
 #include <virt/vcpu.h>
+#include <minos/arch.h>
 
-#define vcpu_to_gp_regs(vcpu)	(stack_to_gp_regs(vcpu->task->stack_base))
+#define vcpu_to_gp_regs(vcpu)	((gp_regs *)(vcpu->task->stack_base))
 
 #define DEFINE_TASK(n, e, ss, pr, a, pdata, f)	\
 	static const struct task_info __used \
@@ -75,6 +76,8 @@ struct task_info {
 		.p = pdata, \
 		.flags = f, \
 	}
+
+#define task_to_vcpu(task)	((struct vcpu *)task->pdata)
 
 struct task *create_task(char *name, void *entry,
 		uint32_t stack_size, int pr, int affinity,

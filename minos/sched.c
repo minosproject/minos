@@ -54,6 +54,18 @@ void pcpu_resched(int pcpu_id)
 	send_sgi(CONFIG_MINOS_RESCHED_IRQ, pcpu_id);
 }
 
+void switch_to_vcpu(struct task *current, struct task *next)
+{
+
+	/*
+	 * if current != next and current != NULL
+	 * then need to save the current cpu context
+	 * to the current vcpu
+	 * restore the next vcpu's context to the real
+	 * hardware
+	 */
+}
+
 void switch_task_sw(struct task *c, struct task *n)
 {
 
@@ -166,8 +178,8 @@ int sched_init(void)
 	struct timer_list *timer;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	request_irq(CONFIG_MINOS_RESCHED_IRQ,
-			reched_handler, NULL);
+	request_irq(CONFIG_MINOS_RESCHED_IRQ, reched_handler,
+			0, "resched handler", NULL);
 
 	timer = &pcpu->sched_timer;
 	timer->expires = NOW() + MILLISECS(CONFIG_SCHED_INTERVAL);

@@ -405,7 +405,7 @@ void SError_from_el1_handler(gp_regs *data)
 	struct serror_desc *ec;
 	struct vcpu *vcpu = (struct vcpu *)data;
 
-	exit_from_guest(vcpu);
+	exit_from_guest(data);
 
 	if (get_pcpu_id(vcpu) != cpuid)
 		panic("this vcpu is not belont to the pcpu");
@@ -463,6 +463,11 @@ static int aarch64_serror_init(void)
 	}
 
 	return 0;
+}
+
+void serror_c_handler(gp_regs *regs)
+{
+
 }
 
 arch_initcall(aarch64_serror_init);

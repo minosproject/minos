@@ -26,6 +26,15 @@ struct irqtag {
 	char *name;
 };
 
+struct virqtag {
+	uint16_t vno;
+	uint16_t hno;
+	uint8_t type;
+	uint16_t vmid;
+	uint16_t vcpu_id;
+	char *name;
+};
+
 struct memtag {
 	unsigned long mem_base;
 	unsigned long mem_end;

@@ -6,7 +6,7 @@
 #include <virt/vmodule.h>
 #include <minos/mm.h>
 #include <minos/bitmap.h>
-#include <minos/irq.h>
+#include <virt/virq.h>
 #include <minos/minos_config.h>
 #include <minos/os.h>
 #include <minos/task.h>
@@ -120,7 +120,7 @@ struct task *create_vcpu_task(struct vm *vm, uint32_t vcpu_id)
 	vcpu->vm = vm;
 
 	vm->vcpus[vcpu_id] = vcpu;
-	vcpu_irq_struct_init(&vcpu->irq_struct);
+	vcpu_virq_struct_init(&vcpu->virq_struct);
 
 	memset(name, 0, 64);
 	sprintf(name, "%s-vcpu-%d", vm->name, vcpu_id);

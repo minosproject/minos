@@ -7,20 +7,23 @@
 #include <minos/mm.h>
 #include <minos/list.h>
 #include <minos/spinlock.h>
-#include <minos/errno.h>
 #include <minos/panic.h>
 #include <minos/smp.h>
 #include <minos/varlist.h>
 #include <config/config.h>
-#include <virt/vcpu.h>
 #include <minos/errno.h>
+#include <minos/init.h>
+#include <minos/device_id.h>
+#include <minos/minos_config.h>
+
+struct task;
 
 #define BUG_ON(condition)	\
 	if ((condition)) {	\
 		do { ; } while (1); \
 	}
 
-typedef void (*hook_func_t)(struct vcpu *vcpu, void *data);
+typedef void (*hook_func_t)(struct task *task, void *contex);
 
 enum hook_type {
 	MINOS_HOOK_TYPE_EXIT_FROM_GUEST = 0,
@@ -31,14 +34,15 @@ enum hook_type {
 
 struct hook {
 	hook_func_t fn;
-	void *data;
 	struct list_head list;
 };
 
-int do_hooks(struct vcpu *vcpu, enum hook_type type);
+int do_hooks(struct task *task, void *context,
+		enum hook_type type);
 
-int register_hook(hook_func_t fn,
-	void *data, enum hook_type type);
+void *get_module_pdata(unsigned long s, unsigned long e,
+		int (*check)(struct module_id *module));
+int register_hook(hook_func_t fn, enum hook_type type);
 
 extern struct minos_config *mv_config;
 

@@ -2,16 +2,11 @@
 #include <minos/irq.h>
 #include <minos/softirq.h>
 #include <virt/virt.h>
+#include <minos/arch.h>
 
-void IRQ_from_el2_handler(void *data)
+void irq_handler(gp_regs *regs)
 {
-	do_irq_handler();
-	irq_exit();
-}
-
-void IRQ_from_el1_handler(void *data)
-{
-	exit_from_guest((struct vcpu *)data);
+	exit_from_guest(regs);
 
 	/*
 	 * keep irq disabled in EL2
