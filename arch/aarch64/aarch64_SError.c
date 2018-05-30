@@ -405,7 +405,7 @@ void SError_from_el1_handler(gp_regs *data)
 	struct serror_desc *ec;
 	struct vcpu *vcpu = (struct vcpu *)data;
 
-	exit_from_guest(data);
+	exit_from_guest(current_task, data);
 
 	if (get_pcpu_id(vcpu) != cpuid)
 		panic("this vcpu is not belont to the pcpu");

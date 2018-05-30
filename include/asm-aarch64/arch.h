@@ -4,6 +4,8 @@
 #include <minos/types.h>
 #include <asm/aarch64_helper.h>
 
+struct task;
+
 typedef struct aarch64_regs {
 	uint64_t elr_elx;
 	uint64_t spsr_elx;
@@ -149,5 +151,8 @@ static inline void flush_all_tlbis(void)
 		: : : "memory"
 	);
 }
+
+int arch_taken_from_guest(gp_regs *regs);
+void arch_switch_task_sw();
 
 #endif

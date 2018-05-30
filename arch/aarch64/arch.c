@@ -8,6 +8,17 @@
 extern int el2_stage2_init(void);
 extern int el2_stage1_init(void);
 
+int arch_taken_from_guest(gp_regs *regs)
+{
+	uint32_t mode = regs->spsr_elx & 0x0f;
+
+	if ((mode == AARCH64_SPSR_EL1h) ||
+			(mode == AARCH64_SPSR_EL1t))
+		return 1;
+
+	return 0;
+}
+
 void arch_init_task(struct task *task, void *entry)
 {
 	gp_regs *regs;

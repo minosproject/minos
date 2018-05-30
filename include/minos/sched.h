@@ -57,5 +57,6 @@ void pcpu_add_task(int cpu, struct task *task);
 void set_task_ready(struct task *task);
 void sched_task(struct task *task, int reason);
 int sched_init(void);
+void sched_new(void);
 
 #endif

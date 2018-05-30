@@ -5,16 +5,30 @@
 
 extern void virqs_init(void);
 
-void exit_from_guest(gp_regs *regs)
+int taken_from_guest(gp_regs *regs)
 {
-	do_hooks(current_task, (void *)regs,
-			MINOS_HOOK_TYPE_EXIT_FROM_GUEST);
+	return arch_taken_from_guest(regs);
 }
 
-void enter_to_guest(gp_regs *regs)
+void exit_from_guest(struct task *task, gp_regs *regs)
 {
-	do_hooks(current_task, (void *)regs,
-			MINOS_HOOK_TYPE_ENTER_TO_GUEST);
+	do_hooks(task, (void *)regs, MINOS_HOOK_TYPE_EXIT_FROM_GUEST);
+}
+
+void enter_to_guest(struct task *task, gp_regs *regs)
+{
+	do_hooks(task, (void *)regs, MINOS_HOOK_TYPE_ENTER_TO_GUEST);
+}
+
+void save_vcpu_task_state(struct task *task)
+{
+	save_vcpu_vmodule_state(task_to_vcpu(task));
+}
+
+void restore_vcpu_task_state(struct task *task)
+{
+	restore_vcpu_vmodule_state(task_to_vcpu(task));
+	enter_to_guest(task, NULL);
 }
 
 static inline int is_vcpu_ready(struct vcpu *vcpu)
@@ -29,10 +43,12 @@ static inline int detach_ready_vcpu(struct vcpu *vcpu)
 
 void vcpu_online(struct vcpu *vcpu)
 {
+
 }
 
 void vcpu_offline(struct vcpu *vcpu)
 {
+
 }
 
 int vcpu_power_on(struct vcpu *caller, int cpuid,
@@ -51,10 +67,6 @@ int vcpu_power_on(struct vcpu *caller, int cpuid,
 	return 0;
 }
 
-void sched_vcpu(struct vcpu *vcpu, int reason)
-{
-}
-
 int vcpu_can_idle(struct vcpu *vcpu)
 {
 	return 0;
@@ -62,6 +74,7 @@ int vcpu_can_idle(struct vcpu *vcpu)
 
 void vcpu_idle(struct vcpu *vcpu)
 {
+
 }
 
 #if 0

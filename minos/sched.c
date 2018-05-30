@@ -1,16 +1,14 @@
-#include <virt/vcpu.h>
 #include <minos/sched.h>
-#include <virt/vm.h>
 #include <minos/minos.h>
 #include <minos/percpu.h>
 #include <minos/pm.h>
-#include <virt/vmodule.h>
 #include <minos/irq.h>
 #include <minos/list.h>
 #include <minos/timer.h>
 #include <minos/time.h>
 #include <minos/os.h>
 #include <minos/task.h>
+#include <virt/virt.h>
 
 static struct pcpu pcpus[CONFIG_NR_CPUS];
 
@@ -54,26 +52,34 @@ void pcpu_resched(int pcpu_id)
 	send_sgi(CONFIG_MINOS_RESCHED_IRQ, pcpu_id);
 }
 
-void switch_to_vcpu(struct task *current, struct task *next)
+void switch_to_task(struct task *current, struct task *next)
 {
+	if (current->task_type == TASK_TYPE_VCPU)
+		save_vcpu_task_state(current);
 
-	/*
-	 * if current != next and current != NULL
-	 * then need to save the current cpu context
-	 * to the current vcpu
-	 * restore the next vcpu's context to the real
-	 * hardware
-	 */
+	if (next->task_type == TASK_TYPE_VCPU)
+		restore_vcpu_task_state(next);
 }
 
 void switch_task_sw(struct task *c, struct task *n)
 {
-
+	switch_to_task(c, n);
+	arch_switch_task_sw();
 }
 
 void sched_task(struct task *task, int reason)
 {
 
+}
+
+void sched_new(void)
+{
+	unsigned long flags;
+	struct pcpu *pcpu = get_cpu_var(pcpu);
+
+	spin_lock_irqsave(&pcpu->lock, flags);
+	next_task = get_highest_pending_task(pcpu);
+	spin_unlock_irqrestore(&pcpu->lock, flags);
 }
 
 void sched(void)

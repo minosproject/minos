@@ -15,6 +15,7 @@
 #include <minos/init.h>
 #include <minos/device_id.h>
 #include <minos/minos_config.h>
+#include <minos/arch.h>
 
 struct task;
 
@@ -36,6 +37,9 @@ struct hook {
 	hook_func_t fn;
 	struct list_head list;
 };
+
+void irq_enter(gp_regs *regs);
+void irq_exit(gp_regs *regs);
 
 int do_hooks(struct task *task, void *context,
 		enum hook_type type);

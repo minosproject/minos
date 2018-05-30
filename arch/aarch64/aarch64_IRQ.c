@@ -4,13 +4,11 @@
 #include <virt/virt.h>
 #include <minos/arch.h>
 
-void irq_handler(gp_regs *regs)
+void irq_c_handler(gp_regs *regs)
 {
-	exit_from_guest(regs);
+	irq_enter(regs);
 
-	/*
-	 * keep irq disabled in EL2
-	 */
 	do_irq_handler();
-	irq_exit();
+
+	irq_exit(regs);
 }

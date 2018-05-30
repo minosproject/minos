@@ -13,7 +13,9 @@
 #include <minos/sched.h>
 #include <minos/smp.h>
 #include <minos/atomic.h>
+#include <minos/softirq.h>
 #include <minos/minos_config.h>
+#include <virt/virt.h>
 
 extern void softirq_init(void);
 extern void init_timers(void);
@@ -103,6 +105,19 @@ void *get_module_pdata(unsigned long s, unsigned long e,
 	}
 
 	return NULL;
+}
+
+void irq_enter(gp_regs *regs)
+{
+	if (taken_from_guest(regs))
+		exit_from_guest(current_task, regs);
+}
+
+void irq_exit(gp_regs *reg)
+{
+	irq_softirq_exit();
+
+	sched_new();
 }
 
 void boot_main(void)

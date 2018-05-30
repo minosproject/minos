@@ -23,6 +23,6 @@ void open_softirq(int nr, void (*action)(struct softirq_action *));
 void softirq_init(void);
 void raise_softirq_irqoff(unsigned int nr);
 void raise_softirq(unsigned int nr);
-void irq_exit(void);
+void irq_softirq_exit(void);
 
 #endif

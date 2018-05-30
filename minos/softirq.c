@@ -90,7 +90,7 @@ void softirq_init(void)
 	}
 }
 
-void irq_exit(void)
+void irq_softirq_exit(void)
 {
 	if (local_softirq_pending())
 		do_softirq();

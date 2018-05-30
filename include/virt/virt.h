@@ -4,8 +4,13 @@
 #include <virt/vcpu.h>
 #include <minos/arch.h>
 
-void exit_from_guest(gp_regs *regs);
-void enter_to_guest(gp_regs *regs);
+int taken_from_guest(gp_regs *regs);
+
+void exit_from_guest(struct task *task, gp_regs *regs);
+void enter_to_guest(struct task *task, gp_regs *regs);
+
+void save_vcpu_task_state(struct task *task);
+void restore_vcpu_task_state(struct task *task);
 
 void vcpu_idle(struct vcpu *vcpu);
 void vcpu_online(struct vcpu *vcpu);
