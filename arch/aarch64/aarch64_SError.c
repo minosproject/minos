@@ -4,7 +4,7 @@
 #include <minos/minos.h>
 #include <minos/smp.h>
 #include <asm/processer.h>
-#include <minos/mmio.h>
+#include <virt/mmio.h>
 #include <minos/sched.h>
 #include <asm/vgic.h>
 #include <minos/irq.h>

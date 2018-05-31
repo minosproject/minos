@@ -1,7 +1,7 @@
 #include <minos/minos.h>
 #include <asm/arch.h>
 #include <virt/vmodule.h>
-#include <minos/mmio.h>
+#include <virt/mmio.h>
 #include <minos/irq.h>
 #include <asm/gicv3.h>
 #include <minos/io.h>

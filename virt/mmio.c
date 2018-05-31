@@ -1,9 +1,9 @@
 #include <minos/types.h>
-#include <minos/mmio.h>
 #include <minos/errno.h>
 #include <minos/string.h>
+#include <virt/mmio.h>
 
-LIST_HEAD(mmio_handler_list);
+static LIST_HEAD(mmio_handler_list);
 
 int do_mmio_emulation(gp_regs *regs, int write,
 		unsigned long address, unsigned long *value)

@@ -2,7 +2,7 @@
 #include <virt/vmodule.h>
 #include <asm/vtimer.h>
 #include <minos/io.h>
-#include <minos/mmio.h>
+#include <virt/mmio.h>
 #include <asm/processer.h>
 #include <asm/exception.h>
 #include <minos/timer.h>
