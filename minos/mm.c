@@ -6,10 +6,10 @@
 #include <config/config.h>
 #include <minos/spinlock.h>
 #include <minos/minos.h>
-#include <minos/minos_config.h>
 #include <minos/init.h>
 #include <minos/mmu.h>
 #include <virt/vcpu.h>
+#include <virt/virt.h>
 
 extern unsigned char __code_start;
 extern unsigned char __code_end;

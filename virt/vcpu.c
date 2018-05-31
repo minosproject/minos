@@ -1,15 +1,15 @@
 #include <minos/minos.h>
-#include <virt/vm.h>
-#include <virt/vcpu.h>
 #include <minos/sched.h>
 #include <config/config.h>
-#include <virt/vmodule.h>
 #include <minos/mm.h>
 #include <minos/bitmap.h>
-#include <virt/virq.h>
-#include <minos/minos_config.h>
 #include <minos/os.h>
 #include <minos/task.h>
+#include <virt/virt.h>
+#include <virt/vm.h>
+#include <virt/vcpu.h>
+#include <virt/vmodule.h>
+#include <virt/virq.h>
 
 extern unsigned char __vm_start;
 extern unsigned char __vm_end;

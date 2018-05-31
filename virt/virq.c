@@ -1,9 +1,8 @@
 #include <minos/minos.h>
 #include <minos/irq.h>
-#include <virt/virq.h>
 #include <minos/sched.h>
-#include <minos/minos_config.h>
 #include <virt/virq.h>
+#include <virt/virt.h>
 
 enum virq_domain_type {
 	VIRQ_DOMAIN_SGI = 0,

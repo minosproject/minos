@@ -100,7 +100,7 @@ $(OUT)/$(PLATFORM)_config.c : $(OUT)/$(PLATFORM).json
 	$(QUIET) python3 tools/generate_mvconfig.py $< $@
 	@ echo "****** Generate $(PLATFORM)_config.c done ******\n"
 
-$(OUT)/$(PLATFORM).json : config/$(PLATFORM)/$(PLATFORM).json.cc config/$(PLATFORM)/$(PLATFORM)_config.h config/$(PLATFORM)/*.cc
+$(OUT)/$(PLATFORM).json : config/$(PLATFORM)/$(PLATFORM).json.cc config/$(PLATFORM)/$(PLATFORM)_config.h config/$(PLATFORM)/*.cc include/virt/virt.h
 	$(PROGRESS)
 	$(QUIET) $(CC) $(CCFLAG) -E -P config/$(PLATFORM)/$(PLATFORM).json.cc -o $(OUT)/$(PLATFORM).json
 

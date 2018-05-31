@@ -2,8 +2,6 @@
 {
 	"version": "0.0.1",
 	"platform": "armv8-fvp",
-	"mem_base": "0xc0000000",
-	"size": "64MB",
 
 	"vmtags": [{
 			"vmid": 0,
@@ -34,10 +32,10 @@
 		}
 #endif
 	],
-	#include "fvp_irq.json.cc"
+	#include "fvp_virq.json.cc"
 	#include "fvp_mem.json.cc"
 
 	"others" : {
-		"comments": "minos config json data"
+		"comments": "minos virtualization config json data"
 	}
 }

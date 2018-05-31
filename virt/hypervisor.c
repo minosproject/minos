@@ -2,8 +2,12 @@
 #include <virt/vmodule.h>
 #include <minos/sched.h>
 #include <minos/arch.h>
+#include <virt/virt.h>
 
 extern void virqs_init(void);
+
+extern struct virt_config virt_config;
+struct virt_config *mv_config = &virt_config;
 
 int taken_from_guest(gp_regs *regs)
 {
@@ -88,6 +92,22 @@ static void update_sched_info(struct vcpu *vcpu)
 }
 
 #endif
+
+static void parse_memtags(void)
+{
+	int i;
+	size_t size = mv_config->nr_memtag;
+	struct memtag *memtags = mv_config->memtags;
+
+	for (i = 0; i < size; i++)
+		register_memory_region(&memtags[i]);
+
+}
+
+void parse_resource(void)
+{
+	parse_memtags();
+}
 
 int reched_handler(uint32_t irq, void *data)
 {

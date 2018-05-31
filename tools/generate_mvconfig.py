@@ -54,18 +54,19 @@ patten = [
         ]
     },
     {
-        'struct_name': 'irqtag',
-        'member_name': 'irqtags',
+        'struct_name': 'virqtag',
+        'member_name': 'virqtags',
         'type': 'ARRAY',
         'static': True,
-        'json_name': 'irqtags',
+        'json_name': 'virqtags',
         'members': [
             {'name': 'vno', 'type': 'NUM', 'data': None},
             {'name': 'hno', 'type': 'NUM', 'data': None},
             {'name': 'enable', 'type': 'NUM', 'data': None},
-            {'name': 'owner', 'type': 'NUM', 'data': None},
+            {'name': 'hw', 'type': 'NUM', 'data': None},
             {'name': 'vmid', 'type': 'NUM', 'data': None},
-            {'name': 'affinity', 'type': 'NUM', 'data': None},
+            {'name': 'vcpu_id', 'type': 'NUM', 'data': None},
+            {'name': 'type', 'type': 'NUM', 'data': None},
             {'name': 'name', 'type': 'STRING', 'data': None}
         ]
     },
@@ -87,8 +88,8 @@ patten = [
         ]
     },
     {
-        'struct_name': "minos_config",
-        'member_name': "minos_config",
+        'struct_name': "virt_config",
+        'member_name': "virt_config",
         'json_name': None,
         'type': "NORMAL",
         'static': False,
@@ -96,10 +97,10 @@ patten = [
             {'name': 'version', 'type': 'STRING', 'data': None},
             {'name': 'platform', 'type': "STRING", 'data': None},
             {'name': 'vmtags', 'type': "CONFIG", 'data': 0},
-            {'name': 'irqtags', 'type': "CONFIG", 'data': 1},
+            {'name': 'virqtags', 'type': "CONFIG", 'data': 1},
             {'name': "memtags", 'type': "CONFIG", 'data': 2},
             {'name': 'nr_vmtag', 'type': "GET_STRUCT_SIZE", 'data': 0},
-            {'name': 'nr_irqtag', 'type': "GET_STRUCT_SIZE", 'data': 1},
+            {'name': 'nr_virqtag', 'type': "GET_STRUCT_SIZE", 'data': 1},
             {'name': "nr_memtag", 'type': "GET_STRUCT_SIZE", 'data': 2}
         ]
     }
@@ -202,8 +203,8 @@ def parse_struct(struct, jdata):
 
 
 def generate_mvconfig(json_data):
-    content = "#include <minos/minos_config.h>\n"
-    content += "#include <minos/compiler.h>\n\n"
+    content = "#include <minos/compiler.h>\n\n"
+    content += "#include <virt/virt.h>\n"
 
     for struct in patten:
         if struct['json_name']:

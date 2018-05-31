@@ -14,7 +14,6 @@
 #include <minos/errno.h>
 #include <minos/init.h>
 #include <minos/device_id.h>
-#include <minos/minos_config.h>
 #include <minos/arch.h>
 
 struct task;
@@ -48,6 +47,5 @@ void *get_module_pdata(unsigned long s, unsigned long e,
 		int (*check)(struct module_id *module));
 int register_hook(hook_func_t fn, enum hook_type type);
 
-extern struct minos_config *mv_config;
 
 #endif

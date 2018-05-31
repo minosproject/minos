@@ -14,16 +14,12 @@
 #include <minos/smp.h>
 #include <minos/atomic.h>
 #include <minos/softirq.h>
-#include <minos/minos_config.h>
 #include <virt/virt.h>
 
 extern void softirq_init(void);
 extern void init_timers(void);
 extern void hypervisor_init(void);
 extern void cpu_idle_task();
-
-extern struct minos_config minos_config;
-struct minos_config *mv_config = &minos_config;
 
 struct list_head hook_lists[MINOS_HOOK_TYPE_UNKNOWN];
 
@@ -65,22 +61,6 @@ int do_hooks(struct task *task, void *context, enum hook_type type)
 		hook->fn(task, context);
 
 	return 0;
-}
-
-static void parse_memtags(void)
-{
-	int i;
-	size_t size = mv_config->nr_memtag;
-	struct memtag *memtags = mv_config->memtags;
-
-	for (i = 0; i < size; i++)
-		register_memory_region(&memtags[i]);
-
-}
-
-void parse_resource(void)
-{
-	parse_memtags();
 }
 
 void *get_module_pdata(unsigned long s, unsigned long e,
@@ -155,8 +135,6 @@ void boot_main(void)
 	module_init_percpu();
 
 	hypervisor_init();
-
-	parse_resource();
 
 	device_init();
 	device_init_percpu();
