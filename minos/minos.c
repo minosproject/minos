@@ -18,7 +18,7 @@
 
 extern void softirq_init(void);
 extern void init_timers(void);
-extern void hypervisor_init(void);
+extern int virt_init(void);
 extern void cpu_idle_task();
 
 struct list_head hook_lists[MINOS_HOOK_TYPE_UNKNOWN];
@@ -134,7 +134,7 @@ void boot_main(void)
 	module_init();
 	module_init_percpu();
 
-	hypervisor_init();
+	virt_init();
 
 	device_init();
 	device_init_percpu();

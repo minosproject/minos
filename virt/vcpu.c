@@ -53,24 +53,6 @@ static int add_vm(struct vmtag *vme)
 	return 0;
 }
 
-static int parse_all_vms(void)
-{
-	int i;
-	struct vmtag *vmtags = mv_config->vmtags;
-
-	if (mv_config->nr_vmtag == 0) {
-		pr_error("No VM is found\n");
-		return -ENOENT;
-	}
-
-	pr_info("Found %d VMs config\n", mv_config->nr_vmtag);
-
-	for (i = 0; i < mv_config->nr_vmtag; i++)
-		add_vm(&vmtags[i]);
-
-	return 0;
-}
-
 struct vm *get_vm_by_id(uint32_t vmid)
 {
 	int i;
@@ -155,15 +137,10 @@ static void inline vm_vmodules_init(struct vm *vm)
 		vcpu_vmodules_init(vm->vcpus[i]);
 }
 
-int create_vms(void)
+int vms_init(void)
 {
 	int i;
 	struct vm *vm;
-
-	if (parse_all_vms()) {
-		pr_info("No virtual machine found\n");
-		return 0;
-	}
 
 	for_each_vm(vm) {
 		/*
@@ -182,4 +159,28 @@ int create_vms(void)
 	}
 
 	return 0;
+}
+
+int create_vms(void)
+{
+	int i, count = 0;
+	struct vmtag *vmtags = mv_config->vmtags;
+
+	if (mv_config->nr_vmtag == 0) {
+		pr_error("No VM is found\n");
+		return -ENOENT;
+	}
+
+	pr_info("Found %d VMs config\n", mv_config->nr_vmtag);
+
+	for (i = 0; i < mv_config->nr_vmtag; i++) {
+		if (add_vm(&vmtags[i])) {
+			pr_error("Create %d VM:%s failed\n", i, vmtags[i].name);
+			continue;
+		}
+
+		count++;
+	}
+
+	return count;
 }

@@ -5,6 +5,7 @@
 #include <virt/virt.h>
 
 extern void virqs_init(void);
+extern void parse_vm_config(void);
 
 extern struct virt_config virt_config;
 struct virt_config *mv_config = &virt_config;
@@ -81,42 +82,21 @@ void vcpu_idle(struct vcpu *vcpu)
 
 }
 
-#if 0
-
-static int vcpu_need_to_run(struct vcpu *vcpu)
-{
-}
-
-static void update_sched_info(struct vcpu *vcpu)
-{
-}
-
-#endif
-
-static void parse_memtags(void)
-{
-	int i;
-	size_t size = mv_config->nr_memtag;
-	struct memtag *memtags = mv_config->memtags;
-
-	for (i = 0; i < size; i++)
-		register_memory_region(&memtags[i]);
-
-}
-
-void parse_resource(void)
-{
-	parse_memtags();
-}
-
 int reched_handler(uint32_t irq, void *data)
 {
 	return 0;
 }
 
-void hypervisor_init(void)
+int virt_init(void)
 {
 	vmodules_init();
-	create_vms();
+
+	if (create_vms() == 0)
+		return -ENOENT;
+
+	parse_vm_config();
+	vms_init();
 	virqs_init();
+
+	return 0;
 }

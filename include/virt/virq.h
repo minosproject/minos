@@ -6,6 +6,7 @@
 #include <minos/cpumask.h>
 
 struct vcpu;
+struct virqtag;
 
 #define CONFIG_VCPU_MAX_ACTIVE_IRQS	(16)
 
@@ -55,6 +56,7 @@ int vcpu_has_virq_pending(struct vcpu *vcpu);
 int vcpu_has_virq_active(struct vcpu *vcpu);
 int vcpu_has_virq(struct vcpu *vcpu);
 void clear_pending_virq(uint32_t irq);
+int register_virq(struct virqtag *v);
 
 int alloc_virtual_irqs(uint32_t start, uint32_t count, int type);
 
