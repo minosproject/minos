@@ -1,7 +1,6 @@
 #include <minos/minos.h>
 #include <minos/mmu.h>
 #include <minos/mm.h>
-#include <virt/vmodule.h>
 
 static struct mmu_chip *mmu_chip;
 

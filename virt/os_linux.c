@@ -1,8 +1,8 @@
 #include <minos/minos.h>
-#include <minos/os.h>
 #include <minos/sched.h>
 #include <minos/arch.h>
 #include <virt/virt.h>
+#include <virt/os.h>
 #include <minos/init.h>
 
 static void linux_vcpu_init(struct vcpu *vcpu)

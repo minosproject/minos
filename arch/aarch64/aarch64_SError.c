@@ -24,9 +24,7 @@ static int unknown_handler(gp_regs *reg, uint32_t esr_value)
 
 static int wfi_wfe_handler(gp_regs *reg, uint32_t esr_value)
 {
-	struct vcpu *vcpu = (struct vcpu *)reg;
-
-	vcpu_idle(vcpu);
+	vcpu_idle(current_vcpu);
 
 	return 0;
 }
@@ -135,7 +133,7 @@ static int access_system_reg_handler(gp_regs *reg, uint32_t esr_value)
 		pr_debug("access system reg SGI1R_EL1\n");
 		if (!sysreg->read) {
 			reg_value = get_reg_value(reg, regindex);
-			vgic_send_sgi((struct vcpu *)reg, reg_value);
+			vgic_send_sgi(current_vcpu, reg_value);
 		}
 		break;
 
@@ -397,17 +395,17 @@ DEFINE_SERROR_DESC(EC_VCTOR_CATCH, EC_TYPE_AARCH32,
 DEFINE_SERROR_DESC(EC_BRK_INS, EC_TYPE_AARCH64,
 		brk_ins_handler, 1, 4);
 
-void SError_from_el1_handler(gp_regs *data)
+void SError_from_lower_EL_handler(gp_regs *data)
 {
 	int cpuid = get_cpu_id();
 	uint32_t esr_value;
 	int ec_type;
 	struct serror_desc *ec;
-	struct vcpu *vcpu = (struct vcpu *)data;
+	struct vcpu *vcpu = current_vcpu;
 
 	exit_from_guest(current_task, data);
 
-	if (get_pcpu_id(vcpu) != cpuid)
+	if ((!vcpu) || (get_pcpu_id(vcpu) != cpuid))
 		panic("this vcpu is not belont to the pcpu");
 
 	esr_value = data->esr_elx;
@@ -431,7 +429,7 @@ out:
 	local_irq_disable();
 }
 
-void SError_from_el2_handler(gp_regs *data)
+void SError_from_current_EL_handler(gp_regs *data)
 {
 	uint32_t esr_value;
 	uint32_t ec_type;
@@ -440,7 +438,7 @@ void SError_from_el2_handler(gp_regs *data)
 	ec_type = (esr_value & 0xfc000000) >> 26;
 	pr_info("ec_type is %d\n", ec_type);
 
-	while (1);
+	panic("Serror in EL2\n");
 }
 
 static int aarch64_serror_init(void)
@@ -467,7 +465,10 @@ static int aarch64_serror_init(void)
 
 void serror_c_handler(gp_regs *regs)
 {
-
+	if (taken_from_guest(regs))
+		SError_from_lower_EL_handler(regs);
+	else
+		SError_from_current_EL_handler(regs);
 }
 
 arch_initcall(aarch64_serror_init);

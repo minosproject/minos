@@ -1,7 +1,7 @@
 #include <minos/minos.h>
 #include <asm/svccc.h>
 #include <minos/sched.h>
-#include <minos/psci.h>
+#include <asm/psci.h>
 #include <virt/virt.h>
 
 static int fvp_std_smc_handler(gp_regs *c,
@@ -16,7 +16,7 @@ static int fvp_std_smc_handler(gp_regs *c,
 
 	case PSCI_0_2_FN64_CPU_ON:
 	case PSCI_0_2_FN_CPU_ON:
-		ret = vcpu_power_on((struct vcpu *)c, (int)args[0],
+		ret = vcpu_power_on(current_vcpu, (int)args[0],
 					(unsigned long)args[1],
 					(unsigned long)args[2]);
 		if (ret)

@@ -11,9 +11,16 @@ extern int el2_stage1_init(void);
 int arch_taken_from_guest(gp_regs *regs)
 {
 	uint32_t mode = regs->spsr_elx & 0x0f;
+	uint64_t current_el = read_current_el() & 0x0f;
+	uint32_t current_mode;
 
-	if ((mode == AARCH64_SPSR_EL1h) ||
-			(mode == AARCH64_SPSR_EL1t))
+	mode = (mode == AARCH64_SPSR_EL1h) ||
+		(mode == AARCH64_SPSR_EL1t);
+
+	current_mode = (current_el == AARCH64_SPSR_EL2h) ||
+			(current_el == AARCH64_SPSR_EL2t);
+
+	if (mode && current_mode)
 		return 1;
 
 	return 0;

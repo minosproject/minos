@@ -6,7 +6,6 @@
 #include <minos/list.h>
 #include <minos/timer.h>
 #include <minos/time.h>
-#include <minos/os.h>
 #include <minos/task.h>
 #include <virt/virt.h>
 

@@ -7,6 +7,7 @@
 #include <asm/exception.h>
 #include <minos/timer.h>
 #include <minos/irq.h>
+#include <minos/sched.h>
 
 int vtimer_vmodule_id = INVAILD_MODULE_ID;
 
@@ -87,19 +88,20 @@ static void vtimer_state_init(struct vcpu *vcpu, void *context)
 	vtimer->cnt_cval = 0;
 }
 
-static void vtimer_handle_cntp_ctl(struct vcpu *vcpu, int read, int rn)
+static void vtimer_handle_cntp_ctl(gp_regs *regs, int read, int rn)
 {
 	struct vtimer *vtimer;
 	uint32_t value;
+	struct vcpu *vcpu = current_vcpu;
 	struct vtimer_context *c = (struct vtimer_context *)
 		get_vmodule_data_by_id(vcpu, vtimer_vmodule_id);
 
 	vtimer = &c->phy_timer;
 
 	if (read) {
-		set_reg_value((gp_regs *)vcpu, rn, vtimer->cnt_ctl);
+		set_reg_value(regs, rn, vtimer->cnt_ctl);
 	} else {
-		value = (uint32_t)get_reg_value((gp_regs *)vcpu, rn);
+		value = (uint32_t)get_reg_value(regs, rn);
 		value &= ~CNT_CTL_ISTATUS;
 
 		if (value & CNT_CTL_ENABLE)
@@ -114,10 +116,12 @@ static void vtimer_handle_cntp_ctl(struct vcpu *vcpu, int read, int rn)
 	}
 }
 
-static void vtimer_handle_cntp_tval(struct vcpu *vcpu, int read, int rn)
+static void vtimer_handle_cntp_tval(gp_regs *regs, int read, int rn)
 {
 	struct vtimer *vtimer;
 	unsigned long now;
+	unsigned long ticks;
+	struct vcpu *vcpu = current_vcpu;
 	struct vtimer_context *c = (struct vtimer_context *)
 		get_vmodule_data_by_id(vcpu, vtimer_vmodule_id);
 
@@ -125,11 +129,10 @@ static void vtimer_handle_cntp_tval(struct vcpu *vcpu, int read, int rn)
 	now = NOW() - c->offset;
 
 	if (read) {
-		set_reg_value((gp_regs *)vcpu, rn,
-				ns_to_ticks(vtimer->cnt_cval - now) &
-				0xffffffffull);
+		ticks = ns_to_ticks(vtimer->cnt_cval - now) & 0xffffffff;
+		set_reg_value(regs, rn, ticks);
 	} else {
-		unsigned long value = get_reg_value((gp_regs *)vcpu, rn);
+		unsigned long value = get_reg_value(regs, rn);
 
 		vtimer->cnt_cval = now + ticks_to_ns(value);
 		if (vtimer->cnt_ctl & CNT_CTL_ENABLE) {
@@ -139,9 +142,10 @@ static void vtimer_handle_cntp_tval(struct vcpu *vcpu, int read, int rn)
 	}
 }
 
-static void vtimer_handle_cntp_cval(struct vcpu *vcpu, int read, int rn)
+static void vtimer_handle_cntp_cval(gp_regs *regs, int read, int rn)
 {
 	struct vtimer *vtimer;
+	struct vcpu *vcpu = current_vcpu;
 	struct vtimer_context *c = (struct vtimer_context *)
 		get_vmodule_data_by_id(vcpu, vtimer_vmodule_id);
 	uint32_t value;
@@ -149,10 +153,9 @@ static void vtimer_handle_cntp_cval(struct vcpu *vcpu, int read, int rn)
 	vtimer = &c->phy_timer;
 
 	if (read) {
-		set_reg_value((gp_regs *)vcpu, rn,
-			ns_to_ticks(vtimer->cnt_cval));
+		set_reg_value(regs, rn, ns_to_ticks(vtimer->cnt_cval));
 	} else {
-		value = (uint32_t)get_reg_value((gp_regs *)vcpu, rn);
+		value = (uint32_t)get_reg_value(regs, rn);
 		vtimer->cnt_cval = ticks_to_ns(value);
 		if (vtimer->cnt_ctl & CNT_CTL_ENABLE) {
 			vtimer->cnt_ctl &= ~CNT_CTL_ISTATUS;
@@ -163,19 +166,18 @@ static void vtimer_handle_cntp_cval(struct vcpu *vcpu, int read, int rn)
 
 int vtimer_sysreg_simulation(gp_regs *regs, uint32_t esr_value)
 {
-	struct vcpu *vcpu = (struct vcpu *)regs;
 	struct esr_sysreg *sysreg = (struct esr_sysreg *)&esr_value;
 	uint32_t reg = esr_value & ESR_SYSREG_REGS_MASK;
 
 	switch (reg) {
 	case ESR_SYSREG_CNTP_CTL_EL0:
-		vtimer_handle_cntp_ctl(vcpu, sysreg->read, sysreg->reg);
+		vtimer_handle_cntp_ctl(regs, sysreg->read, sysreg->reg);
 		break;
 	case ESR_SYSREG_CNTP_CVAL_EL0:
-		vtimer_handle_cntp_cval(vcpu, sysreg->read, sysreg->reg);
+		vtimer_handle_cntp_cval(regs, sysreg->read, sysreg->reg);
 		break;
 	case ESR_SYSREG_CNTP_TVAL_EL0:
-		vtimer_handle_cntp_tval(vcpu, sysreg->read, sysreg->reg);
+		vtimer_handle_cntp_tval(regs, sysreg->read, sysreg->reg);
 		break;
 	default:
 		break;

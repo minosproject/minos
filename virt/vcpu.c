@@ -3,8 +3,8 @@
 #include <config/config.h>
 #include <minos/mm.h>
 #include <minos/bitmap.h>
-#include <minos/os.h>
 #include <minos/task.h>
+#include <virt/os.h>
 #include <virt/virt.h>
 #include <virt/vm.h>
 #include <virt/vcpu.h>

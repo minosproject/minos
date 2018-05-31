@@ -7,7 +7,6 @@
 #include <minos/irq.h>
 #include <minos/mm.h>
 #include <asm/arch.h>
-#include <virt/vcpu.h>
 #include <minos/pm.h>
 #include <minos/init.h>
 #include <minos/sched.h>
