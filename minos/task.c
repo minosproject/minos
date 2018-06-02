@@ -5,6 +5,18 @@
 #include <minos/sched.h>
 #include <minos/arch.h>
 
+static int get_default_affinity(void)
+{
+	return 0;
+}
+
+static uint64_t alloc_pid(void)
+{
+	static uint64_t minos_pid = 0;
+
+	return minos_pid++;
+}
+
 static struct task *__create_task(char *name,
 		void *stack_base, uint32_t stack_size, int pr,
 		int affinity, void *p, unsigned long flag)
@@ -21,14 +33,11 @@ static struct task *__create_task(char *name,
 
 	task->stack_base = stack_base + stack_size;
 	task->stack_size = stack_size;
-	task->pr = pr;
+	task->pid = alloc_pid();
 	task->affinity = affinity;
-	atomic_set(&task->task_stat, TASK_STAT_IDLE);
-	atomic_set(&task->task_pend_stat, TASK_STAT_PEND_OK);
+	task->state = TASK_STAT_SUSPEND;
+	task->pend_state = 0;
 	task->task_type = TASK_TYPE_NORMAL;
-
-	task->bit_map_x = pr / 8;
-	task->bit_map_y = pr % 8;
 
 	init_list(&task->list);
 
@@ -38,16 +47,6 @@ static struct task *__create_task(char *name,
 	task->pdata = p;
 
 	return task;
-}
-
-static int get_default_affinity(void)
-{
-	return 0;
-}
-
-static int get_default_priority(int affinity)
-{
-	return 0;
 }
 
 struct task *create_task(char *name, void *entry,
@@ -72,9 +71,6 @@ struct task *create_task(char *name, void *entry,
 
 	if ((affinity == -1) || (affinity >= NR_CPUS))
 		affinity = get_default_affinity();
-
-	if (pr == -1)
-		pr = get_default_priority(affinity);
 
 	task = __create_task(name, stack_base,
 			stack_size, pr, affinity, p, flag);

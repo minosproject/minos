@@ -19,6 +19,42 @@ static uint32_t total_vms = 0;
 
 LIST_HEAD(vm_list);
 
+void vcpu_online(struct vcpu *vcpu)
+{
+
+}
+
+void vcpu_offline(struct vcpu *vcpu)
+{
+
+}
+
+int vcpu_power_on(struct vcpu *caller, int cpuid,
+		unsigned long entry, unsigned long unsed)
+{
+
+	/*
+	 * resched the pcpu since it may have in the
+	 * wfi or wfe state, or need to sched the new
+	 * vcpu as soon as possible
+	 *
+	 * vcpu belong the the same vm will not
+	 * at the same pcpu
+	 */
+
+	return 0;
+}
+
+int vcpu_can_idle(struct vcpu *vcpu)
+{
+	return 0;
+}
+
+void vcpu_idle(struct vcpu *vcpu)
+{
+
+}
+
 static int add_vm(struct vmtag *vme)
 {
 	struct vm *vm;

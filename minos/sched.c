@@ -15,25 +15,7 @@ DEFINE_PER_CPU(struct pcpu *, pcpu);
 DEFINE_PER_CPU(struct task *, percpu_current_task);
 DEFINE_PER_CPU(struct task *, percpu_next_task);
 
-uint8_t const uint8_ffs_table[256] = {
-    0u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u,
-    4u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u,
-    5u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u,
-    4u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u,
-    6u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u,
-    4u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u,
-    5u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u,
-    4u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u,
-    7u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u,
-    4u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u,
-    5u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u,
-    4u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u,
-    6u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u,
-    4u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u,
-    5u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u,
-    4u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u
-};
-
+#if 0
 struct task *get_highest_pending_task(struct pcpu *pcpu)
 {
 	unsigned long x, y;
@@ -45,6 +27,7 @@ struct task *get_highest_pending_task(struct pcpu *pcpu)
 
 	return pcpu->task_table[(x << 3) + y];
 }
+#endif
 
 void pcpu_resched(int pcpu_id)
 {
@@ -68,34 +51,31 @@ void switch_task_sw(struct task *c, struct task *n)
 
 void sched_task(struct task *task, int reason)
 {
+	struct pcpu *pcpu = get_cpu_var(pcpu);
 
+	pcpu->sched_class->sched_task(pcpu, task);
 }
 
 void sched_new(void)
 {
-	unsigned long flags;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	spin_lock_irqsave(&pcpu->lock, flags);
-	next_task = get_highest_pending_task(pcpu);
-	spin_unlock_irqrestore(&pcpu->lock, flags);
+	next_task = pcpu->sched_class->sched_new(pcpu);
 }
 
 void sched(void)
 {
 	struct task *task, *current;
-	unsigned long flags;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	spin_lock_irqsave(&pcpu->lock, flags);
-	task = get_highest_pending_task(pcpu);
-	spin_unlock_irqrestore(&pcpu->lock, flags);
+	task = pcpu->sched_class->pick_task(pcpu);
 
 	local_irq_disable();
 
 	current = current_task;
 
 	if (task != current) {
+		pcpu->sched_class->sched(pcpu, current, task);
 		next_task = task;
 		switch_task_sw(current, task);
 	}
@@ -116,8 +96,7 @@ void pcpus_init(void)
 	for (i = 0; i < CONFIG_NR_CPUS; i++) {
 		pcpu = &pcpus[i];
 		pcpu->state = PCPU_STATE_RUNNING;
-		init_list(&pcpu->vcpu_list);
-		init_list(&pcpu->ready_list);
+		init_list(&pcpu->task_list);
 		pcpu->pcpu_id = i;
 
 		/*
@@ -132,45 +111,24 @@ void pcpus_init(void)
 
 void set_task_ready(struct task *task)
 {
-	unsigned long flag;
 	struct pcpu *pcpu = get_per_cpu(pcpu, task->affinity);
 
-	spin_lock_irqsave(&pcpu->lock, flag);
-
 	/* set the task ready to run */
-	atomic_set(&task->task_stat, TASK_STAT_READY);
-	atomic_set(&task->task_pend_stat, TASK_STAT_PEND_OK);
-	pcpu->ready_group |= (1 << task->bit_map_x);
-	pcpu->ready_tbl[task->bit_map_x] |= (1 << task->bit_map_y);
-
-	spin_unlock_irqrestore(&pcpu->lock, flag);
+	pcpu->sched_class->set_task_state(pcpu, task, TASK_STAT_READY);
 }
 
-void pcpu_add_task(int cpu, struct task *task)
+int pcpu_add_task(int cpu, struct task *task)
 {
 	struct pcpu *pcpu;
-	unsigned long flag;
 
 	if (cpu >= NR_CPUS) {
 		pr_error("No such physical cpu:%d\n", cpu);
-		return;
+		return -EINVAL;
 	}
 
 	pcpu = get_per_cpu(pcpu, cpu);
 
-	spin_lock_irqsave(&pcpu->lock, flag);
-	if (pcpu->task_table[task->pr]) {
-		pr_error("pr:%d of this cpu:%d already exist\n", task->pr, cpu);
-		goto out;
-	}
-
-	pcpu->task_table[task->pr] = task;
-	list_add_tail(&pcpu->task_list, &task->list);
-	task->pid = pcpu->pids;
-	pcpu->pids++;
-
-out:
-	spin_unlock_irqrestore(&pcpu->lock, flag);
+	return pcpu->sched_class->add_task(pcpu, task);
 }
 
 static int reched_handler(uint32_t irq, void *data)

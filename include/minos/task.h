@@ -36,19 +36,26 @@ struct task;
 struct task {
 	void *stack_base;
 	uint32_t stack_size;
-	int32_t pr;
-	int pid;
-	uint32_t task_delay;
-	atomic_t task_stat;
-	atomic_t task_pend_stat;
+	uint64_t pid;
+
+	/*
+	 * only the code the run on the cpu
+	 * which the task affinity to can change
+	 * the below state member, so only make sure
+	 * when change below two member the irq is
+	 * off, and do not need to aquire the spinlock
+	 */
+	volatile int state;
+	volatile int pend_state;
+
 	uint32_t affinity;
 	uint8_t task_type;
-	uint8_t bit_map_x;
-	uint8_t bit_map_y;
-	uint8_t res;
+
 	struct list_head list;
 	char name[TASK_NAME_SIZE];
+
 	void *pdata;
+	void *sched_data;
 };
 
 struct task_info {
@@ -78,6 +85,8 @@ struct task_info {
 	}
 
 #define task_to_vcpu(task)	((struct vcpu *)task->pdata)
+
+#define task_to_sched_data(task) task->sched_data
 
 struct task *create_task(char *name, void *entry,
 		uint32_t stack_size, int pr, int affinity,

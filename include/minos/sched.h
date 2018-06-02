@@ -10,6 +10,7 @@
 #include <minos/list.h>
 #include <minos/timer.h>
 #include <minos/task.h>
+#include <minos/sched_class.h>
 
 #define PCPU_AFFINITY_FAIL	(0xffff)
 
@@ -32,31 +33,23 @@ struct pcpu {
 	uint32_t pcpu_id;
 	int need_resched;
 	int state;
-	int pids;
-
 	spinlock_t lock;
 
-	/*
-	 * member to get the highest priority
-	 * 64 * 8 = 512 priority and max on pcpu
-	 * can have max 512 tasks or vcpu
-	 */
-	uint64_t ready_group;
-	uint8_t ready_tbl[64];
-	struct task *task_table[64 * 8];
-	struct list_head task_list;
+	struct sched_class *sched_class;
+	void *sched_data;
 
+	struct list_head task_list;
 	struct timer_list sched_timer;
-	struct list_head vcpu_list;
-	struct list_head ready_list;
 };
 
 void pcpus_init(void);
 void sched(void);
-void pcpu_add_task(int cpu, struct task *task);
+int pcpu_add_task(int cpu, struct task *task);
 void set_task_ready(struct task *task);
 void sched_task(struct task *task, int reason);
 int sched_init(void);
 void sched_new(void);
+
+#define pcpu_to_sched_data(pcpu)	(pcpu->sched_data)
 
 #endif

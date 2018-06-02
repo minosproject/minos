@@ -1,0 +1,140 @@
+#include <minos/minos.h>
+#include <minos/sched_class.h>
+#include <minos/task.h>
+#include <minos/sched.h>
+
+struct fifo_task_data {
+	struct list_head fifo_list;
+	struct task *task;
+};
+
+struct fifo_pcpu_data {
+	struct list_head ready_list;
+	struct list_head sleep_list;
+};
+
+static void fifo_set_task_state(struct pcpu *pcpu,
+		struct task *task, int state)
+{
+	unsigned long flags;
+	struct fifo_task_data *td = task_to_sched_data(task);
+	struct fifo_pcpu_data *pd = pcpu_to_sched_data(pcpu);
+
+	local_irq_save(flags);
+
+	if (state == TASK_STAT_READY) {
+		list_del(&td->fifo_list);
+		list_add_tail(&pd->ready_list, &td->fifo_list);
+	}
+
+	if ((state == TASK_STAT_SUSPEND) ||
+		state == TASK_STAT_IDLE) {
+		list_del(&td->fifo_list);
+		list_add_tail(&pd->sleep_list, &td->fifo_list);
+	}
+
+	task->state = state;
+
+	local_irq_restore(flags);
+}
+
+static struct task *fifo_pick_task(struct pcpu *pcpu)
+{
+	struct fifo_pcpu_data *pd = pcpu_to_sched_data(pcpu);
+	struct fifo_task_data *td;
+
+	td = (struct fifo_task_data *)
+		list_first_entry(&pd->ready_list,
+		struct fifo_task_data, fifo_list);
+
+	return td->task;
+}
+
+static int fifo_add_task(struct pcpu *pcpu, struct task *task)
+{
+	unsigned long flags;
+	struct fifo_task_data *td = task_to_sched_data(task);
+	struct fifo_pcpu_data *pd = pcpu_to_sched_data(pcpu);
+
+	local_irq_save(flags);
+	list_add_tail(&pd->sleep_list, &td->fifo_list);
+	task->state = TASK_STAT_SUSPEND;
+	local_irq_restore(flags);
+
+	return 0;
+}
+
+static int fifo_suspend_task(struct pcpu *pcpu, struct task *task)
+{
+	/* more things TBD */
+	fifo_set_task_state(pcpu, task, TASK_STAT_SUSPEND);
+
+	return 0;
+}
+
+static int fifo_init_pcpu_data(struct pcpu *pcpu)
+{
+	struct fifo_pcpu_data *d;
+
+	d = (struct fifo_pcpu_data *)
+		malloc(sizeof(struct fifo_pcpu_data));
+	if (!d)
+		return -ENOMEM;
+
+	init_list(&d->ready_list);
+	init_list(&d->sleep_list);
+	pcpu->sched_data = d;
+
+	return 0;
+}
+
+static int fifo_init_task_data(struct pcpu *pcpu, struct task *task)
+{
+	struct fifo_task_data *data;
+
+	data = (struct fifo_task_data *)
+		malloc(sizeof(struct fifo_task_data));
+	if (!data)
+		return -ENOMEM;
+
+	init_list(&data->fifo_list);
+	task->sched_data = data;
+
+	return 0;
+}
+
+static void fifo_sched(struct pcpu *pcpu,
+			struct task *c, struct task *n)
+{
+
+}
+
+static void fifo_sched_task(struct pcpu *pcpu, struct task *t)
+{
+
+}
+
+static struct task *fifo_sched_new(struct pcpu *pcpu)
+{
+	return NULL;
+}
+
+static struct sched_class sched_fifo = {
+	.name		= "fifo",
+	.set_task_state = fifo_set_task_state,
+	.pick_task	= fifo_pick_task,
+	.add_task	= fifo_add_task,
+	.suspend_task	= fifo_suspend_task,
+	.init_pcpu_data = fifo_init_pcpu_data,
+	.init_task_data = fifo_init_task_data,
+	.sched		= fifo_sched,
+	.sched_task	= fifo_sched_task,
+	.sched_new	= fifo_sched_new,
+};
+
+static int sched_fifo_init(void)
+{
+	return register_sched_class(&sched_fifo);
+}
+
+subsys_initcall(sched_fifo_init);

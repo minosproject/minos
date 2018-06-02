@@ -6,8 +6,6 @@
  */
 #include <minos/time.h>
 
-struct vcpu;
-
 struct timer_list {
 	struct list_head entry;
 	unsigned long expires;
