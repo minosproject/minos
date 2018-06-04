@@ -12,10 +12,12 @@
 #define CONFIG_VM_MAX_VCPU		(CONFIG_NR_CPUS)
 #define CONFIG_MAX_VM			(4)
 
+#define CONFIG_HAS_VIRT			(1)
+
 #define CONFIG_IRQ_CHIP_NAME		"gicv3"
 #define CONFIG_MMU_CHIP_NAME		"armv8-mmu"
 
-#define CONFIG_LOG_LEVEL		3
+#define CONFIG_LOG_LEVEL		4
 
 #define CONFIG_ARM_AARCH64		1
 #define CONFIG_ARCH_ARMV8_A		1

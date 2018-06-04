@@ -25,9 +25,7 @@ static void fifo_set_task_state(struct pcpu *pcpu,
 	if (state == TASK_STAT_READY) {
 		list_del(&td->fifo_list);
 		list_add_tail(&pd->ready_list, &td->fifo_list);
-	}
-
-	if ((state == TASK_STAT_SUSPEND) ||
+	} else if ((state == TASK_STAT_SUSPEND) ||
 		state == TASK_STAT_IDLE) {
 		list_del(&td->fifo_list);
 		list_add_tail(&pd->sleep_list, &td->fifo_list);
@@ -43,6 +41,10 @@ static struct task *fifo_pick_task(struct pcpu *pcpu)
 	struct fifo_pcpu_data *pd = pcpu_to_sched_data(pcpu);
 	struct fifo_task_data *td;
 
+	/*
+	 * list will never empty, since idle task is
+	 * always on the ready list
+	 */
 	td = (struct fifo_task_data *)
 		list_first_entry(&pd->ready_list,
 		struct fifo_task_data, fifo_list);
@@ -99,6 +101,7 @@ static int fifo_init_task_data(struct pcpu *pcpu, struct task *task)
 
 	init_list(&data->fifo_list);
 	task->sched_data = data;
+	data->task = task;
 
 	return 0;
 }
@@ -116,7 +119,7 @@ static void fifo_sched_task(struct pcpu *pcpu, struct task *t)
 
 static struct task *fifo_sched_new(struct pcpu *pcpu)
 {
-	return NULL;
+	return fifo_pick_task(pcpu);
 }
 
 static struct sched_class sched_fifo = {

@@ -253,13 +253,13 @@ static int alloc_irqs(uint32_t start, uint32_t cnt, int type)
 	 * duplicate in the other domain TBD
 	 */
 	ret = irq_domain_create_irqs(domain, start, cnt);
-	if (!ret) {
+	if (ret) {
 		pr_error("add domain:%d irqs failed\n", type);
 		goto out;
 	}
 
 	ret = alloc_virtual_irqs(start, cnt, type);
-	if (!ret) {
+	if (ret) {
 		pr_error("add type:%d virq failed\n", type);
 		goto out;
 	}

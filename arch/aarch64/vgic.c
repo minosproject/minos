@@ -9,6 +9,7 @@
 #include <minos/cpumask.h>
 #include <minos/irq.h>
 #include <asm/vgic.h>
+#include <minos/sched.h>
 
 static struct list_head gicd_list;
 static int vgic_vmodule_id = INVAILD_MODULE_ID;
@@ -357,7 +358,7 @@ static int vgic_mmio_handler(gp_regs *regs, int read,
 	unsigned long offset;
 	struct vgic_gicd *gicd = NULL;
 	struct vgic_gicr *gicr = NULL;
-	struct vcpu *vcpu = (struct vcpu *)regs;
+	struct vcpu *vcpu = current_vcpu;
 
 	gicr = (struct vgic_gicr *)
 		get_vmodule_data_by_id(vcpu, vgic_vmodule_id);

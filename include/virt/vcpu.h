@@ -31,6 +31,9 @@ struct vcpu {
 	void *arch_data;
 } __align_cache_line;
 
+#define vcpu_to_task(vcpu)	(vcpu->task)
+#define vcpu_affinity(vcpu)	(vcpu->task->affinity)
+
 static uint32_t inline get_vcpu_id(struct vcpu *vcpu)
 {
 	return vcpu->vcpu_id;
@@ -52,10 +55,5 @@ int create_vms(void);
 void boot_vms(void);
 struct vcpu *get_vcpu_in_vm(struct vm *vm, uint32_t vcpu_id);
 struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id);
-
-static inline int get_vcpu_affinity(struct vcpu *vcpu)
-{
-	return vcpu->task->affinity;
-}
 
 #endif

@@ -104,6 +104,8 @@ struct task *create_idle_task(void)
 
 	idle->stack_base = 0;
 	pcpu_add_task(cpu, idle);
+	set_task_ready(idle);
+	idle->state = TASK_STAT_RUNNING;
 
 	current_task = idle;
 	next_task = idle;

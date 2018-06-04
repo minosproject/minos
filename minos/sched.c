@@ -65,12 +65,13 @@ void sched_new(void)
 
 void sched(void)
 {
+	unsigned long flags;
 	struct task *task, *current;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
 	task = pcpu->sched_class->pick_task(pcpu);
 
-	local_irq_disable();
+	local_irq_save(flags);
 
 	current = current_task;
 
@@ -80,7 +81,7 @@ void sched(void)
 		switch_task_sw(current, task);
 	}
 
-	local_irq_enable();
+	local_irq_restore(flags);
 }
 
 static void sched_timer_function(unsigned long data)
@@ -109,12 +110,22 @@ void pcpus_init(void)
 	}
 }
 
-void set_task_ready(struct task *task)
+static inline void set_task_state(struct task *task, int state)
 {
 	struct pcpu *pcpu = get_per_cpu(pcpu, task->affinity);
 
 	/* set the task ready to run */
-	pcpu->sched_class->set_task_state(pcpu, task, TASK_STAT_READY);
+	pcpu->sched_class->set_task_state(pcpu, task, state);
+}
+
+void set_task_ready(struct task *task)
+{
+	set_task_state(task, TASK_STAT_READY);
+}
+
+void set_task_suspend(struct task *task)
+{
+	set_task_state(task, TASK_STAT_READY);
 }
 
 int pcpu_add_task(int cpu, struct task *task)
@@ -128,6 +139,9 @@ int pcpu_add_task(int cpu, struct task *task)
 
 	pcpu = get_per_cpu(pcpu, cpu);
 
+	/* init the task's sched private data */
+	pcpu->sched_class->init_task_data(pcpu,  task);
+
 	return pcpu->sched_class->add_task(pcpu, task);
 }
 
@@ -138,8 +152,25 @@ static int reched_handler(uint32_t irq, void *data)
 
 int sched_init(void)
 {
+	int i;
+	struct pcpu *pcpu;
+
+	for (i = 0; i < NR_CPUS; i++) {
+		pcpu = get_per_cpu(pcpu, i);
+		pcpu->sched_class = get_sched_class("fifo");
+		pcpu->sched_class->init_pcpu_data(pcpu);
+	}
+
+	return 0;
+}
+
+int local_sched_init(void)
+{
 	struct timer_list *timer;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
+
+	pcpu->sched_class = get_sched_class("fifo");
+	pcpu->sched_class->init_pcpu_data(pcpu);
 
 	request_irq(CONFIG_MINOS_RESCHED_IRQ, reched_handler,
 			0, "resched handler", NULL);

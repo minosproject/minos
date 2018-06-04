@@ -18,10 +18,11 @@ DECLARE_PER_CPU(struct pcpu *, pcpu);
 DECLARE_PER_CPU(struct task *, percpu_current_task);
 DECLARE_PER_CPU(struct task *, percpu_next_task);
 
-#define current_task	get_cpu_var(percpu_current_task)
-#define next_task	get_cpu_var(percpu_next_task)
+#define current_task		get_cpu_var(percpu_current_task)
+#define next_task		get_cpu_var(percpu_next_task)
 
-#define current_vcpu	(struct vcpu *)current_task->pdata
+#define current_vcpu		(struct vcpu *)current_task->pdata
+#define get_task_state(task)	task->state
 
 typedef enum _pcpu_state_t {
 	PCPU_STATE_RUNNING	= 0x0,
@@ -42,14 +43,17 @@ struct pcpu {
 	struct timer_list sched_timer;
 };
 
+#define pcpu_to_sched_data(pcpu)	(pcpu->sched_data)
+
 void pcpus_init(void);
 void sched(void);
 int pcpu_add_task(int cpu, struct task *task);
 void set_task_ready(struct task *task);
+void set_task_suspend(struct task *task);
 void sched_task(struct task *task, int reason);
 int sched_init(void);
+int local_sched_init(void);
 void sched_new(void);
-
-#define pcpu_to_sched_data(pcpu)	(pcpu->sched_data)
+void pcpu_resched(int pcpu_id);
 
 #endif

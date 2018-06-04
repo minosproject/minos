@@ -21,17 +21,19 @@ LIST_HEAD(vm_list);
 
 void vcpu_online(struct vcpu *vcpu)
 {
-
+	set_task_ready(vcpu_to_task(vcpu));
 }
 
 void vcpu_offline(struct vcpu *vcpu)
 {
-
+	set_task_suspend(vcpu_to_task(vcpu));
 }
 
 int vcpu_power_on(struct vcpu *caller, int cpuid,
 		unsigned long entry, unsigned long unsed)
 {
+	struct vcpu *vcpu;
+	struct os *os = caller->vm->os;
 
 	/*
 	 * resched the pcpu since it may have in the
@@ -41,6 +43,15 @@ int vcpu_power_on(struct vcpu *caller, int cpuid,
 	 * vcpu belong the the same vm will not
 	 * at the same pcpu
 	 */
+	vcpu = get_vcpu_by_id(caller->vm->vmid, cpuid);
+	if (!vcpu)
+		return -ENOENT;
+
+	if (get_task_state(vcpu_to_task(vcpu)) != TASK_STAT_SUSPEND)
+		return -EINVAL;
+
+	os->ops->vcpu_power_on(vcpu, entry);
+	pcpu_resched(vcpu_affinity(vcpu));
 
 	return 0;
 }
@@ -52,7 +63,7 @@ int vcpu_can_idle(struct vcpu *vcpu)
 
 void vcpu_idle(struct vcpu *vcpu)
 {
-
+	//printf("vcpu idle for\n");
 }
 
 static int add_vm(struct vmtag *vme)
@@ -127,7 +138,7 @@ struct task *create_vcpu_task(struct vm *vm, uint32_t vcpu_id)
 	struct vcpu *vcpu;
 	struct task *task;
 	char name[64];
-	unsigned long flags;
+	unsigned long flags = TASK_FLAG_VCPU;
 
 	vcpu = (struct vcpu *)malloc(sizeof(struct vcpu));
 	if (!vcpu)
@@ -152,6 +163,7 @@ struct task *create_vcpu_task(struct vm *vm, uint32_t vcpu_id)
 		return NULL;
 	}
 
+	task->task_type = TASK_TYPE_VCPU;
 	vcpu->task = task;
 
 	return task;

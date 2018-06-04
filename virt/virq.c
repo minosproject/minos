@@ -175,7 +175,12 @@ int __virq_enable(uint32_t virq, int enable)
 	}
 
 	d = get_virq_domain(virq);
+	if (d == NULL)
+		return -ENOENT;
+
 	desc = d->table[virq - d->start];
+	if (!desc)
+		return -ENOENT;
 
 	if ((d->type == VIRQ_DOMAIN_SGI) ||
 			(d->type == VIRQ_DOMAIN_PPI)) {
@@ -198,7 +203,7 @@ int __virq_enable(uint32_t virq, int enable)
 			return -EINVAL;
 
 		/* set the affinity and the type TBD */
-		irq_set_affinity(desc->hno, get_vcpu_affinity(c));
+		irq_set_affinity(desc->hno, vcpu_affinity(c));
 	}
 
 	return 0;
@@ -402,14 +407,14 @@ int alloc_virtual_irqs(uint32_t start, uint32_t count, int type)
 
 	d = virq_domains[type];
 	if (!d) {
-		d = (struct virq_domain *)malloc(sizeof(struct virq_domain));
+		d = (struct virq_domain *)zalloc(sizeof(struct virq_domain));
 		if (!d)
 			return -ENOMEM;
 
 		virq_domains[type] = d;
 	}
 
-	descs = (struct virq_desc **)malloc(count *
+	descs = (struct virq_desc **)zalloc(count *
 			sizeof(struct virq_desc *));
 	if (!descs)
 		return -ENOMEM;
@@ -417,6 +422,7 @@ int alloc_virtual_irqs(uint32_t start, uint32_t count, int type)
 	d->start = start;
 	d->end = start + count - 1;
 	d->table = descs;
+	d->type = type;
 
 	return 0;
 }
@@ -443,7 +449,7 @@ int register_virq(struct virqtag *v)
 	struct virq_domain *d;
 	struct vcpu *vcpu;
 
-	if ((!v) || (v->enable))
+	if ((!v) || (!v->enable))
 		return -EINVAL;
 
 	d = get_virq_domain(v->vno);
@@ -480,7 +486,7 @@ int register_virq(struct virqtag *v)
 	 * is affinity to a hw irq then request the irq
 	 */
 	if ((d->type == VIRQ_DOMAIN_SPI) && (desc->hw)) {
-		irq_set_affinity(desc->hno, get_vcpu_affinity(vcpu));
+		irq_set_affinity(desc->hno, vcpu_affinity(vcpu));
 		request_irq(desc->hno, guest_irq_handler,
 				0, v->name, (void *)desc);
 		irq_mask(desc->hno);

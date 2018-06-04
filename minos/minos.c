@@ -133,6 +133,9 @@ void boot_main(void)
 	module_init();
 	module_init_percpu();
 
+	sched_init();
+	local_sched_init();
+
 	virt_init();
 
 	device_init();
@@ -142,7 +145,6 @@ void boot_main(void)
 	tasks_init();
 
 	smp_cpus_up();
-	sched_init();
 
 	local_irq_enable();
 
@@ -168,11 +170,11 @@ void boot_secondary(void)
 
 	module_init_percpu();
 
+	local_sched_init();
+
 	device_init_percpu();
 
 	create_idle_task();
-
-	sched_init();
 
 	local_irq_enable();
 

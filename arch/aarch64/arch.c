@@ -36,11 +36,11 @@ void arch_init_task(struct task *task, void *entry)
 	regs->elr_elx = (uint64_t)entry;
 
 	if (task->task_type == TASK_TYPE_VCPU) {
-		regs->spsr_elx = AARCH64_SPSR_EL1h | AARCH64_SPSR_F | \
+		regs->spsr_elx = AARCH64_SPSR_EL2h | AARCH64_SPSR_F | \
 				 AARCH64_SPSR_I | AARCH64_SPSR_A;
 
 	} else {
-		regs->spsr_elx = AARCH64_SPSR_EL2h | AARCH64_SPSR_F | \
+		regs->spsr_elx = AARCH64_SPSR_EL1h | AARCH64_SPSR_F | \
 				 AARCH64_SPSR_I | AARCH64_SPSR_A;
 
 	}
