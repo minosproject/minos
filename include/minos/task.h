@@ -50,6 +50,7 @@ struct task {
 
 	uint32_t affinity;
 	uint8_t task_type;
+	uint8_t is_idle;
 
 	struct list_head list;
 	char name[TASK_NAME_SIZE];

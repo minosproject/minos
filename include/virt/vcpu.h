@@ -34,6 +34,9 @@ struct vcpu {
 #define vcpu_to_task(vcpu)	(vcpu->task)
 #define vcpu_affinity(vcpu)	(vcpu->task->affinity)
 
+#define VCPU_SCHED_REASON_HIRQ	0x0
+#define VCPU_SCHED_REASON_VIRQ	0x1
+
 static uint32_t inline get_vcpu_id(struct vcpu *vcpu)
 {
 	return vcpu->vcpu_id;
@@ -44,15 +47,11 @@ static uint32_t inline get_vmid(struct vcpu *vcpu)
 	return (vcpu->vm->vmid);
 }
 
-static uint32_t inline get_pcpu_id(struct vcpu *vcpu)
-{
-	return 0;
-}
-
 struct vm *get_vm_by_id(uint32_t vmid);
 int arch_vm_init(struct vm *vm);
 int create_vms(void);
 void boot_vms(void);
+void sched_vcpu(struct vcpu *vcpu, int reason);
 struct vcpu *get_vcpu_in_vm(struct vm *vm, uint32_t vcpu_id);
 struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id);
 

@@ -54,6 +54,7 @@ static struct task *__create_task(char *name,
 	task->state = TASK_STAT_SUSPEND;
 	task->pend_state = 0;
 	task->task_type = TASK_TYPE_NORMAL;
+	task->is_idle = 0;
 
 	init_list(&task->list);
 
@@ -119,6 +120,7 @@ struct task *create_idle_task(void)
 		panic("Can not create idle task\n");
 
 	idle->stack_base = 0;
+	idle->is_idle = 1;
 	pcpu_add_task(cpu, idle);
 	set_task_ready(idle);
 	idle->state = TASK_STAT_RUNNING;

@@ -27,6 +27,7 @@ struct fifo_task_data {
 struct fifo_pcpu_data {
 	struct list_head ready_list;
 	struct list_head sleep_list;
+	struct task *idle;
 };
 
 static void fifo_set_task_state(struct pcpu *pcpu,
@@ -35,6 +36,9 @@ static void fifo_set_task_state(struct pcpu *pcpu,
 	unsigned long flags;
 	struct fifo_task_data *td = task_to_sched_data(task);
 	struct fifo_pcpu_data *pd = pcpu_to_sched_data(pcpu);
+
+	if (task->is_idle)
+		return;
 
 	local_irq_save(flags);
 
@@ -57,6 +61,9 @@ static struct task *fifo_pick_task(struct pcpu *pcpu)
 	struct fifo_pcpu_data *pd = pcpu_to_sched_data(pcpu);
 	struct fifo_task_data *td;
 
+	if (is_list_empty(&pd->ready_list))
+		return pd->idle;
+
 	/*
 	 * list will never empty, since idle task is
 	 * always on the ready list
@@ -73,6 +80,11 @@ static int fifo_add_task(struct pcpu *pcpu, struct task *task)
 	unsigned long flags;
 	struct fifo_task_data *td = task_to_sched_data(task);
 	struct fifo_pcpu_data *pd = pcpu_to_sched_data(pcpu);
+
+	if (task->is_idle) {
+		pd->idle = task;
+		return 0;
+	}
 
 	local_irq_save(flags);
 	list_add_tail(&pd->sleep_list, &td->fifo_list);
@@ -125,12 +137,41 @@ static int fifo_init_task_data(struct pcpu *pcpu, struct task *task)
 static void fifo_sched(struct pcpu *pcpu,
 			struct task *c, struct task *n)
 {
+	unsigned long flags;
+	struct fifo_task_data *td = task_to_sched_data(n);
+	struct fifo_pcpu_data *pd = pcpu_to_sched_data(pcpu);
 
+
+	local_irq_save(flags);
+
+	/*
+	 * put the task which will run soon to the
+	 * tail of the pcpu's ready list
+	 */
+	if (!n->is_idle) {
+		list_del(&td->fifo_list);
+		list_add_tail(&pd->ready_list, &td->fifo_list);
+	}
+
+	local_irq_restore(flags);
 }
 
 static void fifo_sched_task(struct pcpu *pcpu, struct task *t)
 {
+	unsigned long flags;
+	struct fifo_task_data *td = task_to_sched_data(t);
+	struct fifo_pcpu_data *pd = pcpu_to_sched_data(pcpu);
 
+
+	local_irq_save(flags);
+
+	/*
+	 * put the task to the head of the list
+	 */
+	list_del(&td->fifo_list);
+	list_add(&pd->ready_list, &td->fifo_list);
+
+	local_irq_restore(flags);
 }
 
 static struct task *fifo_sched_new(struct pcpu *pcpu)

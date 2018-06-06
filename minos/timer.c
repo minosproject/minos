@@ -102,10 +102,10 @@ int mod_timer(struct timer_list *timer, unsigned long expires)
 	if (timer_pending(timer) && (timer->expires == expires))
 		return 1;
 
+	spin_lock_irqsave(&timers->lock, flags);
+
 	expires = slack_expires(expires);
 	timer->expires = expires;
-
-	spin_lock_irqsave(&timers->lock, flags);
 
 	detach_timer(timers, timer);
 	list_add_tail(&timers->active, &timer->entry);

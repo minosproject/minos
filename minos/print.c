@@ -27,7 +27,6 @@
 
 struct log_buffer {
 	spinlock_t buffer_lock;
-	int head;
 	int tail;
 	int total;
 	char buf[LOG_BUFFER_SIZE];
@@ -39,7 +38,6 @@ static int uart_init_done = 0;
 void log_init(void)
 {
 	spin_lock_init(&log_buffer.buffer_lock);
-	log_buffer.head = 0;
 	log_buffer.tail = 0;
 	log_buffer.total = 0;
 }
@@ -51,7 +49,7 @@ void flush_log_buf(void)
 	if (uart_init_done)
 		return;
 
-	for (i = 0; i < log_buffer.tail - log_buffer.head; i++)
+	for (i = 0; i < log_buffer.tail; i++)
 		uart_putc(log_buffer.buf[i]);
 
 	uart_init_done = 1;
@@ -59,31 +57,23 @@ void flush_log_buf(void)
 
 static int update_log_buffer(char *buf, int printed)
 {
+	int len;
 	struct log_buffer *lb = &log_buffer;
-	int len1, len2;
 
-	if ((lb->tail + printed) > (LOG_BUFFER_SIZE - 1)) {
-		len1 = LOG_BUFFER_SIZE - lb->tail;
-		len2 = printed - len1;
-	} else {
-		len1 = printed;
-		len2 = 0;
-	}
+	while (printed) {
+		if ((lb->tail + printed) > (LOG_BUFFER_SIZE - 1)) {
+			len = LOG_BUFFER_SIZE - lb->tail;
+			memcpy(lb->buf + lb->tail, buf, len);
+			lb->tail = 0;
+		} else {
+			len = printed > LOG_BUFFER_SIZE ? LOG_BUFFER_SIZE : printed;
+			memcpy(lb->buf + lb->tail, buf, len);
+			lb->tail += len;
+		}
 
-	if (len1)
-		memcpy(lb->buf + lb->tail, buf, len1);
-
-	if (len2)
-		memcpy(lb->buf, buf + len1, len2);
-
-	lb->total += printed;
-
-	if (len2)
-		lb->head = lb->tail = len2;
-	else {
-		lb->tail += len1;
-		if (lb->total > LOG_BUFFER_SIZE)
-			lb->head = lb->tail;
+		printed -= len;
+		buf += len;
+		lb->total += printed;
 	}
 
 	return 0;
@@ -127,7 +117,7 @@ int level_print(char *fmt, ...)
 	/*
 	 * temp disable the log buffer
 	 */
-	update_log_buffer(buffer, printed);
+	//update_log_buffer(buffer, printed);
 	buf = buffer;
 
 	if (uart_init_done) {

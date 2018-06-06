@@ -86,7 +86,7 @@ static void vtimer_state_init(struct vcpu *vcpu, void *context)
 
 	vtimer = &c->virt_timer;
 	vtimer->vcpu = vcpu;
-	init_timer_on_cpu(&vtimer->timer, get_pcpu_id(vcpu));
+	init_timer_on_cpu(&vtimer->timer, vcpu_affinity(vcpu));
 	vtimer->timer.function = virt_timer_expire_function;
 	vtimer->timer.data = (unsigned long)vtimer;
 	vtimer->virq = 27;
@@ -95,7 +95,7 @@ static void vtimer_state_init(struct vcpu *vcpu, void *context)
 
 	vtimer = &c->phy_timer;
 	vtimer->vcpu = vcpu;
-	init_timer_on_cpu(&vtimer->timer, get_pcpu_id(vcpu));
+	init_timer_on_cpu(&vtimer->timer, vcpu_affinity(vcpu));
 	vtimer->timer.function = phys_timer_expire_function;
 	vtimer->timer.data = (unsigned long)vtimer;
 	vtimer->virq = 30;

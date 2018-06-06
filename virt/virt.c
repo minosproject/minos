@@ -49,7 +49,6 @@ void save_vcpu_task_state(struct task *task)
 void restore_vcpu_task_state(struct task *task)
 {
 	restore_vcpu_vmodule_state(task_to_vcpu(task));
-	enter_to_guest(task, NULL);
 }
 
 int virt_init(void)

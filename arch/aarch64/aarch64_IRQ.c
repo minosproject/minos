@@ -22,9 +22,13 @@
 
 void irq_c_handler(gp_regs *regs)
 {
+	in_interrupt += 1;
+
 	irq_enter(regs);
 
 	do_irq_handler();
 
 	irq_exit(regs);
+
+	in_interrupt -= 1;
 }

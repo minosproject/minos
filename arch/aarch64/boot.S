@@ -129,6 +129,9 @@ el2_entry_aarch64:
 	orr	x1, x1, #(3 << 12)	// Inner shareable
 	orr	x1, x1, #(1 << 23)
 	msr	TCR_EL2, x1
+
+	mov	x1, #0x1c9
+	msr	spsr_el2, x1
 	isb
 
 	cbnz	x19, secondary_start_up

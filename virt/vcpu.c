@@ -16,6 +16,7 @@
 
 #include <minos/minos.h>
 #include <minos/sched.h>
+#include <minos/irq.h>
 #include <config/config.h>
 #include <minos/mm.h>
 #include <minos/bitmap.h>
@@ -34,6 +35,11 @@ static struct vm *vms[CONFIG_MAX_VM];
 static uint32_t total_vms = 0;
 
 LIST_HEAD(vm_list);
+
+void sched_vcpu(struct vcpu *vcpu, int reason)
+{
+	sched_task(vcpu_to_task(vcpu));
+}
 
 void vcpu_online(struct vcpu *vcpu)
 {
@@ -74,12 +80,22 @@ int vcpu_power_on(struct vcpu *caller, int cpuid,
 
 int vcpu_can_idle(struct vcpu *vcpu)
 {
-	return 0;
+	if (vcpu_has_virq(vcpu))
+		return 0;
+
+	if (get_task_state(vcpu_to_task(vcpu)) !=
+			TASK_STAT_RUNNING)
+		return 0;
+
+	return 1;
 }
 
 void vcpu_idle(struct vcpu *vcpu)
 {
-	//printf("vcpu idle for\n");
+	if (vcpu_can_idle(vcpu) && (!in_interrupt)) {
+		set_task_suspend(vcpu_to_task(vcpu));
+		sched();
+	}
 }
 
 static int add_vm(struct vmtag *vme)

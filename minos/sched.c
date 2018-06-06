@@ -31,6 +31,8 @@ DEFINE_PER_CPU(struct pcpu *, pcpu);
 DEFINE_PER_CPU(struct task *, percpu_current_task);
 DEFINE_PER_CPU(struct task *, percpu_next_task);
 
+DEFINE_PER_CPU(int, need_resched);
+
 #if 0
 struct task *get_highest_pending_task(struct pcpu *pcpu)
 {
@@ -52,24 +54,40 @@ void pcpu_resched(int pcpu_id)
 
 void switch_to_task(struct task *current, struct task *next)
 {
-	if (current->task_type == TASK_TYPE_VCPU)
-		save_vcpu_task_state(current);
+	if (current != next) {
+		if (current->task_type == TASK_TYPE_VCPU)
+			save_vcpu_task_state(current);
+
+		if (next->task_type == TASK_TYPE_VCPU)
+			restore_vcpu_task_state(next);
+	}
 
 	if (next->task_type == TASK_TYPE_VCPU)
-		restore_vcpu_task_state(next);
+		enter_to_guest(next, NULL);
+
+	current->state = TASK_STAT_READY;
+	next->state = TASK_STAT_RUNNING;
 }
 
-void switch_task_sw(struct task *c, struct task *n)
+void sched_task(struct task *task)
 {
-	switch_to_task(c, n);
-	arch_switch_task_sw();
-}
-
-void sched_task(struct task *task, int reason)
-{
+	struct task *current = current_task;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
+	if ((task->is_idle) || (task->state == TASK_STAT_RUNNING))
+		return;
+
+	if (task->affinity != current->affinity) {
+		pcpu_resched(task->affinity);
+		return;
+	}
+
 	pcpu->sched_class->sched_task(pcpu, task);
+
+	if (in_interrupt)
+		need_resched = 1;
+	else
+		sched();
 }
 
 void sched_new(void)
@@ -82,22 +100,24 @@ void sched_new(void)
 void sched(void)
 {
 	unsigned long flags;
-	struct task *task, *current;
-	struct pcpu *pcpu = get_cpu_var(pcpu);
+	struct task *task, *current = current_task;
+	struct pcpu *pcpu;
 
-	task = pcpu->sched_class->pick_task(pcpu);
+	pcpu = get_cpu_var(pcpu);
 
 	local_irq_save(flags);
-
-	current = current_task;
-
-	if (task != current) {
-		pcpu->sched_class->sched(pcpu, current, task);
-		next_task = task;
-		switch_task_sw(current, task);
-	}
-
+	task = pcpu->sched_class->pick_task(pcpu);
 	local_irq_restore(flags);
+
+	if ((task != current) && (!need_resched)) {
+		local_irq_save(flags);
+		pcpu->sched_class->sched(pcpu, current, task);
+		switch_to_task(current, task);
+		next_task = task;
+		dsb();
+		arch_switch_task_sw();
+		local_irq_restore(flags);
+	}
 }
 
 static void sched_timer_function(unsigned long data)
@@ -126,7 +146,7 @@ void pcpus_init(void)
 	}
 }
 
-static inline void set_task_state(struct task *task, int state)
+void set_task_state(struct task *task, int state)
 {
 	struct pcpu *pcpu = get_per_cpu(pcpu, task->affinity);
 
@@ -134,15 +154,6 @@ static inline void set_task_state(struct task *task, int state)
 	pcpu->sched_class->set_task_state(pcpu, task, state);
 }
 
-void set_task_ready(struct task *task)
-{
-	set_task_state(task, TASK_STAT_READY);
-}
-
-void set_task_suspend(struct task *task)
-{
-	set_task_state(task, TASK_STAT_READY);
-}
 
 int pcpu_add_task(int cpu, struct task *task)
 {
@@ -163,6 +174,8 @@ int pcpu_add_task(int cpu, struct task *task)
 
 static int reched_handler(uint32_t irq, void *data)
 {
+	struct pcpu *pcup = get_cpu_var(pcpu);
+
 	return 0;
 }
 

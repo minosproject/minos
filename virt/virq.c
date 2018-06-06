@@ -106,15 +106,13 @@ static int __send_virq(struct vcpu *vcpu,
 	 * • Having two or more interrupts with the same pINTID in the Lis
 	 *   registers for a single virtual CPU interface.
 	 */
-	if (hw) {
-		for_each_set_bit(index, virq_struct->irq_bitmap,
-				CONFIG_VCPU_MAX_ACTIVE_IRQS) {
-			virq = &virq_struct->virqs[index];
-			if (virq->h_intno == hno) {
-				pr_error("vcpu has same pirq:%d in pending/actvie state", hno);
-				spin_unlock(&virq_struct->lock);
-				return -EAGAIN;
-			}
+	for_each_set_bit(index, virq_struct->irq_bitmap,
+			CONFIG_VCPU_MAX_ACTIVE_IRQS) {
+		virq = &virq_struct->virqs[index];
+		if (virq->v_intno == vno) {
+			pr_error("vcpu has same pirq:%d in pending/actvie state\n", vno);
+			spin_unlock(&virq_struct->lock);
+			return -EAGAIN;
 		}
 	}
 
@@ -125,7 +123,7 @@ static int __send_virq(struct vcpu *vcpu,
 		 * no empty resource to handle this virtual irq
 		 * need to drop it ? TBD
 		 */
-		pr_error("Can not send this virq now\n");
+		pr_error("Can not send this virq now %d\n", vno);
 		spin_unlock(&virq_struct->lock);
 		return -EAGAIN;
 	}
@@ -142,39 +140,12 @@ static int __send_virq(struct vcpu *vcpu,
 
 	spin_unlock(&virq_struct->lock);
 
+	if (hw)
+		sched_vcpu(vcpu, VCPU_SCHED_REASON_HIRQ);
+	else
+		sched_vcpu(vcpu, VCPU_SCHED_REASON_VIRQ);
+
 	return 0;
-}
-
-int _send_virq(struct vcpu *vcpu, uint32_t virq, uint32_t hirq, int hw)
-{
-	int ret = 0;
-	struct task *sender = current_task;
-	struct task *rec = vcpu->task;
-
-	ret = __send_virq(vcpu, virq, hirq, hw);
-	if (ret)
-		goto out;
-
-	if (sender && (sender->affinity != rec->affinity)) {
-		/*
-		 * if the sender and the target are not
-		 * the same pcpu, then send a hw sgi to the
-		 * pcpu to do the sched work
-		 */
-		send_sgi(CONFIG_MINOS_RESCHED_IRQ, rec->affinity);
-	} else {
-		/*
-		 * if the sender and the target are the same
-		 * pcpu, but the vcpu is not the same, just
-		 * update the sched information to decide whether
-		 * need to reshched
-		 */
-		if (sender != rec)
-			sched_task(rec, /* SCHED_REASON_IRQ_PENDING*/ 0);
-	}
-
-out:
-	return ret;
 }
 
 int __virq_enable(uint32_t virq, int enable)
@@ -239,7 +210,7 @@ int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq)
 		return -EINVAL;
 	}
 
-	return _send_virq(vcpu, virq, 0, 0);
+	return __send_virq(vcpu, virq, 0, 0);
 }
 
 int send_virq_to_vm(uint32_t vmid, uint32_t virq)
@@ -260,7 +231,7 @@ void send_vsgi(struct vcpu *sender, uint32_t sgi, cpumask_t *cpumask)
 
 	for_each_set_bit(cpu, cpumask->bits, vm->vcpu_nr) {
 		vcpu = vm->vcpus[cpu];
-		_send_virq(vcpu, sgi, 0, 0);
+		__send_virq(vcpu, sgi, 0, 0);
 	}
 }
 
@@ -456,7 +427,7 @@ int guest_irq_handler(uint32_t irq, void *data)
 	if (!vcpu)
 		return -ENOENT;
 
-	return _send_virq(vcpu, desc->vno, irq, 1);
+	return __send_virq(vcpu, desc->vno, irq, 1);
 }
 
 int register_virq(struct virqtag *v)
@@ -490,6 +461,7 @@ int register_virq(struct virqtag *v)
 	d->table[v->vno - d->start] = desc;
 
 	if ((d->type == VIRQ_DOMAIN_SGI) || (d->type == VIRQ_DOMAIN_PPI)) {
+		desc->enable = 1;
 		if (desc->hw) {
 			pr_warning("virq:%d will not affinity to hirq\n", desc->vno);
 			desc->hw = 0;

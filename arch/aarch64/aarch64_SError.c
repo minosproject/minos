@@ -421,7 +421,7 @@ void SError_from_lower_EL_handler(gp_regs *data)
 
 	exit_from_guest(current_task, data);
 
-	if ((!vcpu) || (get_pcpu_id(vcpu) != cpuid))
+	if ((!vcpu) || (vcpu_affinity(vcpu) != cpuid))
 		panic("this vcpu is not belont to the pcpu");
 
 	esr_value = data->esr_elx;
@@ -443,6 +443,8 @@ void SError_from_lower_EL_handler(gp_regs *data)
 
 out:
 	local_irq_disable();
+
+	enter_to_guest(current_task, NULL);
 }
 
 void SError_from_current_EL_handler(gp_regs *data)

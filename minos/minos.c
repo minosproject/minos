@@ -108,7 +108,10 @@ void irq_exit(gp_regs *reg)
 {
 	irq_softirq_exit();
 
-	sched_new();
+	if (need_resched) {
+		sched_new();
+		need_resched = 0;
+	}
 }
 
 void boot_main(void)

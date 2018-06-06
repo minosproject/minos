@@ -47,8 +47,8 @@ enum irq_type {
 
 enum irq_domain_type {
 	IRQ_DOMAIN_SGI = 0,
-	IRQ_DOMAIN_SPI,
 	IRQ_DOMAIN_PPI,
+	IRQ_DOMAIN_SPI,
 	IRQ_DOMAIN_LPI,
 	IRQ_DOMAIN_SPECIAL,
 	IRQ_DOMAIN_MAX,
@@ -109,6 +109,10 @@ struct irq_domain {
 
 #define local_irq_enable() arch_enable_local_irq()
 #define local_irq_disable() arch_disable_local_irq()
+
+DECLARE_PER_CPU(int, in_interrupt);
+
+#define in_interrupt	get_cpu_var(in_interrupt)
 
 int irq_init(void);
 int irq_secondary_init(void);
