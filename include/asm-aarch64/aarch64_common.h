@@ -112,10 +112,8 @@
 #define LOC_SHIFT		(24)
 #define CLIDR_FIELD_WIDTH	(3)
 
-/* CSSELR definitions */
 #define LEVEL_SHIFT		(1)
 
-/* D$ set/way op type defines */
 #define DCISW			(0x0)
 #define DCCISW			(0x1)
 #define DCCSW			(0x2)

@@ -1,9 +1,3 @@
-//
-// Defines for v8 Memory Model
-//
-// Copyright(c) 2012-2016 ARM Ltd.  All Rights Reserved
-//
-
 #ifndef _MINOS_AARCH64_MMU_H_
 #define _MINOS_AARCH64_MMU_H_
 
