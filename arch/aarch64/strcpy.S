@@ -1,141 +1,96 @@
 /*
+ * Copyright (C) 2013 ARM Ltd.
+ * Copyright (C) 2013 Linaro.
  * Copyright (C) 2014 The Android Open Source Project
- * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
+ * This code is based on glibc cortex strings work originally authored by Linaro
+ * and re-licensed under GPLv2 for the Linux kernel. The original code can
+ * be found @
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- */
-/* Copyright (c) 2014, Linaro Limited
-   All rights reserved.
-
-   Redistribution and use in source and binary forms, with or without
-   modification, are permitted provided that the following conditions are met:
-       * Redistributions of source code must retain the above copyright
-         notice, this list of conditions and the following disclaimer.
-       * Redistributions in binary form must reproduce the above copyright
-         notice, this list of conditions and the following disclaimer in the
-         documentation and/or other materials provided with the distribution.
-       * Neither the name of the Linaro nor the
-         names of its contributors may be used to endorse or promote products
-         derived from this software without specific prior written permission.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-   HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-
-/* Assumptions:
+ * http://bazaar.launchpad.net/~linaro-toolchain-dev/cortex-strings/trunk/
+ * files/head:/src/aarch64/
  *
- * ARMv8-a, AArch64
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <asm/asm_marco.S>
 
 	.global strcpy
 
-/* Arguments and results.  */
-#define dstin       x0
-#define src         x1
-
-/* Locals and temporaries.  */
-#define dst         x2
-#define data1       x3
-#define data1_w     w3
-#define data2       x4
-#define data2_w     w4
-#define has_nul1    x5
-#define has_nul1_w  w5
-#define has_nul2    x6
-#define tmp1        x7
-#define tmp2        x8
-#define tmp3        x9
-#define tmp4        x10
-#define zeroones    x11
-#define zeroones_w  w11
-#define pos         x12
+dst_in		.req x0
+src		.req x1
+dst		.req x2
+data_1		.req x3
+data_1_w	.req w3
+data2		.req x4
+data2_w		.req w4
+has_nul1	.req x5
+has_nul1_w	.req w5
+has_nul2	.req x6
+tmp1		.req x7
+tmp2		.req x8
+tmp3		.req x9
+tmp4		.req x10
+zero_oness	.req x11
+zero_oness_w	.req w11
+pos		.req x12
 
 #define REP8_01 0x0101010101010101
 #define REP8_7f 0x7f7f7f7f7f7f7f7f
 #define REP8_80 0x8080808080808080
 
 func strcpy
-    mov     zeroones, #REP8_01
-    mov     dst, dstin
+    mov     zero_oness, #REP8_01
+    mov     dst, dst_in
     ands    tmp1, src, #15
     b.ne    .Lmisaligned
-    // NUL detection works on the principle that (X - 1) & (~X) & 0x80
-    // (=> (X - 1) & ~(X | 0x7f)) is non-zero iff a byte is zero, and
-    // can be done in parallel across the entire word.
-    // The inner loop deals with two Dwords at a time.  This has a
-    // slightly higher start-up cost, but we should win quite quickly,
-    // especially on cores with a high number of issue slots per
-    // cycle, as we get much better parallelism out of the operations.
 .Lloop:
-    ldp     data1, data2, [src], #16
-    sub     tmp1, data1, zeroones
-    orr     tmp2, data1, #REP8_7f
+    ldp     data_1, data2, [src], #16
+    sub     tmp1, data_1, zero_oness
+    orr     tmp2, data_1, #REP8_7f
     bic     has_nul1, tmp1, tmp2
-    cbnz    has_nul1, .Lnul_in_data1
-    sub     tmp3, data2, zeroones
+    cbnz    has_nul1, .Lnul_in_data_1
+    sub     tmp3, data2, zero_oness
     orr     tmp4, data2, #REP8_7f
     bic     has_nul2, tmp3, tmp4
     cbnz    has_nul2, .Lnul_in_data2
-    // No NUL in either register, copy it in a single instruction.
-    stp     data1, data2, [dst], #16
+    stp     data_1, data2, [dst], #16
     b       .Lloop
 
-.Lnul_in_data1:
+.Lnul_in_data_1:
     rev     has_nul1, has_nul1
     clz     pos, has_nul1
     add     tmp1, pos, #0x8
 
     tbz     tmp1, #6, 1f
-    str     data1, [dst]
+    str     data_1, [dst]
     ret
 1:
     tbz     tmp1, #5, 1f
-    str     data1_w, [dst], #4
-    lsr     data1, data1, #32
+    str     data_1_w, [dst], #4
+    lsr     data_1, data_1, #32
 1:
     tbz     tmp1, #4, 1f
-    strh    data1_w, [dst], #2
-    lsr     data1, data1, #16
+    strh    data_1_w, [dst], #2
+    lsr     data_1, data_1, #16
 1:
     tbz     tmp1, #3, 1f
-    strb    data1_w, [dst]
+    strb    data_1_w, [dst]
 1:
     ret
 
 .Lnul_in_data2:
-    str     data1, [dst], #8
+    str     data_1, [dst], #8
     rev     has_nul2, has_nul2
     clz     pos, has_nul2
     add     tmp1, pos, #0x8
@@ -159,15 +114,15 @@ func strcpy
 
 .Lmisaligned:
     tbz     src, #0, 1f
-    ldrb    data1_w, [src], #1
-    strb    data1_w, [dst], #1
-    cbnz    data1_w, 1f
+    ldrb    data_1_w, [src], #1
+    strb    data_1_w, [dst], #1
+    cbnz    data_1_w, 1f
     ret
 1:
     tbz     src, #1, 1f
-    ldrb    data1_w, [src], #1
-    strb    data1_w, [dst], #1
-    cbz     data1_w, .Ldone
+    ldrb    data_1_w, [src], #1
+    strb    data_1_w, [dst], #1
+    cbz     data_1_w, .Ldone
     ldrb    data2_w, [src], #1
     strb    data2_w, [dst], #1
     cbnz    data2_w, 1f
@@ -175,21 +130,19 @@ func strcpy
     ret
 1:
     tbz     src, #2, 1f
-    ldr     data1_w, [src], #4
-    // Check for a zero.
-    sub     has_nul1_w, data1_w, zeroones_w
-    bic     has_nul1_w, has_nul1_w, data1_w
+    ldr     data_1_w, [src], #4
+    sub     has_nul1_w, data_1_w, zero_oness_w
+    bic     has_nul1_w, has_nul1_w, data_1_w
     ands    has_nul1_w, has_nul1_w, #0x80808080
-    b.ne    .Lnul_in_data1
-    str     data1_w, [dst], #4
+    b.ne    .Lnul_in_data_1
+    str     data_1_w, [dst], #4
 1:
     tbz     src, #3, .Lloop
-    ldr     data1, [src], #8
-    // Check for a zero.
-    sub     tmp1, data1, zeroones
-    orr     tmp2, data1, #REP8_7f
+    ldr     data_1, [src], #8
+    sub     tmp1, data_1, zero_oness
+    orr     tmp2, data_1, #REP8_7f
     bics    has_nul1, tmp1, tmp2
-    b.ne    .Lnul_in_data1
-    str     data1, [dst], #8
+    b.ne    .Lnul_in_data_1
+    str     data_1, [dst], #8
     b       .Lloop
 endfunc strcpy

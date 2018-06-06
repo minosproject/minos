@@ -1,220 +1,221 @@
-/* Copyright (c) 2012-2013, Linaro Limited
-   All rights reserved.
-
-   Redistribution and use in source and binary forms, with or without
-   modification, are permitted provided that the following conditions are met:
-       * Redistributions of source code must retain the above copyright
-         notice, this list of conditions and the following disclaimer.
-       * Redistributions in binary form must reproduce the above copyright
-         notice, this list of conditions and the following disclaimer in the
-         documentation and/or other materials provided with the distribution.
-       * Neither the name of the Linaro nor the
-         names of its contributors may be used to endorse or promote products
-         derived from this software without specific prior written permission.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-   HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
-
 /*
- * Copyright (c) 2015 ARM Ltd
- * All rights reserved.
+ * Copyright (C) 2013 ARM Ltd.
+ * Copyright (C) 2013 Linaro.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the company may not be used to endorse or promote
- *    products derived from this software without specific prior written
- *    permission.
+ * This code is based on glibc cortex strings work originally authored by Linaro
+ * and re-licensed under GPLv2 for the Linux kernel. The original code can
+ * be found @
  *
- * THIS SOFTWARE IS PROVIDED BY ARM LTD ``AS IS'' AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL ARM LTD BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
-
-/* Assumptions:
+ * http://bazaar.launchpad.net/~linaro-toolchain-dev/cortex-strings/trunk/
+ * files/head:/src/aarch64/
  *
- * ARMv8-a, AArch64, unaligned accesses.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <asm/asm_marco.S>
 
+	.macro ldrb1 ptr, regB, val
+	ldrb  \ptr, [\regB], \val
+	.endm
+
+	.macro strb1 ptr, regB, val
+	strb \ptr, [\regB], \val
+	.endm
+
+	.macro ldrh1 ptr, regB, val
+	ldrh  \ptr, [\regB], \val
+	.endm
+
+	.macro strh1 ptr, regB, val
+	strh \ptr, [\regB], \val
+	.endm
+
+	.macro ldr1 ptr, regB, val
+	ldr \ptr, [\regB], \val
+	.endm
+
+	.macro str1 ptr, regB, val
+	str \ptr, [\regB], \val
+	.endm
+
+	.macro ldp1 ptr, regB, regC, val
+	ldp \ptr, \regB, [\regC], \val
+	.endm
+
+	.macro stp1 ptr, regB, regC, val
+	stp \ptr, \regB, [\regC], \val
+	.endm
+
 	.global memcpy
 
-#define dstin	x0
-#define src	x1
-#define count	x2
-#define dst	x3
-#define srcend	x4
-#define dstend	x5
-#define A_l	x6
-#define A_lw	w6
-#define A_h	x7
-#define A_hw	w7
-#define B_l	x8
-#define B_lw   w8
-#define B_h	x9
-#define C_l	x10
-#define C_h	x11
-#define D_l	x12
-#define D_h	x13
-#define E_l	src
-#define E_h	count
-#define F_l	srcend
-#define F_h	dst
-#define tmp1	x9
+dstin	.req	x0
+src	.req	x1
+count	.req	x2
+tmp1	.req	x3
+tmp1w	.req	w3
+tmp2	.req	x4
+tmp2w	.req	w4
+dst	.req	x6
 
-#define L(l) .L ## l
+A_l	.req	x7
+A_h	.req	x8
+B_l	.req	x9
+B_h	.req	x10
+C_l	.req	x11
+C_h	.req	x12
+D_l	.req	x13
+D_h	.req	x14
 
-/* Copies are split into 3 main cases: small copies of up to 16 bytes,
-   medium copies of 17..96 bytes which are fully unrolled. Large copies
-   of more than 96 bytes align the destination and use an unrolled loop
-   processing 64 bytes per iteration.
-   Small and medium copies read all data before writing, allowing any
-   kind of overlap, and memmove tailcalls memcpy for these cases as
-   well as non-overlapping copies.
-*/
 func memcpy
-	prfm    PLDL1KEEP, [src]
-	add	srcend, src, count
-	add	dstend, dstin, count
-        cmp     count, 16
-        b.ls    L(copy16)
-	cmp	count, 96
-	b.hi	L(copy_long)
+	mov	dst, dstin
+	cmp	count, #16
+	/*When memory length is less than 16, the accessed are not aligned.*/
+	b.lo	.Ltiny15
 
-	/* Medium copies: 17..96 bytes.  */
-	sub	tmp1, count, 1
-	ldp	A_l, A_h, [src]
-	tbnz	tmp1, 6, L(copy96)
-	ldp	D_l, D_h, [srcend, -16]
-	tbz	tmp1, 5, 1f
-	ldp	B_l, B_h, [src, 16]
-	ldp	C_l, C_h, [srcend, -32]
-	stp	B_l, B_h, [dstin, 16]
-	stp	C_l, C_h, [dstend, -32]
+	neg	tmp2, src
+	ands	tmp2, tmp2, #15/* Bytes to reach alignment. */
+	b.eq	.LSrcAligned
+	sub	count, count, tmp2
+	/*
+	* Copy the leading memory data from src to dst in an increasing
+	* address order.By this way,the risk of overwritting the source
+	* memory data is eliminated when the distance between src and
+	* dst is less than 16. The memory accesses here are alignment.
+	*/
+	tbz	tmp2, #0, 1f
+	ldrb1	tmp1w, src, #1
+	strb1	tmp1w, dst, #1
 1:
-	stp	A_l, A_h, [dstin]
-	stp	D_l, D_h, [dstend, -16]
-	ret
-
-	.p2align 4
-
-	/* Small copies: 0..16 bytes.  */
-L(copy16):
-	cmp	count, 8
-	b.lo	1f
-	ldr	A_l, [src]
-	ldr	A_h, [srcend, -8]
-	str	A_l, [dstin]
-	str	A_h, [dstend, -8]
-	ret
-	.p2align 4
-1:
-	tbz	count, 2, 1f
-	ldr	A_lw, [src]
-	ldr	A_hw, [srcend, -4]
-	str	A_lw, [dstin]
-	str	A_hw, [dstend, -4]
-	ret
-
-	/* Copy 0..3 bytes.  Use a branchless sequence that copies the same
-	   byte 3 times if count==1, or the 2nd byte twice if count==2.  */
-1:
-	cbz	count, 2f
-	lsr	tmp1, count, 1
-	ldrb	A_lw, [src]
-	ldrb	A_hw, [srcend, -1]
-	ldrb	B_lw, [src, tmp1]
-	strb	A_lw, [dstin]
-	strb	B_lw, [dstin, tmp1]
-	strb	A_hw, [dstend, -1]
-2:	ret
-
-	.p2align 4
-	/* Copy 64..96 bytes.  Copy 64 bytes from the start and
-	   32 bytes from the end.  */
-L(copy96):
-	ldp	B_l, B_h, [src, 16]
-	ldp	C_l, C_h, [src, 32]
-	ldp	D_l, D_h, [src, 48]
-	ldp	E_l, E_h, [srcend, -32]
-	ldp	F_l, F_h, [srcend, -16]
-	stp	A_l, A_h, [dstin]
-	stp	B_l, B_h, [dstin, 16]
-	stp	C_l, C_h, [dstin, 32]
-	stp	D_l, D_h, [dstin, 48]
-	stp	E_l, E_h, [dstend, -32]
-	stp	F_l, F_h, [dstend, -16]
-	ret
-
-	/* Align DST to 16 byte alignment so that we don't cross cache line
-	   boundaries on both loads and stores.	 There are at least 96 bytes
-	   to copy, so copy 16 bytes unaligned and then align.	The loop
-	   copies 64 bytes per iteration and prefetches one iteration ahead.  */
-
-	.p2align 4
-L(copy_long):
-	and	tmp1, dstin, 15
-	bic	dst, dstin, 15
-	ldp	D_l, D_h, [src]
-	sub	src, src, tmp1
-	add	count, count, tmp1	/* Count is now 16 too large.  */
-	ldp	A_l, A_h, [src, 16]
-	stp	D_l, D_h, [dstin]
-	ldp	B_l, B_h, [src, 32]
-	ldp	C_l, C_h, [src, 48]
-	ldp	D_l, D_h, [src, 64]!
-	subs	count, count, 128 + 16	/* Test and readjust count.  */
-	b.ls	2f
-1:
-	stp	A_l, A_h, [dst, 16]
-	ldp	A_l, A_h, [src, 16]
-	stp	B_l, B_h, [dst, 32]
-	ldp	B_l, B_h, [src, 32]
-	stp	C_l, C_h, [dst, 48]
-	ldp	C_l, C_h, [src, 48]
-	stp	D_l, D_h, [dst, 64]!
-	ldp	D_l, D_h, [src, 64]!
-	subs	count, count, 64
-	b.hi	1b
-
-	/* Write the last full set of 64 bytes.	 The remainder is at most 64
-	   bytes, so it is safe to always copy 64 bytes from the end even if
-	   there is just 1 byte left.  */
+	tbz	tmp2, #1, 2f
+	ldrh1	tmp1w, src, #2
+	strh1	tmp1w, dst, #2
 2:
-	ldp	E_l, E_h, [srcend, -64]
-	stp	A_l, A_h, [dst, 16]
-	ldp	A_l, A_h, [srcend, -48]
-	stp	B_l, B_h, [dst, 32]
-	ldp	B_l, B_h, [srcend, -32]
-	stp	C_l, C_h, [dst, 48]
-	ldp	C_l, C_h, [srcend, -16]
-	stp	D_l, D_h, [dst, 64]
-	stp	E_l, E_h, [dstend, -64]
-	stp	A_l, A_h, [dstend, -48]
-	stp	B_l, B_h, [dstend, -32]
-	stp	C_l, C_h, [dstend, -16]
+	tbz	tmp2, #2, 3f
+	ldr1	tmp1w, src, #4
+	str1	tmp1w, dst, #4
+3:
+	tbz	tmp2, #3, .LSrcAligned
+	ldr1	tmp1, src, #8
+	str1	tmp1, dst, #8
+
+.LSrcAligned:
+	cmp	count, #64
+	b.ge	.Lcpy_over64
+	/*
+	* Deal with small copies quickly by dropping straight into the
+	* exit block.
+	*/
+.Ltail63:
+	/*
+	* Copy up to 48 bytes of data. At this point we only need the
+	* bottom 6 bits of count to be accurate.
+	*/
+	ands	tmp1, count, #0x30
+	b.eq	.Ltiny15
+	cmp	tmp1w, #0x20
+	b.eq	1f
+	b.lt	2f
+	ldp1	A_l, A_h, src, #16
+	stp1	A_l, A_h, dst, #16
+1:
+	ldp1	A_l, A_h, src, #16
+	stp1	A_l, A_h, dst, #16
+2:
+	ldp1	A_l, A_h, src, #16
+	stp1	A_l, A_h, dst, #16
+.Ltiny15:
+	/*
+	* Prefer to break one ldp/stp into several load/store to access
+	* memory in an increasing address order,rather than to load/store 16
+	* bytes from (src-16) to (dst-16) and to backward the src to aligned
+	* address,which way is used in original cortex memcpy. If keeping
+	* the original memcpy process here, memmove need to satisfy the
+	* precondition that src address is at least 16 bytes bigger than dst
+	* address,otherwise some source data will be overwritten when memove
+	* call memcpy directly. To make memmove simpler and decouple the
+	* memcpy's dependency on memmove, withdrew the original process.
+	*/
+	tbz	count, #3, 1f
+	ldr1	tmp1, src, #8
+	str1	tmp1, dst, #8
+1:
+	tbz	count, #2, 2f
+	ldr1	tmp1w, src, #4
+	str1	tmp1w, dst, #4
+2:
+	tbz	count, #1, 3f
+	ldrh1	tmp1w, src, #2
+	strh1	tmp1w, dst, #2
+3:
+	tbz	count, #0, .Lexitfunc
+	ldrb1	tmp1w, src, #1
+	strb1	tmp1w, dst, #1
+
+	b	.Lexitfunc
+
+.Lcpy_over64:
+	subs	count, count, #128
+	b.ge	.Lcpy_body_large
+	/*
+	* Less than 128 bytes to copy, so handle 64 here and then jump
+	* to the tail.
+	*/
+	ldp1	A_l, A_h, src, #16
+	stp1	A_l, A_h, dst, #16
+	ldp1	B_l, B_h, src, #16
+	ldp1	C_l, C_h, src, #16
+	stp1	B_l, B_h, dst, #16
+	stp1	C_l, C_h, dst, #16
+	ldp1	D_l, D_h, src, #16
+	stp1	D_l, D_h, dst, #16
+
+	tst	count, #0x3f
+	b.ne	.Ltail63
+	b	.Lexitfunc
+
+	/*
+	* Critical loop.  Start at a new cache line boundary.  Assuming
+	* 64 bytes per line this ensures the entire loop is in one line.
+	*/
+	.p2align 6
+.Lcpy_body_large:
+	/* pre-get 64 bytes data. */
+	ldp1	A_l, A_h, src, #16
+	ldp1	B_l, B_h, src, #16
+	ldp1	C_l, C_h, src, #16
+	ldp1	D_l, D_h, src, #16
+1:
+	/*
+	* interlace the load of next 64 bytes data block with store of the last
+	* loaded 64 bytes data.
+	*/
+	stp1	A_l, A_h, dst, #16
+	ldp1	A_l, A_h, src, #16
+	stp1	B_l, B_h, dst, #16
+	ldp1	B_l, B_h, src, #16
+	stp1	C_l, C_h, dst, #16
+	ldp1	C_l, C_h, src, #16
+	stp1	D_l, D_h, dst, #16
+	ldp1	D_l, D_h, src, #16
+	subs	count, count, #64
+	b.ge	1b
+	stp1	A_l, A_h, dst, #16
+	stp1	B_l, B_h, dst, #16
+	stp1	C_l, C_h, dst, #16
+	stp1	D_l, D_h, dst, #16
+
+	tst	count, #0x3f
+	b.ne	.Ltail63
+.Lexitfunc:
 	ret
 endfunc memcpy
