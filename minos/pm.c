@@ -34,5 +34,5 @@ void cpu_idle(void)
 void cpu_idle_task()
 {
 	//printf("cpu idle for cpu-%d\n", get_cpu_id());
-	//wfi();
+	wfi();
 }

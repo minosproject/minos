@@ -26,8 +26,10 @@
     (IRQ_FLAG_TYPE_LEVEL_LOW | IRQ_FLAG_TYPE_LEVEL_HIGH)
 #define IRQ_FLAG_TYPE_MASK			(0x000000ff)
 
-#define IRQ_FLAGS_MASKED			(0x0)
-#define IRQ_FLAGS_VCPU				(0x1)
+#define IRQ_FLAGS_MASKED_BIT			(0x0)
+#define IRQ_FLAGS_MASKED			(BIT(IRQ_FLAGS_MASKED_BIT))
+#define IRQ_FLAGS_VCPU_BIT			(0x1)
+#define IRQ_FLAGS_VCPU				(BIT(IRQ_FLAGS_VCPU_BIT))
 
 typedef enum sgi_mode {
 	SGI_TO_LIST = 0,

@@ -209,9 +209,9 @@ int __virq_enable(uint32_t virq, int enable)
 		 * if the virq is point to a SPI int and the virq
 		 * is affinity to a hw irq then request the irq
 		 */
-		irq_set_affinity(desc->hno, vcpu_affinity(vcpu));
+		irq_set_affinity(desc->hno, vcpu_affinity(c));
 		request_irq(desc->hno, guest_irq_handler, IRQ_FLAGS_VCPU,
-				vcpu->task->name, (void *)desc);
+				c->task->name, (void *)desc);
 		desc->enable = 1;
 	}
 

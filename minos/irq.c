@@ -80,7 +80,7 @@ static int do_handle_host_irq(struct irq_desc *irq_desc)
 		pr_error("handle irq:%d fail in minos\n", irq_desc->hno);
 
 out:
-	if (!test_bit(IRQ_FLAGS_VCPU, &irq_desc->flags))
+	if (!test_bit(IRQ_FLAGS_VCPU_BIT, &irq_desc->flags))
 		irq_chip->irq_dir(irq_desc->hno);
 
 	return ret;
@@ -365,10 +365,10 @@ void __irq_enable(uint32_t irq, int enable)
 		return;
 
 	if (enable) {
-		if (!test_and_set_bit(IRQ_FLAGS_MASKED, &irq_desc->flags))
+		if (!test_and_set_bit(IRQ_FLAGS_MASKED_BIT, &irq_desc->flags))
 			irq_chip->irq_unmask(irq);
 	} else {
-		if (test_and_clear_bit(IRQ_FLAGS_MASKED, &irq_desc->flags))
+		if (test_and_clear_bit(IRQ_FLAGS_MASKED_BIT, &irq_desc->flags))
 			irq_chip->irq_mask(irq);
 	}
 }
