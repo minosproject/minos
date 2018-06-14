@@ -29,8 +29,6 @@ DEFINE_PER_CPU(int, in_interrupt);
 static struct irq_chip *irq_chip;
 static struct irq_domain *irq_domains[IRQ_DOMAIN_MAX];
 
-extern int do_handle_guest_irq(struct irq_desc *irq_desc);
-
 static struct irq_desc *alloc_irq_desc(void)
 {
 	struct irq_desc *irq;
@@ -82,7 +80,8 @@ static int do_handle_host_irq(struct irq_desc *irq_desc)
 		pr_error("handle irq:%d fail in minos\n", irq_desc->hno);
 
 out:
-	irq_chip->irq_dir(irq_desc->hno);
+	if (!test_bit(IRQ_FLAGS_VCPU, &irq_desc->flags))
+		irq_chip->irq_dir(irq_desc->hno);
 
 	return ret;
 }
@@ -359,35 +358,19 @@ int irq_get_virq_state(struct virq *virq)
 
 void __irq_enable(uint32_t irq, int enable)
 {
-	unsigned long flag;
 	struct irq_desc *irq_desc;
 
 	irq_desc = get_irq_desc(irq);
 	if (!irq_desc)
 		return;
 
-	spin_lock_irqsave(&irq_desc->lock, flag);
-
 	if (enable) {
-		if ((irq_desc->flags & IRQ_FLAG_STATUS_MASK) ==
-				IRQ_FLAG_STATUS_UNMASKED)
-			goto out;
-
-		irq_chip->irq_unmask(irq);
-		irq_desc->flags &= ~IRQ_FLAG_STATUS_MASK;
-		irq_desc->flags |= IRQ_FLAG_STATUS_UNMASKED;
+		if (!test_and_set_bit(IRQ_FLAGS_MASKED, &irq_desc->flags))
+			irq_chip->irq_unmask(irq);
 	} else {
-		if ((irq_desc->flags & IRQ_FLAG_STATUS_MASK) ==
-				IRQ_FLAG_STATUS_MASKED)
-			goto out;
-
-		irq_chip->irq_mask(irq);
-		irq_desc->flags &= ~IRQ_FLAG_STATUS_MASK;
-		irq_desc->flags |= IRQ_FLAG_STATUS_MASKED;
+		if (test_and_clear_bit(IRQ_FLAGS_MASKED, &irq_desc->flags))
+			irq_chip->irq_mask(irq);
 	}
-
-out:
-	spin_unlock_irqrestore(&irq_desc->lock, flag);
 }
 
 void irq_set_affinity(uint32_t irq, int cpu)
@@ -465,6 +448,7 @@ int request_irq(uint32_t irq, irq_handle_t handler,
 	spin_lock_irqsave(&irq_desc->lock, flag);
 	irq_desc->handler = handler;
 	irq_desc->pdata = data;
+	irq_desc->flags |= flags;
 	spin_unlock_irqrestore(&irq_desc->lock, flag);
 
 	irq_unmask(irq);

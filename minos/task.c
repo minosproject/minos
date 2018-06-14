@@ -55,6 +55,7 @@ static struct task *__create_task(char *name,
 	task->pend_state = 0;
 	task->task_type = TASK_TYPE_NORMAL;
 	task->is_idle = 0;
+	task->resched = 0;
 
 	init_list(&task->list);
 

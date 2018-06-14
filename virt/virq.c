@@ -110,7 +110,7 @@ static int __send_virq(struct vcpu *vcpu,
 			CONFIG_VCPU_MAX_ACTIVE_IRQS) {
 		virq = &virq_struct->virqs[index];
 		if (virq->v_intno == vno) {
-			pr_error("vcpu has same pirq:%d in pending/actvie state\n", vno);
+			pr_error("vcpu has same virq:%d in pending/actvie state\n", vno);
 			spin_unlock(&virq_struct->lock);
 			return -EAGAIN;
 		}
@@ -146,6 +146,22 @@ static int __send_virq(struct vcpu *vcpu,
 		sched_vcpu(vcpu, VCPU_SCHED_REASON_VIRQ);
 
 	return 0;
+}
+
+static int guest_irq_handler(uint32_t irq, void *data)
+{
+	struct vcpu *vcpu;
+	struct virq_desc *desc = (struct virq_desc *)data;
+
+	if ((!desc) || (!desc->hw))
+		return -EINVAL;
+
+	/* send the virq to the guest */
+	vcpu = get_vcpu_by_id(desc->vmid, desc->vcpu_id);
+	if (!vcpu)
+		return -ENOENT;
+
+	return __send_virq(vcpu, desc->vno, irq, 1);
 }
 
 int __virq_enable(uint32_t virq, int enable)
@@ -189,8 +205,14 @@ int __virq_enable(uint32_t virq, int enable)
 		if (!c)
 			return -EINVAL;
 
-		/* set the affinity and the type TBD */
-		irq_set_affinity(desc->hno, vcpu_affinity(c));
+		/*
+		 * if the virq is point to a SPI int and the virq
+		 * is affinity to a hw irq then request the irq
+		 */
+		irq_set_affinity(desc->hno, vcpu_affinity(vcpu));
+		request_irq(desc->hno, guest_irq_handler, IRQ_FLAGS_VCPU,
+				vcpu->task->name, (void *)desc);
+		desc->enable = 1;
 	}
 
 	return 0;
@@ -414,27 +436,10 @@ int alloc_virtual_irqs(uint32_t start, uint32_t count, int type)
 	return 0;
 }
 
-int guest_irq_handler(uint32_t irq, void *data)
-{
-	struct vcpu *vcpu;
-	struct virq_desc *desc = (struct virq_desc *)data;
-
-	if ((!desc) || (!desc->hw))
-		return -EINVAL;
-
-	/* send the virq to the guest */
-	vcpu = get_vcpu_by_id(desc->vmid, desc->vcpu_id);
-	if (!vcpu)
-		return -ENOENT;
-
-	return __send_virq(vcpu, desc->vno, irq, 1);
-}
-
 int register_virq(struct virqtag *v)
 {
 	struct virq_desc *desc;
 	struct virq_domain *d;
-	struct vcpu *vcpu;
 
 	if ((!v) || (!v->enable))
 		return -EINVAL;
@@ -442,12 +447,6 @@ int register_virq(struct virqtag *v)
 	d = get_virq_domain(v->vno);
 	if (!d)
 		return -ENOENT;
-
-	if ((d->type != VIRQ_DOMAIN_SGI) && (d->type != VIRQ_DOMAIN_PPI)) {
-		vcpu = get_vcpu_by_id(v->vmid, v->vcpu_id);
-		if (!vcpu)
-			return -ENOENT;
-	}
 
 	desc = (struct virq_desc *)zalloc(sizeof(struct virq_desc));
 	if (!desc)
@@ -459,6 +458,7 @@ int register_virq(struct virqtag *v)
 	desc->vcpu_id = v->vcpu_id;
 	desc->enable = 0;
 	d->table[v->vno - d->start] = desc;
+	desc->hw = v->hw;
 
 	if ((d->type == VIRQ_DOMAIN_SGI) || (d->type == VIRQ_DOMAIN_PPI)) {
 		desc->enable = 1;
@@ -467,17 +467,6 @@ int register_virq(struct virqtag *v)
 			desc->hw = 0;
 			desc->hno = 0;
 		}
-	}
-
-	/*
-	 * if the virq is point to a SPI int and the virq
-	 * is affinity to a hw irq then request the irq
-	 */
-	if ((d->type == VIRQ_DOMAIN_SPI) && (desc->hw)) {
-		irq_set_affinity(desc->hno, vcpu_affinity(vcpu));
-		request_irq(desc->hno, guest_irq_handler,
-				0, v->name, (void *)desc);
-		irq_mask(desc->hno);
 	}
 
 	return 0;

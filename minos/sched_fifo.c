@@ -45,6 +45,9 @@ static void fifo_set_task_state(struct pcpu *pcpu,
 	if (state == TASK_STAT_READY) {
 		list_del(&td->fifo_list);
 		list_add_tail(&pd->ready_list, &td->fifo_list);
+
+		/* if the need_resched flag is set clear it */
+		task->resched = 0;
 	} else if ((state == TASK_STAT_SUSPEND) ||
 		state == TASK_STAT_IDLE) {
 		list_del(&td->fifo_list);

@@ -26,9 +26,8 @@
     (IRQ_FLAG_TYPE_LEVEL_LOW | IRQ_FLAG_TYPE_LEVEL_HIGH)
 #define IRQ_FLAG_TYPE_MASK			(0x000000ff)
 
-#define IRQ_FLAG_STATUS_MASKED			(0x00000000)
-#define IRQ_FLAG_STATUS_UNMASKED		(0x00000100)
-#define IRQ_FLAG_STATUS_MASK			(0x00000f00)
+#define IRQ_FLAGS_MASKED			(0x0)
+#define IRQ_FLAGS_VCPU				(0x1)
 
 typedef enum sgi_mode {
 	SGI_TO_LIST = 0,
@@ -84,7 +83,7 @@ struct irq_chip {
 struct irq_desc {
 	uint32_t hno;
 	uint32_t affinity;
-	uint32_t flags;
+	unsigned long flags;
 	spinlock_t lock;
 	unsigned long irq_count;
 	irq_handle_t handler;

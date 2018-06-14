@@ -78,6 +78,7 @@ void sched_task(struct task *task)
 		return;
 
 	if (task->affinity != current->affinity) {
+		task->resched = 1;
 		pcpu_resched(task->affinity);
 		return;
 	}
@@ -168,13 +169,22 @@ int pcpu_add_task(int cpu, struct task *task)
 
 	/* init the task's sched private data */
 	pcpu->sched_class->init_task_data(pcpu,  task);
+	list_add_tail(&pcpu->task_list, &task->list);
 
 	return pcpu->sched_class->add_task(pcpu, task);
 }
 
-static int reched_handler(uint32_t irq, void *data)
+static int resched_handler(uint32_t irq, void *data)
 {
-	struct pcpu *pcup = get_cpu_var(pcpu);
+	struct pcpu *pcpu = get_cpu_var(pcpu);
+	struct task *task;
+
+	list_for_each_entry(task, &pcpu->task_list, list) {
+		if (task->resched)
+			set_task_state(task, TASK_STAT_READY);
+	}
+
+	need_resched = 1;
 
 	return 0;
 }
@@ -198,10 +208,9 @@ int local_sched_init(void)
 	struct timer_list *timer;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	pcpu->sched_class = get_sched_class("fifo");
-	pcpu->sched_class->init_pcpu_data(pcpu);
+	init_list(&pcpu->task_list);
 
-	request_irq(CONFIG_MINOS_RESCHED_IRQ, reched_handler,
+	request_irq(CONFIG_MINOS_RESCHED_IRQ, resched_handler,
 			0, "resched handler", NULL);
 
 	timer = &pcpu->sched_timer;
