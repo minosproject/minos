@@ -431,9 +431,6 @@ void SError_from_lower_EL_handler(gp_regs *data)
 	if (ec == NULL)
 		goto out;
 
-	if (ec->irq_safe)
-		local_irq_enable();
-
 	/*
 	 * how to deal with the return value
 	 * TBD

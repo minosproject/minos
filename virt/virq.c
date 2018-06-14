@@ -106,13 +106,15 @@ static int __send_virq(struct vcpu *vcpu,
 	 * • Having two or more interrupts with the same pINTID in the Lis
 	 *   registers for a single virtual CPU interface.
 	 */
-	for_each_set_bit(index, virq_struct->irq_bitmap,
-			CONFIG_VCPU_MAX_ACTIVE_IRQS) {
-		virq = &virq_struct->virqs[index];
-		if (virq->v_intno == vno) {
-			pr_error("vcpu has same virq:%d in pending/actvie state\n", vno);
-			spin_unlock(&virq_struct->lock);
-			return -EAGAIN;
+	if (hw) {
+		for_each_set_bit(index, virq_struct->irq_bitmap,
+				CONFIG_VCPU_MAX_ACTIVE_IRQS) {
+			virq = &virq_struct->virqs[index];
+			if (virq->h_intno == hno) {
+				pr_error("vcpu has same hirq:%d in pending/actvie state\n", hno);
+				spin_unlock(&virq_struct->lock);
+				return -EAGAIN;
+			}
 		}
 	}
 

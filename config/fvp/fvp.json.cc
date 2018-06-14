@@ -3,7 +3,9 @@
 	"version": "0.0.1",
 	"platform": "armv8-fvp",
 
-	"vmtags": [{
+	"vmtags": [
+#if 1
+	{
 			"vmid": 0,
 			"name": "linux-01",
 			"type": "linux",
@@ -16,15 +18,15 @@
 			"setup_data": "0x9fe00000",
 			"mmu_on": 1
 		}
-#if 0
+#else
 		{
-			"vmid": 1,
+			"vmid": 0,
 			"name": "os1",
 			"type": "other",
-			"nr_vcpu": 4,
-			"entry": "0xa0000000",
-			"vcpu0_affinity": 1,
-			"vcpu1_affinity": 0,
+			"nr_vcpu": 1,
+			"entry": "0x90000000",
+			"vcpu0_affinity": 0,
+			"vcpu1_affinity": 1,
 			"vcpu2_affinity": 2,
 			"vcpu3_affinity": 3,
 			"setup_data": "0xd0000000",
