@@ -59,6 +59,7 @@ static void vtimer_state_restore(struct vcpu *vcpu, void *context)
 	write_sysreg64(c->offset, CNTVOFF_EL2);
 	write_sysreg64(vtimer->cnt_cval, CNTV_CVAL_EL0);
 	write_sysreg32(vtimer->cnt_ctl, CNTV_CTL_EL0);
+	dsb();
 }
 
 static void vtimer_state_save(struct vcpu *vcpu, void *context)
@@ -66,6 +67,7 @@ static void vtimer_state_save(struct vcpu *vcpu, void *context)
 	struct vtimer_context *c = (struct vtimer_context *)context;
 	struct vtimer *vtimer = &c->virt_timer;
 
+	dsb();
 	vtimer->cnt_ctl = read_sysreg32(CNTV_CTL_EL0);
 	write_sysreg32(vtimer->cnt_ctl & ~CNT_CTL_ENABLE, CNTV_CTL_EL0);
 	vtimer->cnt_cval = read_sysreg64(CNTV_CVAL_EL0);
@@ -75,6 +77,8 @@ static void vtimer_state_save(struct vcpu *vcpu, void *context)
 		mod_timer(&vtimer->timer, ticks_to_ns(vtimer->cnt_cval +
 				c->offset - boot_tick));
 	}
+
+	dsb();
 }
 
 static void vtimer_state_init(struct vcpu *vcpu, void *context)

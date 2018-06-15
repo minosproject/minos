@@ -126,6 +126,7 @@ static void aarch64_system_state_save(struct vcpu *vcpu, void *c)
 	struct aarch64_system_context *context =
 			(struct aarch64_system_context *)c;
 
+	dsb();
 	context->vbar_el1 = read_sysreg(VBAR_EL1);
 	context->esr_el1 = read_sysreg(ESR_EL1);
 	context->vmpidr = read_sysreg(VMPIDR_EL2);
@@ -145,6 +146,7 @@ static void aarch64_system_state_restore(struct vcpu *vcpu, void *c)
 	write_sysreg(context->sctlr_el1, SCTLR_EL1);
 	write_sysreg(context->hcr_el2, HCR_EL2);
 	write_sysreg(context->sp_el1, SP_EL1);
+	dsb();
 }
 
 static int aarch64_system_init(struct vmodule *vmodule)

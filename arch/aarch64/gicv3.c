@@ -509,6 +509,7 @@ static void gicv3_state_save(struct vcpu *vcpu, void *context)
 {
 	struct gic_context *c = (struct gic_context *)context;
 
+	dsb();
 	gicv3_save_lrs(c, gicv3_nr_lr);
 	gicv3_save_aprn(c, gicv3_nr_pr);
 	c->icc_sre_el1 = read_sysreg32(ICC_SRE_EL1);
@@ -587,6 +588,7 @@ static void gicv3_state_restore(struct vcpu *vcpu, void *context)
 	write_sysreg32(c->icc_sre_el1, ICC_SRE_EL1);
 	write_sysreg32(c->ich_vmcr_el2, ICH_VMCR_EL2);
 	write_sysreg32(c->ich_hcr_el2, ICH_HCR_EL2);
+	dsb();
 }
 
 static void gicv3_state_init(struct vcpu *vcpu, void *context)

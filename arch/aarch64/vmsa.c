@@ -563,6 +563,7 @@ static void vmsa_state_save(struct vcpu *vcpu, void *context)
 {
 	struct vmsa_context *c = (struct vmsa_context *)context;
 
+	dsb();
 	c->vtcr_el2 = read_sysreg(VTCR_EL2);
 	c->vttbr_el2 = read_sysreg(VTTBR_EL2);
 	c->ttbr0_el1 = read_sysreg(TTBR0_EL1);
@@ -577,6 +578,7 @@ static void vmsa_state_restore(struct vcpu *vcpu, void *context)
 	write_sysreg(c->vttbr_el2, VTTBR_EL2);
 	write_sysreg(c->ttbr0_el1, TTBR0_EL1);
 	write_sysreg(c->ttbr1_el1, TTBR1_EL1);
+	dsb();
 	flush_local_tlb();
 }
 
