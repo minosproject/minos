@@ -112,9 +112,17 @@ static int __send_virq(struct vcpu *vcpu,
 				CONFIG_VCPU_MAX_ACTIVE_IRQS) {
 			virq = &virq_struct->virqs[index];
 			if (virq->h_intno == hno) {
-				pr_error("vcpu has same hirq:%d in pending/actvie state\n", hno);
+				pr_debug("vcpu has same hirq:%d in pending/actvie state\n", hno);
+
+				/*
+				 * set the virq's state to pending again, just call
+				 * the irq_send_virq() to update the related register
+				 */
+				virq->state = VIRQ_STATE_PENDING;
+				irq_send_virq(virq);
+
 				spin_unlock(&virq_struct->lock);
-				return -EAGAIN;
+				return 0;
 			}
 		}
 	}
