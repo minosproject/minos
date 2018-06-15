@@ -35,6 +35,7 @@ struct task;
 
 struct task {
 	void *stack_base;
+	void *stack_origin;
 	uint32_t stack_size;
 	uint64_t pid;
 

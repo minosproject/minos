@@ -37,6 +37,7 @@ struct virq_desc {
 	uint16_t hno;
 	uint16_t vmid;
 	uint16_t vcpu_id;
+	uint16_t pr;
 } __packed__;
 
 struct virq_domain {
@@ -77,7 +78,7 @@ struct virq_desc *get_virq_desc(uint32_t virq)
 }
 
 static int __send_virq(struct vcpu *vcpu,
-		uint32_t vno, uint32_t hno, int hw)
+		uint32_t vno, uint32_t hno, int hw, int pr)
 {
 	struct virq_struct *virq_struct;
 	struct virq *virq;
@@ -135,6 +136,7 @@ static int __send_virq(struct vcpu *vcpu,
 	virq->v_intno = vno;
 	virq->hw = hw;
 	virq->id = index;
+	virq->pr = pr;
 	virq->state = VIRQ_STATE_OFFLINE;
 	set_bit(index, virq_struct->irq_bitmap);
 	list_add_tail(&virq_struct->pending_list, &virq->list);
@@ -163,7 +165,23 @@ static int guest_irq_handler(uint32_t irq, void *data)
 	if (!vcpu)
 		return -ENOENT;
 
-	return __send_virq(vcpu, desc->vno, irq, 1);
+	return __send_virq(vcpu, desc->vno, irq, 1, desc->pr);
+}
+
+int virq_set_priority(uint32_t virq, int pr)
+{
+	struct virq_desc *desc;
+
+	desc = get_virq_desc(virq);
+	if (!desc) {
+		pr_debug("virq is no exist %d\n", virq);
+		return -ENOENT;
+	}
+
+	pr_debug("set the pr:%d for virq:%d\n", pr, virq);
+	desc->pr = pr;
+
+	return 0;
 }
 
 int __virq_enable(uint32_t virq, int enable)
@@ -234,7 +252,7 @@ int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq)
 		return -EINVAL;
 	}
 
-	return __send_virq(vcpu, virq, 0, 0);
+	return __send_virq(vcpu, virq, 0, 0, desc->pr);
 }
 
 int send_virq_to_vm(uint32_t vmid, uint32_t virq)
@@ -255,7 +273,7 @@ void send_vsgi(struct vcpu *sender, uint32_t sgi, cpumask_t *cpumask)
 
 	for_each_set_bit(cpu, cpumask->bits, vm->vcpu_nr) {
 		vcpu = vm->vcpus[cpu];
-		__send_virq(vcpu, sgi, 0, 0);
+		__send_virq(vcpu, sgi, 0, 0, 0xa0);
 	}
 }
 

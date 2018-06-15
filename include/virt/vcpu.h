@@ -55,4 +55,10 @@ void sched_vcpu(struct vcpu *vcpu, int reason);
 struct vcpu *get_vcpu_in_vm(struct vm *vm, uint32_t vcpu_id);
 struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id);
 
+void vcpu_idle(void);
+int vcpu_suspend(gp_regs *c, uint32_t state, unsigned long entry);
+void vcpu_online(struct vcpu *vcpu);
+void vcpu_offline(struct vcpu *vcpu);
+int vcpu_power_on(struct vcpu *caller, int cpuid,
+		unsigned long entry, unsigned long unsed);
 #endif

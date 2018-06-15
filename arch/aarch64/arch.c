@@ -46,7 +46,7 @@ void arch_init_task(struct task *task, void *entry)
 {
 	gp_regs *regs;
 
-	regs = stack_to_gp_regs(task->stack_base);
+	regs = stack_to_gp_regs(task->stack_origin);
 	memset((char *)regs, 0, sizeof(gp_regs));
 
 	regs->elr_elx = (uint64_t)entry;
@@ -62,7 +62,7 @@ void arch_init_task(struct task *task, void *entry)
 
 	}
 
-	task->stack_base -= sizeof(gp_regs);
+	task->stack_base = task->stack_origin - sizeof(gp_regs);
 }
 
 int arch_early_init(void)

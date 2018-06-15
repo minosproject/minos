@@ -28,9 +28,10 @@ struct virqtag;
 struct virq {
 	uint32_t h_intno;
 	uint32_t v_intno;
-	int hw;
-	int state;
-	int id;
+	uint8_t hw;
+	uint8_t state;
+	uint16_t id;
+	uint16_t pr;
 	struct list_head list;
 };
 
@@ -57,6 +58,7 @@ int vcpu_has_virq_active(struct vcpu *vcpu);
 int vcpu_has_virq(struct vcpu *vcpu);
 void clear_pending_virq(uint32_t irq);
 int register_virq(struct virqtag *v);
+int virq_set_priority(uint32_t virq, int pr);
 
 int alloc_virtual_irqs(uint32_t start, uint32_t count, int type);
 

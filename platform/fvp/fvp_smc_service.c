@@ -41,6 +41,13 @@ static int fvp_std_smc_handler(gp_regs *c,
 
 	case PSCI_0_2_FN_CPU_OFF:
 		break;
+	case PSCI_0_2_FN64_CPU_SUSPEND:
+		/*
+		 * only can be called by vcpu self
+		 */
+		vcpu_suspend(c, (uint32_t)args[0], (unsigned long)args[1]);
+		SVC_RET1(c, 0, PSCI_RET_DENIED);
+		break;
 
 	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
 		SVC_RET1(c, 0, PSCI_0_2_TOS_MP);

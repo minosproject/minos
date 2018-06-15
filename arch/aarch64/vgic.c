@@ -248,7 +248,7 @@ static int vgic_gicd_mmio_write(struct vcpu *vcpu,
 			unsigned long offset,
 			unsigned long *value)
 {
-	uint32_t x, y, bit;
+	uint32_t x, y, bit, t;
 
 	spin_lock(&gicd->gicd_lock);
 
@@ -271,6 +271,20 @@ static int vgic_gicd_mmio_write(struct vcpu *vcpu,
 		y = x * 32;
 		for_each_set_bit(bit, value, 32)
 			virq_mask(y + bit);
+		break;
+
+	case GICD_IPRIORITYR...GICD_IPRIORITYR_END:
+		t = *value;
+		x = (offset - GICD_IPRIORITYR) / 4;
+		y = x * 4 - 1;
+		bit = (t & 0x000000ff);
+		virq_set_priority(y + 1, bit);
+		bit = (t & 0x0000ff00) >> 8;
+		virq_set_priority(y + 2, bit);
+		bit = (t & 0x00ff0000) >> 16;
+		virq_set_priority(y + 3, bit);
+		bit = (t & 0xff000000) >> 24;
+		virq_set_priority(y + 4, bit);
 		break;
 	}
 

@@ -242,7 +242,7 @@
 	{
 		"vno": 24,
 		"hno": 0,
-		"enable": 0,
+		"enable": 1,
 		"hw": 0,
 		"vmid" : 65535,
 		"vcpu_id": 65535,
@@ -252,7 +252,7 @@
 	{
 		"vno": 25,
 		"hno": 0,
-		"enable": 0,
+		"enable": 1,
 		"hw": 0,
 		"vmid" : 65535,
 		"vcpu_id": 65535,

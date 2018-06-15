@@ -48,6 +48,7 @@ static struct task *__create_task(char *name,
 	memset((char *)task, 0, sizeof(struct task));
 
 	task->stack_base = stack_base + stack_size;
+	task->stack_origin = stack_base + stack_size;
 	task->stack_size = stack_size;
 	task->pid = alloc_pid();
 	task->affinity = affinity;

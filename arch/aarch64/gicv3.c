@@ -269,7 +269,7 @@ static int gicv3_send_virq(struct virq *virq)
 
 	lr->v_intid = virq->v_intno;
 	lr->p_intid = virq->h_intno;
-	lr->priority = 0;
+	lr->priority = virq->pr;
 	lr->group = 1;
 	lr->hw = virq->hw;
 	lr->state = 1;
