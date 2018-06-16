@@ -18,6 +18,7 @@ struct virqtag;
 
 #define VIRQ_ACTION_REMOVE	(0x0)
 #define VIRQ_ACTION_ADD		(0x1)
+#define VIRQ_ACTION_CLEAR	(0x2)
 
 #define VIRQ_BASE		(1024)
 #define MAX_VIRQ_NR		(512)

@@ -382,6 +382,7 @@ static void irq_exit_from_guest(struct task *task, void *data)
 			virq->v_intno = 0;
 			virq->hw = 0;
 			virq->state = VIRQ_STATE_INACTIVE;
+			irq_update_virq(virq, VIRQ_ACTION_CLEAR);
 			clear_bit(set_bit, virq_struct->irq_bitmap);
 		}
 	}

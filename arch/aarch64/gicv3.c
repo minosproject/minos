@@ -282,7 +282,6 @@ static int gicv3_send_virq(struct virq *virq)
 static int gicv3_update_virq(struct virq *virq, int action)
 {
 	switch (action) {
-	case VIRQ_ACTION_REMOVE:
 		/*
 		 * wether need to update the context value?
 		 * TBD, since the context has not been saved
@@ -291,10 +290,13 @@ static int gicv3_update_virq(struct virq *virq, int action)
 		 * 2: if the virq is attached to a physical irq
 		 *    need to update the GICR register ?
 		 */
-		gicv3_write_lr(virq->id, 0);
 
+	case VIRQ_ACTION_REMOVE:
 		if (virq->hw)
 			gicv3_clear_pending(virq->h_intno);
+
+	case VIRQ_ACTION_CLEAR:
+		gicv3_write_lr(virq->id, 0);
 		break;
 
 	default:
