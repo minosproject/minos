@@ -26,20 +26,21 @@ extern int el2_stage1_init(void);
 
 int arch_taken_from_guest(gp_regs *regs)
 {
-	uint32_t mode = regs->spsr_elx & 0x0f;
-	uint64_t current_el = read_current_el() & 0x0f;
-	uint32_t current_mode;
+	/* TBD */
+	return ((regs->spsr_elx & 0xf) != (AARCH64_SPSR_EL2h));
+}
 
-	mode = (mode == AARCH64_SPSR_EL1h) ||
-		(mode == AARCH64_SPSR_EL1t);
+static inline void arch_init_gp_regs(gp_regs *regs, void *entry, int type)
+{
+	regs->elr_elx = (uint64_t)entry;
 
-	current_mode = (current_el == AARCH64_SPSR_EL2h) ||
-			(current_el == AARCH64_SPSR_EL2t);
+	if (type != TASK_TYPE_VCPU)
+		regs->spsr_elx = AARCH64_SPSR_EL2h | AARCH64_SPSR_F | \
+				 AARCH64_SPSR_I | AARCH64_SPSR_A;
+	else
 
-	if (mode && current_mode)
-		return 1;
-
-	return 0;
+		regs->spsr_elx = AARCH64_SPSR_EL1h | AARCH64_SPSR_F | \
+				 AARCH64_SPSR_I | AARCH64_SPSR_A;
 }
 
 void arch_init_task(struct task *task, void *entry)
@@ -48,21 +49,9 @@ void arch_init_task(struct task *task, void *entry)
 
 	regs = stack_to_gp_regs(task->stack_origin);
 	memset((char *)regs, 0, sizeof(gp_regs));
-
-	regs->elr_elx = (uint64_t)entry;
-
-	if (task->task_type == TASK_TYPE_VCPU) {
-		regs->spsr_elx = AARCH64_SPSR_EL2h | AARCH64_SPSR_F | \
-				 AARCH64_SPSR_I | AARCH64_SPSR_A;
-
-	} else {
-
-		regs->spsr_elx = AARCH64_SPSR_EL1h | AARCH64_SPSR_F | \
-				 AARCH64_SPSR_I | AARCH64_SPSR_A;
-
-	}
-
 	task->stack_base = task->stack_origin - sizeof(gp_regs);
+
+	arch_init_gp_regs(regs, entry, task->task_type);
 }
 
 int arch_early_init(void)

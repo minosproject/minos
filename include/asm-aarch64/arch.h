@@ -153,6 +153,6 @@ static inline void flush_all_tlbis(void)
 }
 
 int arch_taken_from_guest(gp_regs *regs);
-void arch_switch_task_sw();
+void arch_switch_task_sw(void);
 
 #endif

@@ -35,7 +35,7 @@ static uint64_t alloc_pid(void)
 
 static struct task *__create_task(char *name,
 		void *stack_base, uint32_t stack_size, int pr,
-		int affinity, void *p, unsigned long flag)
+		int affinity, void *p, unsigned long flags)
 {
 	struct task *task;
 
@@ -58,6 +58,9 @@ static struct task *__create_task(char *name,
 	task->is_idle = 0;
 	task->resched = 0;
 
+	if (flags & (TASK_FLAG_VCPU))
+		task->task_type = TASK_TYPE_VCPU;
+
 	init_list(&task->list);
 
 	strncpy(task->name, name,
@@ -70,7 +73,7 @@ static struct task *__create_task(char *name,
 
 struct task *create_task(char *name, void *entry,
 		uint32_t stack_size, int pr, int affinity,
-		void *p, unsigned long flag)
+		void *p, unsigned long flags)
 {
 	struct task *task;
 	void *stack_base;
@@ -92,7 +95,7 @@ struct task *create_task(char *name, void *entry,
 		affinity = get_default_affinity();
 
 	task = __create_task(name, stack_base,
-			stack_size, pr, affinity, p, flag);
+			stack_size, pr, affinity, p, flags);
 	if (!task)
 		return NULL;
 
@@ -105,7 +108,7 @@ struct task *create_task(char *name, void *entry,
 	 * after create it, since vcpu task have some boot
 	 * protocl in each os
 	 */
-	if (!(flag & TASK_FLAG_VCPU))
+	if (!(flags & TASK_FLAG_VCPU))
 		set_task_ready(task);
 
 	return task;
