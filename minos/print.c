@@ -117,7 +117,7 @@ int level_print(char *fmt, ...)
 	/*
 	 * temp disable the log buffer
 	 */
-	//update_log_buffer(buffer, printed);
+	update_log_buffer(buffer, printed);
 	buf = buffer;
 
 	if (uart_init_done) {
