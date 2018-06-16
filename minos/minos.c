@@ -163,10 +163,8 @@ void boot_main(void)
 
 	local_irq_enable();
 
-	while (1) {
-		sched();
-		cpu_idle_task();
-	}
+	cpu_idle_task();
+	panic("Should Not be here\n");
 }
 
 void boot_secondary(void)
@@ -193,8 +191,6 @@ void boot_secondary(void)
 
 	local_irq_enable();
 
-	while (1) {
-		sched();
-		cpu_idle_task();
-	}
+	cpu_idle_task();
+
 }
