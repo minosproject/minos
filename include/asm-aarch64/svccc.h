@@ -21,17 +21,6 @@
 #define SVC_STYPE_TRUST_OS_END		(0x3f)
 #define SVC_STYPE_MAX			(64)
 
-#define PSCI_RET_SUCCESS			0
-#define PSCI_RET_NOT_SUPPORTED			-1
-#define PSCI_RET_INVALID_PARAMS			-2
-#define PSCI_RET_DENIED				-3
-#define PSCI_RET_ALREADY_ON			-4
-#define PSCI_RET_ON_PENDING			-5
-#define PSCI_RET_INTERNAL_FAILURE		-6
-#define PSCI_RET_NOT_PRESENT			-7
-#define PSCI_RET_DISABLED			-8
-#define PSCI_RET_INVALID_ADDRESS		-9
-
 #define SVC_RET0(reg, r)	{	\
 	return r;			\
 }

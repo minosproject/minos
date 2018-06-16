@@ -93,25 +93,6 @@ int vcpu_can_idle(struct vcpu *vcpu)
 	return 1;
 }
 
-int vcpu_suspend(gp_regs *c, uint32_t state, unsigned long entry)
-{
-	struct vcpu *vcpu = current_vcpu;
-	unsigned long flags;
-
-	pr_info("vcpu suspend %d 0x%x\n", state, entry);
-
-	if (!vcpu_can_idle(vcpu))
-		return -EINVAL;
-
-	local_irq_save(flags);
-	arch_init_task(vcpu_to_task(vcpu), (void *)entry);
-	set_task_suspend(vcpu_to_task(vcpu));
-	sched();
-	local_irq_restore(flags);
-
-	return 0;
-}
-
 void vcpu_idle(void)
 {
 	struct vcpu *vcpu = current_vcpu;
@@ -120,6 +101,18 @@ void vcpu_idle(void)
 		set_task_suspend(vcpu_to_task(vcpu));
 		sched();
 	}
+}
+
+int vcpu_suspend(gp_regs *c, uint32_t state, unsigned long entry)
+{
+	/*
+	 * just call vcpu idle to put vcpu to suspend state
+	 * and ignore the wake up entry, since the vcpu will
+	 * not really powered off
+	 */
+	vcpu_idle();
+
+	return 0;
 }
 
 static int add_vm(struct vmtag *vme)
