@@ -56,7 +56,6 @@ unsigned long get_sys_time()
 
 static int timers_arch_init(void)
 {
-	io_remap(0x2a810000, 0x2a810000, 64 * 1024);
 	io_remap(0x2a430000, 0x2a430000, 64 * 1024);
 
 	if (!cpu_khz)

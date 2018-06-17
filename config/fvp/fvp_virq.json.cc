@@ -493,7 +493,7 @@
 		"vno": 58,
 		"hno": 58,
 		"enable": 1,
-		"hw": 1,
+		"hw": 0,
 		"vmid": 0,
 		"vcpu_id": 0,
 		"type": 8,

@@ -380,9 +380,9 @@
 	{
 		"mem_base": "0x2a830000",
 		"mem_end": "0x2a83ffff",
-		"host": 0,
+		"host": 1,
 		"sectype": "S/NS",
-		"enable": 1,
+		"enable": 0,
 		"type": 1,
 		"vmid": 0,
 		"name": "ap_refclk_cntbase1"
