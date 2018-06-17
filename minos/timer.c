@@ -47,6 +47,7 @@ static void run_timer_softirq(struct softirq_action *h)
 			 */
 			list_del(&timer->entry);
 			timer->entry.next = NULL;
+			timer->expires = (unsigned long)~0;
 			timers->running_timer = timer;
 			timer->function(timer->data);
 
@@ -73,7 +74,7 @@ static void run_timer_softirq(struct softirq_action *h)
 
 static inline int timer_pending(const struct timer_list * timer)
 {
-	return timer->entry.next != NULL;
+	return ((timer->entry.next) != NULL);
 }
 
 static int detach_timer(struct timers *timers, struct timer_list *timer)
@@ -99,10 +100,15 @@ int mod_timer(struct timer_list *timer, unsigned long expires)
 	unsigned long flags;
 	struct timers *timers = timer->timers;
 
-	if (timer_pending(timer) && (timer->expires == expires))
+	/*
+	 * if the timer is on pending on the timers active list
+	 * and the new expires equal the timer->expires, just
+	 * return
+	 */
+	if ((timer_pending(timer)) && (timer->expires == expires))
 		return 1;
 
-	printf("modify timer 0x%x\n", expires);
+	pr_debug("modify timer to 0x%x\n", expires);
 
 	spin_lock_irqsave(&timers->lock, flags);
 
