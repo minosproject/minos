@@ -47,7 +47,7 @@ void mm_init(void)
 	free_4k_base = free_mem_base + free_mem_size;
 }
 
-char *malloc(size_t size)
+void *malloc(size_t size)
 {
 	size_t request_size;
 	char *base;
@@ -69,7 +69,7 @@ char *malloc(size_t size)
 	return base;
 }
 
-char *zalloc(size_t size)
+void *zalloc(size_t size)
 {
 	char *base;
 
@@ -81,7 +81,7 @@ char *zalloc(size_t size)
 	return base;
 }
 
-char *get_free_pages(int pages)
+void *get_free_pages(int pages)
 {
 	size_t request_size = pages * SIZE_4K;
 	char *base;

@@ -23,9 +23,9 @@ struct mm_struct {
 };
 
 void mm_init(void);
-char *malloc(size_t size);
-char *zalloc(size_t size);
-char *get_free_pages(int pages);
+void *malloc(size_t size);
+void *zalloc(size_t size);
+void *get_free_pages(int pages);
 void free(void *addr);
 void free_pages(void *addr);
 
