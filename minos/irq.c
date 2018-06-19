@@ -317,6 +317,9 @@ static struct irq_domain *get_irq_domain(uint32_t irq)
 
 	for (i = 0; i < IRQ_DOMAIN_MAX; i++) {
 		domain = irq_domains[i];
+		if (!domain)
+			continue;
+
 		if ((irq >= domain->start) &&
 			(irq < domain->start + domain->count))
 			return domain;

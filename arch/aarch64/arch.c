@@ -97,7 +97,7 @@ static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
 	 * RW : low level is 64bit, when 0 is 32 bit
 	 * VM : enable virtualzation
 	 */
-	context->hcr_el2 = 0ul | HCR_EL2_HVC | HCR_EL2_TWI | HCR_EL2_TWE | \
+	context->hcr_el2 = 0ul | HCR_EL2_HVC | HCR_EL2_TWI | \
 		     HCR_EL2_TIDCP | HCR_EL2_IMO | HCR_EL2_FMO | \
 		     HCR_EL2_BSU_IS | HCR_EL2_FB | HCR_EL2_PTW | \
 		     HCR_EL2_TSC | HCR_EL2_TACR | HCR_EL2_AMO | \

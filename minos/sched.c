@@ -208,8 +208,6 @@ int local_sched_init(void)
 	struct timer_list *timer;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	init_list(&pcpu->task_list);
-
 	request_irq(CONFIG_MINOS_RESCHED_IRQ, resched_handler,
 			0, "resched handler", NULL);
 
