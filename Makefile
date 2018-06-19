@@ -96,9 +96,9 @@ $(OUT)/%.O : %.S $(INCLUDE_DIR)
 	$(QUIET) $(CC) $(CCFLAG) -c $< -o $@
 
 $(OUT)/$(PLATFORM)_config.c : $(OUT)/$(PLATFORM).json
-	@ echo "\n****** Generate $(PLATFORM)_config.c ******"
+	@ echo "****** Generate $(PLATFORM)_config.c ******"
 	$(QUIET) python3 tools/generate_mvconfig.py $< $@
-	@ echo "****** Generate $(PLATFORM)_config.c done ******\n"
+	@ echo "****** Generate $(PLATFORM)_config.c done ******"
 
 $(OUT)/$(PLATFORM).json : config/$(PLATFORM)/$(PLATFORM).json.cc config/$(PLATFORM)/$(PLATFORM)_config.h config/$(PLATFORM)/*.cc include/virt/virt.h
 	$(PROGRESS)
