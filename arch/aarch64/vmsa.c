@@ -49,6 +49,8 @@ struct vmsa_context {
 	uint64_t ttbr0_el1;
 	uint64_t ttbr1_el1;
 	uint64_t vttbr_el2;
+	uint64_t mair_el1;
+	uint64_t tcr_el1;
 }__align(sizeof(unsigned long));
 
 /*
@@ -557,6 +559,8 @@ static void vmsa_state_init(struct vcpu *vcpu, void *context)
 	c->vttbr_el2 = generate_vttbr_el2(vm->vmid, vm->mm.page_table_base);
 	c->ttbr0_el1 = 0;
 	c->ttbr1_el1 = 0;
+	c->mair_el1 = 0;
+	c->tcr_el1 = 0;
 }
 
 static void vmsa_state_save(struct vcpu *vcpu, void *context)
@@ -568,6 +572,8 @@ static void vmsa_state_save(struct vcpu *vcpu, void *context)
 	c->vttbr_el2 = read_sysreg(VTTBR_EL2);
 	c->ttbr0_el1 = read_sysreg(TTBR0_EL1);
 	c->ttbr1_el1 = read_sysreg(TTBR1_EL1);
+	c->mair_el1 = read_sysreg(MAIR_EL1);
+	c->tcr_el1 = read_sysreg(TCR_EL1);
 }
 
 static void vmsa_state_restore(struct vcpu *vcpu, void *context)
@@ -578,6 +584,8 @@ static void vmsa_state_restore(struct vcpu *vcpu, void *context)
 	write_sysreg(c->vttbr_el2, VTTBR_EL2);
 	write_sysreg(c->ttbr0_el1, TTBR0_EL1);
 	write_sysreg(c->ttbr1_el1, TTBR1_EL1);
+	write_sysreg(c->mair_el1, MAIR_EL1);
+	write_sysreg(c->tcr_el1, TCR_EL1);
 	dsb();
 	flush_local_tlb();
 }

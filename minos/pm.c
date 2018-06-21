@@ -18,13 +18,20 @@
 #include <asm/arch.h>
 #include <minos/sched.h>
 
+extern void sched_tick_enable(unsigned long exp);
+extern void sched_tick_disable(void);
+
 void cpu_idle_task()
 {
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
+	/* enable the sched_tick */
+
 	while (1) {
+		sched_tick_enable(MILLISECS(100));
 		sched();
 		pcpu->state = PCPU_STATE_IDLE;
+		sched_tick_disable();
 		wfi();
 		pcpu->state = PCPU_STATE_RUNNING;
 	}

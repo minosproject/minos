@@ -30,18 +30,20 @@ uint64_t boot_tick = 0;
 
 void *refclk_cnt_base = (void *)0x2a430000;
 
+extern unsigned long sched_tick_handler(unsigned long data);
+
 void arch_enable_timer(unsigned long expires)
 {
 	uint64_t deadline;
 
 	if (expires == 0) {
-		write_sysreg32(0, CNTHP_CTL_EL2);
+		write_sysreg32(0, CNTP_CTL_EL0);
 		return;
 	}
 
 	deadline = ns_to_ticks(expires) + boot_tick;
-	write_sysreg64(deadline, CNTHP_CVAL_EL2);
-	write_sysreg32(1 << 0, CNTHP_CTL_EL2);
+	write_sysreg64(deadline, CNTP_CVAL_EL0);
+	write_sysreg32(1 << 0, CNTP_CTL_EL0);
 	isb();
 }
 
@@ -72,7 +74,7 @@ static int timers_arch_init(void)
 static int timer_interrupt_handler(uint32_t irq, void *data)
 {
 	raise_softirq(TIMER_SOFTIRQ);
-	write_sysreg32(0, CNTHP_CTL_EL2);
+	write_sysreg32(0, CNTP_CTL_EL0);
 
 	return 0;
 }
@@ -91,15 +93,60 @@ static int vtimer_interrupt_handler(uint32_t irq, void *data)
 	return 0;
 }
 
+static int sched_timer_handler(uint32_t irq, void *data)
+{
+	unsigned long next_evt;
+	unsigned long exp;
+
+	/* disable timer to avoid interrupt */
+	write_sysreg32(0, CNTHP_CTL_EL2);
+
+	next_evt = sched_tick_handler((unsigned long)data);
+	if (next_evt) {
+		exp = read_sysreg64(CNTPCT_EL0);
+		exp += ns_to_ticks(next_evt);
+		exp += boot_tick;
+
+		write_sysreg64(exp, CNTHP_CVAL_EL2);
+		write_sysreg32(1 << 0, CNTHP_CTL_EL2);
+		isb();
+	}
+
+	return 0;
+}
+
+void sched_tick_disable(void)
+{
+	write_sysreg32(0, CNTHP_CTL_EL2);
+}
+
+void sched_tick_enable(unsigned long exp)
+{
+	unsigned long deadline;
+
+	deadline = read_sysreg64(CNTPCT_EL0);
+	deadline += ns_to_ticks(exp);
+	deadline += boot_tick;
+
+	write_sysreg64(deadline, CNTHP_CVAL_EL2);
+	write_sysreg32(1 << 0, CNTHP_CTL_EL2);
+	isb();
+}
+
 static int timers_init(void)
 {
 	write_sysreg64(0, CNTVOFF_EL2);
+
+	/* el1/el0 can read CNTPCT_EL0 */
 	write_sysreg32(1 << 0, CNTHCTL_EL2);
+
+	/* disable hyper and phy timer */
 	write_sysreg32(0, CNTP_CTL_EL0);
 	write_sysreg32(0, CNTHP_CTL_EL2);
 	isb();
 
-	request_irq(HYP_TIMER_INT, timer_interrupt_handler,
+	/* used for sched ticks */
+	request_irq(HYP_TIMER_INT, sched_timer_handler,
 			0, "hyp timer int", NULL);
 
 	request_irq(PHYS_TIMER_NONSEC_INT, timer_interrupt_handler,

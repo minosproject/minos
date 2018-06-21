@@ -6,6 +6,7 @@ struct pcpu;
 
 struct sched_class {
 	char *name;
+	unsigned long sched_interval;
 	struct task *(*pick_task)(struct pcpu *);
 	void (*set_task_state)(struct pcpu *, struct task *, int);
 	int (*add_task)(struct pcpu *, struct task *);

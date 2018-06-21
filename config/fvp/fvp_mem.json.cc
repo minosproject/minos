@@ -95,7 +95,7 @@
 		"sectype": "S/NS",
 		"enable": 1,
 		"type": 1,
-		"vmid": 0,
+		"vmid": 1,
 		"name": "ve sys reg"
 	},
 	{
@@ -185,7 +185,7 @@
 		"sectype": "S/NS",
 		"enable": 1,
 		"type": 1,
-		"vmid": 0,
+		"vmid": 1,
 		"name": "uart3, pl011"
 	},
 	{
@@ -225,7 +225,7 @@
 		"sectype": "S/NS",
 		"enable": 1,
 		"type": 1,
-		"vmid": 0,
+		"vmid": 1,
 		"name": "timer0 sp804"
 	},
 	{
@@ -275,7 +275,7 @@
 		"sectype": "S/NS",
 		"enable": 1,
 		"type": 1,
-		"vmid": 0,
+		"vmid": 1,
 		"name": "color lcd pl111"
 	},
 	{
@@ -529,12 +529,22 @@
 	},
 	{
 		"mem_base": "0x80000000",
-		"mem_end": "0xc0000000",
+		"mem_end": "0x84000000",
 		"host": 0,
 		"sectype": "S/NS",
 		"enable": 1,
 		"type": 0,
 		"vmid": 0,
+		"name": "dram"
+	},
+	{
+		"mem_base": "0x84000000",
+		"mem_end": "0x88000000",
+		"host": 0,
+		"sectype": "S/NS",
+		"enable": 1,
+		"type": 0,
+		"vmid": 1,
 		"name": "dram"
 	}
 ],

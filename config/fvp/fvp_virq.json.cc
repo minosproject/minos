@@ -334,7 +334,7 @@
 		"hno": 34,
 		"enable": 1,
 		"hw": 1,
-		"vmid": 0,
+		"vmid": 1,
 		"vcpu_id": 0,
 		"type": 8,
 		"name": "sp804-timer0"
@@ -394,7 +394,7 @@
 		"hno": 40,
 		"enable": 1,
 		"hw": 1,
-		"vmid": 0,
+		"vmid": 1,
 		"vcpu_id": 0,
 		"type": 8,
 		"name": "uart3"
@@ -454,7 +454,7 @@
 		"hno": 46,
 		"enable": 1,
 		"hw": 1,
-		"vmid": 0,
+		"vmid": 1,
 		"vcpu_id": 0,
 		"type": 8,
 		"name": "color lcd pl111"

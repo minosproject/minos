@@ -45,7 +45,6 @@ struct pcpu {
 	void *sched_data;
 
 	struct list_head task_list;
-	struct timer_list sched_timer;
 };
 
 #define pcpu_to_sched_data(pcpu)	(pcpu->sched_data)

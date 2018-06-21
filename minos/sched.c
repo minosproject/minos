@@ -54,19 +54,24 @@ void pcpu_resched(int pcpu_id)
 
 void switch_to_task(struct task *current, struct task *next)
 {
+	struct pcpu *pcpu = get_cpu_var(pcpu);
+
 	if (current != next) {
 		if (current->task_type == TASK_TYPE_VCPU)
 			save_vcpu_task_state(current);
 
 		if (next->task_type == TASK_TYPE_VCPU)
 			restore_vcpu_task_state(next);
+
+		pcpu->sched_class->sched(pcpu, current, next);
+
+		current->state = TASK_STAT_READY;
+		next->state = TASK_STAT_RUNNING;
 	}
 
 	if (next->task_type == TASK_TYPE_VCPU)
 		enter_to_guest(next, NULL);
 
-	current->state = TASK_STAT_READY;
-	next->state = TASK_STAT_RUNNING;
 }
 
 void sched_task(struct task *task)
@@ -121,11 +126,6 @@ void sched(void)
 	}
 }
 
-static void sched_timer_function(unsigned long data)
-{
-
-}
-
 void pcpus_init(void)
 {
 	int i;
@@ -136,13 +136,6 @@ void pcpus_init(void)
 		pcpu->state = PCPU_STATE_RUNNING;
 		init_list(&pcpu->task_list);
 		pcpu->pcpu_id = i;
-
-		/*
-		 * init the sched timer
-		 */
-		init_timer(&pcpu->sched_timer);
-		pcpu->sched_timer.function = sched_timer_function;
-
 		get_per_cpu(pcpu, i) = pcpu;
 	}
 }
@@ -189,6 +182,16 @@ static int resched_handler(uint32_t irq, void *data)
 	return 0;
 }
 
+unsigned long sched_tick_handler(unsigned long data)
+{
+	struct pcpu *pcpu = get_cpu_var(pcpu);
+
+	printf("sched_tick_handler\n");
+	next_task = pcpu->sched_class->sched_new(pcpu);
+
+	return pcpu->sched_class->sched_interval;
+}
+
 int sched_init(void)
 {
 	int i;
@@ -205,15 +208,6 @@ int sched_init(void)
 
 int local_sched_init(void)
 {
-	struct timer_list *timer;
-	struct pcpu *pcpu = get_cpu_var(pcpu);
-
-	request_irq(CONFIG_MINOS_RESCHED_IRQ, resched_handler,
+	return request_irq(CONFIG_MINOS_RESCHED_IRQ, resched_handler,
 			0, "resched handler", NULL);
-
-	timer = &pcpu->sched_timer;
-	timer->expires = NOW() + MILLISECS(CONFIG_SCHED_INTERVAL);
-	add_timer(timer);
-
-	return 0;
 }
