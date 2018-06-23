@@ -83,10 +83,11 @@ static int __send_virq(struct vcpu *vcpu,
 	struct virq_struct *virq_struct;
 	struct virq *virq;
 	int index;
+	unsigned long flags;
 
 	virq_struct = &vcpu->virq_struct;
 
-	spin_lock(&virq_struct->lock);
+	spin_lock_irqsave(&virq_struct->lock, flags);
 
 	/*
 	 * The following cases are considered software programming
@@ -107,23 +108,27 @@ static int __send_virq(struct vcpu *vcpu,
 	 * • Having two or more interrupts with the same pINTID in the Lis
 	 *   registers for a single virtual CPU interface.
 	 */
-	if (hw) {
-		for_each_set_bit(index, virq_struct->irq_bitmap,
-				CONFIG_VCPU_MAX_ACTIVE_IRQS) {
-			virq = &virq_struct->virqs[index];
-			if (virq->h_intno == hno) {
-				pr_debug("vcpu has same hirq:%d in pending/actvie state\n", hno);
+	for_each_set_bit(index, virq_struct->irq_bitmap,
+			CONFIG_VCPU_MAX_ACTIVE_IRQS) {
+		virq = &virq_struct->virqs[index];
+		if (virq->v_intno == vno) {
+			pr_info("vcpu has same virq:%d in pending/actvie state\n", vno);
 
-				/*
-				 * set the virq's state to pending again, just call
-				 * the irq_send_virq() to update the related register
-				 */
-				virq->state = VIRQ_STATE_PENDING;
+			/*
+			 * if the irq has not been handled then set the virq's
+			 * state to pending again, just call the irq_send_virq()
+			 * to update the related register
+			 */
+			virq->state = VIRQ_STATE_PENDING;
+			if (vcpu_state(vcpu) == VCPU_STAT_RUNNING) {
 				irq_send_virq(virq);
-
-				spin_unlock(&virq_struct->lock);
-				return 0;
+			} else {
+				index = virq->id;
+				goto out;
 			}
+
+			spin_unlock_irqrestore(&virq_struct->lock, flags);
+			return 0;
 		}
 	}
 
@@ -135,7 +140,7 @@ static int __send_virq(struct vcpu *vcpu,
 		 * need to drop it ? TBD
 		 */
 		pr_error("Can not send this virq now %d\n", vno);
-		spin_unlock(&virq_struct->lock);
+		spin_unlock_irqrestore(&virq_struct->lock, flags);
 		return -EAGAIN;
 	}
 
@@ -145,17 +150,17 @@ static int __send_virq(struct vcpu *vcpu,
 	virq->hw = hw;
 	virq->id = index;
 	virq->pr = pr;
+
+out:
 	virq->state = VIRQ_STATE_OFFLINE;
 	set_bit(index, virq_struct->irq_bitmap);
-	list_add_tail(&virq_struct->pending_list, &virq->list);
-	virq_struct->pending_count++;
+	if (virq->list.next == NULL)
+		list_add_tail(&virq_struct->pending_list, &virq->list);
 
-	spin_unlock(&virq_struct->lock);
+	spin_unlock_irqrestore(&virq_struct->lock, flags);
 
-	if (hw)
-		sched_vcpu(vcpu, VCPU_SCHED_REASON_HIRQ);
-	else
-		sched_vcpu(vcpu, VCPU_SCHED_REASON_VIRQ);
+	sched_vcpu(vcpu, hw ? VCPU_SCHED_REASON_HIRQ :
+			VCPU_SCHED_REASON_VIRQ);
 
 	return 0;
 }
@@ -289,6 +294,7 @@ void clear_pending_virq(uint32_t irq)
 {
 	int bit;
 	struct virq *virq;
+	unsigned long flags;
 	struct vcpu *vcpu = current_vcpu;
 	struct virq_struct *virq_struct = &vcpu->virq_struct;
 
@@ -296,7 +302,7 @@ void clear_pending_virq(uint32_t irq)
 	 * this function can only called by the current
 	 * running vcpu and excuted on the related pcpu
 	 */
-	spin_lock(&virq_struct->lock);
+	spin_lock_irqsave(&virq_struct->lock, flags);
 
 	for_each_set_bit(bit, virq_struct->irq_bitmap,
 			CONFIG_VCPU_MAX_ACTIVE_IRQS) {
@@ -305,7 +311,6 @@ void clear_pending_virq(uint32_t irq)
 		if ((virq->v_intno == irq) &&
 			(virq->state == VIRQ_STATE_PENDING)) {
 			irq_update_virq(virq, VIRQ_ACTION_REMOVE);
-			virq_struct->active_count--;
 			virq->h_intno = 0;
 			virq->v_intno = 0;
 			virq->hw = 0;
@@ -314,7 +319,7 @@ void clear_pending_virq(uint32_t irq)
 		}
 	}
 
-	spin_unlock(&virq_struct->lock);
+	spin_unlock_irqrestore(&virq_struct->lock, flags);
 }
 
 static void irq_enter_to_guest(struct task *task, void *data)
@@ -324,23 +329,29 @@ static void irq_enter_to_guest(struct task *task, void *data)
 	 * before it enter to guest
 	 */
 	struct virq *virq;
+	unsigned long flags;
 	struct vcpu *vcpu = task_to_vcpu(task);
 	struct virq_struct *virq_struct = &vcpu->virq_struct;
 
-	spin_lock(&virq_struct->lock);
+	spin_lock_irqsave(&virq_struct->lock, flags);
 
 	list_for_each_entry(virq, &virq_struct->pending_list, list) {
-		if (virq->state != VIRQ_STATE_OFFLINE)
+		if (virq->state != VIRQ_STATE_OFFLINE) {
 			pr_debug("something was wrong with this irq %d\n", virq->id);
+			continue;
+		}
 
 		virq->state = VIRQ_STATE_PENDING;
 		irq_send_virq(virq);
 		list_del(&virq->list);
-		virq_struct->pending_count--;
-		virq_struct->active_count++;
+		virq->list.next = NULL;
+		if (virq->hw)
+			virq_struct->pending_hirq++;
+		else
+			virq_struct->pending_virq++;
 	}
 
-	spin_unlock(&virq_struct->lock);
+	spin_unlock_irqrestore(&virq_struct->lock, flags);
 }
 
 static void irq_exit_from_guest(struct task *task, void *data)
@@ -353,11 +364,12 @@ static void irq_exit_from_guest(struct task *task, void *data)
 	 */
 	struct virq *virq;
 	uint32_t set_bit;
+	unsigned long flags;
 	int status;
 	struct vcpu *vcpu = task_to_vcpu(task);
 	struct virq_struct *virq_struct = &vcpu->virq_struct;
 
-	spin_lock(&virq_struct->lock);
+	spin_lock_irqsave(&virq_struct->lock, flags);
 
 	for_each_set_bit(set_bit, virq_struct->irq_bitmap,
 			CONFIG_VCPU_MAX_ACTIVE_IRQS) {
@@ -372,22 +384,17 @@ static void irq_exit_from_guest(struct task *task, void *data)
 		 * the virq has been handled by the VCPU
 		 */
 		if (status == VIRQ_STATE_INACTIVE) {
-			virq_struct->active_count--;
-			if (virq_struct->active_count < 0) {
-				pr_error("irq count is error\n");
-				break;
-			}
-
-			virq->h_intno = 0;
-			virq->v_intno = 0;
-			virq->hw = 0;
 			virq->state = VIRQ_STATE_INACTIVE;
 			irq_update_virq(virq, VIRQ_ACTION_CLEAR);
 			clear_bit(set_bit, virq_struct->irq_bitmap);
+			if (virq->hw)
+				virq_struct->pending_hirq--;
+			else
+				virq_struct->pending_virq--;
 		}
 	}
 
-	spin_unlock(&virq_struct->lock);
+	spin_unlock_irqrestore(&virq_struct->lock, flags);
 }
 
 void vcpu_virq_struct_init(struct virq_struct *virq_struct)
@@ -402,7 +409,8 @@ void vcpu_virq_struct_init(struct virq_struct *virq_struct)
 	spin_lock_init(&virq_struct->lock);
 	init_list(&virq_struct->pending_list);
 	bitmap_clear(virq_struct->irq_bitmap, 0, CONFIG_VCPU_MAX_ACTIVE_IRQS);
-	virq_struct->pending_count = 0;
+	virq_struct->pending_virq = 0;
+	virq_struct->pending_hirq = 0;
 
 	for (i = 0; i < CONFIG_VCPU_MAX_ACTIVE_IRQS; i++) {
 		virq = &virq_struct->virqs[i];
@@ -412,27 +420,8 @@ void vcpu_virq_struct_init(struct virq_struct *virq_struct)
 		virq->id = i;
 		virq->hw = 0;
 		init_list(&virq->list);
+		virq->list.next = NULL;
 	}
-}
-
-int vcpu_has_virq_pending(struct vcpu *vcpu)
-{
-	return (!!vcpu->virq_struct.pending_count);
-}
-
-int vcpu_has_virq_active(struct vcpu *vcpu)
-{
-	return (!!vcpu->virq_struct.active_count);
-}
-
-int vcpu_has_virq(struct vcpu *vcpu)
-{
-	int active, pending;
-
-	active = !!vcpu->virq_struct.active_count;
-	pending = !!vcpu->virq_struct.pending_count;
-
-	return (active || pending);
 }
 
 int alloc_virtual_irqs(uint32_t start, uint32_t count, int type)

@@ -28,7 +28,7 @@ void cpu_idle_task()
 	/* enable the sched_tick */
 
 	while (1) {
-		sched_tick_enable(MILLISECS(100));
+		sched_tick_enable(MILLISECS(5));
 		sched();
 		pcpu->state = PCPU_STATE_IDLE;
 		sched_tick_disable();

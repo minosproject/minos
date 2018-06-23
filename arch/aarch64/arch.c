@@ -20,6 +20,7 @@
 #include <virt/vmodule.h>
 #include <asm/arch.h>
 #include <minos/task.h>
+#include <minos/string.h>
 
 extern int el2_stage2_init(void);
 extern int el2_stage1_init(void);

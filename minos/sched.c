@@ -33,20 +33,6 @@ DEFINE_PER_CPU(struct task *, percpu_next_task);
 
 DEFINE_PER_CPU(int, need_resched);
 
-#if 0
-struct task *get_highest_pending_task(struct pcpu *pcpu)
-{
-	unsigned long x, y;
-	uint8_t tmp;
-
-	x = __ffs64(pcpu->ready_group);
-	tmp = pcpu->ready_tbl[x];
-	y = uint8_ffs_table[tmp];
-
-	return pcpu->task_table[(x << 3) + y];
-}
-#endif
-
 void pcpu_resched(int pcpu_id)
 {
 	send_sgi(CONFIG_MINOS_RESCHED_IRQ, pcpu_id);
@@ -186,7 +172,6 @@ unsigned long sched_tick_handler(unsigned long data)
 {
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	printf("sched_tick_handler\n");
 	next_task = pcpu->sched_class->sched_new(pcpu);
 
 	return pcpu->sched_class->sched_interval;

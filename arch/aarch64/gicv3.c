@@ -27,6 +27,7 @@
 #include <asm/arch.h>
 #include <minos/cpumask.h>
 #include <minos/irq.h>
+#include <virt/virq.h>
 
 spinlock_t gicv3_lock;
 static void *gicd_base = (void *)0x2f000000;

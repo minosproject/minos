@@ -54,3 +54,18 @@ uint8_t const uint8_ffs_table[256] = {
     5u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u,
     4u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u
 };
+
+#if 0
+struct task *get_highest_pending_task(struct pcpu *pcpu)
+{
+	unsigned long x, y;
+	uint8_t tmp;
+
+	x = __ffs64(pcpu->ready_group);
+	tmp = pcpu->ready_tbl[x];
+	y = uint8_ffs_table[tmp];
+
+	return pcpu->task_table[(x << 3) + y];
+}
+#endif
+

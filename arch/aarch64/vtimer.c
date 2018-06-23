@@ -23,6 +23,7 @@
 #include <minos/timer.h>
 #include <minos/irq.h>
 #include <minos/sched.h>
+#include <virt/virq.h>
 
 int vtimer_vmodule_id = INVAILD_MODULE_ID;
 

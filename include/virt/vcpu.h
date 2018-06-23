@@ -11,10 +11,37 @@
 #include <virt/vm.h>
 #include <minos/spinlock.h>
 #include <minos/task.h>
-#include <minos/cpumask.h>
-#include <virt/virq.h>
 
 #define VCPU_TASK_DEFAULT_STACK_SIZE	(SIZE_4K * 2)
+
+#define VCPU_MAX_LOCAL_IRQS	(32)
+#define CONFIG_VCPU_MAX_ACTIVE_IRQS	(16)
+
+#define VCPU_STAT_READY		(TASK_STAT_READY)
+#define VCPU_STAT_RUNNING	(TASK_STAT_RUNNING)
+#define VCPU_STAT_SUSPEND	(TASK_STAT_SUSPEND)
+#define VCPU_STAT_IDLE		(TASK_STAT_IDLE)
+
+struct virq {
+	uint32_t h_intno;
+	uint32_t v_intno;
+	uint8_t hw;
+	uint8_t state;
+	uint16_t id;
+	uint16_t pr;
+	struct list_head list;
+};
+
+struct virq_struct {
+	uint32_t active_count;
+	uint32_t pending_hirq;
+	uint32_t pending_virq;
+	spinlock_t lock;
+	struct list_head pending_list;
+	DECLARE_BITMAP(irq_bitmap, CONFIG_VCPU_MAX_ACTIVE_IRQS);
+	DECLARE_BITMAP(local_irq_mask, VCPU_MAX_LOCAL_IRQS);
+	struct virq virqs[CONFIG_VCPU_MAX_ACTIVE_IRQS];
+};
 
 struct vcpu {
 	uint32_t vcpu_id;
@@ -33,6 +60,7 @@ struct vcpu {
 
 #define vcpu_to_task(vcpu)	(vcpu->task)
 #define vcpu_affinity(vcpu)	(vcpu->task->affinity)
+#define vcpu_state(vcpu)	(vcpu->task->state)
 
 #define VCPU_SCHED_REASON_HIRQ	0x0
 #define VCPU_SCHED_REASON_VIRQ	0x1

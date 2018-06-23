@@ -25,6 +25,7 @@
 #include <minos/irq.h>
 #include <asm/vgic.h>
 #include <minos/sched.h>
+#include <virt/virq.h>
 
 static struct list_head gicd_list;
 static int vgic_vmodule_id = INVAILD_MODULE_ID;

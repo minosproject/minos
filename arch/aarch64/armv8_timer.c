@@ -24,6 +24,7 @@
 #include <minos/sched.h>
 #include <virt/vmodule.h>
 #include <minos/irq.h>
+#include <virt/virq.h>
 
 uint32_t cpu_khz = 0;
 uint64_t boot_tick = 0;

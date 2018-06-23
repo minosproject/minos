@@ -38,6 +38,14 @@ LIST_HEAD(vm_list);
 
 void sched_vcpu(struct vcpu *vcpu, int reason)
 {
+	struct vcpu *current = current_vcpu;
+
+	if (vcpu == current)
+		return;
+
+	if (vcpu_has_hwirq_pending(current))
+		return;
+
 	sched_task(vcpu_to_task(vcpu));
 }
 
@@ -83,7 +91,7 @@ int vcpu_can_idle(struct vcpu *vcpu)
 	if (in_interrupt)
 		return 0;
 
-	if (vcpu_has_virq(vcpu))
+	if (vcpu_has_irq(vcpu))
 		return 0;
 
 	if (get_task_state(vcpu_to_task(vcpu)) !=

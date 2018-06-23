@@ -185,7 +185,7 @@ static struct task *fifo_sched_new(struct pcpu *pcpu)
 
 static struct sched_class sched_fifo = {
 	.name		= "fifo",
-	.sched_interval = MILLISECS(50),
+	.sched_interval = MILLISECS(5),
 	.set_task_state = fifo_set_task_state,
 	.pick_task	= fifo_pick_task,
 	.add_task	= fifo_add_task,
