@@ -113,7 +113,6 @@ arch_switch_task_sw:
 	orr	x0, x0, x2
 	str	x0, [sp, #-8]!
 
-	//mrs	x0, elr_el2
 	str	x30, [sp, #-8]!
 
 	ldr	x5, =per_cpu_percpu_current_task
@@ -138,8 +137,8 @@ arch_switch_task_sw:
 	ldr	x2, [x1]
 	mov	sp, x2
 
-	/* current = next */
-	str	x1, [x5]
+	str	x1, [x5]		// current = next
+	dsb sy
 
 	//restore_gp_regs
 	ldr	x0, [sp], #8
@@ -281,9 +280,12 @@ __irq_handler:
 
 	mov	x2, sp
 	str	x2, [x0]		// save the stack to the stack base
-	str	x1, [x5]		// current task = next task
+
 	ldr	x2, [x1]
-	mov	sp, x2		// load the sp from the next task
+	mov	sp, x2			// load the sp from the next task
+
+	str	x1, [x5]		// current task = next task
+	dsb sy
 
 __switch_to_task:
 	//restore_gp_regs

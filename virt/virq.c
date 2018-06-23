@@ -83,11 +83,10 @@ static int __send_virq(struct vcpu *vcpu,
 	struct virq_struct *virq_struct;
 	struct virq *virq;
 	int index;
-	unsigned long flags;
 
 	virq_struct = &vcpu->virq_struct;
 
-	spin_lock_irqsave(&virq_struct->lock, flags);
+	spin_lock(&virq_struct->lock);
 
 	/*
 	 * The following cases are considered software programming
@@ -127,7 +126,7 @@ static int __send_virq(struct vcpu *vcpu,
 				goto out;
 			}
 
-			spin_unlock_irqrestore(&virq_struct->lock, flags);
+			spin_unlock(&virq_struct->lock);
 			return 0;
 		}
 	}
@@ -140,7 +139,7 @@ static int __send_virq(struct vcpu *vcpu,
 		 * need to drop it ? TBD
 		 */
 		pr_error("Can not send this virq now %d\n", vno);
-		spin_unlock_irqrestore(&virq_struct->lock, flags);
+		spin_unlock(&virq_struct->lock);
 		return -EAGAIN;
 	}
 
@@ -148,16 +147,15 @@ static int __send_virq(struct vcpu *vcpu,
 	virq->h_intno = hno;
 	virq->v_intno = vno;
 	virq->hw = hw;
-	virq->id = index;
 	virq->pr = pr;
+	set_bit(index, virq_struct->irq_bitmap);
 
 out:
 	virq->state = VIRQ_STATE_OFFLINE;
-	set_bit(index, virq_struct->irq_bitmap);
 	if (virq->list.next == NULL)
 		list_add_tail(&virq_struct->pending_list, &virq->list);
 
-	spin_unlock_irqrestore(&virq_struct->lock, flags);
+	spin_unlock(&virq_struct->lock);
 
 	sched_vcpu(vcpu, hw ? VCPU_SCHED_REASON_HIRQ :
 			VCPU_SCHED_REASON_VIRQ);
@@ -175,8 +173,10 @@ static int guest_irq_handler(uint32_t irq, void *data)
 
 	/* send the virq to the guest */
 	vcpu = get_vcpu_by_id(desc->vmid, desc->vcpu_id);
-	if (!vcpu)
+	if (!vcpu) {
+		pr_error("%s: Can not get the vcpu for irq:%d\n", irq);
 		return -ENOENT;
+	}
 
 	return __send_virq(vcpu, desc->vno, irq, 1, desc->pr);
 }
@@ -253,6 +253,8 @@ int __virq_enable(uint32_t virq, int enable)
 
 int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq)
 {
+	int ret;
+	unsigned long flags;
 	struct virq_desc *desc;
 
 	desc = get_virq_desc(virq);
@@ -265,7 +267,11 @@ int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq)
 		return -EINVAL;
 	}
 
-	return __send_virq(vcpu, virq, 0, 0, desc->pr);
+	local_irq_save(flags);
+	ret = __send_virq(vcpu, virq, 0, 0, desc->pr);
+	local_irq_restore(flags);
+
+	return ret;
 }
 
 int send_virq_to_vm(uint32_t vmid, uint32_t virq)
@@ -281,13 +287,16 @@ int send_virq_to_vm(uint32_t vmid, uint32_t virq)
 void send_vsgi(struct vcpu *sender, uint32_t sgi, cpumask_t *cpumask)
 {
 	int cpu;
+	unsigned long flags;
 	struct vcpu *vcpu;
 	struct vm *vm = sender->vm;
 
+	local_irq_save(flags);
 	for_each_set_bit(cpu, cpumask->bits, vm->vcpu_nr) {
 		vcpu = vm->vcpus[cpu];
 		__send_virq(vcpu, sgi, 0, 0, 0xa0);
 	}
+	local_irq_restore(flags);
 }
 
 void clear_pending_virq(uint32_t irq)
@@ -328,16 +337,15 @@ static void irq_enter_to_guest(struct task *task, void *data)
 	 * here we send the real virq to the vcpu
 	 * before it enter to guest
 	 */
-	struct virq *virq;
-	unsigned long flags;
+	struct virq *virq, *n;
 	struct vcpu *vcpu = task_to_vcpu(task);
 	struct virq_struct *virq_struct = &vcpu->virq_struct;
 
-	spin_lock_irqsave(&virq_struct->lock, flags);
+	spin_lock(&virq_struct->lock);
 
-	list_for_each_entry(virq, &virq_struct->pending_list, list) {
+	list_for_each_entry_safe(virq, n, &virq_struct->pending_list, list) {
 		if (virq->state != VIRQ_STATE_OFFLINE) {
-			pr_debug("something was wrong with this irq %d\n", virq->id);
+			pr_error("something was wrong with this irq %d\n", virq->id);
 			continue;
 		}
 
@@ -351,7 +359,7 @@ static void irq_enter_to_guest(struct task *task, void *data)
 			virq_struct->pending_virq++;
 	}
 
-	spin_unlock_irqrestore(&virq_struct->lock, flags);
+	spin_unlock(&virq_struct->lock);
 }
 
 static void irq_exit_from_guest(struct task *task, void *data)
@@ -364,12 +372,11 @@ static void irq_exit_from_guest(struct task *task, void *data)
 	 */
 	struct virq *virq;
 	uint32_t set_bit;
-	unsigned long flags;
 	int status;
 	struct vcpu *vcpu = task_to_vcpu(task);
 	struct virq_struct *virq_struct = &vcpu->virq_struct;
 
-	spin_lock_irqsave(&virq_struct->lock, flags);
+	spin_lock(&virq_struct->lock);
 
 	for_each_set_bit(set_bit, virq_struct->irq_bitmap,
 			CONFIG_VCPU_MAX_ACTIVE_IRQS) {
@@ -394,7 +401,7 @@ static void irq_exit_from_guest(struct task *task, void *data)
 		}
 	}
 
-	spin_unlock_irqrestore(&virq_struct->lock, flags);
+	spin_unlock(&virq_struct->lock);
 }
 
 void vcpu_virq_struct_init(struct virq_struct *virq_struct)

@@ -41,6 +41,8 @@ static void inline list_del(struct list_head *list)
 {
 	list->next->pre = list->pre;
 	list->pre->next = list->next;
+	list->next = (void *)0 + 0x10;
+	list->pre = (void *)0 + 0x20;
 }
 
 static void inline list_del_tail(struct list_head *head)
@@ -76,12 +78,21 @@ static inline struct list_head *list_prve(struct list_head *list)
 #define list_first_entry(ptr, type, member) \
 	list_entry((ptr)->next, type, member)
 
+#define list_next_entry(pos, member) \
+	list_entry((pos)->member.next, typeof(*(pos)), member)
+
 #define list_for_each(head, list)	\
 	for(list = (head)->next; list != (head); list = list->next)
 
 #define list_for_each_entry(pos, head, member)	\
 	for (pos = list_entry((head)->next, typeof(*pos), member); \
-	     ((head)->next != (head)) && (&pos->member != (head)); \
+	     &pos->member != (head); \
 	     pos = list_entry(pos->member.next, typeof(*pos), member))
+
+#define list_for_each_entry_safe(pos, n, head, member)			\
+	for (pos = list_first_entry(head, typeof(*pos), member),	\
+		n = list_next_entry(pos, member);			\
+	     &pos->member != (head); 					\
+	     pos = n, n = list_next_entry(n, member))
 
 #endif
