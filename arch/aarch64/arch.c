@@ -78,6 +78,9 @@ struct aarch64_system_context {
 	uint64_t sctlr_el1;
 	uint64_t hcr_el2;
 	uint64_t spsr_el1;
+	uint64_t far_el1;
+	uint64_t actlr_el1;
+	uint64_t tpidr_el1;
 }__align(sizeof(unsigned long));
 
 static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
@@ -115,6 +118,9 @@ static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
 	context->sp_el1 = 0;
 	context->sp_el0 = 0;
 	context->spsr_el1 = 0;
+	context->far_el1 = 0;
+	context->actlr_el1 = 0;
+	context->tpidr_el1 = 0;
 }
 
 static void aarch64_system_state_save(struct vcpu *vcpu, void *c)
@@ -132,6 +138,9 @@ static void aarch64_system_state_save(struct vcpu *vcpu, void *c)
 	context->sp_el1 = read_sysreg(SP_EL1);
 	context->sp_el0 = read_sysreg(SP_EL0);
 	context->spsr_el1 = read_sysreg(SPSR_EL1);
+	context->far_el1 = read_sysreg(FAR_EL1);
+	context->actlr_el1 = read_sysreg(ACTLR_EL1);
+	context->tpidr_el1 = read_sysreg(TPIDR_EL1);
 }
 
 static void aarch64_system_state_restore(struct vcpu *vcpu, void *c)
@@ -148,6 +157,9 @@ static void aarch64_system_state_restore(struct vcpu *vcpu, void *c)
 	write_sysreg(context->sp_el1, SP_EL1);
 	write_sysreg(context->sp_el0, SP_EL0);
 	write_sysreg(context->spsr_el1, SPSR_EL1);
+	write_sysreg(context->far_el1, FAR_EL1);
+	write_sysreg(context->actlr_el1, ACTLR_EL1);
+	write_sysreg(context->tpidr_el1, TPIDR_EL1);
 	dsb();
 }
 
