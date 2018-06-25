@@ -62,11 +62,13 @@ static int timers_arch_init(void)
 	io_remap(0x2a430000, 0x2a430000, 64 * 1024);
 
 	if (!cpu_khz)
-		cpu_khz = ioread32(refclk_cnt_base + CNTFID0);
-
+		cpu_khz = ioread32(refclk_cnt_base + CNTFID0) / 1000;
 	if (!boot_tick)
 		boot_tick = read_sysreg64(CNTPCT_EL0);
 
+	pr_info("boot_tick:0x%x cpu_khz:%d\n", boot_tick, cpu_khz);
+
+	/* enable the counter */
 	iowrite32(refclk_cnt_base + CNTCR, 1);
 
 	return 0;
