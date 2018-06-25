@@ -45,7 +45,10 @@ static void fifo_set_task_state(struct pcpu *pcpu,
 
 	if (state == TASK_STAT_READY) {
 		list_del(&td->fifo_list);
-		list_add_tail(&pd->ready_list, &td->fifo_list);
+		if (task->resched)
+			list_add(&pd->ready_list, &td->fifo_list);
+		else
+			list_add_tail(&pd->ready_list, &td->fifo_list);
 
 		/* if the need_resched flag is set clear it */
 		task->resched = 0;
@@ -92,7 +95,7 @@ static int fifo_add_task(struct pcpu *pcpu, struct task *task)
 
 	local_irq_save(flags);
 	list_add_tail(&pd->sleep_list, &td->fifo_list);
-	task->state = TASK_STAT_SUSPEND;
+	task->state = TASK_STAT_IDLE;
 	local_irq_restore(flags);
 
 	return 0;

@@ -75,6 +75,11 @@ static uint32_t inline get_vmid(struct vcpu *vcpu)
 	return (vcpu->vm->vmid);
 }
 
+static void inline vcpu_need_resched(struct vcpu *vcpu)
+{
+	task_need_resched(vcpu_to_task(vcpu));
+}
+
 struct vm *get_vm_by_id(uint32_t vmid);
 int arch_vm_init(struct vm *vm);
 int create_vms(void);

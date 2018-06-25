@@ -71,6 +71,11 @@ struct task_info {
 	unsigned long flags;
 };
 
+static void inline task_need_resched(struct task *task)
+{
+	task->resched = 1;
+}
+
 #include <virt/vcpu.h>
 #include <minos/arch.h>
 

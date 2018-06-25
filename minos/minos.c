@@ -31,6 +31,7 @@ extern void softirq_init(void);
 extern void init_timers(void);
 extern int virt_init(void);
 extern void cpu_idle_task();
+extern void sched_tick_enable(unsigned long exp);
 
 struct list_head hook_lists[MINOS_HOOK_TYPE_UNKNOWN];
 
@@ -161,6 +162,7 @@ void boot_main(void)
 
 	smp_cpus_up();
 
+	sched_tick_enable(MILLISECS(5));
 	local_irq_enable();
 
 	cpu_idle_task();
@@ -189,8 +191,8 @@ void boot_secondary(void)
 
 	create_idle_task();
 
+	sched_tick_enable(MILLISECS(5));
 	local_irq_enable();
 
 	cpu_idle_task();
-
 }

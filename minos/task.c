@@ -52,7 +52,7 @@ static struct task *__create_task(char *name,
 	task->stack_size = stack_size;
 	task->pid = alloc_pid();
 	task->affinity = affinity;
-	task->state = TASK_STAT_SUSPEND;
+	task->state = TASK_STAT_IDLE;
 	task->pend_state = 0;
 	task->task_type = TASK_TYPE_NORMAL;
 	task->is_idle = 0;

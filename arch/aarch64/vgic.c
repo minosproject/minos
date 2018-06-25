@@ -51,9 +51,7 @@ void vgic_send_sgi(struct vcpu *vcpu, unsigned long sgi_value)
 	int bit, logic_cpu;
 	struct vm *vm = vcpu->vm;
 	struct vcpu *target;
-#if 0
 	struct vgic_gicr *gicr;
-#endif
 
 	sgi = (sgi_value & (0xf << 24)) >> 24;
 	if (sgi >= 16) {
@@ -88,7 +86,6 @@ void vgic_send_sgi(struct vcpu *vcpu, unsigned long sgi_value)
 
 	for_each_cpu(bit, &cpumask) {
 		target = get_vcpu_in_vm(vm, bit);
-#if 0
 		gicr = (struct vgic_gicr *)
 			get_vmodule_data_by_id(target, vgic_vmodule_id);
 
@@ -99,7 +96,6 @@ void vgic_send_sgi(struct vcpu *vcpu, unsigned long sgi_value)
 		spin_lock(&gicr->gicr_lock);
 		gicr->gicr_ispender |= (1 << sgi);
 		spin_unlock(&gicr->gicr_lock);
-#endif
 		send_virq_to_vcpu(target, sgi);
 	}
 }

@@ -58,6 +58,14 @@ out:
 
 void vcpu_online(struct vcpu *vcpu)
 {
+	int cpuid = get_cpu_id();
+
+	if (vcpu_affinity(vcpu) != cpuid) {
+		vcpu_need_resched(vcpu);
+		pcpu_resched(vcpu_affinity(vcpu));
+		return;
+	}
+
 	set_task_ready(vcpu_to_task(vcpu));
 }
 
@@ -81,14 +89,16 @@ int vcpu_power_on(struct vcpu *caller, int cpuid,
 	 * at the same pcpu
 	 */
 	vcpu = get_vcpu_by_id(caller->vm->vmid, cpuid);
-	if (!vcpu)
+	if (!vcpu) {
+		pr_error("no such:%d vcpu for this VM %s\n",
+				cpuid, caller->vm->name);
 		return -ENOENT;
+	}
 
-	if (get_task_state(vcpu_to_task(vcpu)) != TASK_STAT_SUSPEND)
+	if (vcpu_state(vcpu) != TASK_STAT_IDLE)
 		return -EINVAL;
 
 	os->ops->vcpu_power_on(vcpu, entry);
-	pcpu_resched(vcpu_affinity(vcpu));
 
 	return 0;
 }

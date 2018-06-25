@@ -107,27 +107,30 @@ static int __send_virq(struct vcpu *vcpu,
 	 * • Having two or more interrupts with the same pINTID in the Lis
 	 *   registers for a single virtual CPU interface.
 	 */
-	for_each_set_bit(index, virq_struct->irq_bitmap,
-			CONFIG_VCPU_MAX_ACTIVE_IRQS) {
-		virq = &virq_struct->virqs[index];
-		if (virq->v_intno == vno) {
-			pr_info("vcpu has same virq:%d in pending/actvie state\n", vno);
+	if (hw) {
+		for_each_set_bit(index, virq_struct->irq_bitmap,
+				CONFIG_VCPU_MAX_ACTIVE_IRQS) {
+			virq = &virq_struct->virqs[index];
+			if (virq->h_intno == hno) {
+				pr_info("vcpu has same hirq:%d in pending/actvie state\n", hno);
 
-			/*
-			 * if the irq has not been handled then set the virq's
-			 * state to pending again, just call the irq_send_virq()
-			 * to update the related register
-			 */
-			virq->state = VIRQ_STATE_PENDING;
-			if (vcpu_state(vcpu) == VCPU_STAT_RUNNING) {
-				irq_send_virq(virq);
-			} else {
-				index = virq->id;
-				goto out;
+				/*
+				 * if the irq has not been handled then set the virq's
+				 * state to pending again, just call the irq_send_virq()
+				 * to update the related register
+				 */
+				virq->state = VIRQ_STATE_PENDING;
+				if ((vcpu_state(vcpu) == VCPU_STAT_RUNNING) &&
+						(vcpu_affinity(vcpu) == get_cpu_id())) {
+					irq_send_virq(virq);
+				} else {
+					index = virq->id;
+					goto out;
+				}
+
+				spin_unlock(&virq_struct->lock);
+				return 0;
 			}
-
-			spin_unlock(&virq_struct->lock);
-			return 0;
 		}
 	}
 
@@ -320,9 +323,8 @@ void clear_pending_virq(uint32_t irq)
 		if ((virq->v_intno == irq) &&
 			(virq->state == VIRQ_STATE_PENDING)) {
 			irq_update_virq(virq, VIRQ_ACTION_REMOVE);
-			virq->h_intno = 0;
-			virq->v_intno = 0;
-			virq->hw = 0;
+			if (virq->list.next != NULL)
+				list_del(&virq->list);
 			virq->state = VIRQ_STATE_INACTIVE;
 			clear_bit(bit, virq_struct->irq_bitmap);
 		}
