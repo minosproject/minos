@@ -1,5 +1,5 @@
 ARCH 		:= aarch64
-CROSS_COMPILE 	:= aarch64-elf-
+CROSS_COMPILE 	:= aarch64-linux-gnu-
 CC 		:= $(CROSS_COMPILE)gcc
 LD 		:= $(CROSS_COMPILE)ld
 OBJ_COPY	:= $(CROSS_COMPILE)objcopy
