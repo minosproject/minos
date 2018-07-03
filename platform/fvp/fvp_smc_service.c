@@ -18,7 +18,7 @@
 #include <asm/svccc.h>
 #include <minos/sched.h>
 #include <asm/psci.h>
-#include <virt/virt.h>
+#include <minos/virt.h>
 
 static int fvp_std_smc_handler(gp_regs *c,
 		uint32_t id, uint64_t *args)

@@ -17,8 +17,8 @@
 #include <minos/minos.h>
 #include <minos/mmu.h>
 #include <config/config.h>
-#include <virt/vcpu.h>
-#include <virt/vmodule.h>
+#include <minos/vcpu.h>
+#include <minos/vmodule.h>
 #include <asm/arch.h>
 #include <minos/mm.h>
 

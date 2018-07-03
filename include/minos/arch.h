@@ -3,11 +3,11 @@
 
 #include <asm/arch.h>
 
-struct task;
+struct vcpu;
 
 int get_cpu_id(void);
 int arch_early_init(void);
 int __arch_init(void);
-void arch_init_task(struct task *task, void *entry);
+void arch_init_vcpu(struct vcpu *vcpu, void *entry);
 
 #endif

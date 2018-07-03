@@ -15,10 +15,10 @@
  */
 
 #include <minos/minos.h>
-#include <virt/vmodule.h>
+#include <minos/vmodule.h>
 #include <minos/sched.h>
 #include <minos/arch.h>
-#include <virt/virt.h>
+#include <minos/virt.h>
 
 extern void virqs_init(void);
 extern void parse_memtags(void);
@@ -32,24 +32,24 @@ int taken_from_guest(gp_regs *regs)
 	return arch_taken_from_guest(regs);
 }
 
-void exit_from_guest(struct task *task, gp_regs *regs)
+void exit_from_guest(struct vcpu *vcpu, gp_regs *regs)
 {
-	do_hooks(task, (void *)regs, MINOS_HOOK_TYPE_EXIT_FROM_GUEST);
+	do_hooks(vcpu, (void *)regs, MINOS_HOOK_TYPE_EXIT_FROM_GUEST);
 }
 
-void enter_to_guest(struct task *task, gp_regs *regs)
+void enter_to_guest(struct vcpu *vcpu, gp_regs *regs)
 {
-	do_hooks(task, (void *)regs, MINOS_HOOK_TYPE_ENTER_TO_GUEST);
+	do_hooks(vcpu, (void *)regs, MINOS_HOOK_TYPE_ENTER_TO_GUEST);
 }
 
-void save_vcpu_task_state(struct task *task)
+void save_vcpu_vcpu_state(struct vcpu *vcpu)
 {
-	save_vcpu_vmodule_state(task_to_vcpu(task));
+	save_vcpu_vmodule_state(vcpu);
 }
 
-void restore_vcpu_task_state(struct task *task)
+void restore_vcpu_vcpu_state(struct vcpu *vcpu)
 {
-	restore_vcpu_vmodule_state(task_to_vcpu(task));
+	restore_vcpu_vmodule_state(vcpu);
 }
 
 int virt_init(void)

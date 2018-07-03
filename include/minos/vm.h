@@ -24,7 +24,7 @@ struct vm {
 	uint32_t vcpu_nr;
 	uint32_t mmu_on;
 	uint32_t index;
-	int task_pr;
+	int vcpu_pr;
 	uint32_t vcpu_affinity[CONFIG_VM_MAX_VCPU];
 	unsigned long entry_point;
 	unsigned long setup_data;

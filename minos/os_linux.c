@@ -17,13 +17,13 @@
 #include <minos/minos.h>
 #include <minos/sched.h>
 #include <minos/arch.h>
-#include <virt/virt.h>
-#include <virt/os.h>
+#include <minos/virt.h>
+#include <minos/os.h>
 #include <minos/init.h>
 
 static void linux_vcpu_init(struct vcpu *vcpu)
 {
-	gp_regs *regs = vcpu_to_gp_regs(vcpu);
+	gp_regs *regs = (gp_regs *)vcpu->stack_base;
 
 	/* fill the dtb address to x0 */
 	if (get_vcpu_id(vcpu) == 0) {
@@ -34,7 +34,7 @@ static void linux_vcpu_init(struct vcpu *vcpu)
 
 static void linux_vcpu_power_on(struct vcpu *vcpu, unsigned long entry)
 {
-	gp_regs *regs = vcpu_to_gp_regs(vcpu);
+	gp_regs *regs = (gp_regs *)vcpu->stack_base;
 
 	regs->elr_elx = entry;
 	regs->x0 = 0;

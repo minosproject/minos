@@ -16,14 +16,43 @@
 
 #include <asm/aarch64_common.h>
 #include <asm/aarch64_helper.h>
-#include <virt/vcpu.h>
-#include <virt/vmodule.h>
+#include <minos/vcpu.h>
+#include <minos/vmodule.h>
 #include <asm/arch.h>
-#include <minos/task.h>
 #include <minos/string.h>
+#include <minos/print.h>
 
 extern int el2_stage2_init(void);
 extern int el2_stage1_init(void);
+
+DEFINE_SPIN_LOCK(dump_lock);
+
+void dump_register(gp_regs *regs)
+{
+	if (!regs)
+		return;
+
+	spin_lock(&dump_lock);
+
+	pr_fatal("x0:0x%x x1:0x%x x2:0x%x x3:0x%x\n",
+			regs->x0, regs->x1, regs->x2, regs->x3);
+	pr_fatal("x4:0x%x x5:0x%x x6:0x%x x7:0x%x\n",
+			regs->x4, regs->x5, regs->x6, regs->x7);
+	pr_fatal("x8:0x%x x9:0x%x x10:0x%x x11:0x%x\n",
+			regs->x8, regs->x9, regs->x10, regs->x11);
+	pr_fatal("x12:0x%x x13:0x%x x14:0x%x x15:0x%x\n",
+			regs->x12, regs->x13, regs->x14, regs->x15);
+	pr_fatal("x16:0x%x x117:0x%x x18:0x%x x19:0x%x\n",
+			regs->x16, regs->x17, regs->x18, regs->x19);
+	pr_fatal("x20:0x%x x21:0x%x x22:0x%x x23:0x%x\n",
+			regs->x20, regs->x21, regs->x22, regs->x23);
+	pr_fatal("x24:0x%x x25:0x%x x26:0x%x x27:0x%x\n",
+			regs->x24, regs->x25, regs->x26, regs->x27);
+	pr_fatal("x28:0x%x x29:0x%x lr:0x%x elr_elx:0x%x\n",
+			regs->x28, regs->x29, regs->lr, regs->elr_elx);
+	pr_fatal("esr_elx:0x%x spsr_elx:0x%x\n", regs->esr_elx, regs->spsr_elx);
+	spin_unlock(&dump_lock);
+}
 
 int arch_taken_from_guest(gp_regs *regs)
 {
@@ -31,28 +60,27 @@ int arch_taken_from_guest(gp_regs *regs)
 	return ((regs->spsr_elx & 0xf) != (AARCH64_SPSR_EL2h));
 }
 
-static inline void arch_init_gp_regs(gp_regs *regs, void *entry, int type)
+static inline void arch_init_gp_regs(gp_regs *regs, void *entry, int idle)
 {
 	regs->elr_elx = (uint64_t)entry;
 
-	if (type != TASK_TYPE_VCPU)
+	if (idle)
 		regs->spsr_elx = AARCH64_SPSR_EL2h | AARCH64_SPSR_F | \
 				 AARCH64_SPSR_I | AARCH64_SPSR_A;
 	else
-
 		regs->spsr_elx = AARCH64_SPSR_EL1h | AARCH64_SPSR_F | \
 				 AARCH64_SPSR_I | AARCH64_SPSR_A;
 }
 
-void arch_init_task(struct task *task, void *entry)
+void arch_init_vcpu(struct vcpu *vcpu, void *entry)
 {
 	gp_regs *regs;
 
-	regs = stack_to_gp_regs(task->stack_origin);
+	regs = stack_to_gp_regs(vcpu->stack_origin);
 	memset((char *)regs, 0, sizeof(gp_regs));
-	task->stack_base = task->stack_origin - sizeof(gp_regs);
+	vcpu->stack_base = vcpu->stack_origin - sizeof(gp_regs);
 
-	arch_init_gp_regs(regs, entry, task->task_type);
+	arch_init_gp_regs(regs, entry, vcpu->is_idle);
 }
 
 int arch_early_init(void)

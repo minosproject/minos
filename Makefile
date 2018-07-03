@@ -12,12 +12,12 @@ QUIET ?= @
 
 include build/$(PLATFORM).mk
 
-src_dir-y			+= minos virt arch/$(ARCH) platform/$(PLATFORM)
+src_dir-y			+= minos arch/$(ARCH) platform/$(PLATFORM)
 src_dir-$(CONFIG_UART_PL011)	+= drivers/pl011
 src_dir-$(CONFIG_LIBFDT)	+= external/libfdt
 src_dir-$(CONFIG_JSON_SJSON)	+= external/sjson
 
-inc_dir-y			+= include/minos include/virt include/asm include/config config/$(PLATFORM)
+inc_dir-y			+= include/minos include/asm include/config config/$(PLATFORM)
 inc_dir-$(CONFIG_LIBFDT)	+= include/libfdt
 inc_dir-$(CONFIG_JSON_SJSON)	+= include/sjson
 
@@ -100,7 +100,7 @@ $(OUT)/$(PLATFORM)_config.c : $(OUT)/$(PLATFORM).json
 	$(QUIET) python3 tools/generate_mvconfig.py $< $@
 	@ echo "****** Generate $(PLATFORM)_config.c done ******"
 
-$(OUT)/$(PLATFORM).json : config/$(PLATFORM)/$(PLATFORM).json.cc config/$(PLATFORM)/$(PLATFORM)_config.h config/$(PLATFORM)/*.cc include/virt/virt.h
+$(OUT)/$(PLATFORM).json : config/$(PLATFORM)/$(PLATFORM).json.cc config/$(PLATFORM)/$(PLATFORM)_config.h config/$(PLATFORM)/*.cc include/minos/virt.h
 	$(PROGRESS)
 	$(QUIET) $(CC) $(CCFLAG) -E -P config/$(PLATFORM)/$(PLATFORM).json.cc -o $(OUT)/$(PLATFORM).json
 

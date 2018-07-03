@@ -22,7 +22,7 @@
 
 	.global __irq_handler
 	.global __serror_handler
-	.global arch_switch_task_sw
+	.global arch_switch_vcpu_sw
 
 .macro save_gp_regs
 	stp	x29, x30, [sp, #-16]!
@@ -83,9 +83,9 @@
 	ldr	x30, [sp], #8
 .endm
 
-	.type arch_switch_task_sw "function"
+	.type arch_switch_vcpu_sw "function"
 	.cfi_startproc
-arch_switch_task_sw:
+arch_switch_vcpu_sw:
 	//save_gp_regs
 	stp	x29, x30, [sp, #-16]!
 	stp	x27, x28, [sp, #-16]!
@@ -115,8 +115,8 @@ arch_switch_task_sw:
 
 	str	x30, [sp, #-8]!
 
-	ldr	x5, =per_cpu_percpu_current_task
-	ldr	x4, =per_cpu_percpu_next_task
+	ldr	x5, =per_cpu_percpu_current_vcpu
+	ldr	x4, =per_cpu_percpu_next_vcpu
 	mrs	x1, mpidr_el1
 	ubfx	x1, x1, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
 	ldr	x2, =percpu_offset
@@ -128,8 +128,8 @@ arch_switch_task_sw:
 	ldr	x2, [x2]
 	add	x5, x5, x2
 	add	x4, x4, x2
-	ldr	x0, [x5]		// x0 is current running task
-	ldr	x1, [x4]		// x4 is next running task
+	ldr	x0, [x5]		// x0 is current running vcpu
+	ldr	x1, [x4]		// x4 is next running vcpu
 
 	mov	x2, sp
 	str	x2, [x0]
@@ -253,8 +253,8 @@ __irq_handler:
 	mov	x0, sp
 	bl	irq_c_handler
 
-	ldr	x5, =per_cpu_percpu_current_task
-	ldr	x4, =per_cpu_percpu_next_task
+	ldr	x5, =per_cpu_percpu_current_vcpu
+	ldr	x4, =per_cpu_percpu_next_vcpu
 	mrs	x1, mpidr_el1
 	ubfx	x1, x1, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
 	ldr	x2, =percpu_offset
@@ -266,28 +266,28 @@ __irq_handler:
 	ldr	x2, [x2]
 	add	x5, x5, x2
 	add	x4, x4, x2
-	ldr	x0, [x5]		// x0 is current running task
-	ldr	x1, [x4]		// x4 is next running task
+	ldr	x0, [x5]		// x0 is current running vcpu
+	ldr	x1, [x4]		// x4 is next running vcpu
 
 	stp	x4, x5, [sp, #-16]!
 	stp	x0, x1, [sp, #-16]!
-	bl	switch_to_task
+	bl	switch_to_vcpu
 	ldp	x0, x1, [sp], #16
 	ldp	x4, x5, [sp], #16
 
 	cmp	x0, x1
-	beq	__switch_to_task
+	beq	__switch_to_vcpu
 
 	mov	x2, sp
 	str	x2, [x0]		// save the stack to the stack base
 
 	ldr	x2, [x1]
-	mov	sp, x2			// load the sp from the next task
+	mov	sp, x2			// load the sp from the next vcpu
 
-	str	x1, [x5]		// current task = next task
+	str	x1, [x5]		// current vcpu = next vcpu
 	dsb sy
 
-__switch_to_task:
+__switch_to_vcpu:
 	//restore_gp_regs
 	ldr	x0, [sp], #8
 	msr	elr_el2, x0

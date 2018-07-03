@@ -15,10 +15,10 @@
  */
 
 #include <minos/minos.h>
-#include <virt/vmodule.h>
+#include <minos/vmodule.h>
 #include <minos/init.h>
 #include <minos/mm.h>
-#include <virt/vcpu.h>
+#include <minos/vcpu.h>
 #include <minos/spinlock.h>
 
 extern unsigned char __vmodule_start;

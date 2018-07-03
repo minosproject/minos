@@ -4,7 +4,7 @@
 #include <minos/types.h>
 #include <asm/aarch64_helper.h>
 
-struct task;
+struct vcpu;
 
 typedef struct aarch64_regs {
 	uint64_t elr_elx;
@@ -153,6 +153,7 @@ static inline void flush_all_tlbis(void)
 }
 
 int arch_taken_from_guest(gp_regs *regs);
-void arch_switch_task_sw(void);
+void arch_switch_vcpu_sw(void);
+void dump_register(gp_regs *regs);
 
 #endif

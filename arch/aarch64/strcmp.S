@@ -152,7 +152,7 @@ func strcmp
 	* If all 8 bytes are equal,then start the second part's comparison.
 	* Otherwise finish the comparison.
 	* This special handle can garantee all the accesses are in the
-	* thread/task space in avoid to overrange access.
+	* thread/vcpu space in avoid to overrange access.
 	*/
 	ldr	data1, [src1,pos]
 	ldr	data2, [src2,pos]

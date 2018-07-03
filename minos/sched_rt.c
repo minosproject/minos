@@ -16,11 +16,10 @@
 
 #include <minos/minos.h>
 #include <minos/sched_class.h>
-#include <minos/task.h>
 #include <minos/sched.h>
 
-struct rt_task_data {
-	uint32_t task_delay;
+struct rt_vcpu_data {
+	uint32_t vcpu_delay;
 	uint8_t bit_map_x;
 	uint8_t bit_map_y;
 };
@@ -29,11 +28,11 @@ struct rt_pcpu_data {
 	/*
 	 * member to get the highest priority
 	 * 64 * 8 = 512 priority and max on pcpu
-	 * can have max 512 tasks or vcpu
+	 * can have max 512 vcpus or vcpu
 	 */
 	uint64_t ready_group;
 	uint8_t ready_tbl[64];
-	struct task *task_table[64 * 8];
+	struct vcpu *vcpu_table[64 * 8];
 };
 
 uint8_t const uint8_ffs_table[256] = {
@@ -56,7 +55,7 @@ uint8_t const uint8_ffs_table[256] = {
 };
 
 #if 0
-struct task *get_highest_pending_task(struct pcpu *pcpu)
+struct vcpu *get_highest_pending_vcpu(struct pcpu *pcpu)
 {
 	unsigned long x, y;
 	uint8_t tmp;
@@ -65,7 +64,7 @@ struct task *get_highest_pending_task(struct pcpu *pcpu)
 	tmp = pcpu->ready_tbl[x];
 	y = uint8_ffs_table[tmp];
 
-	return pcpu->task_table[(x << 3) + y];
+	return pcpu->vcpu_table[(x << 3) + y];
 }
 #endif
 

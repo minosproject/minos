@@ -25,12 +25,12 @@
 #include <minos/smp.h>
 #include <minos/atomic.h>
 #include <minos/softirq.h>
-#include <virt/virt.h>
+#include <minos/virt.h>
 
 extern void softirq_init(void);
 extern void init_timers(void);
 extern int virt_init(void);
-extern void cpu_idle_task();
+extern void cpu_idle();
 extern void sched_tick_enable(unsigned long exp);
 
 struct list_head hook_lists[MINOS_HOOK_TYPE_UNKNOWN];
@@ -65,12 +65,12 @@ int register_hook(hook_func_t fn, enum hook_type type)
 	return 0;
 }
 
-int do_hooks(struct task *task, void *context, enum hook_type type)
+int do_hooks(struct vcpu *vcpu, void *context, enum hook_type type)
 {
 	struct hook *hook;
 
 	list_for_each_entry(hook, &hook_lists[type], list)
-		hook->fn(task, context);
+		hook->fn(vcpu, context);
 
 	return 0;
 }
@@ -102,7 +102,7 @@ void *get_module_pdata(unsigned long s, unsigned long e,
 void irq_enter(gp_regs *regs)
 {
 	if (taken_from_guest(regs))
-		exit_from_guest(current_task, regs);
+		exit_from_guest(current_vcpu, regs);
 }
 
 void irq_exit(gp_regs *reg)
@@ -157,15 +157,14 @@ void boot_main(void)
 	device_init();
 	device_init_percpu();
 
-	create_idle_task();
-	tasks_init();
+	create_idle_vcpu();
 
 	smp_cpus_up();
 
 	sched_tick_enable(MILLISECS(5));
 	local_irq_enable();
 
-	cpu_idle_task();
+	cpu_idle();
 	panic("Should Not be here\n");
 }
 
@@ -189,10 +188,10 @@ void boot_secondary(void)
 
 	device_init_percpu();
 
-	create_idle_task();
+	create_idle_vcpu();
 
 	sched_tick_enable(MILLISECS(5));
 	local_irq_enable();
 
-	cpu_idle_task();
+	cpu_idle();
 }

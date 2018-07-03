@@ -20,13 +20,12 @@
 #include <config/config.h>
 #include <minos/mm.h>
 #include <minos/bitmap.h>
-#include <minos/task.h>
-#include <virt/os.h>
-#include <virt/virt.h>
-#include <virt/vm.h>
-#include <virt/vcpu.h>
-#include <virt/vmodule.h>
-#include <virt/virq.h>
+#include <minos/os.h>
+#include <minos/virt.h>
+#include <minos/vm.h>
+#include <minos/vcpu.h>
+#include <minos/vmodule.h>
+#include <minos/virq.h>
 
 extern unsigned char __vm_start;
 extern unsigned char __vm_end;
@@ -36,42 +35,22 @@ static uint32_t total_vms = 0;
 
 LIST_HEAD(vm_list);
 
-void sched_vcpu(struct vcpu *vcpu, int reason)
-{
-	struct vcpu *current = current_vcpu;
-	int state;
-
-	if (vcpu == current)
-		return;
-
-	if (vcpu_has_hwirq_pending(current)) {
-		state = vcpu_state(vcpu);
-		if ((state == VCPU_STAT_SUSPEND) || (state == VCPU_STAT_IDLE))
-			goto out;
-		else
-			return;
-	}
-
-out:
-	sched_task(vcpu_to_task(vcpu));
-}
-
 void vcpu_online(struct vcpu *vcpu)
 {
 	int cpuid = get_cpu_id();
 
-	if (vcpu_affinity(vcpu) != cpuid) {
-		vcpu_need_resched(vcpu);
-		pcpu_resched(vcpu_affinity(vcpu));
+	if (vcpu->affinity != cpuid) {
+		vcpu->resched = 1;
+		pcpu_resched(vcpu->affinity);
 		return;
 	}
 
-	set_task_ready(vcpu_to_task(vcpu));
+	set_vcpu_ready(vcpu);
 }
 
 void vcpu_offline(struct vcpu *vcpu)
 {
-	set_task_suspend(vcpu_to_task(vcpu));
+	set_vcpu_suspend(vcpu);
 }
 
 int vcpu_power_on(struct vcpu *caller, int cpuid,
@@ -95,7 +74,7 @@ int vcpu_power_on(struct vcpu *caller, int cpuid,
 		return -ENOENT;
 	}
 
-	if (vcpu_state(vcpu) != TASK_STAT_IDLE)
+	if (vcpu->state != VCPU_STAT_IDLE)
 		return -EINVAL;
 
 	os->ops->vcpu_power_on(vcpu, entry);
@@ -111,8 +90,7 @@ int vcpu_can_idle(struct vcpu *vcpu)
 	if (vcpu_has_irq(vcpu))
 		return 0;
 
-	if (get_task_state(vcpu_to_task(vcpu)) !=
-			TASK_STAT_RUNNING)
+	if (vcpu->state != VCPU_STAT_RUNNING)
 		return 0;
 
 	return 1;
@@ -128,7 +106,7 @@ void vcpu_idle(void)
 		if (vcpu_can_idle(vcpu))
 			goto out;
 
-		set_task_suspend(vcpu_to_task(vcpu));
+		set_vcpu_suspend(vcpu);
 		sched();
 out:
 		local_irq_restore(flags);
@@ -214,48 +192,100 @@ struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id)
 	return get_vcpu_in_vm(vm, vcpu_id);
 }
 
-struct task *create_vcpu_task(struct vm *vm, uint32_t vcpu_id)
+static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 {
-	struct vcpu *vcpu;
-	struct task *task;
 	char name[64];
-	unsigned long flags = TASK_FLAG_VCPU;
+	struct vcpu *vcpu;
+	void *stack_base;
 
 	vcpu = (struct vcpu *)malloc(sizeof(struct vcpu));
 	if (!vcpu)
 		return NULL;
 
-	memset((char *)vcpu, 0, sizeof(struct vcpu));
-	vcpu->vcpu_id = vcpu_id;
-	vcpu->vm = vm;
-
-	vm->vcpus[vcpu_id] = vcpu;
-	vcpu_virq_struct_init(&vcpu->virq_struct);
-
-	memset(name, 0, 64);
-	sprintf(name, "%s-vcpu-%d", vm->name, vcpu_id);
-	flags = 0 | TASK_FLAG_VCPU;
-	task = create_task(name, (void *)vm->entry_point,
-			VCPU_TASK_DEFAULT_STACK_SIZE,
-			vm->task_pr, vm->vcpu_affinity[vcpu_id],
-			(void *)vcpu, flags);
-	if (!task) {
+	stack_base = (void *)get_free_pages(
+			PAGE_NR(VCPU_DEFAULT_STACK_SIZE));
+	if (!stack_base) {
 		free(vcpu);
 		return NULL;
 	}
 
-	task->task_type = TASK_TYPE_VCPU;
-	vcpu->task = task;
+	memset((char *)vcpu, 0, sizeof(struct vcpu));
+	vcpu->vcpu_id = vcpu_id;
+	vcpu->vm = vm;
 
-	return task;
+	vcpu->stack_size = VCPU_DEFAULT_STACK_SIZE;
+	vcpu->stack_base = stack_base + VCPU_DEFAULT_STACK_SIZE;
+	vcpu->stack_origin = vcpu->stack_base;
+	vcpu->affinity = vm->vcpu_affinity[vcpu_id];
+	vcpu->state = VCPU_STAT_IDLE;
+	vcpu->is_idle = 0;
+
+	init_list(&vcpu->list);
+	memset(name, 0, 64);
+	sprintf(name, "%s-vcpu-%d", vm->name, vcpu_id);
+	strncpy(vcpu->name, name, strlen(name) > (VCPU_NAME_SIZE -1) ?
+			(VCPU_NAME_SIZE - 1) : strlen(name));
+
+	vcpu_virq_struct_init(&vcpu->virq_struct);
+	vm->vcpus[vcpu_id] = vcpu;
+
+	return vcpu;
 }
 
-static void inline create_vcpu_tasks(struct vm *vm)
+static int create_vcpus(struct vm *vm)
 {
-	int i;
+	int i, j;
+	struct vcpu *vcpu;
 
-	for (i = 0; i < vm->vcpu_nr; i++)
-		create_vcpu_task(vm, i);
+	for (i = 0; i < vm->vcpu_nr; i++) {
+		vcpu = create_vcpu(vm, i);
+		if (!vcpu) {
+			pr_error("create vcpu:%d for %s failed\n", i, vm->name);
+			for (j = 0; j < vm->vcpu_nr; j++) {
+				vcpu = vm->vcpus[j];
+				if (!vcpu)
+					continue;
+
+				free(vcpu->stack_origin - VCPU_DEFAULT_STACK_SIZE);
+				free(vcpu);
+			}
+
+			return -ENOMEM;
+		}
+
+		arch_init_vcpu(vcpu, (void *)vm->entry_point);
+		pcpu_add_vcpu(vcpu->affinity, vcpu);
+	}
+
+	return 0;
+}
+
+struct vcpu *create_idle_vcpu(void)
+{
+	struct vcpu *idle = NULL;
+	int cpu = smp_processor_id();
+
+	idle = (struct vcpu *)malloc(sizeof(struct vcpu));
+	if (!idle)
+		panic("Can not create idle vcpu\n");
+
+	memset(idle, 0, sizeof(struct vcpu));
+	init_list(&idle->list);
+	idle->stack_base = 0;
+	idle->stack_size = VCPU_DEFAULT_STACK_SIZE;
+	idle->is_idle = 1;
+
+	pcpu_add_vcpu(cpu, idle);
+	set_vcpu_ready(idle);
+	idle->state = VCPU_STAT_RUNNING;
+	idle->affinity = get_cpu_id();
+
+	strncpy(idle->name, "idle", 4);
+
+	current_vcpu = idle;
+	next_vcpu = idle;
+
+	return idle;
 }
 
 static void inline vm_vmodules_init(struct vm *vm)
@@ -274,12 +304,12 @@ int vms_init(void)
 	for_each_vm(vm) {
 		/*
 		 * - map the vm's memory
-		 * - create the task for vm's each vcpu
+		 * - create the vcpu for vm's each vcpu
 		 * - init the vmodule state for each vcpu
 		 * - prepare the vcpu for bootup
 		 */
 		vm_mm_init(vm);
-		create_vcpu_tasks(vm);
+		create_vcpus(vm);
 		vm->os = get_vm_os(vm->os_type);
 		vm_vmodules_init(vm);
 

@@ -1,5 +1,5 @@
 # MINOS
-A small os with aarch64 virtualization support
+A armv8 Type 1 Hypervisor
 
 基于armv8架构虚拟化技术实现的一个Hypervisor, 代码代码在arm的FVP上进行调试。具体进展如下:
 
@@ -26,7 +26,7 @@ MINOS目标是实现成为一个支持虚拟化功能的实时操作系统，实
 1. 创建工作目录
 
         mkdir ~/minos-workspace
-        cd ~minos-workspace
+        cd ~/minos-workspace
 
 2. 下载gcc toolchain [https://releases.linaro.org/components/toolchain/binaries/latest/aarch64-linux-gnu/](https://releases.linaro.org/components/toolchain/binaries/latest/aarch64-linux-gnu/) 当前最新版本7.3.1
 

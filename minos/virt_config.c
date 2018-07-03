@@ -14,9 +14,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <virt/virt.h>
-#include <virt/virq.h>
-#include <virt/vmm.h>
+#include <minos/virt.h>
+#include <minos/virq.h>
+#include <minos/vmm.h>
 
 void parse_memtags(void)
 {

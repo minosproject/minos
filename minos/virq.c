@@ -17,8 +17,8 @@
 #include <minos/minos.h>
 #include <minos/irq.h>
 #include <minos/sched.h>
-#include <virt/virq.h>
-#include <virt/virt.h>
+#include <minos/virq.h>
+#include <minos/virt.h>
 
 enum virq_domain_type {
 	VIRQ_DOMAIN_SGI = 0,
@@ -120,8 +120,8 @@ static int __send_virq(struct vcpu *vcpu,
 				 * to update the related register
 				 */
 				virq->state = VIRQ_STATE_PENDING;
-				if ((vcpu_state(vcpu) == VCPU_STAT_RUNNING) &&
-						(vcpu_affinity(vcpu) == get_cpu_id())) {
+				if ((vcpu->state == VCPU_STAT_RUNNING) &&
+						(vcpu->affinity == get_cpu_id())) {
 					irq_send_virq(virq);
 				} else {
 					index = virq->id;
@@ -160,8 +160,7 @@ out:
 
 	spin_unlock(&virq_struct->lock);
 
-	sched_vcpu(vcpu, hw ? VCPU_SCHED_REASON_HIRQ :
-			VCPU_SCHED_REASON_VIRQ);
+	//sched_vcpu(vcpu);
 
 	return 0;
 }
@@ -347,14 +346,13 @@ void clear_pending_virq(uint32_t irq)
 	spin_unlock_irqrestore(&virq_struct->lock, flags);
 }
 
-static void irq_enter_to_guest(struct task *task, void *data)
+static void irq_enter_to_guest(struct vcpu *vcpu, void *data)
 {
 	/*
 	 * here we send the real virq to the vcpu
 	 * before it enter to guest
 	 */
 	struct virq *virq, *n;
-	struct vcpu *vcpu = task_to_vcpu(task);
 	struct virq_struct *virq_struct = &vcpu->virq_struct;
 
 	spin_lock(&virq_struct->lock);
@@ -378,7 +376,7 @@ static void irq_enter_to_guest(struct task *task, void *data)
 	spin_unlock(&virq_struct->lock);
 }
 
-static void irq_exit_from_guest(struct task *task, void *data)
+static void irq_exit_from_guest(struct vcpu *vcpu, void *data)
 {
 	/*
 	 * here we update the states of the irq state
@@ -389,7 +387,6 @@ static void irq_exit_from_guest(struct task *task, void *data)
 	struct virq *virq;
 	uint32_t set_bit;
 	int status;
-	struct vcpu *vcpu = task_to_vcpu(task);
 	struct virq_struct *virq_struct = &vcpu->virq_struct;
 
 	spin_lock(&virq_struct->lock);
@@ -513,9 +510,9 @@ int register_virq(struct virqtag *v)
 			if (!c)
 				return -EINVAL;
 
-			irq_set_affinity(desc->hno, vcpu_affinity(c));
+			irq_set_affinity(desc->hno, c->affinity);
 			request_irq(desc->hno, guest_irq_handler, IRQ_FLAGS_VCPU,
-					c->task->name, (void *)desc);
+					c->name, (void *)desc);
 			irq_mask(desc->hno);
 		}
 	}

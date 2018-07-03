@@ -17,7 +17,7 @@
 #include <minos/types.h>
 #include <minos/errno.h>
 #include <minos/string.h>
-#include <virt/mmio.h>
+#include <minos/mmio.h>
 
 static LIST_HEAD(mmio_handler_list);
 

@@ -3,7 +3,7 @@
 
 #include <minos/arch.h>
 #include <minos/types.h>
-#include <virt/vcpu.h>
+#include <minos/vcpu.h>
 
 struct vmtag {
 	uint32_t vmid;
@@ -55,10 +55,10 @@ extern struct virt_config *mv_config;
 
 int taken_from_guest(gp_regs *regs);
 
-void exit_from_guest(struct task *task, gp_regs *regs);
-void enter_to_guest(struct task *task, gp_regs *regs);
+void exit_from_guest(struct vcpu *vcpu, gp_regs *regs);
+void enter_to_guest(struct vcpu *vcpu, gp_regs *regs);
 
-void save_vcpu_task_state(struct task *task);
-void restore_vcpu_task_state(struct task *task);
+void save_vcpu_vcpu_state(struct vcpu *vcpu);
+void restore_vcpu_vcpu_state(struct vcpu *vcpu);
 
 #endif

@@ -21,7 +21,7 @@
 extern void sched_tick_enable(unsigned long exp);
 extern void sched_tick_disable(void);
 
-void cpu_idle_task()
+void cpu_idle()
 {
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 

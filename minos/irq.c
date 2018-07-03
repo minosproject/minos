@@ -20,7 +20,7 @@
 #include <config/config.h>
 #include <minos/device_id.h>
 #include <minos/sched.h>
-#include <virt/virq.h>
+#include <minos/virq.h>
 
 DEFINE_PER_CPU(struct irq_desc **, sgi_irqs);
 DEFINE_PER_CPU(struct irq_desc **, ppi_irqs);

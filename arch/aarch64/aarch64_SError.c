@@ -15,18 +15,18 @@
  */
 
 #include <asm/aarch64_helper.h>
-#include <virt/vcpu.h>
+#include <minos/vcpu.h>
 #include <asm/exception.h>
 #include <minos/minos.h>
 #include <minos/smp.h>
 #include <asm/processer.h>
-#include <virt/mmio.h>
+#include <minos/mmio.h>
 #include <minos/sched.h>
 #include <asm/vgic.h>
 #include <minos/irq.h>
 #include <asm/svccc.h>
 #include <asm/vtimer.h>
-#include <virt/virt.h>
+#include <minos/virt.h>
 
 extern unsigned char __serror_desc_start;
 extern unsigned char __serror_desc_end;
@@ -420,10 +420,10 @@ void SError_from_lower_EL_handler(gp_regs *data)
 	struct serror_desc *ec;
 	struct vcpu *vcpu = current_vcpu;
 
-	exit_from_guest(current_task, data);
-
-	if ((!vcpu) || (vcpu_affinity(vcpu) != cpuid))
+	if ((!vcpu) || (vcpu->affinity != cpuid))
 		panic("this vcpu is not belont to the pcpu");
+
+	exit_from_guest(current_vcpu, data);
 
 	esr_value = data->esr_elx;
 	ec_type = (esr_value & 0xfc000000) >> 26;
@@ -442,7 +442,7 @@ void SError_from_lower_EL_handler(gp_regs *data)
 out:
 	local_irq_disable();
 
-	enter_to_guest(current_task, NULL);
+	enter_to_guest(current_vcpu, NULL);
 }
 
 void SError_from_current_EL_handler(gp_regs *data)
@@ -452,9 +452,10 @@ void SError_from_current_EL_handler(gp_regs *data)
 
 	esr_value = read_esr_el2();
 	ec_type = (esr_value & 0xfc000000) >> 26;
-	pr_info("ec_type is %d\n", ec_type);
+	dump_register(data);
 
-	panic("Serror in EL2\n");
+	pr_fatal("panic with serror in EL2:0x%x\n", ec_type);
+	while (1);
 }
 
 static int aarch64_serror_init(void)

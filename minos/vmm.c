@@ -15,9 +15,9 @@
  */
 
 #include <minos/minos.h>
-#include <virt/virt.h>
-#include <virt/vm.h>
-#include <virt/vcpu.h>
+#include <minos/virt.h>
+#include <minos/vm.h>
+#include <minos/vcpu.h>
 #include <minos/mmu.h>
 
 static LIST_HEAD(shared_mem_list);

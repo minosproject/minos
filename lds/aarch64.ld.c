@@ -112,11 +112,11 @@ SECTIONS
 
 	. = ALIGN(8);
 
-	__static_task_info_start = .;
-	.__static_task_info : {
-		*(.__static_task_info)
+	__static_vcpu_info_start = .;
+	.__static_vcpu_info : {
+		*(.__static_vcpu_info)
 	}
-	__static_task_info_end = .;
+	__static_vcpu_info_end = .;
 
 	. = ALIGN(8);
 

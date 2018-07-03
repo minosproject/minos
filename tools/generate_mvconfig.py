@@ -204,7 +204,7 @@ def parse_struct(struct, jdata):
 
 def generate_mvconfig(json_data):
     content = "#include <minos/compiler.h>\n\n"
-    content += "#include <virt/virt.h>\n"
+    content += "#include <minos/virt.h>\n"
 
     for struct in patten:
         if struct['json_name']:

@@ -3,7 +3,7 @@
 
 #include <minos/types.h>
 #include <minos/list.h>
-#include <virt/vcpu.h>
+#include <minos/vcpu.h>
 
 #include <minos/device_id.h>
 

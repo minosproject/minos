@@ -1,7 +1,7 @@
 #ifndef __MINOS_VIRQ_H__
 #define __MINOS_VIRQ_H__
 
-#include <virt/vcpu.h>
+#include <minos/vcpu.h>
 #include <minos/cpumask.h>
 
 struct virqtag;

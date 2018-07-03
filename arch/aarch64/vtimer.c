@@ -14,16 +14,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <minos/minos.h>
-#include <virt/vmodule.h>
+#include <minos/vmodule.h>
 #include <asm/vtimer.h>
 #include <minos/io.h>
-#include <virt/mmio.h>
+#include <minos/mmio.h>
 #include <asm/processer.h>
 #include <asm/exception.h>
 #include <minos/timer.h>
 #include <minos/irq.h>
 #include <minos/sched.h>
-#include <virt/virq.h>
+#include <minos/virq.h>
 
 int vtimer_vmodule_id = INVAILD_MODULE_ID;
 
@@ -100,7 +100,7 @@ static void vtimer_state_init(struct vcpu *vcpu, void *context)
 
 	vtimer = &c->virt_timer;
 	vtimer->vcpu = vcpu;
-	init_timer_on_cpu(&vtimer->timer, vcpu_affinity(vcpu));
+	init_timer_on_cpu(&vtimer->timer, vcpu->affinity);
 	vtimer->timer.function = virt_timer_expire_function;
 	vtimer->timer.data = (unsigned long)vtimer;
 	vtimer->virq = 27;
@@ -109,7 +109,7 @@ static void vtimer_state_init(struct vcpu *vcpu, void *context)
 
 	vtimer = &c->phy_timer;
 	vtimer->vcpu = vcpu;
-	init_timer_on_cpu(&vtimer->timer, vcpu_affinity(vcpu));
+	init_timer_on_cpu(&vtimer->timer, vcpu->affinity);
 	vtimer->timer.function = phys_timer_expire_function;
 	vtimer->timer.data = (unsigned long)vtimer;
 	vtimer->virq = 30;
@@ -118,7 +118,7 @@ static void vtimer_state_init(struct vcpu *vcpu, void *context)
 
 	vtimer = &c->phy_mem_timer;
 	vtimer->vcpu = vcpu;
-	init_timer_on_cpu(&vtimer->timer, vcpu_affinity(vcpu));
+	init_timer_on_cpu(&vtimer->timer, vcpu->affinity);
 	vtimer->timer.function = phys_timer_expire_function;
 	vtimer->timer.data = (unsigned long)vtimer;
 	vtimer->virq = 58;

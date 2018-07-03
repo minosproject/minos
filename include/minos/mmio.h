@@ -3,7 +3,7 @@
 
 #include <minos/list.h>
 #include <minos/types.h>
-#include <virt/vcpu.h>
+#include <minos/vcpu.h>
 
 struct mmio_info {
 	unsigned long write_value;

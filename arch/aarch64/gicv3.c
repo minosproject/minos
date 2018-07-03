@@ -21,13 +21,13 @@
 #include <minos/print.h>
 #include <asm/gicv3.h>
 #include <minos/errno.h>
-#include <virt/vmodule.h>
-#include <virt/vcpu.h>
+#include <minos/vmodule.h>
+#include <minos/vcpu.h>
 #include <minos/panic.h>
 #include <asm/arch.h>
 #include <minos/cpumask.h>
 #include <minos/irq.h>
-#include <virt/virq.h>
+#include <minos/virq.h>
 
 spinlock_t gicv3_lock;
 static void *gicd_base = (void *)0x2f000000;

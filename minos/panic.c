@@ -18,8 +18,6 @@
 
 void panic(char *str)
 {
-	pr_fatal("--------- PANIC -------\n");
 	pr_fatal("%s\n", str);
-	pr_fatal("--------- PANIC END -------\n");
 	while (1);
 }

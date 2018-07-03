@@ -15,17 +15,17 @@
  */
 #include <minos/minos.h>
 #include <asm/arch.h>
-#include <virt/vmodule.h>
-#include <virt/mmio.h>
+#include <minos/vmodule.h>
+#include <minos/mmio.h>
 #include <minos/irq.h>
 #include <asm/gicv3.h>
 #include <minos/io.h>
-#include <virt/vmodule.h>
+#include <minos/vmodule.h>
 #include <minos/cpumask.h>
 #include <minos/irq.h>
 #include <asm/vgic.h>
 #include <minos/sched.h>
-#include <virt/virq.h>
+#include <minos/virq.h>
 
 static struct list_head gicd_list;
 static int vgic_vmodule_id = INVAILD_MODULE_ID;

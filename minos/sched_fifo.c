@@ -16,95 +16,86 @@
 
 #include <minos/minos.h>
 #include <minos/sched_class.h>
-#include <minos/task.h>
 #include <minos/sched.h>
 #include <minos/time.h>
 
-struct fifo_task_data {
+struct fifo_vcpu_data {
 	struct list_head fifo_list;
-	struct task *task;
+	struct vcpu *vcpu;
 };
 
 struct fifo_pcpu_data {
 	struct list_head ready_list;
 	struct list_head sleep_list;
-	struct task *idle;
+	struct vcpu *idle;
 };
 
-static void fifo_set_task_state(struct pcpu *pcpu,
-		struct task *task, int state)
+static void fifo_set_vcpu_state(struct pcpu *pcpu,
+		struct vcpu *vcpu, int state)
 {
 	unsigned long flags;
-	struct fifo_task_data *td = task_to_sched_data(task);
-	struct fifo_pcpu_data *pd = pcpu_to_sched_data(pcpu);
+	struct fifo_vcpu_data *td = vcpu->sched_data;
+	struct fifo_pcpu_data *pd = pcpu->sched_data;
 
-	if (task->is_idle)
+	if (vcpu->is_idle)
 		return;
 
 	local_irq_save(flags);
 
-	if (state == TASK_STAT_READY) {
+	if (state == VCPU_STAT_READY) {
 		list_del(&td->fifo_list);
-		if (task->resched)
+		if (vcpu->resched)
 			list_add(&pd->ready_list, &td->fifo_list);
 		else
 			list_add_tail(&pd->ready_list, &td->fifo_list);
 
 		/* if the need_resched flag is set clear it */
-		task->resched = 0;
-	} else if ((state == TASK_STAT_SUSPEND) ||
-		state == TASK_STAT_IDLE) {
+		vcpu->resched = 0;
+	} else if ((state == VCPU_STAT_SUSPEND) ||
+		state == VCPU_STAT_IDLE) {
 		list_del(&td->fifo_list);
 		list_add_tail(&pd->sleep_list, &td->fifo_list);
 	}
 
-	task->state = state;
+	vcpu->state = state;
 
 	local_irq_restore(flags);
 }
 
-static struct task *fifo_pick_task(struct pcpu *pcpu)
+static struct vcpu *fifo_pick_vcpu(struct pcpu *pcpu)
 {
-	struct fifo_pcpu_data *pd = pcpu_to_sched_data(pcpu);
-	struct fifo_task_data *td;
+	struct fifo_pcpu_data *pd = pcpu->sched_data;
+	struct fifo_vcpu_data *td;
 
 	if (is_list_empty(&pd->ready_list))
 		return pd->idle;
 
 	/*
-	 * list will never empty, since idle task is
+	 * list will never empty, since idle vcpu is
 	 * always on the ready list
 	 */
-	td = (struct fifo_task_data *)
+	td = (struct fifo_vcpu_data *)
 		list_first_entry(&pd->ready_list,
-		struct fifo_task_data, fifo_list);
+		struct fifo_vcpu_data, fifo_list);
 
-	return td->task;
+	return td->vcpu;
 }
 
-static int fifo_add_task(struct pcpu *pcpu, struct task *task)
+static int fifo_add_vcpu(struct pcpu *pcpu, struct vcpu *vcpu)
 {
 	unsigned long flags;
-	struct fifo_task_data *td = task_to_sched_data(task);
-	struct fifo_pcpu_data *pd = pcpu_to_sched_data(pcpu);
+	struct fifo_vcpu_data *td = vcpu->sched_data;
+	struct fifo_pcpu_data *pd = pcpu->sched_data;
 
-	if (task->is_idle) {
-		pd->idle = task;
+	if (vcpu->is_idle) {
+		pd->idle = vcpu;
 		return 0;
 	}
 
 	local_irq_save(flags);
 	list_add_tail(&pd->sleep_list, &td->fifo_list);
-	task->state = TASK_STAT_IDLE;
+	vcpu->state = VCPU_STAT_IDLE;
 	local_irq_restore(flags);
-
-	return 0;
-}
-
-static int fifo_suspend_task(struct pcpu *pcpu, struct task *task)
-{
-	/* more things TBD */
-	fifo_set_task_state(pcpu, task, TASK_STAT_SUSPEND);
 
 	return 0;
 }
@@ -125,34 +116,33 @@ static int fifo_init_pcpu_data(struct pcpu *pcpu)
 	return 0;
 }
 
-static int fifo_init_task_data(struct pcpu *pcpu, struct task *task)
+static int fifo_init_vcpu_data(struct pcpu *pcpu, struct vcpu *vcpu)
 {
-	struct fifo_task_data *data;
+	struct fifo_vcpu_data *data;
 
-	data = (struct fifo_task_data *)
-		malloc(sizeof(struct fifo_task_data));
+	data = (struct fifo_vcpu_data *)
+		malloc(sizeof(struct fifo_vcpu_data));
 	if (!data)
 		return -ENOMEM;
 
 	init_list(&data->fifo_list);
-	task->sched_data = data;
-	data->task = task;
+	vcpu->sched_data = data;
+	data->vcpu = vcpu;
 
 	return 0;
 }
 
 static void fifo_sched(struct pcpu *pcpu,
-			struct task *c, struct task *n)
+			struct vcpu *c, struct vcpu *n)
 {
 	unsigned long flags;
-	struct fifo_task_data *td = task_to_sched_data(n);
-	struct fifo_pcpu_data *pd = pcpu_to_sched_data(pcpu);
-
+	struct fifo_vcpu_data *td = n->sched_data;
+	struct fifo_pcpu_data *pd = pcpu->sched_data;
 
 	local_irq_save(flags);
 
 	/*
-	 * put the task which will run soon to the
+	 * put the vcpu which will run soon to the
 	 * tail of the pcpu's ready list
 	 */
 	if (!n->is_idle) {
@@ -163,41 +153,44 @@ static void fifo_sched(struct pcpu *pcpu,
 	local_irq_restore(flags);
 }
 
-static void fifo_sched_task(struct pcpu *pcpu, struct task *t)
+static int fifo_sched_vcpu(struct pcpu *pcpu, struct vcpu *t)
 {
 	unsigned long flags;
-	struct fifo_task_data *td = task_to_sched_data(t);
-	struct fifo_pcpu_data *pd = pcpu_to_sched_data(pcpu);
+	struct fifo_vcpu_data *td = t->sched_data;
+	struct fifo_pcpu_data *pd = pcpu->sched_data;
 
 
 	local_irq_save(flags);
 
 	/*
-	 * put the task to the head of the list
+	 * put the vcpu to the head of the list
 	 */
 	list_del(&td->fifo_list);
 	list_add(&pd->ready_list, &td->fifo_list);
 
 	local_irq_restore(flags);
+
+	return 1;
 }
 
-static struct task *fifo_sched_new(struct pcpu *pcpu)
+static unsigned long fifo_tick_handler(struct pcpu *pcpu)
 {
-	return fifo_pick_task(pcpu);
+	next_vcpu = fifo_pick_vcpu(pcpu);
+
+	return MILLISECS(5);
 }
 
 static struct sched_class sched_fifo = {
 	.name		= "fifo",
 	.sched_interval = MILLISECS(5),
-	.set_task_state = fifo_set_task_state,
-	.pick_task	= fifo_pick_task,
-	.add_task	= fifo_add_task,
-	.suspend_task	= fifo_suspend_task,
+	.set_vcpu_state = fifo_set_vcpu_state,
+	.pick_vcpu	= fifo_pick_vcpu,
+	.add_vcpu	= fifo_add_vcpu,
 	.init_pcpu_data = fifo_init_pcpu_data,
-	.init_task_data = fifo_init_task_data,
+	.init_vcpu_data = fifo_init_vcpu_data,
 	.sched		= fifo_sched,
-	.sched_task	= fifo_sched_task,
-	.sched_new	= fifo_sched_new,
+	.sched_vcpu	= fifo_sched_vcpu,
+	.tick_handler	= fifo_tick_handler,
 };
 
 static int sched_fifo_init(void)
