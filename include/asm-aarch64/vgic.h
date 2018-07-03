@@ -18,6 +18,7 @@ struct vgic_gicr {
 	uint32_t gicr_pidr2;
 	uint64_t gicr_typer;
 	uint32_t gicr_ispender;
+	uint32_t gicr_enabler0;
 	uint32_t vcpu_id;
 	unsigned long rd_base;
 	unsigned long sgi_base;

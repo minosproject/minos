@@ -82,20 +82,6 @@ static int timer_interrupt_handler(uint32_t irq, void *data)
 	return 0;
 }
 
-static int vtimer_interrupt_handler(uint32_t irq, void *data)
-{
-	struct vcpu *vcpu = current_vcpu;
-	struct vtimer_context *c = (struct vtimer_context *)
-		get_vmodule_data_by_id(vcpu, vtimer_vmodule_id);
-	struct vtimer *vtimer = &c->virt_timer;
-
-	vtimer->cnt_ctl = read_sysreg32(CNTV_CTL_EL0);
-	write_sysreg32(vtimer->cnt_ctl | CNT_CTL_IMASK, CNTV_CTL_EL0);
-	send_virq_to_vcpu(vcpu, vtimer->virq);
-
-	return 0;
-}
-
 static int sched_timer_handler(uint32_t irq, void *data)
 {
 	unsigned long next_evt;
@@ -154,10 +140,6 @@ static int timers_init(void)
 
 	request_irq(PHYS_TIMER_NONSEC_INT, timer_interrupt_handler,
 			0, "nonsec timer int", NULL);
-
-	request_irq(VIRT_TIMER_INT, vtimer_interrupt_handler,
-			0, "virt timer int", NULL);
-
 	return 0;
 }
 

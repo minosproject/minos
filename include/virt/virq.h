@@ -20,7 +20,9 @@ struct virqtag;
 #define MAX_VIRQ_NR		(512)
 #define VIRQ_OFFSET(v)		(v - VIRQ_BASE)
 
-int __virq_enable(uint32_t virq, int enable);
+#define VIRQ_AFFINITY_ANY	(0xffff)
+
+int virq_enable(uint32_t virq, int enable);
 void vcpu_virq_struct_init(struct virq_struct *irq_struct);
 
 int send_virq_hw(uint32_t vmid, uint32_t virq, uint32_t hirq);
@@ -51,12 +53,12 @@ static inline int vcpu_has_irq(struct vcpu *vcpu)
 
 static inline void virq_mask(uint32_t virq)
 {
-	__virq_enable(virq, 0);
+	virq_enable(virq, 0);
 }
 
 static inline void virq_unmask(uint32_t virq)
 {
-	__virq_enable(virq, 1);
+	virq_enable(virq, 1);
 }
 
 #endif

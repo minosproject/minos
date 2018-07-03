@@ -81,7 +81,11 @@ static int do_handle_host_irq(struct irq_desc *irq_desc)
 		pr_error("handle irq:%d fail in minos\n", irq_desc->hno);
 
 out:
-	if (!test_bit(IRQ_FLAGS_VCPU_BIT, &irq_desc->flags))
+	/*
+	 * 1: if the hw irq is to vcpu do not dir it
+	 * 2: if the hw irq is to vcpu but failed to send then dir it
+	 */
+	if (ret || (!test_bit(IRQ_FLAGS_VCPU_BIT, &irq_desc->flags)))
 		irq_chip->irq_dir(irq_desc->hno);
 
 	return ret;

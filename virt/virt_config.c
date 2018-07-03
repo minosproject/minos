@@ -18,7 +18,7 @@
 #include <virt/virq.h>
 #include <virt/vmm.h>
 
-static void parse_memtags(void)
+void parse_memtags(void)
 {
 	int i;
 	size_t size = mv_config->nr_memtag;
@@ -29,7 +29,7 @@ static void parse_memtags(void)
 
 }
 
-static void parse_virqs(void)
+void parse_virqs(void)
 {
 	int i;
 	size_t size = mv_config->nr_virqtag;
@@ -37,10 +37,4 @@ static void parse_virqs(void)
 
 	for (i = 0; i < size; i++)
 		register_virq(&virqtags[i]);
-}
-
-void parse_vm_config(void)
-{
-	parse_memtags();
-	parse_virqs();
 }

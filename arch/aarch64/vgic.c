@@ -336,6 +336,10 @@ static int vgic_gicr_sgi_mmio(struct vcpu *vcpu, struct vgic_gicr *gicr,
 		case GICR_PIDR2:
 			*value = 0x3 << 4;
 			break;
+		case GICR_ISENABLER:
+		case GICR_ICENABLER:
+			*value = gicr->gicr_enabler0;
+			break;
 		default:
 			*value = 0;
 			break;
@@ -347,6 +351,26 @@ static int vgic_gicr_sgi_mmio(struct vcpu *vcpu, struct vgic_gicr *gicr,
 			for_each_set_bit(bit, value, 32) {
 				gicr->gicr_ispender &= ~BIT(bit);
 				clear_pending_virq(bit);
+			}
+			spin_unlock(&gicr->gicr_lock);
+			break;
+		case GICR_ISENABLER:
+			spin_lock(&gicr->gicr_lock);
+			for_each_set_bit(bit, value, 32) {
+				if (!(gicr->gicr_enabler0 & BIT(bit))) {
+					virq_unmask(bit);
+					gicr->gicr_enabler0 |= BIT(bit);
+				}
+			}
+			spin_unlock(&gicr->gicr_lock);
+			break;
+		case GICR_ICENABLER:
+			spin_lock(&gicr->gicr_lock);
+			for_each_set_bit(bit, value, 32) {
+				if (gicr->gicr_enabler0 & BIT(bit)) {
+					virq_mask(bit);
+					gicr->gicr_enabler0 &= ~BIT(bit);
+				}
 			}
 			spin_unlock(&gicr->gicr_lock);
 			break;

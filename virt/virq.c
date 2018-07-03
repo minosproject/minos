@@ -175,7 +175,12 @@ static int guest_irq_handler(uint32_t irq, void *data)
 		return -EINVAL;
 
 	/* send the virq to the guest */
-	vcpu = get_vcpu_by_id(desc->vmid, desc->vcpu_id);
+	if ((desc->vmid == VIRQ_AFFINITY_ANY) &&
+			(desc->vcpu_id == VIRQ_AFFINITY_ANY))
+		vcpu = current_vcpu;
+	else
+		vcpu = get_vcpu_by_id(desc->vmid, desc->vcpu_id);
+
 	if (!vcpu) {
 		pr_error("%s: Can not get the vcpu for irq:%d\n", irq);
 		return -ENOENT;
@@ -200,13 +205,55 @@ int virq_set_priority(uint32_t virq, int pr)
 	return 0;
 }
 
-int __virq_enable(uint32_t virq, int enable)
+static int __virq_enable(struct virq_domain *d, struct virq_desc *desc)
+{
+	struct virq_struct *vs;
+	struct vcpu *vcpu = current_vcpu;
+
+	if ((d->type == VIRQ_DOMAIN_SGI) ||
+			(d->type == VIRQ_DOMAIN_PPI)) {
+		vs = &vcpu->virq_struct;
+		bitmap_set(vs->local_irq_mask, desc->vno - d->start, 1);
+	} else {
+		if (vcpu->vm->vmid != desc->vmid)
+			return -EFAULT;
+
+		desc->enable = 1;
+	}
+
+	if (desc->hw)
+		irq_unmask(desc->hno);
+
+	return 0;
+}
+
+static int __virq_disable(struct virq_domain *d, struct virq_desc *desc)
+{
+	struct virq_struct *vs;
+	struct vcpu *vcpu = current_vcpu;
+
+	if ((d->type == VIRQ_DOMAIN_SGI) ||
+			(d->type == VIRQ_DOMAIN_PPI)) {
+		vs = &vcpu->virq_struct;
+		bitmap_clear(vs->local_irq_mask, desc->vno - d->start, 1);
+	} else {
+		if (vcpu->vm->vmid != desc->vmid)
+			return -EFAULT;
+
+		desc->enable = 0;
+	}
+
+	if (desc->hw)
+		irq_mask(desc->hno);
+
+	return 0;
+}
+
+int virq_enable(uint32_t virq, int enable)
 {
 	struct virq_domain *d;
 	struct virq_desc *desc;
 	struct vcpu *vcpu = current_vcpu;
-	struct virq_struct *vs;
-	struct vcpu *c;
 
 	if (vcpu == NULL) {
 		pr_error("can not enable virq in host\n");
@@ -221,37 +268,10 @@ int __virq_enable(uint32_t virq, int enable)
 	if (!desc)
 		return -ENOENT;
 
-	if ((d->type == VIRQ_DOMAIN_SGI) ||
-			(d->type == VIRQ_DOMAIN_PPI)) {
+	if (enable)
+		return __virq_enable(d, desc);
 
-		vs = &vcpu->virq_struct;
-		bitmap_set(vs->local_irq_mask, virq - d->start, 1);
-		return 0;
-	}
-
-	/*
-	 * if the virq is affinity to a hw irq, need to
-	 * enable the hw irq too
-	 */
-	if (desc->hw) {
-		if (vcpu->vm->vmid != desc->vmid)
-			return -EINVAL;
-
-		c = get_vcpu_by_id(vcpu->vm->vmid, desc->vcpu_id);
-		if (!c)
-			return -EINVAL;
-
-		/*
-		 * if the virq is point to a SPI int and the virq
-		 * is affinity to a hw irq then request the irq
-		 */
-		irq_set_affinity(desc->hno, vcpu_affinity(c));
-		request_irq(desc->hno, guest_irq_handler, IRQ_FLAGS_VCPU,
-				c->task->name, (void *)desc);
-		desc->enable = 1;
-	}
-
-	return 0;
+	return __virq_disable(d, desc);
 }
 
 int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq)
@@ -263,12 +283,6 @@ int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq)
 	desc = get_virq_desc(virq);
 	if (!desc)
 		return -ENOENT;
-
-	if (desc->hw) {
-		pr_error("virq affinity to hw irq can not call %s\n",
-				__func__);
-		return -EINVAL;
-	}
 
 	local_irq_save(flags);
 	ret = __send_virq(vcpu, virq, 0, 0, desc->pr);
@@ -467,6 +481,7 @@ int register_virq(struct virqtag *v)
 {
 	struct virq_desc *desc;
 	struct virq_domain *d;
+	struct vcpu *c;
 
 	if ((!v) || (!v->enable))
 		return -EINVAL;
@@ -487,12 +502,21 @@ int register_virq(struct virqtag *v)
 	d->table[v->vno - d->start] = desc;
 	desc->hw = v->hw;
 
-	if ((d->type == VIRQ_DOMAIN_SGI) || (d->type == VIRQ_DOMAIN_PPI)) {
-		desc->enable = 1;
-		if (desc->hw) {
-			pr_warning("virq:%d will not affinity to hirq\n", desc->vno);
-			desc->hw = 0;
-			desc->hno = 0;
+	if (desc->hw) {
+		/*
+		 * if the virq is point to a SPI int and the virq
+		 * is affinity to a hw irq then request the irq
+		 */
+		if ((d->type != VIRQ_DOMAIN_SGI) &&
+				(d->type != VIRQ_DOMAIN_PPI)) {
+			c = get_vcpu_by_id(desc->vmid, desc->vcpu_id);
+			if (!c)
+				return -EINVAL;
+
+			irq_set_affinity(desc->hno, vcpu_affinity(c));
+			request_irq(desc->hno, guest_irq_handler, IRQ_FLAGS_VCPU,
+					c->task->name, (void *)desc);
+			irq_mask(desc->hno);
 		}
 	}
 
@@ -510,3 +534,31 @@ void virqs_init(void)
 	register_hook(irq_enter_to_guest,
 			MINOS_HOOK_TYPE_ENTER_TO_GUEST);
 }
+
+static int vsgi_irqs_init(void)
+{
+	int i, j, size;
+	struct virq_domain *d;
+	struct virq_desc *desc;
+
+	for (j = VIRQ_DOMAIN_SGI; j <= VIRQ_DOMAIN_PPI; j++) {
+		d = virq_domains[j];
+		size = d->end - d->start + 1;
+
+		for (i = 0; i < size; i++) {
+			desc = d->table[i];
+			if (!desc)
+				continue;
+
+			if (desc->hw) {
+				request_irq(desc->hno, guest_irq_handler, IRQ_FLAGS_VCPU,
+						"local irq", (void *)desc);
+				irq_mask(desc->hno);
+			}
+		}
+	}
+
+	return 0;
+}
+
+device_initcall_percpu(vsgi_irqs_init);

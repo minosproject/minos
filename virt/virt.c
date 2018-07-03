@@ -21,7 +21,8 @@
 #include <virt/virt.h>
 
 extern void virqs_init(void);
-extern void parse_vm_config(void);
+extern void parse_memtags(void);
+extern void parse_virqs(void);
 
 extern struct virt_config virt_config;
 struct virt_config *mv_config = &virt_config;
@@ -58,8 +59,9 @@ int virt_init(void)
 	if (create_vms() == 0)
 		return -ENOENT;
 
-	parse_vm_config();
+	parse_memtags();
 	vms_init();
+	parse_virqs();
 	virqs_init();
 
 	return 0;
