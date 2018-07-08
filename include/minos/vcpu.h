@@ -43,26 +43,7 @@
 
 #define VCPU_IDLE_PR		(511)
 
-struct virq {
-	uint32_t h_intno;
-	uint32_t v_intno;
-	uint8_t hw;
-	uint8_t state;
-	uint16_t id;
-	uint16_t pr;
-	struct list_head list;
-};
-
-struct virq_struct {
-	uint32_t active_count;
-	uint32_t pending_hirq;
-	uint32_t pending_virq;
-	spinlock_t lock;
-	struct list_head pending_list;
-	DECLARE_BITMAP(irq_bitmap, CONFIG_VCPU_MAX_ACTIVE_IRQS);
-	DECLARE_BITMAP(local_irq_mask, VCPU_MAX_LOCAL_IRQS);
-	struct virq virqs[CONFIG_VCPU_MAX_ACTIVE_IRQS];
-};
+struct virq_struct;
 
 struct vcpu {
 	void *stack_base;
@@ -75,7 +56,7 @@ struct vcpu {
 	 * member to record the irq list which the
 	 * vcpu is handling now
 	 */
-	struct virq_struct virq_struct;
+	struct virq_struct *virq_struct;
 	volatile int state;
 
 	uint32_t affinity;

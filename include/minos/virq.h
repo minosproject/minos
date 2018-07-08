@@ -22,6 +22,28 @@ struct virqtag;
 
 #define VIRQ_AFFINITY_ANY	(0xffff)
 
+struct virq {
+	uint32_t h_intno;
+	uint32_t v_intno;
+	uint8_t hw;
+	uint8_t state;
+	uint16_t id;
+	uint16_t pr;
+	struct list_head list;
+};
+
+struct virq_struct {
+	uint32_t active_count;
+	uint32_t pending_hirq;
+	uint32_t pending_virq;
+	spinlock_t lock;
+	struct list_head pending_list;
+	struct list_head active_list;
+	DECLARE_BITMAP(irq_bitmap, CONFIG_VCPU_MAX_ACTIVE_IRQS);
+	DECLARE_BITMAP(local_irq_mask, VCPU_MAX_LOCAL_IRQS);
+	struct virq virqs[CONFIG_VCPU_MAX_ACTIVE_IRQS];
+};
+
 int virq_enable(uint32_t virq, int enable);
 void vcpu_virq_struct_init(struct virq_struct *irq_struct);
 
@@ -37,18 +59,18 @@ int alloc_virtual_irqs(uint32_t start, uint32_t count, int type);
 
 static inline int vcpu_has_virq_pending(struct vcpu *vcpu)
 {
-	return (!!vcpu->virq_struct.pending_virq);
+	return (!!vcpu->virq_struct->pending_virq);
 }
 
 static inline int vcpu_has_hwirq_pending(struct vcpu *vcpu)
 {
-	return (!!vcpu->virq_struct.pending_hirq);
+	return (!!vcpu->virq_struct->pending_hirq);
 }
 
 static inline int vcpu_has_irq(struct vcpu *vcpu)
 {
-	return ((vcpu->virq_struct.pending_hirq +
-			vcpu->virq_struct.pending_virq));
+	return ((vcpu->virq_struct->pending_hirq +
+			vcpu->virq_struct->pending_virq));
 }
 
 static inline void virq_mask(uint32_t virq)

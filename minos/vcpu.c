@@ -192,30 +192,59 @@ struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id)
 	return get_vcpu_in_vm(vm, vcpu_id);
 }
 
-static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
+static void release_vcpu(struct vcpu *vcpu)
 {
-	char name[64];
+	free(vcpu->stack_origin);
+	free(vcpu->virq_struct);
+	free(vcpu);
+}
+
+static struct vcpu *alloc_vcpu(size_t size)
+{
 	struct vcpu *vcpu;
-	void *stack_base;
+	void *stack_base = NULL;
 
 	vcpu = (struct vcpu *)malloc(sizeof(struct vcpu));
 	if (!vcpu)
 		return NULL;
 
-	stack_base = (void *)get_free_pages(
-			PAGE_NR(VCPU_DEFAULT_STACK_SIZE));
-	if (!stack_base) {
-		free(vcpu);
-		return NULL;
+	memset((char *)vcpu, 0, sizeof(struct vcpu));
+	vcpu->virq_struct = malloc(sizeof(struct virq_struct));
+	if (!vcpu->virq_struct)
+		goto free_vcpu;
+
+	if (size) {
+		stack_base = (void *)get_free_pages(PAGE_NR(size));
+		if (!stack_base)
+			goto free_virq_struct;
 	}
 
-	memset((char *)vcpu, 0, sizeof(struct vcpu));
+	vcpu->stack_size = size;
+	vcpu->stack_base = stack_base + size;
+	vcpu->stack_origin = vcpu->stack_base;
+
+	return vcpu;
+
+free_virq_struct:
+	free(vcpu->virq_struct);
+free_vcpu:
+	free(vcpu);
+
+	return NULL;
+}
+
+static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
+{
+	char name[64];
+	struct vcpu *vcpu;
+
+	vcpu = alloc_vcpu(VCPU_DEFAULT_STACK_SIZE);
+	if (!vcpu)
+		return NULL;
+
 	vcpu->vcpu_id = vcpu_id;
 	vcpu->vm = vm;
 
-	vcpu->stack_size = VCPU_DEFAULT_STACK_SIZE;
-	vcpu->stack_base = stack_base + VCPU_DEFAULT_STACK_SIZE;
-	vcpu->stack_origin = vcpu->stack_base;
 	vcpu->affinity = vm->vcpu_affinity[vcpu_id];
 	vcpu->state = VCPU_STAT_IDLE;
 	vcpu->is_idle = 0;
@@ -226,7 +255,7 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 	strncpy(vcpu->name, name, strlen(name) > (VCPU_NAME_SIZE -1) ?
 			(VCPU_NAME_SIZE - 1) : strlen(name));
 
-	vcpu_virq_struct_init(&vcpu->virq_struct);
+	vcpu_virq_struct_init(vcpu->virq_struct);
 	vm->vcpus[vcpu_id] = vcpu;
 
 	return vcpu;
@@ -246,8 +275,7 @@ static int create_vcpus(struct vm *vm)
 				if (!vcpu)
 					continue;
 
-				free(vcpu->stack_origin - VCPU_DEFAULT_STACK_SIZE);
-				free(vcpu);
+				release_vcpu(vcpu);
 			}
 
 			return -ENOMEM;
@@ -265,13 +293,11 @@ struct vcpu *create_idle_vcpu(void)
 	struct vcpu *idle = NULL;
 	int cpu = smp_processor_id();
 
-	idle = (struct vcpu *)malloc(sizeof(struct vcpu));
+	idle = alloc_vcpu(0);
 	if (!idle)
 		panic("Can not create idle vcpu\n");
 
-	memset(idle, 0, sizeof(struct vcpu));
 	init_list(&idle->list);
-	idle->stack_base = 0;
 	idle->stack_size = VCPU_DEFAULT_STACK_SIZE;
 	idle->is_idle = 1;
 

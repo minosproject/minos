@@ -62,7 +62,7 @@ void switch_to_vcpu(struct vcpu *current, struct vcpu *next)
 void sched_vcpu(struct vcpu *vcpu)
 {
 	struct vcpu *current = current_vcpu;
-	struct pcpu *pcpu = get_cpu_var(pcpu);
+	//struct pcpu *pcpu = get_cpu_var(pcpu);
 
 	/* Fix me TBD */
 

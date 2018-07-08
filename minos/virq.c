@@ -80,11 +80,9 @@ struct virq_desc *get_virq_desc(uint32_t virq)
 static int __send_virq(struct vcpu *vcpu,
 		uint32_t vno, uint32_t hno, int hw, int pr)
 {
-	struct virq_struct *virq_struct;
-	struct virq *virq;
 	int index;
-
-	virq_struct = &vcpu->virq_struct;
+	struct virq *virq;
+	struct virq_struct *virq_struct = vcpu->virq_struct;
 
 	spin_lock(&virq_struct->lock);
 
@@ -211,7 +209,7 @@ static int __virq_enable(struct virq_domain *d, struct virq_desc *desc)
 
 	if ((d->type == VIRQ_DOMAIN_SGI) ||
 			(d->type == VIRQ_DOMAIN_PPI)) {
-		vs = &vcpu->virq_struct;
+		vs = vcpu->virq_struct;
 		bitmap_set(vs->local_irq_mask, desc->vno - d->start, 1);
 	} else {
 		if (vcpu->vm->vmid != desc->vmid)
@@ -233,7 +231,7 @@ static int __virq_disable(struct virq_domain *d, struct virq_desc *desc)
 
 	if ((d->type == VIRQ_DOMAIN_SGI) ||
 			(d->type == VIRQ_DOMAIN_PPI)) {
-		vs = &vcpu->virq_struct;
+		vs = vcpu->virq_struct;
 		bitmap_clear(vs->local_irq_mask, desc->vno - d->start, 1);
 	} else {
 		if (vcpu->vm->vmid != desc->vmid)
@@ -321,7 +319,7 @@ void clear_pending_virq(uint32_t irq)
 	struct virq *virq;
 	unsigned long flags;
 	struct vcpu *vcpu = current_vcpu;
-	struct virq_struct *virq_struct = &vcpu->virq_struct;
+	struct virq_struct *virq_struct = vcpu->virq_struct;
 
 	/*
 	 * this function can only called by the current
@@ -353,7 +351,7 @@ static void irq_enter_to_guest(struct vcpu *vcpu, void *data)
 	 * before it enter to guest
 	 */
 	struct virq *virq, *n;
-	struct virq_struct *virq_struct = &vcpu->virq_struct;
+	struct virq_struct *virq_struct = vcpu->virq_struct;
 
 	spin_lock(&virq_struct->lock);
 
@@ -366,7 +364,7 @@ static void irq_enter_to_guest(struct vcpu *vcpu, void *data)
 		virq->state = VIRQ_STATE_PENDING;
 		irq_send_virq(virq);
 		list_del(&virq->list);
-		virq->list.next = NULL;
+		list_add_tail(&virq_struct->active_list, &virq->list);
 		if (virq->hw)
 			virq_struct->pending_hirq++;
 		else
@@ -384,17 +382,13 @@ static void irq_exit_from_guest(struct vcpu *vcpu, void *data)
 	 * on percpu and hanlde per_vcpu's data so do not
 	 * need spinlock
 	 */
-	struct virq *virq;
-	uint32_t set_bit;
 	int status;
-	struct virq_struct *virq_struct = &vcpu->virq_struct;
+	struct virq *virq, *n;
+	struct virq_struct *virq_struct = vcpu->virq_struct;
 
 	spin_lock(&virq_struct->lock);
 
-	for_each_set_bit(set_bit, virq_struct->irq_bitmap,
-			CONFIG_VCPU_MAX_ACTIVE_IRQS) {
-		virq = (struct virq *)&virq_struct->virqs[set_bit];
-
+	list_for_each_entry_safe(virq, n, &virq_struct->active_list, list) {
 		if (virq->state == VIRQ_STATE_OFFLINE)
 			continue;
 
@@ -406,7 +400,9 @@ static void irq_exit_from_guest(struct vcpu *vcpu, void *data)
 		if (status == VIRQ_STATE_INACTIVE) {
 			virq->state = VIRQ_STATE_INACTIVE;
 			irq_update_virq(virq, VIRQ_ACTION_CLEAR);
-			clear_bit(set_bit, virq_struct->irq_bitmap);
+			list_del(&virq->list);
+			virq->list.next = NULL;
+			clear_bit(virq->id, virq_struct->irq_bitmap);
 			if (virq->hw)
 				virq_struct->pending_hirq--;
 			else
@@ -428,9 +424,14 @@ void vcpu_virq_struct_init(struct virq_struct *virq_struct)
 	virq_struct->active_count = 0;
 	spin_lock_init(&virq_struct->lock);
 	init_list(&virq_struct->pending_list);
-	bitmap_clear(virq_struct->irq_bitmap, 0, CONFIG_VCPU_MAX_ACTIVE_IRQS);
+	init_list(&virq_struct->active_list);
 	virq_struct->pending_virq = 0;
 	virq_struct->pending_hirq = 0;
+
+	bitmap_clear(virq_struct->irq_bitmap,
+			0, CONFIG_VCPU_MAX_ACTIVE_IRQS);
+	bitmap_clear(virq_struct->local_irq_mask,
+			0, VCPU_MAX_LOCAL_IRQS);
 
 	for (i = 0; i < CONFIG_VCPU_MAX_ACTIVE_IRQS; i++) {
 		virq = &virq_struct->virqs[i];
