@@ -165,7 +165,7 @@
 		"sectype": "S/NS",
 		"enable": 1,
 		"type": 1,
-		"vmid": 1,
+		"vmid": 0,
 		"name": "uart1, pl011"
 	},
 	{
@@ -185,7 +185,7 @@
 		"sectype": "S/NS",
 		"enable": 1,
 		"type": 1,
-		"vmid": 0,
+		"vmid": 1,
 		"name": "uart3, pl011"
 	},
 	{

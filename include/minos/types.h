@@ -61,7 +61,7 @@ static inline unsigned long BALIGN(unsigned long num, size_t size)
 #define stringify_no_expansion(x) #x
 #define stringify(x) stringify_no_expansion(x)
 
-#define SIZE_1G		(0x40000000)
+#define SIZE_1G		(0x40000000UL)
 #define SIZE_4K		(0x1000)
 #define SIZE_1M		(0x100000)
 #define SIZE_1K		(0x400)
@@ -75,6 +75,7 @@ static inline unsigned long BALIGN(unsigned long num, size_t size)
 
 #define PAGE_SIZE	(SIZE_4K)
 #define PAGE_SHIFT	(12)
+#define PAGE_MASK	(0xfff)
 
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 
@@ -102,7 +103,7 @@ static inline unsigned long BALIGN(unsigned long num, size_t size)
     (((~0UL) << (l)) & (~0UL >> (BITS_PER_LONG - 1 - (h))))
 
 #define GENMASK_ULL(h, l) \
-    (((~0ULL) << (l)) & (~0ULL >> (BITS_PER_LLONG - 1 - (h))))
+    (((~0ULL) << (l)) & (~0ULL >> (BITS_PER_LONG - 1 - (h))))
 
 #define __AC(X,Y)	(X##Y)
 #define _AC(X,Y)	__AC(X,Y)

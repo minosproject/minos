@@ -193,14 +193,14 @@ SECTIONS
 	__config_data_end = .;
 	. = ALIGN(16);
 
-	.el2_stack (NOLOAD): {
+	.el2_stack : {
 		. = ALIGN(64);
 		__el2_stack = .;
 		. = . + (CONFIG_NR_CPUS * 0x2000);
 		__el2_stack_end = .;
 	}
 
-	.el3_stack (NOLOAD): {
+	.el3_stack : {
 		. = ALIGN(64);
 		__el3_stack = .;
 		. = . + (CONFIG_NR_CPUS * 0x100);
@@ -209,31 +209,23 @@ SECTIONS
 
 	. = ALIGN(4096);
 
+	.el2_ttb0_l0 : {
+		. = ALIGN(4096);
+		__el2_ttb0_l0 = .;
+		. = . + 0x1000;
+	}
+
 	/* 4K level1 can map 512GB memory */
-	.el2_ttb0_l1 (NOLOAD): {
+	.el2_ttb0_l1 : {
 		. = ALIGN(4096);
 		__el2_ttb0_l1 = .;
 		. = . + 0x1000;
 	}
 
-	.el2_ttb0_l2_code (NOLOAD) : {
+	.el2_ttb0_l2_code : {
 		. = ALIGN(4096);
 		__el2_ttb0_l2_code = .;
 		. = . + 0x1000;
-	}
-
-	.el2_stage2_ttb_l1 (NOLOAD): {
-		. = ALIGN(MMU_TTB_LEVEL1_ALIGN);
-		__el2_stage2_ttb_l1 = .;
-		. = . + (CONFIG_NR_CPUS * MMU_TTB_LEVEL1_SIZE);
-		__el2_stage2_ttb_l1_end = .;
-	}
-
-	.el2_stage2_ttbl2 (NOLOAD): {
-		. = ALIGN(MMU_TTB_LEVEL2_ALIGN);
-		__el2_stage2_ttb_l2 = .;
-		. = . + (CONFIG_NR_CPUS * MMU_TTB_LEVEL2_SIZE);
-		__el2_stage2_ttb_l2_end = .;
 	}
 
 	__code_end = .;

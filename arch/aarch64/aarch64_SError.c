@@ -182,19 +182,13 @@ static int misaligned_pc_handler(gp_regs *reg, uint32_t esr_value)
 	return 0;
 }
 
-static int get_faulting_ipa(unsigned long vaddr)
+static inline int get_faulting_ipa(unsigned long vaddr)
 {
 	uint64_t hpfar = read_sysreg(HPFAR_EL2);
 	unsigned long ipa;
 
 	ipa = (hpfar & HPFAR_MASK) << (12 - 4);
-
-	/*
-	 * fix the page size to 64k, this will be modified
-	 * TBD
-	 */
-	//ipa |= vaddr & (~PAGE_MASK);
-	ipa |= vaddr & (~(~(64 * 1024 -1)));
+	ipa |= vaddr & (~(~PAGE_MASK));
 
 	return ipa;
 }

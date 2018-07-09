@@ -2,6 +2,7 @@
 #define _MINOS_MM_H_
 
 #include <minos/list.h>
+#include <minos/spinlock.h>
 
 #define PAGE_NR(size)	(size >> PAGE_SHIFT)
 
@@ -20,6 +21,7 @@ struct memory_region {
 struct mm_struct {
 	unsigned long page_table_base;
 	struct list_head mem_list;
+	spinlock_t lock;
 };
 
 void mm_init(void);
@@ -29,7 +31,7 @@ void *get_free_pages(int pages);
 void free(void *addr);
 void free_pages(void *addr);
 
-static inline char *get_free_page(void)
+static inline void *get_free_page(void)
 {
 	return get_free_pages(1);
 }

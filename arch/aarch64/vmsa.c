@@ -53,26 +53,6 @@ struct vmsa_context {
 	uint64_t tcr_el1;
 }__align(sizeof(unsigned long));
 
-/*
- * now using two level page table in host
- * mode and guest mode, host using 4k granule
- * size and guest using 64k granule size
- */
-struct mmu_config {
-	uint32_t table_offset;
-	uint32_t level1_table_size;
-	uint32_t level1_entry_map_size;
-	uint32_t level1_offset;
-	int level1_description_type;
-	uint32_t level2_pages;
-	uint32_t level2_entry_map_size;
-	uint32_t level2_offset;
-	int level2_description_type;
-	char *(*alloc_level2_pages)(int pages);
-	uint64_t (*get_tt_description)(int mtype, int dtype);
-	spinlock_t *lock;
-};
-
 struct aa64mmfr0 {
 	uint64_t pa_range : 4;
 	uint64_t asid : 4;
@@ -85,95 +65,96 @@ struct aa64mmfr0 {
 	uint64_t res : 32;
 };
 
-#define G4K_LEVEL1_OFFSET	(30)
-#define G4K_LEVEL2_OFFSET	(21)
-#define G16K_LEVEL1_OFFSET	(25)
-#define G16K_LEVEL2_OFFSET	(14)
-#define G64K_LEVEL1_OFFSET	(29)
-#define G64K_LEVEL2_OFFSET	(16)
+struct tt_lvl_config {
+	int range_offset;
+	int des_offset;
+	unsigned long offset_mask;
+	size_t map_size;
+	struct tt_lvl_config *next;
+	struct tt_lvl_config *prev;
+};
 
-#ifdef CONFIG_GRANULE_SIZE_4K
-	#define GRANULE_TYPE		GRANULE_SIZE_4K
-	#define LEVEL2_OFFSET		G4K_LEVEL2_OFFSET
-	#define LEVEL1_OFFSET		G4K_LEVEL1_OFFSET
-	#define LEVEL2_ENTRY_MAP_SIZE	(SIZE_2M)
-	#define LEVEL1_ENTRY_MAP_SIZE	(SIZE_1G)
-	#define LEVEL1_DESCRIPTION_TYPE	(DESCRIPTION_TABLE)
-	#define LEVEL2_DESCRIPTION_TYPE	(DESCRIPTION_BLOCK)
-	#define LEVEL2_PAGES		(1)
-#elif CONFIG_GRANULE_SIZE_16K
-	#define GRANULE_TYPE		GRANULE_SIZE_16K
-	#define LEVEL1_OFFSET		G16K_LEVEL1_OFFSET
-	#define LEVEL2_OFFSET		G16K_LEVEL2_OFFSET
-	#define LEVEL2_ENTRY_MAP_SIZE	(SIZE_16K)
-	#define LEVEL1_ENTRY_MAP_SIZE	(SIZE_32M)
-	#define LEVEL1_DESCRIPTION_TYPE	(DESCRIPTION_TABLE)
-	#define LEVEL2_DESCRIPTION_TYPE	(DESCRIPTION_PAGE)
-	#define LEVEL2_PAGES		(4)
-#else
-	#define GRANULE_TYPE		GRANULE_SIZE_64K
-	#define LEVEL2_OFFSET		G64K_LEVEL2_OFFSET
-	#define LEVEL1_OFFSET		G64K_LEVEL1_OFFSET
-	#define LEVEL2_ENTRY_MAP_SIZE	(SIZE_64K)
-	#define LEVEL1_ENTRY_MAP_SIZE	(SIZE_512M)
-	#define LEVEL1_DESCRIPTION_TYPE	(DESCRIPTION_TABLE)
-	#define LEVEL2_DESCRIPTION_TYPE	(DESCRIPTION_PAGE)
-	#define LEVEL2_PAGES		(16)
-#endif
+struct map_info {
+	unsigned long table_base;
+	unsigned long vir_base;
+	unsigned long phy_base;
+	size_t size;
+	int lvl;
+	int host;
+	int mem_type;
+	struct tt_lvl_config *config;
+};
 
-extern unsigned char __el2_stage2_ttb_l1;
-extern unsigned char __el2_stage2_ttb_l1_end;
-extern unsigned char __el2_stage2_ttb_l2;
-extern unsigned char __el2_stage2_ttb_l2_end;
+extern unsigned char __el2_ttb0_l0;
+static unsigned long el2_ttb0_l0;
 
-extern unsigned char __el2_ttb0_l1;
-extern unsigned char __el2_ttb0_l2_code;
-static unsigned long el2_ttb0_l1;
 static spinlock_t host_lock;
 
-static char *level1_base;
-static char *level2_base;
-static size_t level1_size;
-static size_t level2_size;
+#define G4K_LVL0_OFFSET			(39)
+#define G4K_LVL1_OFFSET			(30)
+#define G4K_LVL2_OFFSET			(21)
+#define G4K_LVL3_OFFSET			(12)
+#define G4K_DESCRIPTION_OFFSET		(12)
 
-static spinlock_t guest_lock;
+#define VMSA_DESC_MASK(n) (~((1UL << (n)) - 1))
 
-static struct mmu_config host_config;
-static struct mmu_config guest_config;
+struct tt_lvl_config g4k_host_lvl3_config = {
+	.range_offset	= 12,
+	.des_offset	= 12,
+	.offset_mask	= 0x1ffUL << 12,
+	.map_size	= SIZE_4K,
+	.next		= NULL,
+};
 
-static char *alloc_guest_level2(int pages)
-{
-	char *ret = NULL;
+struct tt_lvl_config g4k_host_lvl2_config = {
+	.range_offset	= 21,
+	.des_offset	= 12,
+	.offset_mask	= 0x1ffUL << 21,
+	.map_size	= SIZE_2M,
+	.next		= &g4k_host_lvl3_config,
+};
 
-	if (level2_size < (pages * SIZE_4K))
-		return NULL;
+struct tt_lvl_config g4k_host_lvl1_config = {
+	.range_offset	= 30,
+	.des_offset	= 12,
+	.offset_mask	= 0x1ffUL << 30,
+	.map_size	= SIZE_1G,
+	.next		= &g4k_host_lvl2_config,
+};
 
-	ret = level2_base;
-	level2_base += (pages * SIZE_4K);
-	level2_size -= (pages * SIZE_4K);
+struct tt_lvl_config g4k_host_lvl0_config = {
+	.range_offset	= 39,
+	.des_offset	= 12,
+	.offset_mask	= 0x1ffUL << 39,
+	.map_size	= (512 * SIZE_1G),
+	.next		= &g4k_host_lvl1_config,
+};
 
-	return ret;
-}
+struct tt_lvl_config g4k_guest_lvl3_config = {
+	.range_offset	= 12,
+	.des_offset	= 12,
+	.offset_mask	= 0x1ffUL << 12,
+	.map_size	= SIZE_4K,
+	.next		= NULL,
+};
 
-static char *mmu_alloc_level1_mem()
-{
-	char *ret = NULL;
+struct tt_lvl_config g4k_guest_lvl2_config = {
+	.range_offset	= 21,
+	.des_offset	= 12,
+	.offset_mask	= 0x1ffUL << 21,
+	.map_size	= SIZE_2M,
+	.next		= &g4k_guest_lvl3_config,
+};
 
-	spin_lock(&guest_lock);
+struct tt_lvl_config g4k_guest_lvl1_config = {
+	.range_offset	= 30,
+	.des_offset	= 12,
+	.offset_mask	= 0x3ffUL << 30,
+	.map_size	= SIZE_1G,
+	.next		= &g4k_guest_lvl2_config,
+};
 
-	if (level1_size < MMU_TTB_LEVEL1_SIZE)
-		return NULL;
-
-	ret = level1_base;
-	level1_base += MMU_TTB_LEVEL1_SIZE;
-	level1_size -= MMU_TTB_LEVEL1_SIZE;
-
-	spin_unlock(&guest_lock);
-
-	return ret;
-}
-
-static uint64_t guest_tt_description(int m_type, int d_type)
+static unsigned long guest_tt_description(int m_type, int d_type)
 {
 	uint64_t attr;
 
@@ -189,7 +170,7 @@ static uint64_t guest_tt_description(int m_type, int d_type)
 		} else {
 			attr = TT_S2_ATTR_BLOCK | TT_S2_ATTR_AP_RW | \
 			       TT_S2_ATTR_SH_INNER | TT_S2_ATTR_AF | \
-			       TT_S2_ATTR_MEMATTR_DEVICE | \
+			       TT_S2_ATTR_XN | TT_S2_ATTR_MEMATTR_DEVICE | \
 			       TT_S2_ATTR_MEMATTR_DEV_nGnRnE;
 		}
 
@@ -205,7 +186,7 @@ static uint64_t guest_tt_description(int m_type, int d_type)
 		} else {
 			attr = TT_S2_ATTR_PAGE | TT_S2_ATTR_AP_RW | \
 			       TT_S2_ATTR_SH_INNER | TT_S2_ATTR_AF | \
-			       TT_S2_ATTR_MEMATTR_DEVICE | \
+			       TT_S2_ATTR_XN | TT_S2_ATTR_MEMATTR_DEVICE | \
 			       TT_S2_ATTR_MEMATTR_DEV_nGnRnE;
 		}
 
@@ -215,12 +196,7 @@ static uint64_t guest_tt_description(int m_type, int d_type)
 	return 0;
 }
 
-static char *alloc_host_level2(int pages)
-{
-	return get_free_pages(pages);
-}
-
-static uint64_t host_tt_description(int m_type, int d_type)
+static unsigned long host_tt_description(int m_type, int d_type)
 {
 	uint64_t attr;
 
@@ -242,6 +218,7 @@ static uint64_t host_tt_description(int m_type, int d_type)
 			       TT_S1_ATTR_NS | \
 			       TT_S1_ATTR_AP_RW_PL1 | \
 			       TT_S1_ATTR_AF | \
+			       TT_S1_ATTR_XN | \
 			       TT_S1_ATTR_nG;
 		}
 
@@ -263,6 +240,7 @@ static uint64_t host_tt_description(int m_type, int d_type)
 			       TT_S1_ATTR_NS | \
 			       TT_S1_ATTR_AP_RW_PL1 | \
 			       TT_S1_ATTR_AF | \
+			       TT_S1_ATTR_XN | \
 			       TT_S1_ATTR_nG;
 		}
 
@@ -272,101 +250,146 @@ static uint64_t host_tt_description(int m_type, int d_type)
 	return 0;
 }
 
-static int map_level2_pages(unsigned long *tbase, unsigned long vbase,
-			unsigned long pbase, size_t size,
-			int type, struct mmu_config *config)
+static inline unsigned long get_tt_description(int host, int m_type, int d_type)
 {
-	int i;
-	uint64_t attr;
+	if (host)
+		return host_tt_description(m_type, d_type);
+	else
+		return guest_tt_description(m_type, d_type);
+}
+
+static int get_map_type(struct map_info *info)
+{
+	struct tt_lvl_config *config = info->config;
+	unsigned long a, b;
+
+	if (info->lvl == 3)
+		return DESCRIPTION_PAGE;
+
+	/*
+	 * check whether the map size is level map
+	 * size align and the virtual base aligin
+	 * FIX ME : whether need to check the physical base?
+	 */
+	a = (info->size) & (config->map_size - 1);
+	b = (info->vir_base) & (config->map_size - 1);
+	if (a || b)
+		return DESCRIPTION_TABLE;
+	else
+		return DESCRIPTION_BLOCK;
+}
+
+static int create_page_entry(struct map_info *info)
+{
+	int i, map_type;
 	uint32_t offset, index;
-	unsigned long tmp;
+	unsigned long attr;
+	struct tt_lvl_config *config = info->config;
+	unsigned long *tbase = (unsigned long *)info->table_base;
 
-	offset = config->level2_offset;
-	attr = config->get_tt_description(type,
-			config->level2_description_type);
+	if (info->lvl != 3)
+		map_type = DESCRIPTION_BLOCK;
+	else
+		map_type = DESCRIPTION_PAGE;
 
-	tmp = ALIGN(vbase, config->level1_entry_map_size);
-	index = (vbase - tmp) >> offset;
-	tmp = index;
+	offset = config->range_offset;
+	attr = get_tt_description(info->host, info->mem_type, map_type);
 
-	for (i = 0; i < (size >> offset); i++) {
-		if (*(tbase + index) != 0)
-			goto again;
+	index = (info->vir_base & config->offset_mask) >> offset;
 
-		*(tbase + index) = (attr | \
-			(pbase >> offset) << offset);
-
-again:
-		vbase += config->level2_entry_map_size;
-		pbase += config->level2_entry_map_size;
+	for (i = 0; i < (info->size >> offset); i++) {
+		*(tbase + index) = attr | (info->phy_base &
+				VMSA_DESC_MASK(config->des_offset));
+		info->vir_base += config->map_size;
+		info->phy_base += config->map_size;
 		index++;
 	}
 
 	return 0;
 }
 
-static int map_mem(unsigned long t_base, unsigned long base,
-		unsigned long phy_base, size_t size,
-		int type, struct mmu_config *config)
+static int create_table_entry(struct map_info *info)
 {
-	int ret = 0;
-	unsigned long tmp;
-	uint32_t offset;
-	uint64_t value;
-	uint64_t attr;
-	size_t map_size;
-	unsigned long *tbase = (unsigned long *)t_base;
+	size_t size, map_size;
+	unsigned long attr, value, offset;
+	int ret = 0, map_type, new_page;
+	struct map_info map_info;
+	struct tt_lvl_config *config = info->config;
+	unsigned long *tbase = (unsigned long *)info->table_base;
 
-	spin_lock(config->lock);
-
-	attr = config->get_tt_description(type,
-			config->level1_description_type);
+	size = info->size;
+	attr = get_tt_description(info->host,
+			info->mem_type, DESCRIPTION_TABLE);
 
 	while (size > 0) {
-		offset = base >> (config->level1_offset);
-		value = *(tbase + offset);
-		if (value == 0) {
-			tmp = (unsigned long)config->alloc_level2_pages(
-					config->level2_pages);
-			if (!tmp) {
-				ret =  -ENOMEM;
-				goto out;
-			}
-
-			memset((char *)tmp, 0, config->level2_pages * SIZE_4K);
-
-			*(tbase + offset) = attr | \
-				((tmp >> config->table_offset) << \
-				 config->table_offset);
-			value = (uint64_t)tmp;
-			flush_dcache_range((unsigned long)(tbase + offset),
-					sizeof(unsigned long));
-		} else {
-			/* get the base address of the entry */
-			value = value & 0x0000ffffffffffff;
-			value = value >> config->table_offset;
-			value = value << config->table_offset;
-		}
-
-		map_size = BALIGN(base, config->level1_entry_map_size) - base;
-		map_size = map_size ? map_size :
-				config->level1_entry_map_size;
+		new_page = 0;
+		map_size = BALIGN(info->vir_base, config->map_size) - info->vir_base;
+		map_size = map_size ? map_size : config->map_size;
 		if (map_size > size)
 			map_size = size;
 
-		map_level2_pages((unsigned long *)value, base,
-				phy_base, map_size, type, config);
+		offset = (info->vir_base & config->offset_mask) >>
+			config->range_offset;
+		value = *(tbase + offset);
 
-		flush_dcache_range(value,
-			config->level2_pages * SIZE_4K);
+		if (value == 0) {
+			value = (unsigned long)get_free_page();
+			if (!value)
+				return -ENOMEM;
 
-		base += map_size;
+			new_page = 1;
+			memset((void *)value, 0, SIZE_4K);
+			*(tbase + offset) = attr | (value &
+					VMSA_DESC_MASK(config->des_offset));
+			flush_dcache_range((unsigned long)(tbase + offset),
+						sizeof(unsigned long));
+		} else {
+			/* get the base address of the entry */
+			value = value & 0x0000ffffffffffff;
+			value = value >> config->des_offset;
+			value = value << config->des_offset;
+		}
+
+		memset(&map_info, 0, sizeof(struct map_info));
+		map_info.table_base = value;
+		map_info.vir_base = info->vir_base;
+		map_info.phy_base = info->phy_base;
+		map_info.size = map_size;
+		map_info.lvl = info->lvl + 1;
+		map_info.mem_type = info->mem_type;
+		map_info.host = info->host;
+		map_info.config = config->next;
+
+		/*
+		 * get next level map entry type, if the entry
+		 * has been already maped then force it to a
+		 * Table description
+		 *
+		 * FIX ME: if the attribute of the page table entry
+		 * is changed, such as from TABLE to BLOCK, need to
+		 * free the page table page --- TBD
+		 */
+		map_type = get_map_type(&map_info);
+
+		if (map_type == DESCRIPTION_TABLE)
+			ret = create_table_entry(&map_info);
+		else
+			ret = create_page_entry(&map_info);
+		if (ret) {
+			if (new_page) {
+				free((void *)value);
+				new_page = 0;
+			}
+
+			return ret;
+		}
+
+		flush_dcache_range(value, SIZE_4K);
+		info->vir_base += map_size;
 		size -= map_size;
-		phy_base += map_size;
+		info->phy_base += map_size;
 	}
 
-out:
-	spin_unlock(config->lock);
 	return ret;
 }
 
@@ -375,38 +398,59 @@ static unsigned long alloc_guest_pt(void)
 	/*
 	 * return the table base address, this function
 	 * is called when init the vm
+	 *
+	 * 2 pages for each VM to map 1T IPA memory
+	 *
 	 */
-	char *page;
+	void *page;
 
-	page = mmu_alloc_level1_mem();
+	page = get_free_pages(2);
 	if (!page)
 		panic("No memory to map vm memory\n");
 
-	memset(page, 0, MMU_TTB_LEVEL1_SIZE);
+	memset(page, 0, SIZE_4K * 2);
 	return (unsigned long)page;
 }
 
-static int map_host_mem(unsigned long vir, unsigned long phy,
-			size_t size, int type)
+
+static int map_memory(struct map_info *info)
 {
 	int ret;
-	unsigned long vir_base, phy_base, tmp;
-	struct mmu_config *config = &host_config;
 
-	vir_base = ALIGN(vir, config->level2_entry_map_size);
-	phy_base = ALIGN(phy, config->level2_entry_map_size);
-	tmp = BALIGN(vir_base + size, config->level2_entry_map_size);
+	ret = create_table_entry(info);
+	if (ret)
+		pr_error("map host 0x%x->0x%x size:%x failed\n",
+				info->vir_base, info->phy_base, info->size);
+	else
+		flush_all_tlb();
+
+	return ret;
+}
+
+int map_host_mem(unsigned long vir, unsigned long phy, size_t size, int type)
+{
+	int ret = 0;
+	unsigned long vir_base, phy_base, tmp;
+	struct map_info map_info;
+
+	vir_base = ALIGN(vir, SIZE_4K);
+	phy_base = ALIGN(phy, SIZE_4K);
+	tmp = BALIGN(vir_base + size, SIZE_4K);
 	size = tmp - vir_base;
 
-	ret = map_mem(el2_ttb0_l1, vir_base,
-			phy_base, size, type, config);
-	if (ret) {
-		pr_error("map host 0x%x->0x%x size:%x failed\n",
-				vir, phy, size);
-	} else {
-		flush_all_tlb();
-		//inv_dcache_range(vir_base, size);
-	}
+	memset(&map_info, 0, sizeof(struct map_info));
+	map_info.table_base = el2_ttb0_l0;
+	map_info.vir_base = vir_base;
+	map_info.phy_base = phy_base;
+	map_info.size = size;
+	map_info.lvl = 0;
+	map_info.host = 1;
+	map_info.mem_type = type;
+	map_info.config = &g4k_host_lvl0_config;
+
+	spin_lock(&host_lock);
+	ret = map_memory(&map_info);
+	spin_unlock(&host_lock);
 
 	return ret;
 }
@@ -414,44 +458,47 @@ static int map_host_mem(unsigned long vir, unsigned long phy,
 int map_guest_mem(unsigned long tt, unsigned long vir,
 		unsigned long phy, size_t size, int type)
 {
-	int ret;
 	unsigned long vir_base, phy_base, tmp;
-	struct mmu_config *config = &guest_config;
+	struct map_info map_info;
 
-	vir_base = ALIGN(vir, config->level2_entry_map_size);
-	phy_base = ALIGN(phy, config->level2_entry_map_size);
-	tmp = BALIGN(vir_base + size, config->level2_entry_map_size);
+	vir_base = ALIGN(vir, SIZE_4K);
+	phy_base = ALIGN(phy, SIZE_4K);
+	tmp = BALIGN(vir_base + size, SIZE_4K);
 	size = tmp - vir_base;
 
-	ret = map_mem(tt, vir_base, phy_base, size, type, config);
-	if (ret) {
-		pr_error("map host 0x%x->0x%x size:%x failed\n",
-				vir, phy, size);
-	}
+	memset(&map_info, 0, sizeof(struct map_info));
+	map_info.table_base = tt;
+	map_info.vir_base = vir_base;
+	map_info.phy_base = phy_base;
+	map_info.size = size;
+	map_info.lvl = 1;
+	map_info.host = 0;
+	map_info.mem_type = type;
+	map_info.config = &g4k_guest_lvl1_config;
 
-	return ret;
+	return map_memory(&map_info);
 }
 
 static uint64_t generate_vtcr_el2(void)
 {
 	uint64_t value = 0;
 
-	value |= (0x20 << 0);	// t0sz = 0x20 32bits vaddr
-	value |= (0x01 << 6);	// SL0: 64kb/16 start at level2 4k start at level1
+	/*
+	 * vtcr_el2 used to defined the memory attribute
+	 * for the EL1, this is defined by hypervisor
+	 * and may do not related to physical information
+	 */
+	value |= (24 << 0);	// t0sz = 0x10 40bits vaddr
+	value |= (0x01 << 6);	// SL0: 4kb start at level1
 	value |= (0x1 << 8);	// Normal memory, Inner WBWA
 	value |= (0x1 << 10);	// Normal memory, Outer WBWA
 	value |= (0x3 << 12);	// Inner Shareable
 
-	// TG0
-	if (GRANULE_TYPE == GRANULE_SIZE_4K)
-		value |= (0x0 << 14);
-	else if (GRANULE_TYPE == GRANULE_SIZE_16K)
-		value |= (0x2 << 14);
-	else
-		value |= (0x1 << 14);
+	// TG0 4K
+	value |= (0x0 << 14);
 
-	// PS --- pysical size
-	value |= (0x0 << 16);
+	// PS --- pysical size 1TB
+	value |= (2 << 16);
 
 	// vmid -- 8bit
 	value |= (0x0 << 19);
@@ -469,56 +516,17 @@ static uint64_t generate_vttbr_el2(uint32_t vmid, unsigned long base)
 	return value;
 }
 
-static int stage2_tt_mem_init(void)
-{
-	level1_base = (char *)&__el2_stage2_ttb_l1;
-	level2_base = (char *)&__el2_stage2_ttb_l2;
-	level1_size = &__el2_stage2_ttb_l1_end - &__el2_stage2_ttb_l1;
-	level2_size = &__el2_stage2_ttb_l2_end - &__el2_stage2_ttb_l2;
-
-	pr_info("level1: 0x%x 0x%x level2:0x%x 0x%x\n",
-			level1_base, level1_size, level2_base, level2_size);
-	if ((level1_size <= 0) || (level2_size <= 0))
-		panic("No memory for el2 stage2 translation table\n");
-
-	spin_lock_init(&guest_lock);
-
-	memset((char *)&guest_config, 0, sizeof(struct mmu_config));
-	guest_config.table_offset = 16;
-	guest_config.level1_entry_map_size = LEVEL1_ENTRY_MAP_SIZE;
-	guest_config.level1_offset = LEVEL1_OFFSET;
-	guest_config.level1_description_type = LEVEL1_DESCRIPTION_TYPE;
-	guest_config.level2_pages = LEVEL2_PAGES;
-	guest_config.level2_entry_map_size = LEVEL2_ENTRY_MAP_SIZE;
-	guest_config.level2_offset = LEVEL2_OFFSET;
-	guest_config.level2_description_type = LEVEL2_DESCRIPTION_TYPE;
-	guest_config.alloc_level2_pages = alloc_guest_level2;
-	guest_config.get_tt_description = guest_tt_description;
-	guest_config.lock = &guest_lock;
-	guest_config.level1_table_size = 64 * 1024;
-
-	return 0;
-}
-
 int el2_stage1_init(void)
 {
-	el2_ttb0_l1 = (unsigned long)&__el2_ttb0_l1;
+	el2_ttb0_l0 = (unsigned long)&__el2_ttb0_l0;
+	g4k_host_lvl0_config.prev = NULL;
+	g4k_host_lvl1_config.prev = &g4k_host_lvl0_config;
+	g4k_host_lvl2_config.prev = &g4k_host_lvl1_config;
+	g4k_host_lvl3_config.prev = &g4k_host_lvl1_config;
+	g4k_guest_lvl1_config.prev = NULL;
+	g4k_guest_lvl2_config.prev = &g4k_guest_lvl1_config;
+	g4k_guest_lvl3_config.prev = &g4k_guest_lvl2_config;
 	spin_lock_init(&host_lock);
-
-	memset((char *)&host_config, 0, sizeof(struct mmu_config));
-
-	host_config.table_offset = 12;
-	host_config.level1_entry_map_size = SIZE_1G;
-	host_config.level1_offset = G4K_LEVEL1_OFFSET;
-	host_config.level1_description_type = DESCRIPTION_TABLE;
-	host_config.level2_pages = 1;
-	host_config.level2_entry_map_size = SIZE_2M;
-	host_config.level2_offset = 21;
-	host_config.level2_description_type = DESCRIPTION_BLOCK;
-	host_config.alloc_level2_pages = alloc_host_level2;
-	host_config.get_tt_description = host_tt_description;
-	host_config.lock = &host_lock;
-	host_config.level1_table_size = 4 * 1024;
 
 	return 0;
 }
@@ -544,8 +552,6 @@ int el2_stage2_init(void)
 	dcache = 4 << ((value & 0xf0000) >> 16);
 	icache = 4 << ((value & 0xf));
 	pr_info("dcache_line_size:%d ichache_line_size:%d\n", dcache, icache);
-
-	stage2_tt_mem_init();
 
 	return 0;
 }

@@ -409,15 +409,3 @@ int mm_init(void)
 }
 
 #endif
-
-static int memory_init(void)
-{
-	/* map all the memory space to el2 space */
-	mmu_map_host_memory(CONFIG_RAM_START_ADDRESS,
-			CONFIG_RAM_START_ADDRESS,
-			CONFIG_RAM_SIZE, MEM_TYPE_NORMAL);
-
-	return 0;
-}
-
-subsys_initcall(memory_init);

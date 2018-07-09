@@ -74,6 +74,20 @@ int register_memory_region(struct memtag *res)
 	return 0;
 }
 
+static int map_vm_memory(struct vm *vm, unsigned long vir_base,
+		unsigned long phy_base, size_t size, int type)
+{
+	int ret;
+	struct mm_struct *mm = &vm->mm;
+
+	spin_lock(&mm->lock);
+	ret = mmu_map_guest_memory(mm->page_table_base,
+			vir_base, phy_base, size, type);
+	spin_unlock(&mm->lock);
+
+	return ret;
+}
+
 int vm_mm_init(struct vm *vm)
 {
 	struct memory_region *region;
@@ -83,6 +97,7 @@ int vm_mm_init(struct vm *vm)
 
 	init_list(&mm->mem_list);
 	mm->page_table_base = 0;
+	spin_lock_init(&mm->lock);
 
 	/*
 	 * this function will excuted at bootup
@@ -112,13 +127,13 @@ int vm_mm_init(struct vm *vm)
 	}
 
 	list_for_each_entry(region, &mm->mem_list, list) {
-		mmu_map_guest_memory(mm->page_table_base, region->mem_base,
-			region->vir_base, region->size, region->type);
+		map_vm_memory(vm, region->mem_base, region->vir_base,
+				region->size, region->type);
 	}
 
 	list_for_each_entry(region, &shared_mem_list, list) {
-		mmu_map_guest_memory(mm->page_table_base, region->mem_base,
-			region->vir_base, region->size, region->type);
+		map_vm_memory(vm, region->mem_base, region->vir_base,
+				region->size, region->type);
 	}
 
 	flush_all_tlb();

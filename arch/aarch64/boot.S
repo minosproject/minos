@@ -114,16 +114,26 @@ el2_entry_aarch64:
 	isb
 
 	/* setup the el2 page table */
-	ldr	x1, = __el2_ttb0_l1
+	ldr	x1, = __el2_ttb0_l0
 	msr	TTBR0_EL2, x1
 
 	mov	x1, #0xff44
 	movk	x1, #4, lsl #16
 	msr	MAIR_EL2, x1
 
+	/*
+	 * get the physical address range
+	 */
+	mrs	x0, ID_AA64MMFR0_EL1
+	and	x0, x0, #0xf
+	mov	x2, x0, lsl #16
+
 	/* config the TCR_EL2 */
 	mrs	x1, TCR_EL2
-	orr	x1, x1, #0x20
+	ldr	x3, =0xfff8ffff
+	and	x1, x1, x3
+	orr	x1, x1, x2
+	orr	x1, x1, #0x10		// VA 48 bit address range and translation start at lvl0
 	orr	x1, x1, #(1 << 8)	// IRGN0 : Normal memory, Inner Write-Back Read-Allocate Write-Allocate Cacheable
 	orr	x1, x1, #(1 << 10)	// ORGN0
 	orr	x1, x1, #(3 << 12)	// Inner shareable
@@ -136,8 +146,16 @@ el2_entry_aarch64:
 
 	cbnz	x19, secondary_start_up
 
-	/* map the code memory VA->PA, if need to using d
-	   cache need to enable the MMU */
+	/*
+	 * map the code memory VA->PA, if need to using
+	 * dcache need to enable the MMU
+	 */
+	ldr	x20, = __el2_ttb0_l0
+	mov	x0, x21
+	mov	x1, #0
+	mov	x2, #4096
+	bl	memset
+
 	ldr	x21, = __el2_ttb0_l1
 	mov	x0, x21
 	mov	x1, #0
@@ -155,17 +173,30 @@ el2_entry_aarch64:
 	ldr	x2, = CONFIG_MINOS_START_ADDRESS
 	ldr	x3, = CONFIG_MINOS_RAM_SIZE
 
-	/* set up the level 1 page table assume
-	 the code size is less than 1G */
-	ubfx	x23, x1, #30, #2
-	orr	x4, x22, #TT_S1_ATTR_PAGE
+	/*
+	 * set upt the level 0 page table
+	 */
+	ubfx	x23, x1, #39, #9
+	orr	x4, x21, #TT_S1_ATTR_TABLE
+	str	x4, [x20, x23, lsl #3]
+
+	/*
+	 * set up the level 1 page table assume
+	 * the code size is less than 1G
+	 */
+	ubfx	x23, x1, #30, #9
+	orr	x4, x22, #TT_S1_ATTR_TABLE
 	str	x4, [x21, x23, lsl #3]
 
-	/* set up the level 2 page table */
+	/*
+	 * set up the level 2 page table
+	 */
 	bl	map_memory
 	dsb	ish
 
-	/* enable the mmu and disable the aligment check */
+	/*
+	 * enable the mmu and disable the aligment check
+	 */
 	mrs	x1, SCTLR_EL2
 	orr	x1, x1, #SCTLR_ELx_M
 	bic	x1, x1, #SCTLR_ELx_A

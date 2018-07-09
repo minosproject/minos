@@ -20,14 +20,14 @@
 
 static struct mmu_chip *mmu_chip;
 
-int mmu_map_guest_memory(unsigned long page_table_base, unsigned long phy_base,
-		unsigned long vir_base, size_t size, int type)
+int mmu_map_guest_memory(unsigned long tbase, unsigned long vir_base,
+		unsigned long phy_base, size_t size, int type)
 {
 	if (!mmu_chip->map_guest_memory)
 		return -EINVAL;
 
-	return mmu_chip->map_guest_memory(page_table_base,
-			phy_base, vir_base, size, type);
+	return mmu_chip->map_guest_memory(tbase, phy_base,
+			vir_base, size, type);
 }
 
 unsigned long mmu_alloc_guest_pt(void)
