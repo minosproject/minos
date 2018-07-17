@@ -148,55 +148,81 @@ el2_entry_aarch64:
 
 	/*
 	 * map the code memory VA->PA, if need to using
-	 * dcache need to enable the MMU
+	 * dcache need to enable the MMU, first clear
+	 * the page table
 	 */
-	ldr	x20, = __el2_ttb0_l0
-	mov	x0, x21
 	mov	x1, #0
 	mov	x2, #4096
+	ldr	x20, = __el2_ttb0_l0
+	mov	x0, x20
 	bl	memset
-
 	ldr	x21, = __el2_ttb0_l1
 	mov	x0, x21
-	mov	x1, #0
-	mov	x2, #4096
+	bl	memset
+	ldr	x23, = __el2_ttb0_l2_code
+	mov	x0, x23
+	bl	memset
+	ldr	x24, = __el2_ttb0_l2_io
+	mov	x0, x24
 	bl	memset
 
-	ldr	x22, = __el2_ttb0_l2_code
-	mov	x0, x22
-	mov	x1, #0
-	mov	x2, #4096
-	bl	memset
+	ldr	x7, =0x1fffff
+	ldr	x8, =0xffffffffffe00000
 
-	mov	x0, x22
-	ldr	x1, = CONFIG_MINOS_START_ADDRESS
+	mov	x0, x20
+	mov	x1, x21
 	ldr	x2, = CONFIG_MINOS_START_ADDRESS
-	ldr	x3, = CONFIG_MINOS_RAM_SIZE
+	ldr	x3, = CONFIG_MINOS_START_ADDRESS
+	ldr	x4, = CONFIG_MINOS_RAM_SIZE
+	add	x6, x2, x4
+	add	x6, x6, x7
+	and	x2, x2, x8
+	and	x3, x3, x8
+	and	x6, x6, x8
+	sub	x4, x6, x2	//get the real size in 2M align
+	bl	buid_l0_table
 
-	/*
-	 * set upt the level 0 page table
-	 */
-	ubfx	x23, x1, #39, #9
-	orr	x4, x21, #TT_S1_ATTR_TABLE
-	str	x4, [x20, x23, lsl #3]
+	mov	x0, x21
+	mov	x1, x23
+	bl	build_l1_table
 
-	/*
-	 * set up the level 1 page table assume
-	 * the code size is less than 1G
-	 */
-	ubfx	x23, x1, #30, #9
-	orr	x4, x22, #TT_S1_ATTR_TABLE
-	str	x4, [x21, x23, lsl #3]
-
-	/*
-	 * set up the level 2 page table
-	 */
-	bl	map_memory
+	mov	x0, 0
+	mov	x5, #(TT_S1_ATTR_BLOCK | \
+		(1 << TT_S1_ATTR_MATTR_LSB) | \
+		TT_S1_ATTR_NS | \
+		TT_S1_ATTR_AP_RW_PL1 | \
+		TT_S1_ATTR_SH_INNER | \
+		TT_S1_ATTR_AF | \
+		TT_S1_ATTR_nG)
+	bl	build_l2_table
 	dsb	ish
 
-	/*
-	 * enable the mmu and disable the aligment check
-	 */
+	/* map the uart io space for early uart print */
+	ldr	x2, = CONFIG_UART_BASE
+	ldr	x3, = CONFIG_UART_BASE
+	ldr	x4, = CONFIG_UART_IO_SIZE
+	add	x6, x2, x4
+	add	x6, x6, x7
+	and	x2, x2, x8
+	and	x3, x3, x8
+	and	x6, x6, x8
+	sub	x4, x6, x2	//get the real size in 2M align
+
+	mov	x0, x21
+	mov	x1, x24
+	bl	build_l1_table
+
+	mov	x0, 0
+	mov	x5, #(TT_S1_ATTR_BLOCK | \
+		(2 << TT_S1_ATTR_MATTR_LSB) | \
+		TT_S1_ATTR_NS | \
+		TT_S1_ATTR_AP_RW_PL1 | \
+		TT_S1_ATTR_AF | \
+		TT_S1_ATTR_nG)
+	bl	build_l2_table
+	dsb	ish
+
+	/* enable the mmu and disable the aligment check */
 	mrs	x1, SCTLR_EL2
 	orr	x1, x1, #SCTLR_ELx_M
 	bic	x1, x1, #SCTLR_ELx_A
@@ -220,6 +246,10 @@ el2_entry_aarch64:
 	ldr	x2, =__bss_end
 	sub	x2, x2, x0
 	bl	memset
+
+	/* init the uart */
+	bl	uart_init
+	nop
 
 	bl	boot_main
 	nop
@@ -256,49 +286,62 @@ wait_loop:
 	bl	boot_secondary
 	nop
 
-	/* x0 - level 2 table address
-	   x1 - the virtual address
-	   x2 - the physical address
-	   x3 - the size */
-map_memory:
-	/* check aligment */
-	ldr	x4, =0xffffffffffe00000
-	and	x1, x1, x4
-	and	x2, x2, x4
-	ldr	x7, =0x1fffff
-	add	x3, x3, x7
-	and	x3, x3, x4
+buid_l0_table:
+	/*
+	 * x0 : l0 table base
+	 * x1 : l1 table base
+	 * x2 : the virtual address
+	 * x3 : the physical address
+	 * x4 : map size
+	 * only map one entry (512G) at boot time
+	 */
+	ubfx	x11, x2, #39, #9
+	orr	x12, x1, #TT_S1_ATTR_TABLE
+	str	x12, [x0, x11, lsl #3]
+	ret
 
-	/* 1G region, assume all the minos memory
-	   are in the same 1G region, other CASE
-	   TBD and get the index in the page table */
-	and	x5, x1, #0x3fffffff
-	//lsr	x5, x5, #21
-	ubfx	x5, x5, #21, #17
-	add	x0, x0, x5, lsl #3	// the base address in the page table
+build_l1_table:
+	/*
+	 * x0 : l1 table base
+	 * x1 : l2 table base
+	 * x2 : the virtual address
+	 * x3 : the physical address
+	 * x4 : map size
+	 * only map one entry (4G) at boot time
+	 */
+	ubfx	x11, x2, #30, #9
+	orr	x12, x1, #TT_S1_ATTR_TABLE
+	str	x12, [x0, x11, lsl #3]
+	ret
 
-	/* 4K 2M block */
-	bic	x2, x2, #0x1fffff
-	bic	x2, x2, #0xffff000000000000
+build_l2_table:
+	/*
+	 * x0 - 0
+	 * x1 - level 2 table address
+	 * x2 - the virtual address
+	 * x3 - the physical address
+	 * x4 - the size
+	 * x5 - the entry attribute
+	 * 1G region, assume all the minos memory
+	 * are in the same 1G region, other CASE
+	 * TBD and get the index in the page table
+	 * map as 2M block
+	 */
+	and	x11, x2, #0x3fffffff
+	ubfx	x11, x11, #21, #17
+	add	x1, x1, x11, lsl #3	// the base address in the page table
 
-	mov	x6, #(TT_S1_ATTR_BLOCK | \
-		(1 << TT_S1_ATTR_MATTR_LSB) | \
-		TT_S1_ATTR_NS | \
-		TT_S1_ATTR_AP_RW_PL1 | \
-		TT_S1_ATTR_SH_INNER | \
-		TT_S1_ATTR_AF | \
-		TT_S1_ATTR_nG)
+	bic	x3, x3, #0x1fffff
+	bic	x3, x3, #0xffff000000000000
 
-	orr	x2, x2, x6
-
-	/* begin the loop */
+	orr	x3, x3, x5
 loop:
-	cbz	x3, exit_loop
-	str	x2, [x0]
-	sub	x3, x3, #0x200000
-	add	x0, x0, #8
-	add	x2, x2, #0x200000
+	cbz	x4, exit_loop
+	str	x3, [x1]
+	sub	x4, x4, #0x200000
+	add	x1, x1, #8
+	add	x3, x3, #0x200000
 	b loop
-
 exit_loop:
 	ret
+

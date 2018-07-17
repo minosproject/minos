@@ -64,7 +64,7 @@ static int parse_svc_desc(unsigned long start,
 	for (i = 0; i < size; i++) {
 		if ((desc->type_start > desc->type_end) ||
 				(desc->type_end >= SVC_STYPE_MAX)) {
-			pr_warning("Invaild argument for SVC_DESC:%s\n",
+			pr_warn("Invaild argument for SVC_DESC:%s\n",
 					desc->name);
 			desc++;
 			continue;
@@ -72,7 +72,7 @@ static int parse_svc_desc(unsigned long start,
 
 		for (j = desc->type_start; j <= desc->type_end; j++) {
 			if (table[j])
-				pr_warning("overwrite SVC_DESC:%d %s\n",
+				pr_warn("overwrite SVC_DESC:%d %s\n",
 						j, desc->name);
 			table[j] = desc;
 		}
@@ -85,7 +85,7 @@ static int parse_svc_desc(unsigned long start,
 
 static int svc_service_init(void)
 {
-	pr_info("Parsing SMC/HVC handler\n");
+	pr_info("parsing SMC/HVC handler\n");
 
 	memset((char *)smc_descs, 0, sizeof(struct svc_desc *) * SVC_STYPE_MAX);
 	memset((char *)hvc_descs, 0, sizeof(struct svc_desc *) * SVC_STYPE_MAX);

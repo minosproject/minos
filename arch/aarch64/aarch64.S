@@ -18,9 +18,21 @@
 #include <asm/asm_marco.S>
 
 	.global get_cpu_id
+	.global arch_get_fp
+	.global arch_get_lr
 
 func get_cpu_id
 	mrs 	x0, MPIDR_EL1
 	ubfx    x0, x0, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
 	ret
 endfunc get_cpu_id
+
+func arch_get_fp
+	mov	x0, x29
+	ret
+endfunc arch_get_fp
+
+func arch_get_lr
+	mov	x0, x30
+	ret
+endfunc arch_get_lr

@@ -292,6 +292,8 @@ struct vcpu *create_idle_vcpu(void)
 {
 	struct vcpu *idle = NULL;
 	int cpu = smp_processor_id();
+	extern unsigned char __el2_stack_end;
+	void *el2_stack_base = (void *)&__el2_stack_end;
 
 	idle = alloc_vcpu(0);
 	if (!idle)
@@ -299,6 +301,7 @@ struct vcpu *create_idle_vcpu(void)
 
 	init_list(&idle->list);
 	idle->stack_size = VCPU_DEFAULT_STACK_SIZE;
+	idle->stack_origin = el2_stack_base - (cpu * 0x2000);
 	idle->is_idle = 1;
 
 	pcpu_add_vcpu(cpu, idle);
@@ -352,15 +355,15 @@ int create_vms(void)
 	struct vmtag *vmtags = mv_config->vmtags;
 
 	if (mv_config->nr_vmtag == 0) {
-		pr_error("No VM is found\n");
+		pr_error("no VM is found\n");
 		return -ENOENT;
 	}
 
-	pr_info("Found %d VMs config\n", mv_config->nr_vmtag);
+	pr_info("found %d VMs config\n", mv_config->nr_vmtag);
 
 	for (i = 0; i < mv_config->nr_vmtag; i++) {
 		if (add_vm(&vmtags[i])) {
-			pr_error("Create %d VM:%s failed\n", i, vmtags[i].name);
+			pr_error("create %d VM:%s failed\n", i, vmtags[i].name);
 			continue;
 		}
 

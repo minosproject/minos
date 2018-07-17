@@ -5,7 +5,7 @@
 #include <minos/varlist.h>
 
 long absolute(long num);
-long num_to_str(char *buf, unsigned int num, int bdho);
+long num_to_str(char *buf, unsigned long num, int bdho);
 long itoa(char *buf, long num);
 long uitoa(char *buf, unsigned long num);
 long hextoa(char *buf, unsigned long num);

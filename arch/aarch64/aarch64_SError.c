@@ -216,7 +216,7 @@ static int dataabort_tfl_handler(gp_regs *regs, uint32_t esr_value)
 
 		ret = do_mmio_emulation(regs, dabt->write, paddr, &value);
 		if (ret) {
-			pr_warning("handle mmio read/write fail 0x%x vmid:%d\n",
+			pr_warn("handle mmio read/write fail 0x%x vmid:%d\n",
 					paddr, get_vmid(current_vcpu));
 		} else {
 			if (!dabt->write)
@@ -234,6 +234,10 @@ static int dataabort_tfl_handler(gp_regs *regs, uint32_t esr_value)
 
 static int dataabort_twe_handler(gp_regs *reg, uint32_t esr_value)
 {
+
+	pr_fatal("Unable to handle NULL pointer at address:0x%p\n",
+			read_sysreg(FAR_EL2));
+
 	return 0;
 }
 
@@ -432,7 +436,6 @@ void SError_from_lower_EL_handler(gp_regs *data)
 	 */
 	data->elr_elx += ec->ret_addr_adjust;
 	ec->handler(data, esr_value);
-
 out:
 	local_irq_disable();
 
@@ -443,12 +446,15 @@ void SError_from_current_EL_handler(gp_regs *data)
 {
 	uint32_t esr_value;
 	uint32_t ec_type;
+	struct serror_desc *ec;
 
 	esr_value = read_esr_el2();
 	ec_type = (esr_value & 0xfc000000) >> 26;
-	dump_register(data);
+	ec = serror_descs[ec_type];
+	if (ec != NULL)
+		ec->handler(data, esr_value);
 
-	pr_fatal("panic with serror in EL2:0x%x\n", ec_type);
+	dump_stack(data, NULL);
 	while (1);
 }
 

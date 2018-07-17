@@ -117,7 +117,6 @@ static void vgic_state_init(struct vcpu *vcpu, void *context)
 	 * now for gicv3 TBD
 	 */
 	base = 0x2f100000 + (128 * 1024) * vcpu->vcpu_id;
-	pr_info("vgic base is 0x%x\n", base);
 	gicr->rd_base = base;
 	gicr->sgi_base = base + (64 * 1024);
 	gicr->vlpi_base = 0;

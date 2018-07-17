@@ -23,9 +23,10 @@
 #define PRINTF_HEX		0x0002
 #define PRINTF_OCT		0x0004
 #define PRINTF_BIN		0x0008
-#define PRINTF_MASK		(0x0f)
-#define PRINTF_UNSIGNED		0X0010
-#define PRINTF_SIGNED		0x0020
+#define PRINTF_POINTER		0x0010
+#define PRINTF_MASK		(0xff)
+#define PRINTF_UNSIGNED		0X0100
+#define PRINTF_SIGNED		0x0200
 
 long absolute(long num)
 {
@@ -34,12 +35,18 @@ long absolute(long num)
 	return (~num) + 1;
 }
 
-long num_to_str(char *buf, unsigned int num, int bdho)
+long num_to_str(char *buf, unsigned long num, int b)
 {
 	char hex[] ="0123456789abcdef";
 	long m, len, res;
-	char tmp_buf[64] = {0};
+	char tmp_buf[64];
 	char *tmp = tmp_buf;
+	int bdho = b;
+
+	if (bdho == 32)
+		bdho = 16;
+
+	memset(tmp_buf, '0', 64);
 
 	do {
 		m = num % bdho;
@@ -49,7 +56,11 @@ long num_to_str(char *buf, unsigned int num, int bdho)
 	if (num != 0)
 		*tmp++ = hex[num];
 
-	res = len = tmp - tmp_buf;
+	if (b == 32)
+		res = len = 16;
+	else
+		res = len = tmp - tmp_buf;
+
 	while (len > 0) {
 		*buf++ = tmp_buf[len-1];
 		len--;
@@ -96,6 +107,11 @@ long bintoa(char *buf, unsigned long num)
 	return num_to_str(buf, num, 2);
 }
 
+long ptoa(char *buf, unsigned long num)
+{
+	return num_to_str(buf, num, 32);
+}
+
 char *strncpy(char *des, char *src, int len)
 {
 	char *tmp = des;
@@ -131,6 +147,8 @@ int numbric(char *buf, unsigned long num, int flag)
 		case PRINTF_BIN:
 			len = bintoa(buf, num);
 			break;
+		case PRINTF_POINTER:
+			len = ptoa(buf, num);
 		default:
 			break;
 	}
@@ -166,6 +184,9 @@ int vsprintf(char *buf, const char *fmt, va_list arg)
 		switch (*fmt) {
 			case 'd':
 				flag |= PRINTF_DEC | PRINTF_SIGNED;
+				break;
+			case 'p':
+				flag |= PRINTF_POINTER | PRINTF_UNSIGNED;
 				break;
 			case 'x':
 				flag |= PRINTF_HEX | PRINTF_UNSIGNED;

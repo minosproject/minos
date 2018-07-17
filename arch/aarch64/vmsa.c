@@ -86,6 +86,11 @@ struct map_info {
 };
 
 extern unsigned char __el2_ttb0_l0;
+extern unsigned char __el2_ttb0_l1_code;
+extern unsigned char __el2_ttb0_l1_io;
+extern unsigned char __el2_ttb0_l2_code;
+extern unsigned char __el2_ttb0_l2_io;
+
 static unsigned long el2_ttb0_l0;
 
 static spinlock_t host_lock;
@@ -263,8 +268,13 @@ static int get_map_type(struct map_info *info)
 	struct tt_lvl_config *config = info->config;
 	unsigned long a, b;
 
-	if (info->lvl == 3)
-		return DESCRIPTION_PAGE;
+	if (info->host) {
+		if (info->lvl == 2)
+			return DESCRIPTION_BLOCK;
+	} else {
+		if (info->lvl == 3)
+			return DESCRIPTION_PAGE;
+	}
 
 	/*
 	 * check whether the map size is level map
@@ -404,7 +414,7 @@ static unsigned long alloc_guest_pt(void)
 	 */
 	void *page;
 
-	page = get_free_pages(2);
+	page = get_free_pages_align(2, 2);
 	if (!page)
 		panic("No memory to map vm memory\n");
 
@@ -433,9 +443,9 @@ int map_host_mem(unsigned long vir, unsigned long phy, size_t size, int type)
 	unsigned long vir_base, phy_base, tmp;
 	struct map_info map_info;
 
-	vir_base = ALIGN(vir, SIZE_4K);
-	phy_base = ALIGN(phy, SIZE_4K);
-	tmp = BALIGN(vir_base + size, SIZE_4K);
+	vir_base = ALIGN(vir, MEM_BLOCK_SIZE);
+	phy_base = ALIGN(phy, MEM_BLOCK_SIZE);
+	tmp = BALIGN(vir_base + size, MEM_BLOCK_SIZE);
 	size = tmp - vir_base;
 
 	memset(&map_info, 0, sizeof(struct map_info));

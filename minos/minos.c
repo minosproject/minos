@@ -119,15 +119,15 @@ void boot_main(void)
 {
 	log_init();
 
-	pr_info("Starting mVisor ...\n");
-
-	mm_init();
-	mmu_init();
-
-	hooks_init();
+	pr_info("Starting Minos ...\n");
 
 	early_init();
 	early_init_percpu();
+
+	mmu_init();
+	mm_init();
+
+	hooks_init();
 
 	percpus_init();
 

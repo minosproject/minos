@@ -158,7 +158,7 @@ struct irq_domain_ops spi_domain_ops = {
 static struct irq_desc **local_alloc_irqs(uint32_t start,
 		uint32_t count, int type)
 {
-	struct irq_desc **irqs, **tmp;
+	struct irq_desc **irqs, **tmp = NULL;
 	struct irq_desc *desc;
 	uint32_t size;
 	uint32_t i, j;
@@ -209,7 +209,7 @@ static struct irq_desc **local_alloc_irqs(uint32_t start,
 
 static struct irq_desc *local_get_irq_desc(struct irq_domain *d, uint32_t irq)
 {
-	struct irq_desc **irqs;
+	struct irq_desc **irqs = NULL;
 
 	if ((irq < d->start) || (irq >= (d->start + d->count)))
 		return NULL;

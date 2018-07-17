@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <minos/types.h>
+#include <minos/minos.h>
 #include <minos/io.h>
 #include <minos/percpu.h>
 #include <minos/spinlock.h>
@@ -23,7 +23,6 @@
 #include <minos/errno.h>
 #include <minos/vmodule.h>
 #include <minos/vcpu.h>
-#include <minos/panic.h>
 #include <asm/arch.h>
 #include <minos/cpumask.h>
 #include <minos/irq.h>
@@ -610,7 +609,7 @@ void gic_init_el3(void)
 	void *gicr_rd_base;
 	void *gicr_sgi_base;
 	int cpuid = get_cpu_id();
-	uint32_t val, nr_lines;
+	uint32_t val, nr_lines = 0;
 
 	gicr_rd_base = __gicr_rd_base + (128 * 1024) * cpuid;
 	gicr_sgi_base = gicr_rd_base + (64 * 1024);

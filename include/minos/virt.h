@@ -51,6 +51,8 @@ struct virt_config {
 	struct memtag *memtags;
 };
 
+#define VMID_HOST	(65535)
+
 extern struct virt_config *mv_config;
 
 int taken_from_guest(gp_regs *regs);

@@ -137,3 +137,30 @@ again:
 	}
 	return index;
 }
+
+unsigned long bitmap_find_next_zero_area_align(unsigned long *map,
+					     unsigned long size,
+					     unsigned long start,
+					     unsigned int nr,
+					     unsigned long align)
+{
+	unsigned long index, end, i;
+again:
+	index = find_next_zero_bit(map, size, start);
+
+	end = index + nr;
+	if (end > size)
+		return end;
+
+	if (!(index & (~(align - 1)))) {
+		start = index + 1;
+		goto again;
+	}
+
+	i = find_next_bit(map, end, index);
+	if (i < end) {
+		start = i + 1;
+		goto again;
+	}
+	return index;
+}

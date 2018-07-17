@@ -21,37 +21,95 @@
 #include <asm/arch.h>
 #include <minos/string.h>
 #include <minos/print.h>
+#include <minos/sched.h>
+#include <minos/calltrace.h>
+#include <minos/smp.h>
 
 extern int el2_stage2_init(void);
 extern int el2_stage1_init(void);
 
-DEFINE_SPIN_LOCK(dump_lock);
-
-void dump_register(gp_regs *regs)
+static void dump_register(gp_regs *regs)
 {
+	unsigned long spsr;
+
 	if (!regs)
 		return;
 
-	spin_lock(&dump_lock);
+	spsr = regs->spsr_elx;
+	pr_fatal("SPSR:0x%x Mode:%d-%s F:%d I:%d A:%d D:%d NZCV:%x\n",
+			spsr, (spsr & 0x7), (spsr & 0x8) ?
+			"aarch64" : "aarch32", (spsr & (BIT(6))) >> 6,
+			(spsr & (BIT(7))) >> 7, (spsr & (BIT(8))) >> 8,
+			(spsr & (BIT(9))) >> 9, spsr >> 28);
 
-	pr_fatal("x0:0x%x x1:0x%x x2:0x%x x3:0x%x\n",
-			regs->x0, regs->x1, regs->x2, regs->x3);
-	pr_fatal("x4:0x%x x5:0x%x x6:0x%x x7:0x%x\n",
-			regs->x4, regs->x5, regs->x6, regs->x7);
-	pr_fatal("x8:0x%x x9:0x%x x10:0x%x x11:0x%x\n",
-			regs->x8, regs->x9, regs->x10, regs->x11);
-	pr_fatal("x12:0x%x x13:0x%x x14:0x%x x15:0x%x\n",
-			regs->x12, regs->x13, regs->x14, regs->x15);
-	pr_fatal("x16:0x%x x117:0x%x x18:0x%x x19:0x%x\n",
-			regs->x16, regs->x17, regs->x18, regs->x19);
-	pr_fatal("x20:0x%x x21:0x%x x22:0x%x x23:0x%x\n",
-			regs->x20, regs->x21, regs->x22, regs->x23);
-	pr_fatal("x24:0x%x x25:0x%x x26:0x%x x27:0x%x\n",
-			regs->x24, regs->x25, regs->x26, regs->x27);
-	pr_fatal("x28:0x%x x29:0x%x lr:0x%x elr_elx:0x%x\n",
-			regs->x28, regs->x29, regs->lr, regs->elr_elx);
-	pr_fatal("esr_elx:0x%x spsr_elx:0x%x\n", regs->esr_elx, regs->spsr_elx);
-	spin_unlock(&dump_lock);
+	pr_fatal("x0:0x%p x1:0x%p x2:0x%p\n",
+			regs->x0, regs->x1, regs->x2);
+	pr_fatal("x3:0x%p x4:0x%p x5:0x%p\n",
+			regs->x3, regs->x4, regs->x5);
+	pr_fatal("x6:0x%p x7:0x%p x8:0x%p\n",
+			regs->x6, regs->x7, regs->x8);
+	pr_fatal("x9:0x%p x10:0x%p x11:0x%p\n",
+			regs->x9, regs->x10, regs->x11);
+	pr_fatal("x12:0x%p x13:0x%p x14:0x%p\n",
+			regs->x12, regs->x13, regs->x14);
+	pr_fatal("x15:0x%p x16:0x%p x17:0x%p\n",
+			regs->x15, regs->x16, regs->x17);
+	pr_fatal("x18:0x%p x19:0x%p x20:0x%p\n",
+			regs->x18, regs->x19, regs->x20);
+	pr_fatal("x21:0x%p x22:0x%p x23:0x%p\n",
+			regs->x21, regs->x22, regs->x23);
+	pr_fatal("x24:0x%p x25:0x%p x26:0x%p\n",
+			regs->x24, regs->x25, regs->x26);
+	pr_fatal("x27:0x%p x28:0x%p x29:0x%p\n",
+			regs->x27, regs->x28, regs->x29);
+	pr_fatal("lr:0x%p esr:0x%p spsr:0x%p\n",
+			regs->lr, regs->esr_elx, regs->spsr_elx);
+	pr_fatal("elr:0x%p\n", regs->elr_elx);
+}
+
+void arch_dump_stack(gp_regs *regs, unsigned long *stack)
+{
+	struct vcpu *vcpu = current_vcpu;
+	extern unsigned char __el2_stack_end;
+	unsigned long stack_base;
+	unsigned long fp, lr = 0;
+
+	if (vcpu) {
+		pr_fatal("current vcpu: vmid:%d vcpuid:%d vcpu_name:%s\n",
+				get_vmid(vcpu), get_vcpu_id(vcpu), vcpu->name);
+		stack_base = (unsigned long)vcpu->stack_origin;
+	} else {
+		stack_base = (unsigned long)&__el2_stack_end -
+			(smp_processor_id() * 0x2000);
+	}
+
+	dump_register(regs);
+
+	if (!stack) {
+		if (regs) {
+			fp = regs->x29;
+			lr = regs->elr_elx;
+		} else {
+			fp = arch_get_fp();
+			lr = arch_get_lr();
+		}
+	} else {
+		fp = *stack;
+	}
+
+	pr_fatal("Call Trace :\n");
+	pr_fatal("------------ cut here ------------\n");
+	do {
+		print_symbol(lr);
+
+		if ((fp < (stack_base - VCPU_DEFAULT_STACK_SIZE))
+				|| (fp >= stack_base))
+				break;
+
+		lr = *(unsigned long *)(fp + sizeof(unsigned long));
+		lr -= 4;
+		fp = *(unsigned long *)fp;
+	} while (1);
 }
 
 int arch_taken_from_guest(gp_regs *regs)

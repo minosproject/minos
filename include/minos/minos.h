@@ -7,7 +7,6 @@
 #include <minos/mm.h>
 #include <minos/list.h>
 #include <minos/spinlock.h>
-#include <minos/panic.h>
 #include <minos/smp.h>
 #include <minos/varlist.h>
 #include <config/config.h>
@@ -15,6 +14,7 @@
 #include <minos/init.h>
 #include <minos/device_id.h>
 #include <minos/arch.h>
+#include <minos/calltrace.h>
 
 struct vcpu;
 

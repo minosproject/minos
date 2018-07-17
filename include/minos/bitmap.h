@@ -73,6 +73,12 @@ bitmap_find_next_zero_area(unsigned long *map,
 					      align_mask, 0);
 }
 
+unsigned long bitmap_find_next_zero_area_align(unsigned long *map,
+					     unsigned long size,
+					     unsigned long start,
+					     unsigned int nr,
+					     unsigned long align);
+
 #define BITMAP_FIRST_WORD_MASK(start) (~0UL << ((start) & (BITS_PER_LONG - 1)))
 #define BITMAP_LAST_WORD_MASK(nbits) (~0UL >> (-(nbits) & (BITS_PER_LONG - 1)))
 

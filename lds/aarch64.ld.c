@@ -16,7 +16,6 @@ SECTIONS
 	.text : 
 	{
 		*(.text) 
-		*(.rodata)
 	}
 
 	. = ALIGN(8);
@@ -207,8 +206,6 @@ SECTIONS
 		__el3_stack_end = .;
 	}
 
-	. = ALIGN(4096);
-
 	.el2_ttb0_l0 : {
 		. = ALIGN(4096);
 		__el2_ttb0_l0 = .;
@@ -226,6 +223,22 @@ SECTIONS
 		. = ALIGN(4096);
 		__el2_ttb0_l2_code = .;
 		. = . + 0x1000;
+	}
+
+	.el2_ttb0_l2_io : {
+		. = ALIGN(4096);
+		__el2_ttb0_l2_io = .;
+		. = . + 0x1000;
+	}
+
+	__symbols_start = .;
+
+	.__symbols__ : {
+		*(.__symbols__)
+	}
+
+	.rodata : {
+		*(.rodata)
 	}
 
 	__code_end = .;

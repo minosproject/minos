@@ -15,9 +15,28 @@
  */
 
 #include <minos/minos.h>
+#include <asm/arch.h>
+
+static DEFINE_SPIN_LOCK(dump_lock);
+
+void dump_stack(gp_regs *regs, unsigned long *stack)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&dump_lock, flags);
+	arch_dump_stack(regs, stack);
+	spin_unlock_irqrestore(&dump_lock, flags);
+}
 
 void panic(char *str)
 {
-	pr_fatal("%s\n", str);
+	size_t size;
+
+	size = strlen(str);
+	if (str[size - 1] == '\n')
+		str[size - 1] = 0;
+
+	pr_fatal("[Panic] : %s\n", str);
+	dump_stack(NULL, NULL);
 	while (1);
 }

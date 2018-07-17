@@ -12,7 +12,7 @@ typedef struct spinlock {
 } spinlock_t;
 
 #define DEFINE_SPIN_LOCK(name)	\
-	static spinlock_t name = {	\
+	spinlock_t name = {	\
 		.lock = 0,	\
 	}
 

@@ -21,7 +21,7 @@
 #include <minos/mmu.h>
 
 static LIST_HEAD(shared_mem_list);
-static LIST_HEAD(mem_list);
+LIST_HEAD(mem_list);
 
 int register_memory_region(struct memtag *res)
 {
@@ -32,6 +32,10 @@ int register_memory_region(struct memtag *res)
 
 	if (!res->enable)
 		return -EAGAIN;
+
+	/* only parse the memory for guest */
+	if (res->vmid == VMID_HOST)
+		return -EINVAL;
 
 	region = (struct memory_region *)
 		malloc(sizeof(struct memory_region));

@@ -4,9 +4,11 @@ CC 		:= $(CROSS_COMPILE)gcc
 LD 		:= $(CROSS_COMPILE)ld
 OBJ_COPY	:= $(CROSS_COMPILE)objcopy
 OBJ_DUMP 	:= $(CROSS_COMPILE)objdump
+NM		:= $(CROSS_COMPILE)nm
 
 PLATFORM	:= fvp
 TARGET		:= minos
+DEBUG_LEVEL	:= 0
 
 QUIET ?= @
 
@@ -35,10 +37,11 @@ OUT		:= out
 TARGET_ELF	:= $(OUT)/$(TARGET).elf
 TARGET_BIN	:= $(OUT)/$(TARGET).bin
 TARGET_LDS	:= $(OUT)/$(ARCH).lds
-TARGET_DUMP	:= $(OUT)/minos.s
+TARGET_DUMP	:= $(OUT)/$(TARGET).s
+TARGET_OBJECT	:= $(OUT)/__vminos__.o
 
 INCLUDE_DIR 	:= $(inc_dir-y)
-CCFLAG 		:= -Wall --static -nostdlib -fno-builtin -g \
+CCFLAG 		:= -Wall -O$(DEBUG_LEVEL) --static -nostdlib -fno-builtin -g \
 		   -march=armv8-a -I$(PWD)/include
 LDFLAG 		:= -T$(TARGET_LDS) -Map=$(OUT)/linkmap.txt
 
@@ -48,7 +51,7 @@ VPATH		:= $(src_dir-y)
 
 objs		= $(src_c-y:%.c=$(OUT)/%.o)
 objs-s		= $(src_s-y:%.S=$(OUT)/%.O)
-
+obj-symbols	= $(OUT)/allsymbols.o
 obj-config	= $(OUT)/$(PLATFORM)_config.o
 
 ifeq ($(QUIET),@)
@@ -62,15 +65,25 @@ $(TARGET_BIN) : $(TARGET_ELF)
 	$(QUIET) $(OBJ_DUMP) $(TARGET_ELF) -D > $(TARGET_DUMP)
 	$(QUIET) echo "Build done sucessfully"
 
-$(TARGET_ELF) : include/asm include/config/config.h $(objs) $(objs-s) $(obj-config) $(TARGET_LDS)
+$(TARGET_ELF) : include/asm include/config/config.h $(TARGET_OBJECT) $(obj-symbols) $(TARGET_LDS)
 	@ echo Linking $@ ...
-	$(QUIET) $(LD) $(LDFLAG) -o $(TARGET_ELF) $(objs-s) $(objs) $(obj-config) $(LDPATH)
-	@ echo Linking done
+	$(QUIET) $(LD) $(LDFLAG) -o $(TARGET_ELF) $(TARGET_OBJECT) $(obj-symbols) $(LDPATH)
 
 $(TARGET_LDS) : $(LDS_SRC)
 	@ echo Generate LDS file ...
 	$(QUIET) $(CC) $(CCFLAG) -E -P $(LDS_SRC) -o $(TARGET_LDS)
-	@ echo Generate LDS file done
+
+$(obj-symbols) : $(TARGET_OBJECT) $(TARGET_LDS) tools/generate_allsymbols.py
+	@ echo Generate Symbols file
+	$(QUIET) $(LD) $(LDFLAG) -o $(OUT)/tmp.minos.elf $(TARGET_OBJECT) $(LDPATH)
+	$(QUIET) $(NM) -n $(OUT)/tmp.minos.elf > $(OUT)/tmp.minos.symbols
+	$(QUIET) python3 tools/generate_allsymbols.py $(OUT)/tmp.minos.symbols $(OUT)/allsymbols.S
+	@ echo Compiling allsymbols.S ...
+	$(QUIET) $(CC) $(CCFLAG) -c $(OUT)/allsymbols.S -o $(obj-symbols)
+
+$(TARGET_OBJECT) : $(objs) $(objs-s) $(obj-config)
+	@ echo Linking $@ ...
+	$(QUIET) $(LD) -r -o $(TARGET_OBJECT) $(objs) $(objs-s) $(obj-config)
 
 $(obj-out-dir) :
 	@ mkdir -p $@
@@ -81,7 +94,7 @@ include/asm :
 
 include/config/config.h:
 	@ echo Link config/$(PLATFORM)/$(PLATFORM)_config.h to include/config/config.h ...
-	@  ln -s ../../config/$(PLATFORM)/$(PLATFORM)_config.h include/config/config.h
+	@ ln -s ../../config/$(PLATFORM)/$(PLATFORM)_config.h include/config/config.h
 
 $(obj-config): $(OUT)/$(PLATFORM)_config.c
 	$(PROGRESS)
@@ -96,17 +109,24 @@ $(OUT)/%.O : %.S $(INCLUDE_DIR)
 	$(QUIET) $(CC) $(CCFLAG) -c $< -o $@
 
 $(OUT)/$(PLATFORM)_config.c : $(OUT)/$(PLATFORM).json
+	@ echo "    "
 	@ echo "****** Generate $(PLATFORM)_config.c ******"
 	$(QUIET) python3 tools/generate_mvconfig.py $< $@
 	@ echo "****** Generate $(PLATFORM)_config.c done ******"
+	@ echo "    "
 
 $(OUT)/$(PLATFORM).json : config/$(PLATFORM)/$(PLATFORM).json.cc config/$(PLATFORM)/$(PLATFORM)_config.h config/$(PLATFORM)/*.cc include/minos/virt.h
 	$(PROGRESS)
 	$(QUIET) $(CC) $(CCFLAG) -E -P config/$(PLATFORM)/$(PLATFORM).json.cc -o $(OUT)/$(PLATFORM).json
 
-.PHONY: clean
+.PHONY: clean distclean
 
 clean:
+	@ echo "removing objs and out directory ..."
+	@ rm -rf out
+	@ echo "All build objects have been cleaned"
+
+distclean:
 	@ echo "removing objs and out directory ..."
 	@ rm -rf out
 	@ echo "removing include/asm directory ..."

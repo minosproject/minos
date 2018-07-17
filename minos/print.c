@@ -33,26 +33,12 @@ struct log_buffer {
 };
 
 static struct log_buffer log_buffer;
-static int uart_init_done = 0;
 
 void log_init(void)
 {
 	spin_lock_init(&log_buffer.buffer_lock);
 	log_buffer.tail = 0;
 	log_buffer.total = 0;
-}
-
-void flush_log_buf(void)
-{
-	int i;
-
-	if (uart_init_done)
-		return;
-
-	for (i = 0; i < log_buffer.tail; i++)
-		uart_putc(log_buffer.buf[i]);
-
-	uart_init_done = 1;
 }
 
 static int update_log_buffer(char *buf, int printed)
@@ -100,8 +86,8 @@ int level_print(char *fmt, ...)
 	 * the level to the current CPU
 	 */
 	i = smp_processor_id();
-	fmt[1] = (i / 10) + '0';
-	fmt[2] = (i % 10) + '0';
+	fmt[4] = (i / 10) + '0';
+	fmt[5] = (i % 10) + '0';
 
 	/*
 	 * TBD need to check the length of fmt
@@ -120,10 +106,8 @@ int level_print(char *fmt, ...)
 	update_log_buffer(buffer, printed);
 	buf = buffer;
 
-	if (uart_init_done) {
-		for(i = 0; i < printed; i++)
+	for(i = 0; i < printed; i++)
 			uart_putc(*buf++);
-	}
 
 	spin_unlock(&log_buffer.buffer_lock);
 
