@@ -20,7 +20,7 @@
 #include <minos/vcpu.h>
 #include <minos/vmodule.h>
 #include <asm/arch.h>
-#include <minos/mm.h>
+#include <minos/vmm.h>
 
 /*
  * a - Non-shareable
@@ -82,6 +82,7 @@ struct map_info {
 	int lvl;
 	int host;
 	int mem_type;
+	struct vm *vm;
 	struct tt_lvl_config *config;
 };
 
@@ -343,7 +344,8 @@ static int create_table_entry(struct map_info *info)
 		value = *(tbase + offset);
 
 		if (value == 0) {
-			value = (unsigned long)get_free_page();
+			value = (unsigned long)
+				get_vm_translation_page(info->vm);
 			if (!value)
 				return -ENOMEM;
 
@@ -368,6 +370,7 @@ static int create_table_entry(struct map_info *info)
 		map_info.lvl = info->lvl + 1;
 		map_info.mem_type = info->mem_type;
 		map_info.host = info->host;
+		map_info.vm = info->vm;
 		map_info.config = config->next;
 
 		/*
@@ -414,7 +417,7 @@ static unsigned long alloc_guest_pt(void)
 	 */
 	void *page;
 
-	page = get_free_pages_align(2, 2);
+	page = __get_free_pages(2, 2);
 	if (!page)
 		panic("No memory to map vm memory\n");
 
@@ -455,6 +458,7 @@ int map_host_mem(unsigned long vir, unsigned long phy, size_t size, int type)
 	map_info.size = size;
 	map_info.lvl = 0;
 	map_info.host = 1;
+	map_info.vm = NULL;
 	map_info.mem_type = type;
 	map_info.config = &g4k_host_lvl0_config;
 
@@ -465,8 +469,9 @@ int map_host_mem(unsigned long vir, unsigned long phy, size_t size, int type)
 	return ret;
 }
 
-int map_guest_mem(unsigned long tt, unsigned long vir,
-		unsigned long phy, size_t size, int type)
+int map_guest_mem(struct vm *vm, unsigned long tt,
+		unsigned long vir, unsigned long phy,
+		size_t size, int type)
 {
 	unsigned long vir_base, phy_base, tmp;
 	struct map_info map_info;
@@ -483,6 +488,7 @@ int map_guest_mem(unsigned long tt, unsigned long vir,
 	map_info.size = size;
 	map_info.lvl = 1;
 	map_info.host = 0;
+	map_info.vm = vm;
 	map_info.mem_type = type;
 	map_info.config = &g4k_guest_lvl1_config;
 

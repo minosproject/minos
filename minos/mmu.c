@@ -17,20 +17,22 @@
 #include <minos/minos.h>
 #include <minos/mmu.h>
 #include <minos/mm.h>
+#include <minos/vcpu.h>
 
 static struct mmu_chip *mmu_chip;
 
-int mmu_map_guest_memory(unsigned long tbase, unsigned long vir_base,
-		unsigned long phy_base, size_t size, int type)
+int map_guest_memory(struct vm *vm, unsigned long tbase,
+		unsigned long vir_base, unsigned long phy_base,
+		size_t size, int type)
 {
 	if (!mmu_chip->map_guest_memory)
 		return -EINVAL;
 
-	return mmu_chip->map_guest_memory(tbase, phy_base,
+	return mmu_chip->map_guest_memory(vm, tbase, phy_base,
 			vir_base, size, type);
 }
 
-unsigned long mmu_alloc_guest_pt(void)
+unsigned long alloc_guest_page_table(void)
 {
 	if (!mmu_chip->alloc_guest_pt)
 		return -EINVAL;
@@ -38,7 +40,7 @@ unsigned long mmu_alloc_guest_pt(void)
 	return mmu_chip->alloc_guest_pt();
 }
 
-int mmu_map_host_memory(unsigned long vir,
+int map_host_memory(unsigned long vir,
 		unsigned long phy, size_t size, int type)
 {
 	if (!mmu_chip->map_host_memory)

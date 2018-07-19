@@ -30,13 +30,7 @@ void dump_stack(gp_regs *regs, unsigned long *stack)
 
 void panic(char *str)
 {
-	size_t size;
-
-	size = strlen(str);
-	if (str[size - 1] == '\n')
-		str[size - 1] = 0;
-
-	pr_fatal("[Panic] : %s\n", str);
+	pr_fatal("[Panic] : %s", str);
 	dump_stack(NULL, NULL);
 	while (1);
 }

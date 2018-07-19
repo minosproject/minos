@@ -6,6 +6,7 @@
 #include <config/config.h>
 
 #define PAGE_NR(size)		(size >> PAGE_SHIFT)
+#define __PAGE_MASK		(~((1UL << PAGE_SHIFT) - 1))
 
 #define GFB_SLAB		(1 << 0)
 #define GFB_PAGE		(1 << 1)
@@ -57,21 +58,18 @@ struct memory_region {
 	struct list_head list;
 };
 
+/*
+ * page_table_base : the lvl0 table base
+ * mem_list : static config memory region for this vm
+ * block_list : the mem_block allocated for this vm
+ * head : the pages table allocated for this vm
+ */
 struct mm_struct {
 	unsigned long page_table_base;
+	struct page *head;
 	struct list_head mem_list;
+	struct list_head block_list;
 	spinlock_t lock;
-};
-
-struct mem_allocator {
-	char *name;
-	int (*init)(void);
-	void *(*malloc)(size_t size);
-	void (*free)(void *addr);
-	void *(*get_free_pages_align)(int pages, int align);
-	void (*free_pages)(void *addr);
-	struct mem_block *(*get_mem_block)(unsigned long flags);
-	void (*free_mem_block)(struct mem_block *block);
 };
 
 extern struct list_head mem_list;
@@ -80,22 +78,34 @@ int mm_init(void);
 void *malloc(size_t size);
 void *zalloc(size_t size);
 void free(void *addr);
-void *get_free_pages_align(int pages, int align);
 void free_pages(void *addr);
+void *__get_free_pages(int pages, int align);
+struct page *__alloc_pages(int pages, int align);
+void release_pages(struct page *page);
+
+#define page_to_addr(page)	(void *)(page->phy_base & __PAGE_MASK)
 
 static inline void *get_free_page(void)
 {
-	return get_free_pages_align(1, 1);
+	return __get_free_pages(1, 1);
 }
 
 static inline void *get_free_pages(int pages)
 {
-	return get_free_pages_align(pages, 1);
+	return __get_free_pages(pages, 1);
 }
 
-int register_memory_region(struct memtag *res);
-int vm_mm_init(struct vm *vm);
-struct mem_block *alloc_new_mem_block(unsigned long flags);
-void free_mem_block(struct mem_block *block);
+static inline struct page *alloc_pages(int pages, int align)
+{
+	return __alloc_pages(pages, 1);
+}
+
+static inline struct page *alloc_page(void)
+{
+	return __alloc_pages(1, 1);
+}
+
+struct mem_block *alloc_mem_block(unsigned long flags);
+void release_mem_block(struct mem_block *block);
 
 #endif

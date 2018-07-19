@@ -26,6 +26,7 @@
 #include <minos/vcpu.h>
 #include <minos/vmodule.h>
 #include <minos/virq.h>
+#include <minos/vmm.h>
 
 extern unsigned char __vm_start;
 extern unsigned char __vm_end;
