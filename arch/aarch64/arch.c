@@ -74,7 +74,7 @@ void arch_dump_stack(gp_regs *regs, unsigned long *stack)
 	unsigned long stack_base;
 	unsigned long fp, lr = 0;
 
-	if (vcpu) {
+	if ((vcpu) && !(vcpu->is_idle)) {
 		pr_fatal("current vcpu: vmid:%d vcpuid:%d vcpu_name:%s\n",
 				get_vmid(vcpu), get_vcpu_id(vcpu), vcpu->name);
 		stack_base = (unsigned long)vcpu->stack_origin;
@@ -143,7 +143,6 @@ void arch_init_vcpu(struct vcpu *vcpu, void *entry)
 
 int arch_early_init(void)
 {
-	el2_stage1_init();
 	el2_stage2_init();
 
 	return 0;
@@ -167,12 +166,26 @@ struct aarch64_system_context {
 	uint64_t far_el1;
 	uint64_t actlr_el1;
 	uint64_t tpidr_el1;
+	uint64_t csselr;
+	uint64_t cpacr;
+	uint64_t contextidr;
+	uint64_t tpidr_el0;
+	uint64_t tpidrro_el0;
+	uint64_t cntkctl;
+	uint64_t afsr0;
+	uint64_t afsr1;
+	uint32_t teecr;
+	uint32_t teehbr;
+	uint32_t dacr32_el2;
+	uint32_t ifsr32_el2;
 }__align(sizeof(unsigned long));
 
 static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
 {
 	struct aarch64_system_context *context =
 			(struct aarch64_system_context *)c;
+
+	memset(context, 0, sizeof(struct aarch64_system_context));
 
 	/*
 	 * HVC : enable hyper call function
@@ -196,17 +209,7 @@ static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
 		     HCR_EL2_TSC | HCR_EL2_TACR | HCR_EL2_AMO | \
 		     HCR_EL2_RW | HCR_EL2_VM;
 
-	context->vbar_el1 = 0;
-	context->esr_el1 = 0;
-	context->elr_el1 = 0;
 	context->vmpidr = get_vcpu_id(vcpu);
-	context->sctlr_el1 = 0;
-	context->sp_el1 = 0;
-	context->sp_el0 = 0;
-	context->spsr_el1 = 0;
-	context->far_el1 = 0;
-	context->actlr_el1 = 0;
-	context->tpidr_el1 = 0;
 }
 
 static void aarch64_system_state_save(struct vcpu *vcpu, void *c)
@@ -227,6 +230,21 @@ static void aarch64_system_state_save(struct vcpu *vcpu, void *c)
 	context->far_el1 = read_sysreg(FAR_EL1);
 	context->actlr_el1 = read_sysreg(ACTLR_EL1);
 	context->tpidr_el1 = read_sysreg(TPIDR_EL1);
+	context->csselr = read_sysreg(CSSELR_EL1);
+	context->cpacr = read_sysreg(CPACR_EL1);
+	context->contextidr = read_sysreg(CONTEXTIDR_EL1);
+	context->tpidr_el0 = read_sysreg(TPIDR_EL0);
+	context->tpidrro_el0 = read_sysreg(TPIDRRO_EL0);
+	context->cntkctl = read_sysreg(CNTKCTL_EL1);
+	context->afsr0 = read_sysreg(AFSR0_EL1);
+	context->afsr1 = read_sysreg(AFSR1_EL1);
+
+	if (is_32bit_vm(vcpu->vm)) {
+		context->teecr = read_sysreg32(TEECR32_EL1);
+		context->teehbr = read_sysreg32(TEEHBR32_EL1);
+		context->dacr32_el2 = read_sysreg32(DACR32_EL2);
+		context->ifsr32_el2 = read_sysreg32(IFSR32_EL2);
+	}
 }
 
 static void aarch64_system_state_restore(struct vcpu *vcpu, void *c)
@@ -246,6 +264,22 @@ static void aarch64_system_state_restore(struct vcpu *vcpu, void *c)
 	write_sysreg(context->far_el1, FAR_EL1);
 	write_sysreg(context->actlr_el1, ACTLR_EL1);
 	write_sysreg(context->tpidr_el1, TPIDR_EL1);
+	write_sysreg(context->csselr, CSSELR_EL1);
+	write_sysreg(context->cpacr, CPACR_EL1);
+	write_sysreg(context->contextidr, CONTEXTIDR_EL1);
+	write_sysreg(context->tpidr_el0, TPIDR_EL0);
+	write_sysreg(context->tpidrro_el0, TPIDRRO_EL0);
+	write_sysreg(context->cntkctl, CNTKCTL_EL1);
+	write_sysreg(context->afsr0, AFSR0_EL1);
+	write_sysreg(context->afsr1, AFSR1_EL1);
+
+	if (is_32bit_vm(vcpu->vm)) {
+		write_sysreg(context->teecr, TEECR32_EL1);
+		write_sysreg(context->teehbr, TEEHBR32_EL1);
+		write_sysreg(context->dacr32_el2, DACR32_EL2);
+		write_sysreg(context->ifsr32_el2, IFSR32_EL2);
+	}
+
 	dsb();
 }
 

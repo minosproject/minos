@@ -144,7 +144,7 @@ static void vgic_state_restore(struct vcpu *vcpu, void *context)
 
 }
 
-static void vgic_vm_create(struct vm *vm)
+static void vgic_vm_init(struct vm *vm)
 {
 	struct vgic_gicd *gicd;
 
@@ -153,7 +153,7 @@ static void vgic_vm_create(struct vm *vm)
 	 * one vgic for each vm since gicr is percpu
 	 * but gicd is shared so created it here
 	 */
-	gicd = (struct vgic_gicd*)malloc(sizeof(struct vgic_gicd));
+	gicd = (struct vgic_gicd *)malloc(sizeof(struct vgic_gicd));
 	if (!gicd)
 		panic("No more memory for gicd\n");
 
@@ -503,7 +503,7 @@ static int vgic_vmodule_init(struct vmodule *vmodule)
 	vmodule->state_init = vgic_state_init;
 	vmodule->state_save = vgic_state_save;
 	vmodule->state_restore = vgic_state_restore;
-	vmodule->create_vm = vgic_vm_create;
+	vmodule->vm_init = vgic_vm_init;
 	vgic_vmodule_id = vmodule->id;
 
 	register_mmio_emulation_handler("vgic", &vgic_mmio_ops);

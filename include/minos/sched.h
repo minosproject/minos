@@ -22,6 +22,8 @@ DECLARE_PER_CPU(int, need_resched);
 #define current_vcpu		get_cpu_var(percpu_current_vcpu)
 #define next_vcpu		get_cpu_var(percpu_next_vcpu)
 
+#define current_vm		current_vcpu->vm;
+
 #define get_vcpu_state(vcpu)	vcpu->state
 #define need_resched		get_cpu_var(need_resched)
 

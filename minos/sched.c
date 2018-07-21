@@ -33,6 +33,17 @@ DEFINE_PER_CPU(struct vcpu *, percpu_next_vcpu);
 
 DEFINE_PER_CPU(int, need_resched);
 
+void get_vcpu_affinity(int *aff, int nr)
+{
+	int i, base = NR_CPUS - 1;
+
+	/* TBD */
+	for (i = nr; i > 0; i--) {
+		aff[nr - 1] = base;
+		base--;
+	}
+}
+
 void pcpu_resched(int pcpu_id)
 {
 	send_sgi(CONFIG_MINOS_RESCHED_IRQ, pcpu_id);

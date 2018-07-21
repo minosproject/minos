@@ -32,6 +32,7 @@ extern void init_timers(void);
 extern int virt_init(void);
 extern void cpu_idle();
 extern void sched_tick_enable(unsigned long exp);
+extern void mmu_init(void);
 
 struct list_head hook_lists[MINOS_HOOK_TYPE_UNKNOWN];
 

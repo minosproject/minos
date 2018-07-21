@@ -83,6 +83,7 @@ static struct slab slab;
 static struct slab *pslab = &slab;
 static struct page_pool __page_pool;
 static struct page_pool *page_pool = &__page_pool;
+static size_t free_blocks;
 
 static void add_boot_slab_mem(unsigned long base, size_t size);
 static void inline add_slab_to_slab_pool(struct slab_header *header,
@@ -165,6 +166,7 @@ static int add_memory_section(unsigned long mem_base, size_t size)
 	ms->nr_blocks = real_size >> MEM_BLOCK_SHIFT;
 	ms->free_blocks = ms->nr_blocks;
 	ms->id = nr_sections;
+	free_blocks += ms->nr_blocks;
 
 	nr_sections++;
 	pr_info("add memory section start:0x%x size:0x%x\n", mem_base, size);
@@ -300,6 +302,7 @@ static int mem_sections_init(void)
 
 	section = &mem_sections[0];
 	boot_block_size = (mem_end - code_base) >> MEM_BLOCK_SHIFT;
+	free_blocks -= boot_block_size;
 	block = section->blocks;
 	for (i = 0; i < boot_block_size; i++) {
 		set_bit(i, section->bitmap);
@@ -428,6 +431,7 @@ again:
 	 * bit to 1
 	 */
 	set_bit(bit, section->bitmap);
+	free_blocks--;
 	spin_unlock_irqrestore(&section->lock, flags);
 
 	block = &section->blocks[bit];
@@ -830,6 +834,9 @@ void *malloc(size_t size)
 	slab_alloc_func func;
 	unsigned long flags;
 
+	if (size == 0)
+		return NULL;
+
 	size = get_slab_alloc_size(size);
 	spin_lock_irqsave(&pslab->lock, flags);
 
@@ -878,6 +885,7 @@ void release_mem_block(struct mem_block *block)
 	spin_lock_irqsave(&section->lock, flags);
 	start = offset_in_section_bitmap(block->phy_base, section);
 	bitmap_clear(section->bitmap, start, 1);
+	free_blocks++;
 
 	/*
 	 * shoud do this here or in free_page function ?
@@ -981,6 +989,11 @@ static void page_pool_init(void)
 	spin_lock_init(&page_pool->lock);
 	init_list(&page_pool->meta_list);
 	init_list(&page_pool->block_list);
+}
+
+int has_enough_memory(size_t size)
+{
+	return (free_blocks >= (size >> MEM_BLOCK_SHIFT));
 }
 
 int mm_init(void)

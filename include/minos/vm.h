@@ -9,18 +9,34 @@
 #include <minos/list.h>
 #include <config/config.h>
 #include <minos/mmu.h>
-#include <minos/mm.h>
+#include <minos/vmm.h>
 
 #define MINOS_VM_NAME_SIZE	32
 #define OS_TYPE_SIZE		32
 
+#define VMID_HOST	(65535)
+#define VMID_INVALID	(-1)
+
 struct vcpu;
 struct os;
+struct vmtag;
 
 extern struct list_head vm_list;
 
+struct vminfo {
+	int8_t name[32];
+	int8_t os_type[32];
+	int32_t nr_vcpus;
+	int32_t bit64;
+	uint64_t mem_size;
+	uint64_t mem_start;
+	uint64_t mem_end;
+	uint64_t entry;
+	uint64_t setup_data;
+};
+
 struct vm {
-	uint32_t vmid;
+	int vmid;
 	uint32_t vcpu_nr;
 	uint32_t mmu_on;
 	uint32_t index;
@@ -31,7 +47,7 @@ struct vm {
 	unsigned long setup_data;
 	char name[MINOS_VM_NAME_SIZE];
 	char os_type[OS_TYPE_SIZE];
-	struct vcpu *vcpus[CONFIG_VM_MAX_VCPU];
+	struct vcpu **vcpus;
 	struct mm_struct mm;
 	struct os *os;
 	struct list_head vm_list;
@@ -49,8 +65,21 @@ struct vm {
 
 struct vm *get_vm(uint32_t vmid);
 
-int vms_init(void);
 void vm_mm_struct_init(struct vm *vm);
-int vm_memory_init(struct vm *vm);
+
+int vm0_connect_host(void);
+unsigned long vm0_create_shmem(void);
+int vm0_destory_shmem(void);
+int vm0_set_shmem_size(size_t size);
+int vm_server_init(void);
+int vm0_disconnect_host(void);
+struct vm *create_dynamic_vm(struct vmtag *vme);
+int create_new_vm(struct vminfo *info);
+void destory_vm(struct vm *vm);
+
+static inline int is_32bit_vm(struct vm *vm)
+{
+	return (!vm->bit64);
+}
 
 #endif

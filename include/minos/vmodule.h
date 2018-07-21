@@ -24,19 +24,21 @@ struct vmodule {
 	void (*state_save)(struct vcpu *vcpu, void *context);
 	void (*state_restore)(struct vcpu *vcpu, void *context);
 	void (*state_init)(struct vcpu *vcpu, void *context);
-	void (*create_vm)(struct vm *vm);
+	void (*vm_init)(struct vm *vm);
 };
 
 void *get_vmodule_data(unsigned long s, unsigned long e,
 		int (*check)(struct module_id *vmodule));
 
 int vcpu_vmodules_init(struct vcpu *vcpu);
+int vcpu_vmodules_deinit(struct vcpu *vcpu);
 void *get_vmodule_data_by_name(struct vcpu *vcpu, char *name);
 void *get_vmodule_data_by_id(struct vcpu *vcpu, int id);
 void save_vcpu_vmodule_state(struct vcpu *vcpu);
 void restore_vcpu_vmodule_state(struct vcpu *vcpu);
 int get_vmodule_id(char *type);
-void vmodules_create_vm(struct vm *vm);
+void vm_vmodules_init(struct vm *vm);
+void vm_vmodules_deinit(struct vm *vm);
 int vmodules_init(void);
 
 #endif

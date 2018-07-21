@@ -206,28 +206,28 @@ SECTIONS
 		__el3_stack_end = .;
 	}
 
-	.el2_ttb0_l0 : {
+	.el2_ttb0_pgd : {
 		. = ALIGN(4096);
-		__el2_ttb0_l0 = .;
+		__el2_ttb0_pgd = .;
 		. = . + 0x1000;
 	}
 
 	/* 4K level1 can map 512GB memory */
-	.el2_ttb0_l1 : {
+	.el2_ttb0_pud : {
 		. = ALIGN(4096);
-		__el2_ttb0_l1 = .;
+		__el2_ttb0_pud = .;
 		. = . + 0x1000;
 	}
 
-	.el2_ttb0_l2_code : {
+	.el2_ttb0_pmd_code : {
 		. = ALIGN(4096);
-		__el2_ttb0_l2_code = .;
+		__el2_ttb0_pmd_code = .;
 		. = . + 0x1000;
 	}
 
-	.el2_ttb0_l2_io : {
+	.el2_ttb0_pmd_io : {
 		. = ALIGN(4096);
-		__el2_ttb0_l2_io = .;
+		__el2_ttb0_pmd_io = .;
 		. = . + 0x1000;
 	}
 

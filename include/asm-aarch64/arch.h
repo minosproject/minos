@@ -104,7 +104,18 @@ static inline void arch_restore_irqflags(unsigned long flags)
 #define read_sysreg(name)     read_sysreg64(name)
 #define write_sysreg(v, name) write_sysreg64(v, name)
 
-static inline void flush_local_tlb(void)
+static inline void flush_all_tlb_host(void)
+{
+	asm volatile (
+		"dsb sy;"
+		"tlbi alle2;"
+		"dsb sy;"
+		"isb;"
+		: : : "memory"
+	);
+}
+
+static inline void flush_local_tlb_guest(void)
 {
 	/* current VMID only */
 	asm volatile (
@@ -116,7 +127,7 @@ static inline void flush_local_tlb(void)
 	);
 }
 
-static inline void flush_local_tlbis(void)
+static inline void flush_local_tlbis_guest(void)
 {
 	/* current vmid only and innershareable TLBS */
 	asm volatile(
@@ -128,7 +139,7 @@ static inline void flush_local_tlbis(void)
 	);
 }
 
-static inline void flush_all_tlb(void)
+static inline void flush_all_tlb_guest(void)
 {
 	/* flush all vmids local TLBS, non-hypervisor mode */
 	asm volatile(
@@ -140,7 +151,7 @@ static inline void flush_all_tlb(void)
 	);
 }
 
-static inline void flush_all_tlbis(void)
+static inline void flush_all_tlbis_guest(void)
 {
 	/* flush innershareable TLBS, all VMIDs, non-hypervisor mode */
 	asm volatile(
@@ -150,6 +161,48 @@ static inline void flush_all_tlbis(void)
 		"isb;"
 		: : : "memory"
 	);
+}
+
+static inline unsigned long va_to_pa(unsigned long va)
+{
+	uint64_t pa, tmp = read_sysreg64(PAR_EL1);
+
+	asm volatile ("at s1e2r, %0;" : : "r" (va));
+	isb();
+	pa = read_sysreg64(PAR_EL1);
+	write_sysreg64(tmp, PAR_EL1);
+
+	return pa;
+}
+
+static inline unsigned long guest_va_to_pa(unsigned long va, int read)
+{
+	uint64_t pa, tmp = read_sysreg64(PAR_EL1);
+
+	if (read)
+		asm volatile ("at s12e1w, %0;" : : "r" (va));
+	else
+		asm volatile ("at s12e1r, %0;" : : "r" (va));
+	isb();
+	pa = read_sysreg64(PAR_EL1);
+	write_sysreg64(tmp, PAR_EL1);
+
+	return pa;
+}
+
+static inline unsigned long guest_va_to_ipa(unsigned long va, int read)
+{
+	uint64_t pa, tmp = read_sysreg64(PAR_EL1);
+
+	if (read)
+		asm volatile ("at s1e1w, %0;" : : "r" (va));
+	else
+		asm volatile ("at s1e1r, %0;" : : "r" (va));
+	isb();
+	pa = read_sysreg64(PAR_EL1);
+	write_sysreg64(tmp, PAR_EL1);
+
+	return pa;
 }
 
 int arch_taken_from_guest(gp_regs *regs);

@@ -119,7 +119,7 @@ $(OUT)/$(PLATFORM).json : config/$(PLATFORM)/$(PLATFORM).json.cc config/$(PLATFO
 	$(PROGRESS)
 	$(QUIET) $(CC) $(CCFLAG) -E -P config/$(PLATFORM)/$(PLATFORM).json.cc -o $(OUT)/$(PLATFORM).json
 
-.PHONY: clean distclean
+.PHONY: clean distclean user_tool
 
 clean:
 	@ echo "removing objs and out directory ..."
@@ -134,3 +134,6 @@ distclean:
 	@ echo "removing include/config/config.h ..."
 	@ rm -rf include/config/config.h
 	@ echo "All build objects have been cleaned"
+
+user_tool:
+	@ $(QUIET) $(CC) -c tools/minos/minos.c -o out/minos

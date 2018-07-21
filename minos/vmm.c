@@ -44,8 +44,8 @@ int register_memory_region(struct memtag *res)
 		return -ENOMEM;
 	}
 
-	pr_info("register memory region: 0x%x 0x%x %d %d %s\n",
-			res->mem_base, res->mem_end, res->type,
+	pr_info("MEM : 0x%x 0x%x %d %d %s\n", res->mem_base,
+			res->mem_end, res->type,
 			res->vmid, res->name);
 
 	memset((char *)region, 0, sizeof(struct memory_region));
@@ -83,17 +83,19 @@ void *get_vm_translation_page(struct vm *vm)
 	struct page *page = NULL;
 	struct mm_struct *mm = NULL;
 
-
+	/*
+	 * this function will only be excuted in
+	 * map_vm_memory, map_vm_memory has alreadly
+	 * get the spin lock, so do not get it here
+	 */
 	page = alloc_page();
 	if (!page)
 		return NULL;
 
 	if (vm) {
 		mm = &vm->mm;
-		spin_lock(&mm->lock);
 		page->next = mm->head;
 		mm->head = page;
-		spin_unlock(&mm->lock);
 	}
 
 	return page_to_addr(page);
@@ -113,6 +115,119 @@ int map_vm_memory(struct vm *vm, unsigned long vir_base,
 	return ret;
 }
 
+int unmap_vm_memory(struct vm *vm, unsigned long vir_addr,
+			size_t size, int type)
+{
+	int ret;
+	struct mm_struct *mm = &vm->mm;
+
+	spin_lock(&mm->lock);
+	ret = unmap_guest_memory(vm, mm->page_table_base,
+			vir_addr, size, type);
+	spin_unlock(&mm->lock);
+
+	return ret;
+}
+
+void release_vm_memory(struct vm *vm)
+{
+	struct mem_block *block, *n;
+	struct mm_struct *mm;
+	struct page *page, *tmp;
+
+	if (!vm)
+		return;
+
+	mm = &vm->mm;
+	page = mm->head;
+
+	/*
+	 * - release the block list
+	 * - release the page table page and page table
+	 * - set all the mm_struct to 0
+	 * this function will not be called when vm is
+	 * running, do not to require the lock
+	 */
+	list_for_each_entry_safe(block, n, &mm->block_list, list)
+		release_mem_block(block);
+
+	while (page != NULL) {
+		tmp = page->next;
+		release_pages(page);
+		page = tmp;
+	}
+
+	free_pages((void *)mm->page_table_base);
+	memset(mm, 0, sizeof(struct mm_struct));
+}
+
+int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size)
+{
+	int i, count;
+	unsigned long base;
+	struct mm_struct *mm = &vm->mm;
+	struct mem_block *block;
+
+	base = ALIGN(start, MEM_BLOCK_SIZE);
+	if (base != start)
+		pr_warn("memory base is not mem_block align\n");
+
+	/*
+	 * first allocate the page table for vm, since
+	 * the vm is not running, do not need to get
+	 * the spin lock
+	 */
+	mm->page_table_base = alloc_guest_page_table();
+	if (!mm->page_table_base)
+		return -ENOMEM;
+
+	mm->mem_base = base;
+	mm->mem_size = size;
+	mm->mem_free = size;
+	count = size >> MEM_BLOCK_SHIFT;
+
+	/*
+	 * here get all the memory block for the vm
+	 * TBD: get contiueous memory or not contiueous ?
+	 */
+	for (i = 0; i < count; i++) {
+		block = alloc_mem_block(GFB_VM);
+		if (!block)
+			goto free_vm_memory;
+
+		block->vmid = vm->vmid;
+		list_add_tail(&mm->block_list, &block->list);
+	}
+
+	/* begin to map the memory */
+	list_for_each_entry(block, &mm->block_list, list) {
+		i = map_vm_memory(vm, base, block->phy_base,
+				MEM_BLOCK_SIZE, MEM_TYPE_NORMAL);
+		if (i)
+			goto free_vm_memory;
+
+		base += MEM_BLOCK_SIZE;
+	}
+
+	return 0;
+
+free_vm_memory:
+	release_vm_memory(vm);
+
+	return -ENOMEM;
+}
+
+void vm_mm_struct_init(struct vm *vm)
+{
+	struct mm_struct *mm = &vm->mm;
+
+	init_list(&mm->mem_list);
+	init_list(&mm->block_list);
+	mm->head = NULL;
+	mm->page_table_base = 0;
+	spin_lock_init(&mm->lock);
+}
+
 int vm_mm_init(struct vm *vm)
 {
 	struct memory_region *region;
@@ -120,11 +235,7 @@ int vm_mm_init(struct vm *vm)
 	struct list_head *list = mem_list.next;
 	struct list_head *head = &mem_list;
 
-	init_list(&mm->mem_list);
-	init_list(&mm->block_list);
-	mm->head = NULL;
-	mm->page_table_base = 0;
-	spin_lock_init(&mm->lock);
+	vm_mm_struct_init(vm);
 
 	/*
 	 * this function will excuted at bootup
@@ -164,8 +275,6 @@ int vm_mm_init(struct vm *vm)
 				region->vir_base,
 				region->size, region->type);
 	}
-
-	flush_all_tlb();
 
 	return 0;
 }

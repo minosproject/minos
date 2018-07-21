@@ -41,12 +41,12 @@ int do_svc_handler(gp_regs *regs, uint32_t svc_id, uint64_t *args, int smc)
 
 	if (type > SVC_STYPE_MAX) {
 		pr_error("Unsupported SVC type %d\n", type);
-		SVC_RET1(regs, -EINVAL, -EINVAL);
+		SVC_RET1(regs, -EINVAL);
 	}
 
 	desc = table[type];
 	if (!desc)
-		SVC_RET1(regs, -EINVAL, -EINVAL);
+		SVC_RET1(regs, -EINVAL);
 
 	pr_debug("doing SVC Call %s:0x%x\n", desc->name, svc_id);
 

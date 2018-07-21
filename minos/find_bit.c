@@ -64,6 +64,35 @@ unsigned long find_next_zero_bit(const unsigned long *addr, unsigned long size,
 	return _find_next_bit(addr, size, offset, ~0UL);
 }
 
+unsigned long _find_next_bit_loop(const unsigned long *addr, unsigned long size,
+				unsigned long offset, unsigned long invert)
+{
+	unsigned long bit;
+
+loop:
+	bit = _find_next_bit(addr, size, offset, invert);
+	if (bit >= size) {
+		if (offset != 0) {
+			offset = 0;
+			goto loop;
+		}
+	}
+
+	return bit;
+}
+
+unsigned long find_next_bit_loop(const unsigned long *addr, unsigned long size,
+				unsigned long offset)
+{
+	return _find_next_bit_loop(addr, size, offset, 0UL);
+}
+
+unsigned long find_next_zero_bit_loop(const unsigned long *addr, unsigned long size,
+				unsigned long offset)
+{
+	return _find_next_bit_loop(addr, size, offset, ~0UL);
+}
+
 /*
  * Find the first set bit in a memory region.
  */

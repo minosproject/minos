@@ -54,7 +54,7 @@ static void virt_timer_expire_function(unsigned long data)
 	send_virq_to_vcpu(vtimer->vcpu, vtimer->virq);
 }
 
-static void vtimer_create_vm(struct vm *vm)
+static void vtimer_vm_init(struct vm *vm)
 {
 	vm->time_offset = NOW();
 }
@@ -285,7 +285,7 @@ static int vtimer_vmodule_init(struct vmodule *vmodule)
 	vmodule->state_init = vtimer_state_init;
 	vmodule->state_save = vtimer_state_save;
 	vmodule->state_restore = vtimer_state_restore;
-	vmodule->create_vm = vtimer_create_vm;
+	vmodule->vm_init = vtimer_vm_init;
 	vtimer_vmodule_id = vmodule->id;
 
 	register_mmio_emulation_handler("vtimer", &vtimer_phy_mem_ops);

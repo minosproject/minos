@@ -74,12 +74,12 @@ struct vcpu {
 #define VCPU_SCHED_REASON_HIRQ	0x0
 #define VCPU_SCHED_REASON_VIRQ	0x1
 
-static uint32_t inline get_vcpu_id(struct vcpu *vcpu)
+static int inline get_vcpu_id(struct vcpu *vcpu)
 {
 	return vcpu->vcpu_id;
 }
 
-static uint32_t inline get_vmid(struct vcpu *vcpu)
+static int inline get_vmid(struct vcpu *vcpu)
 {
 	return (vcpu->vm->vmid);
 }

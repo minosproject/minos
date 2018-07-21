@@ -120,14 +120,24 @@ int vcpu_vmodules_init(struct vcpu *vcpu)
 	return 0;
 }
 
-void vmodules_create_vm(struct vm *vm)
+int vcpu_vmodules_deinit(struct vcpu *vcpu)
+{
+	return 0;
+}
+
+void vm_vmodules_init(struct vm *vm)
 {
 	struct vmodule *vmodule;
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
-		if (vmodule->create_vm)
-			vmodule->create_vm(vm);
+		if (vmodule->vm_init)
+			vmodule->vm_init(vm);
 	}
+}
+
+void vm_vmodules_deinit(struct vm *vm)
+{
+
 }
 
 void *get_vmodule_pdata(char *name, char *type)

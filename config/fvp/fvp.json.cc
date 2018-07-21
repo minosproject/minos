@@ -8,15 +8,16 @@
 			"vmid": 0,
 			"name": "linux-01",
 			"type": "linux",
-			"nr_vcpu": 4,
+			"nr_vcpu": 1,
 			"entry": "0x80080000",
 			"vcpu0_affinity": 0,
 			"vcpu1_affinity": 1,
 			"vcpu2_affinity": 2,
 			"vcpu3_affinity": 3,
 			"setup_data": "0x83e00000",
-			"mmu_on": 1
-		},
+			"bit64": 1
+		}
+#if 0
 		{
 			"vmid": 1,
 			"name": "os1",
@@ -30,6 +31,7 @@
 			"setup_data": "0xd0000000",
 			"mmu_on": 1
 		}
+#endif
 	],
 	#include "fvp_virq.json.cc"
 	#include "fvp_mem.json.cc"

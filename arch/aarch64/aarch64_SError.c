@@ -111,10 +111,14 @@ static inline int svc_aarch64_handler(gp_regs *reg, uint32_t esr_value, int smc)
 	uint32_t id;
 	uint16_t imm;
 	uint64_t args[6];
+	struct vcpu *vcpu = current_vcpu;
+
+	if ((!vcpu->vm) || (get_vmid(vcpu) != 0))
+		HVC_RET1(reg, -EPERM);
 
 	imm = esr_value & 0xff;
 	if (imm != 0)
-		SVC_RET1(reg, -EINVAL, -EINVAL);
+		SVC_RET1(reg, -EINVAL);
 
 	id = reg->x0;
 	fast = !!(id & SVC_CTYPE_MASK);

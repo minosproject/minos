@@ -114,7 +114,7 @@ el2_entry_aarch64:
 	isb
 
 	/* setup the el2 page table */
-	ldr	x1, = __el2_ttb0_l0
+	ldr	x1, = __el2_ttb0_pgd
 	msr	TTBR0_EL2, x1
 
 	mov	x1, #0xff44
@@ -153,16 +153,16 @@ el2_entry_aarch64:
 	 */
 	mov	x1, #0
 	mov	x2, #4096
-	ldr	x20, = __el2_ttb0_l0
+	ldr	x20, = __el2_ttb0_pgd
 	mov	x0, x20
 	bl	memset
-	ldr	x21, = __el2_ttb0_l1
+	ldr	x21, = __el2_ttb0_pud
 	mov	x0, x21
 	bl	memset
-	ldr	x23, = __el2_ttb0_l2_code
+	ldr	x23, = __el2_ttb0_pmd_code
 	mov	x0, x23
 	bl	memset
-	ldr	x24, = __el2_ttb0_l2_io
+	ldr	x24, = __el2_ttb0_pmd_io
 	mov	x0, x24
 	bl	memset
 

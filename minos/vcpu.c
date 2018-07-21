@@ -32,9 +32,28 @@ extern unsigned char __vm_start;
 extern unsigned char __vm_end;
 
 static struct vm *vms[CONFIG_MAX_VM];
-static uint32_t total_vms = 0;
+static int total_vms = 0;
+
+DEFINE_SPIN_LOCK(vms_lock);
+static DECLARE_BITMAP(vmid_bitmap, CONFIG_MAX_VM);
 
 LIST_HEAD(vm_list);
+
+static int alloc_new_vmid(void)
+{
+	int vmid, start = total_vms;
+
+	spin_lock(&vms_lock);
+	vmid = find_next_zero_bit_loop(vmid_bitmap, CONFIG_MAX_VM, start);
+	if (vmid >= CONFIG_MAX_VM)
+		goto out;
+
+	set_bit(vmid, vmid_bitmap);
+out:
+	spin_unlock(&vms_lock);
+
+	return vmid;
+}
 
 void vcpu_online(struct vcpu *vcpu)
 {
@@ -126,52 +145,72 @@ int vcpu_suspend(gp_regs *c, uint32_t state, unsigned long entry)
 	return 0;
 }
 
-static int add_vm(struct vmtag *vme)
+static struct vm *__create_vm(struct vmtag *vme)
 {
 	struct vm *vm;
 
-	if (!vme)
-		return -EINVAL;
-
 	vm = (struct vm *)malloc(sizeof(struct vm));
 	if (!vm)
-		return -ENOMEM;
+		return NULL;
 
 	memset((char *)vm, 0, sizeof(struct vm));
+	vm->vcpus = (struct vcpu **)malloc(sizeof(struct vcpu *) * vme->nr_vcpu);
+	if (!vm->vcpus) {
+		free(vm);
+		return NULL;
+	}
+
 	vm->vmid = vme->vmid;
 	strncpy(vm->name, vme->name,
 		MIN(strlen(vme->name), MINOS_VM_NAME_SIZE - 1));
 	strncpy(vm->os_type, vme->type,
 		MIN(strlen(vme->type), OS_TYPE_SIZE - 1));
 	vm->vcpu_nr = MIN(vme->nr_vcpu, CONFIG_VM_MAX_VCPU);
-	vm->mmu_on = vme->mmu_on;
+	vm->bit64 = vme->bit64;
 	vm->entry_point = vme->entry;
 	vm->setup_data = vme->setup_data;
 	memcpy(vm->vcpu_affinity, vme->vcpu_affinity,
-			sizeof(uint32_t) * CONFIG_VM_MAX_VCPU);
+			sizeof(int) * CONFIG_VM_MAX_VCPU);
 
 	vm->index = total_vms;
-	vms[total_vms] = vm;
+	vms[vme->vmid] = vm;
 	total_vms++;
+
+	spin_lock(&vms_lock);
 	list_add_tail(&vm_list, &vm->vm_list);
+	spin_unlock(&vms_lock);
 
-	vmodules_create_vm(vm);
+	vm_vmodules_init(vm);
 
-	return 0;
+	return vm;
+}
+
+struct vm *create_vm(struct vmtag *vme)
+{
+	if (!vme)
+		return NULL;
+
+	if ((vme->vmid <= 0) || (vme->vmid >= CONFIG_MAX_VM)) {
+		vme->vmid = alloc_new_vmid();
+		if (vme->vmid == VMID_INVALID)
+			return NULL;
+	} else {
+		if (test_bit(vme->vmid, vmid_bitmap))
+			return NULL;
+	}
+
+	if (vme->nr_vcpu <= 0)
+		return NULL;
+
+	return __create_vm(vme);
 }
 
 struct vm *get_vm_by_id(uint32_t vmid)
 {
-	int i;
-	struct vm *vm;
+	if (vmid >= CONFIG_MAX_VM)
+		return NULL;
 
-	for (i = 0; i < total_vms; i++) {
-		vm = vms[i];
-		if (vm->vmid == vmid)
-			return vm;
-	}
-
-	return NULL;
+	return vms[vmid];
 }
 
 struct vcpu *get_vcpu_in_vm(struct vm *vm, uint32_t vcpu_id)
@@ -195,6 +234,7 @@ struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id)
 
 static void release_vcpu(struct vcpu *vcpu)
 {
+	vcpu_vmodules_deinit(vcpu);
 	free(vcpu->stack_origin);
 	free(vcpu->virq_struct);
 	free(vcpu);
@@ -258,6 +298,7 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 
 	vcpu_virq_struct_init(vcpu->virq_struct);
 	vm->vcpus[vcpu_id] = vcpu;
+	vcpu_vmodules_init(vcpu);
 
 	return vcpu;
 }
@@ -289,6 +330,42 @@ static int create_vcpus(struct vm *vm)
 	return 0;
 }
 
+void destory_vm(struct vm *vm)
+{
+	int i;
+	struct vcpu *vcpu;
+
+	if (!vm)
+		return;
+
+	/*
+	 * first release the vcpu allocate to
+	 * this vm
+	 */
+	for (i = 0; i < vm->vcpu_nr; i++) {
+		vcpu = vm->vcpus[i];
+		if (!vcpu)
+			continue;
+
+		release_vcpu(vcpu);
+	}
+
+	release_vm_memory(vm);
+	free(vm->vcpus);
+
+	/*
+	 * update the vmid bitmap and other things
+	 */
+	i = vm->vmid;
+	spin_lock(&vms_lock);
+	clear_bit(i, vmid_bitmap);
+	list_del(&vm->vm_list);
+	spin_unlock(&vms_lock);
+
+	vm_vmodules_deinit(vm);
+	free(vm);
+}
+
 struct vcpu *create_idle_vcpu(void)
 {
 	struct vcpu *idle = NULL;
@@ -318,15 +395,64 @@ struct vcpu *create_idle_vcpu(void)
 	return idle;
 }
 
-static void inline vm_vmodules_init(struct vm *vm)
+struct vm *create_dynamic_vm(struct vmtag *vme)
 {
-	int i;
+	int ret;
+	struct vm *vm;
 
-	for (i = 0; i < vm->vcpu_nr; i++)
-		vcpu_vmodules_init(vm->vcpus[i]);
+	if (!vme)
+		return NULL;
+
+	vm = create_vm(vme);
+	if (!vm)
+		return NULL;
+
+	ret = create_vcpus(vm);
+	if (ret) {
+		pr_error("create vcpus for vm failded\n");
+		ret = VMID_INVALID;
+		goto release_vm;
+	}
+
+	vm->os = get_vm_os(vm->os_type);
+	vm_vmodules_init(vm);
+
+	return vm;
+
+release_vm:
+	destory_vm(vm);
+
+	return NULL;
 }
 
-int vms_init(void)
+int create_static_vms(void)
+{
+	struct vm *vm;
+	int i, count = 0;
+	struct vmtag *vmtags = mv_config->vmtags;
+
+	if (mv_config->nr_vmtag == 0) {
+		pr_error("no VM is found\n");
+		return -ENOENT;
+	}
+
+	pr_info("found %d VMs config\n", mv_config->nr_vmtag);
+
+	for (i = 0; i < mv_config->nr_vmtag; i++) {
+		vm = create_vm(&vmtags[i]);
+		if (!vm) {
+			pr_error("create %d VM:%s failed\n",
+					vm->vmid, vmtags[i].name);
+			continue;
+		}
+
+		count++;
+	}
+
+	return count;
+}
+
+int static_vms_init(void)
 {
 	int i;
 	struct vm *vm;
@@ -348,28 +474,4 @@ int vms_init(void)
 	}
 
 	return 0;
-}
-
-int create_vms(void)
-{
-	int i, count = 0;
-	struct vmtag *vmtags = mv_config->vmtags;
-
-	if (mv_config->nr_vmtag == 0) {
-		pr_error("no VM is found\n");
-		return -ENOENT;
-	}
-
-	pr_info("found %d VMs config\n", mv_config->nr_vmtag);
-
-	for (i = 0; i < mv_config->nr_vmtag; i++) {
-		if (add_vm(&vmtags[i])) {
-			pr_error("create %d VM:%s failed\n", i, vmtags[i].name);
-			continue;
-		}
-
-		count++;
-	}
-
-	return count;
 }

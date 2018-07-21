@@ -23,6 +23,8 @@
 extern void virqs_init(void);
 extern void parse_memtags(void);
 extern void parse_virqs(void);
+extern int static_vms_init(void);
+extern int create_static_vms(void);
 
 extern struct virt_config virt_config;
 struct virt_config *mv_config = &virt_config;
@@ -54,13 +56,16 @@ void restore_vcpu_vcpu_state(struct vcpu *vcpu)
 
 int virt_init(void)
 {
+	int ret;
+
 	vmodules_init();
 
-	if (create_vms() == 0)
+	ret = create_static_vms();
+	if (!ret)
 		return -ENOENT;
 
 	parse_memtags();
-	vms_init();
+	static_vms_init();
 	parse_virqs();
 	virqs_init();
 

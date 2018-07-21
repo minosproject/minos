@@ -12,7 +12,7 @@
 #define CONFIG_MAX_CPU_NR		(8)
 #define CONFIG_NR_CPUS			(4)
 #define CONFIG_VM_MAX_VCPU		(CONFIG_NR_CPUS)
-#define CONFIG_MAX_VM			(4)
+#define CONFIG_MAX_VM			(64)
 
 #define CONFIG_HAS_VIRT			(1)
 

@@ -11,7 +11,7 @@ struct vmtag {
 	char *type;
 	int nr_vcpu;
 	unsigned long entry;
-	int mmu_on;
+	int bit64;
 	unsigned long setup_data;
 	int vcpu_affinity[4];
 };
@@ -50,8 +50,6 @@ struct virt_config {
 	struct virqtag *virqtags;
 	struct memtag *memtags;
 };
-
-#define VMID_HOST	(65535)
 
 extern struct virt_config *mv_config;
 

@@ -3,28 +3,10 @@
 
 #include <minos/list.h>
 #include <minos/spinlock.h>
-#include <config/config.h>
-
-#define PAGE_NR(size)		(size >> PAGE_SHIFT)
-#define __PAGE_MASK		(~((1UL << PAGE_SHIFT) - 1))
-
-#define GFB_SLAB		(1 << 0)
-#define GFB_PAGE		(1 << 1)
-#define GPF_PAGE_META		(1 << 2)
-
-#define GFB_SLAB_BIT		(0)
-#define GFB_PAGE_BIT		(1)
-#define GFB_PAGE_META_BIT	(2)
-
-#define GFB_MASK		(0xffff)
+#include <minos/memattr.h>
 
 struct memtag;
 struct vm;
-
-#define MAX_MEM_SECTIONS	(10)
-#define MEM_BLOCK_SIZE		(0x200000)
-#define MEM_BLOCK_SHIFT		(21)
-#define PAGES_IN_BLOCK		(MEM_BLOCK_SIZE >> PAGE_SHIFT)
 
 struct mem_block {
 	unsigned long phy_base;
@@ -56,20 +38,6 @@ struct memory_region {
 	unsigned long vir_base;
 	size_t size;
 	struct list_head list;
-};
-
-/*
- * page_table_base : the lvl0 table base
- * mem_list : static config memory region for this vm
- * block_list : the mem_block allocated for this vm
- * head : the pages table allocated for this vm
- */
-struct mm_struct {
-	unsigned long page_table_base;
-	struct page *head;
-	struct list_head mem_list;
-	struct list_head block_list;
-	spinlock_t lock;
 };
 
 extern struct list_head mem_list;
@@ -107,5 +75,6 @@ static inline struct page *alloc_page(void)
 
 struct mem_block *alloc_mem_block(unsigned long flags);
 void release_mem_block(struct mem_block *block);
+int has_enough_memory(size_t size);
 
 #endif
