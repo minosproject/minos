@@ -25,7 +25,7 @@
 
 extern void get_vcpu_affinity(int *aff, int nr);
 
-static inline void vminfo_to_vmtag(struct vminfo *info, struct vmtag *tag)
+static inline void vminfo_to_vmtag(struct vm_info *info, struct vmtag *tag)
 {
 	tag->vmid = VMID_INVALID;
 	tag->name = (char *)info->name;
@@ -55,37 +55,37 @@ int vm_power_up(int vmid)
 	return 0;
 }
 
-int create_new_vm(struct vminfo *info)
+int create_new_vm(struct vm_info *info)
 {
 	int ret;
 	struct vm *vm;
 	size_t size;
 	struct vmtag vme;
-	struct vminfo *vminfo = (struct vminfo *)
-			guest_va_to_pa((unsigned long)info, 0);
+	struct vm_info *vm_info = (struct vm_info *)
+			guest_va_to_ipa((unsigned long)info, 1);
 
-	if (!vminfo)
+	if (!vm_info)
 		return VMID_INVALID;
 
 	/*
 	 * first check whether there are enough
 	 * memory for this vm
 	 */
-	size = vminfo->mem_end - vminfo->mem_start;
-	if (size > vminfo->mem_size)
-		size = vminfo->mem_size;
+	size = vm_info->mem_end - vm_info->mem_start;
+	if (size > vm_info->mem_size)
+		size = vm_info->mem_size;
 
-	if ((vminfo->mem_start + size) > GUSET_MEMORY_END)
+	if ((vm_info->mem_start + size) > GUSET_MEMORY_END)
 		return -EINVAL;
 
 	if (!has_enough_memory(size))
 		return -ENOMEM;
 
-	if (vminfo->nr_vcpus > NR_CPUS)
+	if (vm_info->nr_vcpus > NR_CPUS)
 		return -EINVAL;
 
 	memset(&vme, 0, sizeof(struct vmtag));
-	vminfo_to_vmtag(vminfo, &vme);
+	vminfo_to_vmtag(vm_info, &vme);
 
 	vm = create_dynamic_vm(&vme);
 	if (!vm)
@@ -94,15 +94,17 @@ int create_new_vm(struct vminfo *info)
 	/*
 	 * allocate memory to this vm
 	 */
-	vm->bit64 = !!vminfo->bit64;
+	vm->bit64 = !!vm_info->bit64;
 	vm_mm_struct_init(vm);
 
-	ret = alloc_vm_memory(vm, vminfo->mem_start, size);
+	ret = alloc_vm_memory(vm, vm_info->mem_start, size);
 	if (ret)
 		goto release_vm;
+
+	return (vm->vmid);
 
 release_vm:
 	destory_vm(vm);
 
-	return ret;
+	return -ENOMEM;
 }

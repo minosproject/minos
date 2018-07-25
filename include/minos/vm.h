@@ -8,8 +8,8 @@
 #include <minos/types.h>
 #include <minos/list.h>
 #include <config/config.h>
-#include <minos/mmu.h>
 #include <minos/vmm.h>
+#include <minos/errno.h>
 
 #define MINOS_VM_NAME_SIZE	32
 #define OS_TYPE_SIZE		32
@@ -23,7 +23,7 @@ struct vmtag;
 
 extern struct list_head vm_list;
 
-struct vminfo {
+struct vm_info {
 	int8_t name[32];
 	int8_t os_type[32];
 	int32_t nr_vcpus;
@@ -63,7 +63,7 @@ struct vm {
 #define for_each_vm(vm)	\
 	list_for_each_entry(vm, &vm_list, vm_list)
 
-struct vm *get_vm(uint32_t vmid);
+struct vm *get_vm_by_id(uint32_t vmid);
 
 void vm_mm_struct_init(struct vm *vm);
 
@@ -74,12 +74,33 @@ int vm0_set_shmem_size(size_t size);
 int vm_server_init(void);
 int vm0_disconnect_host(void);
 struct vm *create_dynamic_vm(struct vmtag *vme);
-int create_new_vm(struct vminfo *info);
+int create_new_vm(struct vm_info *info);
 void destory_vm(struct vm *vm);
 
 static inline int is_32bit_vm(struct vm *vm)
 {
 	return (!vm->bit64);
+}
+
+static inline int
+create_vm_mmap(int vmid,  unsigned long *offset, unsigned long *size)
+{
+	struct vm *vm = get_vm_by_id(vmid);
+
+	if (!vm)
+		return -ENOENT;
+
+	return vm_mmap(vm, offset, size);
+}
+
+static inline void destory_vm_mmap(int vmid)
+{
+	struct vm *vm = get_vm_by_id(vmid);
+
+	if (!vm)
+		return;
+
+	vm_unmmap(vm);
 }
 
 #endif

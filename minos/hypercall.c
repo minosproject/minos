@@ -32,12 +32,8 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 
 	switch (id) {
 	case HVC_VM_CREATE:
-		vmid = create_new_vm((struct vminfo *)args[0]);
-		if (vmid < 0) {
-			HVC_RET1(c, vmid);
-		} else {
-			HVC_RET1(c, vmid);
-		}
+		vmid = create_new_vm((struct vm_info *)args[0]);
+		HVC_RET1(c, vmid);
 		break;
 	case HVC_VM_DESTORY:
 		break;
@@ -46,6 +42,15 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 	case HVC_VM_POWER_UP:
 		break;
 	case HVC_VM_POWER_DOWN:
+		break;
+	case HVC_VM_MMAP:
+		vmid = create_vm_mmap((int)args[0], (unsigned long *)&args[1],
+				(unsigned long *)&args[2]);
+		HVC_RET3(c, vmid, args[1], args[2]);
+		break;
+	case HVC_VM_UNMMAP:
+		destory_vm_mmap((int)args[0]);
+		HVC_RET1(c, 0);
 		break;
 	}
 

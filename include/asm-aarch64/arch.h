@@ -169,7 +169,8 @@ static inline unsigned long va_to_pa(unsigned long va)
 
 	asm volatile ("at s1e2r, %0;" : : "r" (va));
 	isb();
-	pa = read_sysreg64(PAR_EL1);
+	pa = read_sysreg64(PAR_EL1) & 0x0000fffffffff000;
+	pa = pa | (va & (~(~PAGE_MASK)));
 	write_sysreg64(tmp, PAR_EL1);
 
 	return pa;
@@ -180,11 +181,12 @@ static inline unsigned long guest_va_to_pa(unsigned long va, int read)
 	uint64_t pa, tmp = read_sysreg64(PAR_EL1);
 
 	if (read)
-		asm volatile ("at s12e1w, %0;" : : "r" (va));
-	else
 		asm volatile ("at s12e1r, %0;" : : "r" (va));
+	else
+		asm volatile ("at s12e1w, %0;" : : "r" (va));
 	isb();
-	pa = read_sysreg64(PAR_EL1);
+	pa = read_sysreg64(PAR_EL1) & 0x0000fffffffff000;
+	pa = pa | (va & (~(~PAGE_MASK)));
 	write_sysreg64(tmp, PAR_EL1);
 
 	return pa;
@@ -199,7 +201,8 @@ static inline unsigned long guest_va_to_ipa(unsigned long va, int read)
 	else
 		asm volatile ("at s1e1r, %0;" : : "r" (va));
 	isb();
-	pa = read_sysreg64(PAR_EL1);
+	pa = read_sysreg64(PAR_EL1) & 0x0000fffffffff000;
+	pa = pa | (va & (~(~PAGE_MASK)));
 	write_sysreg64(tmp, PAR_EL1);
 
 	return pa;

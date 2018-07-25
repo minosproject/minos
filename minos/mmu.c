@@ -24,35 +24,16 @@
 struct pagetable_attr {
 	int range_offset;
 	int des_offset;
+	int lvl;
 	unsigned long offset_mask;
 	size_t map_size;
 	struct pagetable_attr *next;
 };
 
-struct mapping_info {
-	unsigned long table_base;
-	unsigned long vir_base;
-	unsigned long phy_base;
-	size_t size;
-	int lvl;
-	int host;
-	int mem_type;
-	struct vm *vm;
-	struct pagetable_attr *config;
-};
-
-extern unsigned char __el2_ttb0_pgd;
-extern unsigned char __el2_ttb0_pud;
-extern unsigned char __el2_ttb0_pmd_code;
-extern unsigned char __el2_ttb0_pmd_io;
-
-static unsigned long el2_ttb0_pgd;
-
-static DEFINE_SPIN_LOCK(host_lock);
-
 struct pagetable_attr pte_attr = {
 	.range_offset 	= PTE_RANGE_OFFSET,
 	.des_offset 	= PTE_DES_OFFSET,
+	.lvl		= PTE,
 	.offset_mask	= PTE_ENTRY_OFFSET_MASK,
 	.map_size	= PTE_MAP_SIZE,
 	.next		= NULL,
@@ -61,6 +42,7 @@ struct pagetable_attr pte_attr = {
 struct pagetable_attr pmd_attr = {
 	.range_offset 	= PMD_RANGE_OFFSET,
 	.des_offset 	= PMD_DES_OFFSET,
+	.lvl		= PMD,
 	.offset_mask	= PMD_ENTRY_OFFSET_MASK,
 	.map_size	= PMD_MAP_SIZE,
 	.next		= &pte_attr,
@@ -69,6 +51,7 @@ struct pagetable_attr pmd_attr = {
 struct pagetable_attr pud_attr = {
 	.range_offset 	= PUD_RANGE_OFFSET,
 	.des_offset 	= PUD_DES_OFFSET,
+	.lvl		= PUD,
 	.offset_mask	= PUD_ENTRY_OFFSET_MASK,
 	.map_size	= PUD_MAP_SIZE,
 	.next		= &pmd_attr,
@@ -77,31 +60,20 @@ struct pagetable_attr pud_attr = {
 struct pagetable_attr pgd_attr = {
 	.range_offset 	= PGD_RANGE_OFFSET,
 	.des_offset 	= PGD_DES_OFFSET,
+	.lvl		= PGD,
 	.offset_mask	= PGD_ENTRY_OFFSET_MASK,
 	.map_size	= PGD_MAP_SIZE,
 	.next		= &pud_attr,
 };
 
-unsigned long alloc_guest_page_table(void)
-{
-	/*
-	 * return the table base address, this function
-	 * is called when init the vm
-	 *
-	 * 2 pages for each VM to map 1T IPA memory
-	 *
-	 */
-	void *page;
+static struct pagetable_attr *attrs[PTE + 1] = {
+	&pgd_attr,
+	&pud_attr,
+	&pmd_attr,
+	&pte_attr,
+};
 
-	page = __get_free_pages(GUEST_PGD_PAGE_NR, GUEST_PGD_PAGE_ALIGN);
-	if (!page)
-		panic("No memory to map vm memory\n");
-
-	memset(page, 0, SIZE_4K * GUEST_PGD_PAGE_NR);
-	return (unsigned long)page;
-}
-
-static inline unsigned long
+static inline uint64_t
 get_tt_description(int host, int m_type, int d_type)
 {
 	if (host)
@@ -110,7 +82,7 @@ get_tt_description(int host, int m_type, int d_type)
 		return arch_guest_tt_description(m_type, d_type);
 }
 
-static int get_map_type(struct mapping_info *info)
+static int get_map_type(struct mapping_struct *info)
 {
 	struct pagetable_attr *config = info->config;
 	unsigned long a, b;
@@ -136,11 +108,11 @@ static int get_map_type(struct mapping_info *info)
 		return DESCRIPTION_BLOCK;
 }
 
-static int create_page_entry(struct mapping_info *info)
+static int create_page_entry(struct mapping_struct *info)
 {
 	int i, map_type;
 	uint32_t offset, index;
-	unsigned long attr;
+	uint64_t attr;
 	struct pagetable_attr *config = info->config;
 	unsigned long *tbase = (unsigned long *)info->table_base;
 
@@ -165,12 +137,13 @@ static int create_page_entry(struct mapping_info *info)
 	return 0;
 }
 
-static int create_table_entry(struct mapping_info *info)
+static int create_table_entry(struct mapping_struct *info)
 {
 	size_t size, map_size;
-	unsigned long attr, value, offset;
+	uint64_t attr;
+	unsigned long value, offset;
 	int ret = 0, map_type, new_page;
-	struct mapping_info map_info;
+	struct mapping_struct map_info;
 	struct pagetable_attr *config = info->config;
 	unsigned long *tbase = (unsigned long *)info->table_base;
 
@@ -191,7 +164,7 @@ static int create_table_entry(struct mapping_info *info)
 
 		if (value == 0) {
 			value = (unsigned long)
-				get_vm_translation_page(info->vm);
+				info->get_free_pages(1, info->data);
 			if (!value)
 				return -ENOMEM;
 
@@ -208,7 +181,7 @@ static int create_table_entry(struct mapping_info *info)
 			value = value << config->des_offset;
 		}
 
-		memset(&map_info, 0, sizeof(struct mapping_info));
+		memset(&map_info, 0, sizeof(struct mapping_struct));
 		map_info.table_base = value;
 		map_info.vir_base = info->vir_base;
 		map_info.phy_base = info->phy_base;
@@ -216,8 +189,9 @@ static int create_table_entry(struct mapping_info *info)
 		map_info.lvl = info->lvl + 1;
 		map_info.mem_type = info->mem_type;
 		map_info.host = info->host;
-		map_info.vm = info->vm;
+		map_info.data = info->data;
 		map_info.config = config->next;
+		map_info.get_free_pages = info->get_free_pages;
 
 		/*
 		 * get next level map entry type, if the entry
@@ -252,9 +226,12 @@ static int create_table_entry(struct mapping_info *info)
 	return ret;
 }
 
-static int inline map_memory(struct mapping_info *info)
+int create_mem_mapping(struct mapping_struct *info)
 {
 	int ret;
+
+	if (!info->config)
+		info->config = attrs[info->lvl];
 
 	ret = create_table_entry(info);
 	if (ret)
@@ -269,7 +246,7 @@ static int inline map_memory(struct mapping_info *info)
 	return ret;
 }
 
-int __unmap_memory(struct mapping_info *info)
+static int __destory_mem_mapping(struct mapping_struct *info)
 {
 	int type;
 	int lvl = info->lvl;
@@ -316,9 +293,12 @@ int __unmap_memory(struct mapping_info *info)
 	return 0;
 }
 
-static int inline unmap_memory(struct mapping_info *info)
+int destory_mem_mapping(struct mapping_struct *info)
 {
-	__unmap_memory(info);
+	if (!info->config)
+		info->config = attrs[info->lvl];
+
+	__destory_mem_mapping(info);
 
 	if (info->host)
 		flush_all_tlb_host();
@@ -328,123 +308,37 @@ static int inline unmap_memory(struct mapping_info *info)
 	return 0;
 }
 
-int map_host_memory(unsigned long vir,
-		unsigned long phy, size_t size, int type)
+unsigned long get_mapping_entry(unsigned long tt,
+		unsigned long vir, int start, int end)
 {
-	int ret = 0;
-	unsigned long vir_base, phy_base, tmp;
-	struct mapping_info map_info;
+	unsigned long offset;
+	unsigned long value;
+	unsigned long *table = (unsigned long *)tt;
+	struct pagetable_attr *attr = attrs[start];
 
-	/*
-	 * for host mapping, IO and Normal memory all mapped
-	 * as MEM_BLOCK_SIZE ALIGN
-	 */
-	vir_base = ALIGN(vir, MEM_BLOCK_SIZE);
-	phy_base = ALIGN(phy, MEM_BLOCK_SIZE);
-	tmp = BALIGN(vir_base + size, MEM_BLOCK_SIZE);
-	size = tmp - vir_base;
+	do {
+		offset = (vir & attr->offset_mask) >> attr->range_offset;
+		value = *(table + offset);
+		if ((value == 0) && (attr->lvl < end))
+			return attr->lvl;
 
-	memset(&map_info, 0, sizeof(struct mapping_info));
-	map_info.table_base = el2_ttb0_pgd;
-	map_info.vir_base = vir_base;
-	map_info.phy_base = phy_base;
-	map_info.size = size;
-	map_info.lvl = PGD;
-	map_info.host = 1;
-	map_info.vm = NULL;
-	map_info.mem_type = type;
-	map_info.config = &pgd_attr;
+		attr = attr->next;
+		table = (unsigned long *)(value & 0xfffffffffffff000);
+	} while (attr->lvl < end);
 
-	spin_lock(&host_lock);
-	ret = map_memory(&map_info);
-	spin_unlock(&host_lock);
-
-	return ret;
+	return (unsigned long)table;
 }
 
-int unmap_host_memory(unsigned long vir, size_t size, int type)
+void create_level_mapping(int lvl, unsigned long tt, unsigned long addr,
+			int mem_type, int map_type, int host)
 {
-	unsigned long end;
-	struct mapping_info map_info;
+	uint64_t attr;
+	unsigned long offset;
+	struct pagetable_attr *ar = attrs[lvl];
 
-	end = vir + size;
-	end = BALIGN(end, PAGE_SIZE);
-	vir = ALIGN(vir, PAGE_SIZE);
-	size = end - vir;
+	offset = addr >> ar->range_offset;
+	attr = get_tt_description(host, mem_type, map_type);
 
-	memset(&map_info, 0, sizeof(struct mapping_info));
-	map_info.table_base = el2_ttb0_pgd;
-	map_info.vir_base = vir;
-	map_info.size = size;
-	map_info.lvl = PGD;
-	map_info.host = 1;
-	map_info.mem_type = type;
-	map_info.vm = NULL;
-	map_info.config = &pgd_attr;
-
-	return unmap_memory(&map_info);
-}
-
-int io_remap(unsigned long vir, unsigned long phy, size_t size)
-{
-	return map_host_memory(vir, phy, size, MEM_TYPE_IO);
-}
-
-int io_unmap(unsigned long vir, size_t size)
-{
-	return unmap_host_memory(vir, size, MEM_TYPE_IO);
-}
-
-int map_guest_memory(struct vm *vm, unsigned long tbase, unsigned long vir,
-		unsigned long phy, size_t size, int type)
-{
-	unsigned long vir_base, phy_base, tmp;
-	struct mapping_info map_info;
-
-	vir_base = ALIGN(vir, SIZE_4K);
-	phy_base = ALIGN(phy, SIZE_4K);
-	tmp = BALIGN(vir_base + size, SIZE_4K);
-	size = tmp - vir_base;
-
-	memset(&map_info, 0, sizeof(struct mapping_info));
-	map_info.table_base = tbase;
-	map_info.vir_base = vir_base;
-	map_info.phy_base = phy_base;
-	map_info.size = size;
-	map_info.lvl = PUD;
-	map_info.host = 0;
-	map_info.vm = vm;
-	map_info.mem_type = type;
-	map_info.config = &pud_attr;
-
-	return map_memory(&map_info);
-}
-
-int unmap_guest_memory(struct vm *vm, unsigned long tt,
-		unsigned long vir, size_t size, int type)
-{
-	unsigned long end;
-	struct mapping_info map_info;
-
-	end = vir + size;
-	end = BALIGN(end, PAGE_SIZE);
-	vir = ALIGN(vir, PAGE_SIZE);
-	size = end - vir;
-
-	memset(&map_info, 0, sizeof(struct mapping_info));
-	map_info.table_base = tt;
-	map_info.vir_base = vir;
-	map_info.size = size;
-	map_info.lvl = PUD;
-	map_info.host = 0;
-	map_info.mem_type = type;
-	map_info.vm = vm;
-	map_info.config = &pud_attr;
-
-	return unmap_memory(&map_info);
-}
-
-void mmu_init(void)
-{
-	el2_ttb0_pgd = (unsigned long)&__el2_ttb0_pgd;
+	*(unsigned long *)(tt + offset * sizeof(uint64_t)) =
+		(addr & 0xfffffffffffff000) | attr;
 }

@@ -32,7 +32,7 @@ extern void init_timers(void);
 extern int virt_init(void);
 extern void cpu_idle();
 extern void sched_tick_enable(unsigned long exp);
-extern void mmu_init(void);
+extern void vmm_init(void);
 
 struct list_head hook_lists[MINOS_HOOK_TYPE_UNKNOWN];
 
@@ -125,7 +125,6 @@ void boot_main(void)
 	early_init();
 	early_init_percpu();
 
-	mmu_init();
 	mm_init();
 
 	hooks_init();
@@ -154,6 +153,7 @@ void boot_main(void)
 	local_sched_init();
 
 	virt_init();
+	vmm_init();
 
 	device_init();
 	device_init_percpu();

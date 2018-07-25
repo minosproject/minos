@@ -2,8 +2,8 @@
 #define __MINOS_VIRT_VMM_H__
 
 #include <minos/types.h>
-#include <minos/virt.h>
 #include <minos/mm.h>
+#include <minos/mmu.h>
 
 /*
  * below is the memory map for guest vm
@@ -29,6 +29,14 @@
 
 #define VM0_DEFAULT_SHMEM_SIZE		(PAGE_SIZE)
 
+#define VM0_MMAP_REGION_START		(0xc0000000)
+#define VM0_MMAP_REGION_SIZE		(0x40000000)
+
+#define VM_MMAP_MAX_SIZE		(VM0_MMAP_REGION_SIZE / CONFIG_MAX_VM)
+#define VM_MMAP_ENTRY_COUNT		(VM_MMAP_MAX_SIZE >> MEM_BLOCK_SHIFT)
+
+struct vm;
+
 /*
  * page_table_base : the lvl0 table base
  * mem_list : static config memory region for this vm
@@ -48,13 +56,43 @@ struct mm_struct {
 
 int register_memory_region(struct memtag *res);
 int vm_mm_init(struct vm *vm);
-void *get_vm_translation_page(struct vm *vm);
+
 int map_vm_memory(struct vm *vm, unsigned long vir_base,
 		unsigned long phy_base, size_t size, int type);
 int unmap_vm_memory(struct vm *vm, unsigned long vir_addr,
 			size_t size, int type);
-int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size);
 
+int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size);
 void release_vm_memory(struct vm *vm);
+
+int create_host_mapping(unsigned long, unsigned long, size_t, int);
+int destory_host_mapping(unsigned long, size_t, int);
+
+static inline int
+io_remap(unsigned long vir, unsigned long phy, size_t size)
+{
+	return create_host_mapping(vir, phy, size, MEM_TYPE_IO);
+}
+
+static inline int
+io_unmap(unsigned long vir, size_t size)
+{
+	return destory_host_mapping(vir, size, MEM_TYPE_IO);
+}
+
+static inline void create_guest_level_mapping(int lvl, unsigned long tt,
+			unsigned long value, int map_type)
+{
+	create_level_mapping(lvl, tt, value, MEM_TYPE_NORMAL, map_type, 0);
+}
+
+static inline void create_host_level_mapping(int lvl, unsigned long tt,
+			unsigned long value, int map_type)
+{
+	create_level_mapping(lvl, tt, value, MEM_TYPE_NORMAL, map_type, 1);
+}
+
+int vm_mmap(struct vm *vm, unsigned long *offset, unsigned long *size);
+void vm_unmmap(struct vm *vm);
 
 #endif

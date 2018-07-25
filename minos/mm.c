@@ -19,8 +19,8 @@
 #include <minos/spinlock.h>
 #include <minos/minos.h>
 #include <minos/init.h>
-#include <minos/mmu.h>
 #include <minos/mm.h>
+#include <minos/vmm.h>
 #include <minos/virt.h>
 
 extern unsigned char __code_start;
@@ -339,7 +339,7 @@ static void map_memory_sections(void)
 	/* boot section do not to be mapped again */
 	for (i = 1; i < nr_sections; i++) {
 		section = &mem_sections[i];
-		map_host_memory(section->phy_base, section->phy_base,
+		create_host_mapping(section->phy_base, section->phy_base,
 				section->size, MEM_TYPE_NORMAL);
 	}
 }
@@ -365,7 +365,8 @@ static struct mem_block *addr_to_mem_block(unsigned long addr)
 
 	section = addr_to_mem_section(addr);
 
-	return (&section->blocks[addr >> MEM_BLOCK_SHIFT]);
+	return (&section->blocks[(addr - section->phy_base) >>
+			MEM_BLOCK_SHIFT]);
 }
 
 static inline struct mem_section *block_to_mem_section(struct mem_block *block)

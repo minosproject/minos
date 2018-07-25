@@ -8,3 +8,4 @@ include/asm
 include/config/config.h
 *.o
 *.patch
+tools/minos/minos

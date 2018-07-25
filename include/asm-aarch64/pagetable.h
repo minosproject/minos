@@ -23,7 +23,7 @@
 #define __GUEST_PGD_PAGE_NR		(2)
 #define __GUEST_PGD_PAGE_ALIGN		(2)
 
-static inline unsigned long arch_guest_tt_description(int m_type, int d_type)
+static inline uint64_t arch_guest_tt_description(int m_type, int d_type)
 {
 	uint64_t attr;
 
@@ -65,7 +65,7 @@ static inline unsigned long arch_guest_tt_description(int m_type, int d_type)
 	return 0;
 }
 
-static inline unsigned long arch_host_tt_description(int m_type, int d_type)
+static inline uint64_t arch_host_tt_description(int m_type, int d_type)
 {
 	uint64_t attr;
 

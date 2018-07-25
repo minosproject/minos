@@ -5,6 +5,7 @@ LD 		:= $(CROSS_COMPILE)ld
 OBJ_COPY	:= $(CROSS_COMPILE)objcopy
 OBJ_DUMP 	:= $(CROSS_COMPILE)objdump
 NM		:= $(CROSS_COMPILE)nm
+STRIP		:= $(CROSS_COMPILE)strip
 
 PLATFORM	:= fvp
 TARGET		:= minos
@@ -136,4 +137,5 @@ distclean:
 	@ echo "All build objects have been cleaned"
 
 user_tool:
-	@ $(QUIET) $(CC) -c tools/minos/minos.c -o out/minos
+	@ $(QUIET) $(CC) --static tools/minos/minos.c -o tools/minos/minos
+	@ $(QUIET) $(STRIP) -s tools/minos/minos

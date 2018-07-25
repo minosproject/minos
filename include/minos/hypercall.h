@@ -21,5 +21,7 @@
 #define HVC_VM_RESTART			HVC_VM_FN(2)
 #define HVC_VM_POWER_UP			HVC_VM_FN(3)
 #define HVC_VM_POWER_DOWN		HVC_VM_FN(4)
+#define HVC_VM_MMAP			HVC_VM_FN(5)
+#define HVC_VM_UNMMAP			HVC_VM_FN(6)
 
 #endif

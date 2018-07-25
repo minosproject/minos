@@ -63,7 +63,7 @@ static inline void *get_free_pages(int pages)
 	return __get_free_pages(pages, 1);
 }
 
-static inline struct page *alloc_pages(int pages, int align)
+static inline struct page *alloc_pages(int pages)
 {
 	return __alloc_pages(pages, 1);
 }
