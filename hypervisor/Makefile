@@ -95,6 +95,7 @@ include/asm :
 
 include/config/config.h:
 	@ echo Link config/$(PLATFORM)/$(PLATFORM)_config.h to include/config/config.h ...
+	@ mkdir -p include/config
 	@ ln -s ../../config/$(PLATFORM)/$(PLATFORM)_config.h include/config/config.h
 
 $(obj-config): $(OUT)/$(PLATFORM)_config.c
@@ -129,7 +130,7 @@ clean:
 
 distclean:
 	@ echo "removing objs and out directory ..."
-	@ rm -rf out
+	@ rm -rf out include/config
 	@ echo "removing include/asm directory ..."
 	@ rm -rf include/asm
 	@ echo "removing include/config/config.h ..."
