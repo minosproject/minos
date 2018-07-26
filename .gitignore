@@ -1,11 +1,115 @@
-out/
+hypervisor/out/
 tags
 cscope.in.out
 cscope.out
 cscope.po.out
 linkmap.txt
-include/asm
-include/config/config.h
+hypervisor/include/asm
+hypervisor/include/config/config.h
+.*
 *.o
+*.o.*
+*.a
+*.s
+*.ko
+*.so
+*.so.dbg
+*.mod.c
+*.i
+*.lst
+*.symtypes
+*.order
+*.elf
+*.bin
+*.tar
+*.gz
+*.bz2
+*.lzma
+*.xz
+*.lz4
+*.lzo
 *.patch
-tools/minos/minos
+*.gcno
+modules.builtin
+Module.symvers
+*.dwo
+*.su
+
+#
+# Top-level generic files
+#
+/tags
+/TAGS
+/linux
+/vmlinux
+/vmlinux.32
+/vmlinux-gdb.py
+/vmlinuz
+/System.map
+/Module.markers
+
+#
+# Debian directory (make deb-pkg)
+#
+/debian/
+
+#
+# tar directory (make tar*-pkg)
+#
+/tar-install/
+
+#
+# git files that we don't want to ignore even if they are dot-files
+#
+!.gitignore
+!.mailmap
+
+#
+# Generated include files
+#
+include/config
+include/generated
+arch/*/include/generated
+
+# stgit generated dirs
+patches-*
+
+# quilt's files
+patches
+series
+
+# cscope files
+cscope.*
+ncscope.*
+
+# gnu global files
+GPATH
+GRTAGS
+GSYMS
+GTAGS
+
+# id-utils files
+ID
+
+*.orig
+*~
+\#*#
+
+#
+# Leavings from module signing
+#
+extra_certificates
+signing_key.pem
+signing_key.priv
+signing_key.x509
+x509.genkey
+
+# Kconfig presets
+all.config
+
+# Kdevelop4
+*.kdev4
+
+arch/arm64/configs/bya8665_spm_l_debug_defconfig
+arch/arm64/configs/bya8665_spm_l_defconfig
+drivers/misc/mediatek/mach/mt6735/bya8665_spm_l/dct/dct/codegen.dws

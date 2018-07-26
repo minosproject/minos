@@ -20,7 +20,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 
-#include "minos.h"
+#include "mvm.h"
 
 static int map_guest_memory(int fd, uint64_t *offset, uint64_t *size)
 {
