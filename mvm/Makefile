@@ -7,6 +7,8 @@ OBJ_DUMP 	:= $(CROSS_COMPILE)objdump
 NM		:= $(CROSS_COMPILE)nm
 STRIP		:= $(CROSS_COMPILE)strip
 
+PWD		:= $(shell pwd)
+
 QUIET ?= @
 
 ifeq ($(QUIET),@)
@@ -15,16 +17,28 @@ endif
 
 TARGET := mvm
 
-CFLAG := --static
+CCFLAG := -Wall --static -march=armv8-a -I$(PWD)/include
 
-src	:= mvm.c
-inc	:= mvm.h
+src	:= mvm.c bootimage.c
+src	+= libfdt/fdt_addresses.c libfdt/fdt.c libfdt/fdt_empty_tree.c
+src	+= libfdt/fdt_ro.c libfdt/fdt_rw.c libfdt/fdt_strerror.c
+src	+= libfdt/fdt_sw.c libfdt/fdt_wip.c
 
-$(TARGET) : $(src) $(inc)
+INCLUDE_DIR = include/libfdt include/mvm
+
+objs	:= $(src:%.c=%.o)
+
+$(TARGET) : $(objs)
 	$(PROGRESS)
-	$(QUIET) $(CC) $(CFLAG) $(src) -o $(TARGET)
+	$(QUIET) $(CC) $^ -o $@ $(CCFLAG)
 	$(QUIET) $(STRIP) -s $(TARGET)
 
+%.o : %.c $(INCLUDE_DIR)
+	$(PROGRESS)
+	$(QUIET) $(CC) $(CCFLAG) -c $< -o $@
 
 .PHONY: clean
-	$(QUIET) rm $(TARGET)
+
+clean:
+	@ echo rm objs and $(TARGET)
+	$(QUIET) rm $(TARGET) $(objs)

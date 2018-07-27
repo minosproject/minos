@@ -16,11 +16,19 @@ struct vm_info {
 	int32_t bit64;
 	uint64_t mem_size;
 	uint64_t mem_start;
-	uint64_t mem_end;
 	uint64_t entry;
 	uint64_t setup_data;
 };
 
 #define VM_MEM_START			(0x80000000UL)
+#define MEM_BLOCK_SIZE			(0x200000)
+#define MEM_BLOCK_SHIFT			(21)
+#define VM_MAX_MMAP_SIZE		(MEM_BLOCK_SIZE * 8)
+
+#define MEM_BLOCK_ALIGN(v)		(v & ~(MEM_BLOCK_SIZE - 1))
+#define MEM_BLOCK_BALIGN(v) \
+	((v + MEM_BLOCK_SIZE - 1) & ~(MEM_BLOCK_SIZE - 1))
+
+#define VM_MAX_VCPUS			(2)
 
 #endif
