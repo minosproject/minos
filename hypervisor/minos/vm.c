@@ -59,8 +59,8 @@ int create_new_vm(struct vm_info *info)
 {
 	int ret;
 	struct vm *vm;
-	size_t size;
 	struct vmtag vme;
+	size_t size;
 	struct vm_info *vm_info = (struct vm_info *)
 			guest_va_to_ipa((unsigned long)info, 1);
 
@@ -71,10 +71,7 @@ int create_new_vm(struct vm_info *info)
 	 * first check whether there are enough
 	 * memory for this vm
 	 */
-	size = vm_info->mem_end - vm_info->mem_start;
-	if (size > vm_info->mem_size)
-		size = vm_info->mem_size;
-
+	size = vm_info->mem_size;
 	if ((vm_info->mem_start + size) > GUSET_MEMORY_END)
 		return -EINVAL;
 

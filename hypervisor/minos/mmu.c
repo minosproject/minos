@@ -73,8 +73,7 @@ static struct pagetable_attr *attrs[PTE + 1] = {
 	&pte_attr,
 };
 
-static inline uint64_t
-get_tt_description(int host, int m_type, int d_type)
+unsigned long get_tt_description(int host, int m_type, int d_type)
 {
 	if (host)
 		return arch_host_tt_description(m_type, d_type);
@@ -140,7 +139,7 @@ static int create_page_entry(struct mapping_struct *info)
 static int create_table_entry(struct mapping_struct *info)
 {
 	size_t size, map_size;
-	uint64_t attr;
+	unsigned long attr;
 	unsigned long value, offset;
 	int ret = 0, map_type, new_page;
 	struct mapping_struct map_info;
@@ -332,7 +331,7 @@ unsigned long get_mapping_entry(unsigned long tt,
 void create_level_mapping(int lvl, unsigned long tt, unsigned long addr,
 			int mem_type, int map_type, int host)
 {
-	uint64_t attr;
+	unsigned long attr;
 	unsigned long offset;
 	struct pagetable_attr *ar = attrs[lvl];
 

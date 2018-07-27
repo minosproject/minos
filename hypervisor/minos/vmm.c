@@ -353,8 +353,9 @@ int vm_mmap(struct vm *vm, unsigned long *o, unsigned long *s)
 	unsigned long *vm_pmd;
 	struct mm_struct *mm = &vm->mm;
 	int start = 0, i, off, count;
-	unsigned long offset = *o;
+	unsigned long offset = *o, value;
 	unsigned long size = *s;
+	uint64_t attr;
 
 	offset = ALIGN(offset, MEM_BLOCK_SIZE);
 	size = BALIGN(size, MEM_BLOCK_SIZE);
@@ -366,15 +367,27 @@ int vm_mmap(struct vm *vm, unsigned long *o, unsigned long *s)
 	count = size >> MEM_BLOCK_SHIFT;
 	start = VM_MMAP_ENTRY_COUNT * vm->vmid;
 
+	/* clear the previous map */
+	memset(vm0_mmap_base + start, 0, VM_MMAP_ENTRY_COUNT);
+
 	vm_pmd = (unsigned long *)get_vm_mapping_pmd(vm, vir);
 	if (mapping_error(vm_pmd))
 		return -EIO;
 
 	off = (vir - ALIGN(vir, PMD_MAP_SIZE)) >> MEM_BLOCK_SHIFT;
 
-	/* just copy the mapping entry from other vm */
-	for (i = 0; i < count; i++)
-		*(vm0_mmap_base + start + i) = *(vm_pmd + off + i);
+	/*
+	 * map the memory as a IO memory in guest to
+	 * avoid the cache issue
+	 */
+	attr = get_tt_description(0, MEM_TYPE_IO, DESCRIPTION_BLOCK);
+
+	for (i = 0; i < count; i++) {
+		value = *(vm_pmd + off + i);
+		value &= PAGETABLE_ATTR_MASK;
+		value |= attr;
+		*(vm0_mmap_base + start + i) = attr;
+	}
 
 	flush_dcache_range((unsigned long)(vm0_mmap_base + start),
 			sizeof(unsigned long) * count);

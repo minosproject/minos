@@ -15,7 +15,7 @@
 #define OS_TYPE_SIZE		32
 
 #define VMID_HOST	(65535)
-#define VMID_INVALID	(-1)
+#define VMID_INVALID	(0)
 
 struct vcpu;
 struct os;
@@ -30,7 +30,6 @@ struct vm_info {
 	int32_t bit64;
 	uint64_t mem_size;
 	uint64_t mem_start;
-	uint64_t mem_end;
 	uint64_t entry;
 	uint64_t setup_data;
 };

@@ -21,6 +21,8 @@
 #define PTE_DES_OFFSET		(__PTE_DES_OFFSET)
 #define PTE_ENTRY_OFFSET_MASK	(__PTE_ENTRY_OFFSET_MASK)
 
+#define PAGETABLE_ATTR_MASK 	(__PAGETABLE_ATTR_MASK)
+
 #define PGD_MAP_SIZE		(1UL << PGD_RANGE_OFFSET)
 #define PUD_MAP_SIZE		(1UL << PUD_RANGE_OFFSET)
 #define PMD_MAP_SIZE		(1UL << PMD_RANGE_OFFSET)
@@ -56,6 +58,8 @@ unsigned long get_mapping_entry(unsigned long tt,
 
 void create_level_mapping(int lvl, unsigned long tt, unsigned long addr,
 		int mem_type, int map_type, int host);
+
+unsigned long get_tt_description(int host, int m_type, int d_type);
 
 static inline unsigned long
 get_mapping_pte(unsigned long tt, unsigned long vir, int host)
