@@ -9,9 +9,23 @@
 #define MINOS_IOCTL_MMAP		(0xf006)
 #define MINOS_IOCTL_UNMMAP		(0xf007)
 
+/*
+ * MVM_FLAGS_NO_RAMDISK - used for linux to indicate
+ * that the system has no ramdisk image
+ */
+#define MVM_FLAGS_NO_RAMDISK		(1 << 0)
+
+extern int verbose;
+
+#define printv(fmt, arg...)	\
+	do {			\
+		if (verbose)	\
+			printf(fmt, ##arg); \
+	} while (0)
+
 struct vm_info {
-	int8_t name[32];
-	int8_t os_type[32];
+	char name[32];
+	char os_type[32];
 	int32_t nr_vcpus;
 	int32_t bit64;
 	uint64_t mem_size;
@@ -20,7 +34,32 @@ struct vm_info {
 	uint64_t setup_data;
 };
 
+struct vm;
+
+struct vm_os {
+	char *name;
+	int (*early_init)(struct vm *vm);
+	int (*load_image)(struct vm *vm);
+	int (*setup_vm_env)(struct vm *vm);
+};
+
+/*
+ * vmid	 : vmid allocated by hypervisor
+ * flags : some flags of this vm
+ * os	 : the os of this vm
+ */
+struct vm {
+	int vmid;
+	int vm_fd;
+	int image_fd;
+	unsigned long flags;
+	struct vm_info vm_info;
+	struct vm_os *os;
+	void *os_data;
+};
+
 #define VM_MEM_START			(0x80000000UL)
+#define VM_MIN_MEM_SIZE			(32 * 1024 * 1024)
 #define MEM_BLOCK_SIZE			(0x200000)
 #define MEM_BLOCK_SHIFT			(21)
 #define VM_MAX_MMAP_SIZE		(MEM_BLOCK_SIZE * 8)
@@ -30,5 +69,7 @@ struct vm_info {
 	((v + MEM_BLOCK_SIZE - 1) & ~(MEM_BLOCK_SIZE - 1))
 
 #define VM_MAX_VCPUS			(2)
+
+void *map_vm_memory(int fd, uint64_t offset, uint64_t *size);
 
 #endif

@@ -19,7 +19,7 @@ TARGET := mvm
 
 CCFLAG := -Wall --static -march=armv8-a -I$(PWD)/include
 
-src	:= mvm.c bootimage.c
+src	:= mvm.c bootimage.c os_linux.c os_other.c
 src	+= libfdt/fdt_addresses.c libfdt/fdt.c libfdt/fdt_empty_tree.c
 src	+= libfdt/fdt_ro.c libfdt/fdt_rw.c libfdt/fdt_strerror.c
 src	+= libfdt/fdt_sw.c libfdt/fdt_wip.c
@@ -40,5 +40,4 @@ $(TARGET) : $(objs)
 .PHONY: clean
 
 clean:
-	@ echo rm objs and $(TARGET)
-	$(QUIET) rm $(TARGET) $(objs)
+	rm -rf $(TARGET) $(objs)

@@ -22,10 +22,19 @@
 #include <getopt.h>
 
 #include <mvm/mvm.h>
-#include <mvm/bootimage.h>
-#include <libfdt/libfdt.h>
 
-static int no_ramdisk = 0;
+struct vm *mvm_vm = NULL;
+
+int verbose;
+
+extern struct vm_os os_other;
+extern struct vm_os os_linux;
+
+static struct vm_os *vm_oses[] = {
+	&os_other,
+	&os_linux,
+	NULL,
+};
 
 void *map_vm_memory(int fd, uint64_t offset, uint64_t *size)
 {
@@ -51,7 +60,8 @@ void *map_vm_memory(int fd, uint64_t offset, uint64_t *size)
 	vbase = mmap(0, args[1], PROT_READ | PROT_WRITE,
 			MAP_HUGETLB, mem_fd, args[0]);
 	if (!vbase) {
-		printf("mmap memory failed\n");
+		printf("* error - mmap memory failed 0x%lx 0x%lx\n",
+				offset, *size);
 		return NULL;
 	}
 
@@ -59,7 +69,7 @@ void *map_vm_memory(int fd, uint64_t offset, uint64_t *size)
 	return vbase;
 }
 
-int create_new_vm(struct vm_info *vminfo)
+static int create_new_vm(struct vm_info *vminfo)
 {
 	int fd, vmid = -1;
 
@@ -68,6 +78,16 @@ int create_new_vm(struct vm_info *vminfo)
 		perror("/dev/mvm/mvm0");
 		return -EIO;
 	}
+
+	printv("* create new vm *");
+	printv("        -name       : %s\n", vminfo->name);
+	printv("        -os_type    : %s\n", vminfo->os_type);
+	printv("        -nr_vcpus   : %d\n", vminfo->nr_vcpus);
+	printv("        -bit64      : %d\n", vminfo->bit64);
+	printv("        -mem_size   : 0x%lx\n", vminfo->mem_size);
+	printv("        -mem_start  : 0x%lx\n", vminfo->mem_start);
+	printv("        -entry      : 0x%lx\n", vminfo->entry);
+	printv("        -setup_data : 0x%lx\n", vminfo->setup_data);
 
 	vmid = ioctl(fd, MINOS_IOCTL_CREATE_VM, vminfo);
 	if (vmid <= 0) {
@@ -80,219 +100,125 @@ int create_new_vm(struct vm_info *vminfo)
 	return vmid;
 }
 
-int destory_vm(int vmid)
+static int release_vm(int fd)
 {
+	return ioctl(fd, MINOS_IOCTL_DESTORY_VM, NULL);
+}
+
+int destory_vm(struct vm *vm)
+{
+	if (!vm)
+		return -EINVAL;
+
+	if (vm->vmid)
+		release_vm(vm->vm_fd);
+
+	if (vm->vm_fd)
+		close(vm->vm_fd);
+
+	if (vm->image_fd)
+		close(vm->image_fd);
+
+	if (vm->os_data)
+		free(vm->os_data);
+
+	free(vm);
+
 	return 0;
 }
 
 void print_usage(void)
 {
 	fprintf(stderr, "\nUsage: mvm [options] \n\n");
-	fprintf(stderr, "    -c <vcpu_count>		(set the vcpu numbers of the vm)\n");
-	fprintf(stderr, "    -m <mem_size_in_MB>	(set the memsize of the vm - 2M align)\n");
+	fprintf(stderr, "    -c <vcpu_count>            (set the vcpu numbers of the vm)\n");
+	fprintf(stderr, "    -m <mem_size_in_MB>        (set the memsize of the vm - 2M align)\n");
 	fprintf(stderr, "    -i <boot or kernel image>  (the kernel or bootimage to use)\n");
-	fprintf(stderr, "    -s <mem_start>		(set the membase of the vm if not a boot.img)\n");
-	fprintf(stderr, "    -n <vm name>		(the name of the vm)\n");
-	fprintf(stderr, "    -t <vm type>		(the os type of the vm )\n");
-	fprintf(stderr, "    -b <32 or 64>		(32bit or 64 bit )\n");
-	fprintf(stderr, "    -r				(do not load ramdisk image)\n");
+	fprintf(stderr, "    -s <mem_start>             (set the membase of the vm if not a boot.img)\n");
+	fprintf(stderr, "    -n <vm name>               (the name of the vm)\n");
+	fprintf(stderr, "    -t <vm type>               (the os type of the vm )\n");
+	fprintf(stderr, "    -b <32 or 64>              (32bit or 64 bit )\n");
+	fprintf(stderr, "    -r                         (do not load ramdisk image)\n");
+	fprintf(stderr, "    -v                         (verbose print debug information)\n");
 	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);
 }
 
-static int load_image(int vm_fd, int image_fd, uint32_t load_offset,
-		uint32_t image_offset, uint64_t mem_offset, uint32_t load_size)
+static int create_and_init_vm(struct vm *vm)
 {
 	int ret;
-	uint32_t w_size;
-	void *vbase;
-	uint64_t offset = mem_offset, size;
-
-	size = VM_MAX_MMAP_SIZE;
-
-	if (lseek(image_fd, image_offset, SEEK_SET) == -1)
-		return -EIO;
-
-	while (load_size > 0) {
-		vbase = map_vm_memory(vm_fd, offset, &size);
-		if (vbase == 0) {
-			printf("map guest memory failed\n");
-			return -ENOMEM;
-		}
-
-		printf("map guest memory successed 0x%lx 0x%lx\n",
-				(unsigned long)vbase, size);
-
-		w_size = load_size > size ? size : load_size;
-		ret = read(image_fd, (char *)(vbase + load_offset), w_size);
-		if (ret != w_size)
-			return -EIO;
-
-		load_size -= w_size;
-		offset += size;
-		load_offset = 0;
-		printf("load image 0x%x size remain:0x%x",
-				w_size, load_size);
-	}
-
-	return 0;
-}
-
-static int load_boot_image(int vm_fd, int image_fd,
-		struct vm_info *info, boot_img_hdr *hdr)
-{
-	int ret;
-	uint64_t offset;
-	uint32_t load_size, load_offset, seek, tmp;
-
-	/*
-	 * map vm memory to vm0 space and using mmap
-	 * to map them into vm0 userspace, 16M is the
-	 * max map size supported now.
-	 */
-
-	/* load the kernel image to guest memory */
-	offset = hdr->kernel_addr - info->mem_start;
-	offset = MEM_BLOCK_ALIGN(offset);
-	load_offset = hdr->kernel_addr - offset;
-	load_size = hdr->kernel_size;
-	tmp = 1;
-	seek = tmp* hdr->page_size;
-
-	printf("load kernel image: 0x%lx 0x%x 0x%x 0x%x\n",
-			offset, load_offset, seek, load_size);
-
-	ret = load_image(vm_fd, image_fd, load_offset,
-			seek, offset, load_size);
-	if (ret) {
-		printf("load kernel image failed\n");
-		return ret;
-	}
-
-	tmp += (hdr->kernel_size + hdr->page_size - 1) / hdr->page_size;
-
-	/* load the ramdisk image */
-	if (no_ramdisk)
-		goto load_dtb_image;
-
-	offset = hdr->ramdisk_addr - info->mem_start;
-	offset = MEM_BLOCK_ALIGN(offset);
-	load_offset = hdr->ramdisk_addr - offset;
-	load_size = hdr->ramdisk_size;
-	seek = tmp * hdr->page_size;
-
-	printf("load ramdisk image: 0x%lx 0x%x 0x%x 0x%x\n",
-			offset, load_offset, seek, load_size);
-	ret = load_image(vm_fd, image_fd, load_offset,
-			seek, offset, load_size);
-	if (ret) {
-		printf("load ramdisk image failed\n");
-		return ret;
-	}
-
-load_dtb_image:
-	tmp += (hdr->ramdisk_size + hdr->page_size - 1) / hdr->page_size;
-	offset = hdr->ramdisk_addr - info->mem_start;
-	offset = MEM_BLOCK_ALIGN(offset);
-	load_offset = hdr->second_addr - offset;
-	load_size = hdr->second_size;
-	seek = tmp * hdr->page_size;
-
-	printf("load dtb image: 0x%lx 0x%x 0x%x 0x%x\n",
-			offset, load_offset, seek, load_size);
-	ret = load_image(vm_fd, image_fd, load_offset,
-			seek, offset, load_size);
-	if (ret) {
-		printf("load dtb image failed\n");
-		return ret;
-	}
-
-	return 0;
-}
-
-static int dts_setup_commandline(void *dtb, char *cmdline)
-{
-	int nodeoffset;
-
-	nodeoffset = fdt_path_offset(dtb, "/chosen");
-	if (nodeoffset < 0) {
-		nodeoffset = fdt_add_subnode(dtb, 0, "chosen");
-		if (nodeoffset < 0)
-			return nodeoffset;
-	}
-
-	fdt_setprop(dtb, nodeoffset, "bootargs",
-			cmdline, strlen(cmdline) + 1);
-
-	return 0;
-}
-
-static int dts_setup_cpu(void *dtb, int vcpus)
-{
-	return 0;
-}
-
-static int dts_setup_memory(void *dtb, uint64_t mstart,
-		uint64_t msize, int bit64)
-{
-	int offset;
-
-	offset = fdt_path_offset(dtb, "/memory");
-	if (offset < 0) {
-		offset = fdt_add_subnode(dtb, 0, "memory");
-		if (offset < 0)
-			return offset;
-	}
-
-	return 0;
-}
-
-static int setup_vm_dts(int vm_fd, struct vm_info *info, boot_img_hdr *hdr)
-{
-	uint32_t dtb_hear_offset;
-	void *vbase;
-	uint64_t size;
-	uint32_t offset, dtb_size, dtb_addr;
-
-	dtb_size = hdr->second_size;
-	dtb_addr = hdr->second_addr;
-
-	offset = dtb_addr - info->mem_start;
-	offset = MEM_BLOCK_ALIGN(offset);
-	dtb_hear_offset = dtb_addr - offset;
-	size = MEM_BLOCK_BALIGN(dtb_size);
-
-	vbase = map_vm_memory(vm_fd, offset, &size);
-	if (vbase == 0)
-		return -ENOMEM;
-
-	vbase += dtb_hear_offset;
-
-	printf("checking DTB header at 0x%lx\n", (unsigned long)vbase);
-
-	if (fdt_check_header(vbase)) {
-		printf("invalid DTB please check the bootimage\n");
-		return -EINVAL;
-	}
-
-	/*
-	 * 1: set up commandline
-	 * 2: set up nr vcpu
-	 * 3: setup mem attr
-	 */
-	dts_setup_commandline(vbase, (char *)hdr->cmdline);
-	dts_setup_cpu(vbase, info->nr_vcpus);
-	dts_setup_memory(vbase, info->mem_start,
-			info->mem_size, info->bit64);
-
-	return 0;
-}
-
-static int main_loop(struct vm_info *info, char *image_path)
-{
-	boot_img_hdr *hdr;
 	char path[32];
-	int image_fd, ret, vm_fd, vmid;
+	struct vm_info *info = &vm->vm_info;
+
+	/* set the default value of vm_info if not give */
+	if (info->entry == 0)
+		info->entry = VM_MEM_START;
+	if (info->mem_start == 0)
+		info->entry = VM_MEM_START;
+	if (info->mem_size == 0)
+		info->mem_size = VM_MIN_MEM_SIZE;
+	if (info->nr_vcpus == 0)
+		info->nr_vcpus = 1;
+
+	vm->vmid = create_new_vm(info);
+	if (vm->vmid <= 0)
+		return (vm->vmid);
+
+	memset(path, 0, 32);
+	sprintf(path, "/dev/mvm/mvm%d", vm->vmid);
+	vm->vm_fd = open(path, O_RDWR | O_NONBLOCK);
+	if (vm->vm_fd < 0) {
+		perror(path);
+		return -EIO;
+	}
+
+	/* load the image into the vm memory */
+	ret = vm->os->load_image(vm);
+	if (ret)
+		return ret;
+
+	ret = vm->os->setup_vm_env(vm);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static struct vm_os *get_vm_os(char *os_type)
+{
+	int i;
+	struct vm_os *os = NULL;
+	struct vm_os *default_os = NULL;
+
+	for (i = 0; ; i++) {
+		os = vm_oses[i];
+		if (!os)
+			break;
+
+		if (strcmp(os_type, os->name) == 0)
+			return os;
+
+		if (strcmp("default", os->name) == 0)
+			default_os = os;
+	}
+
+	return default_os;
+}
+
+static int mvm_main(struct vm_info *info, char *image_path, unsigned long flags)
+{
+	int image_fd, ret;
+	struct vm_os *os;
+
+	if (info->name[0] == 0)
+		strcpy(info->name, "unknown");
+	if (info->os_type[0] == 0)
+		strcpy(info->os_type, "unknown");
+
+	os = get_vm_os(info->os_type);
+	if (!os)
+		return -EINVAL;
+
+	printv("* target vm os type - %s\n", os->name);
 
 	/* read the image to get the entry and other args */
 	image_fd = open(image_path, O_RDWR | O_NONBLOCK);
@@ -301,52 +227,43 @@ static int main_loop(struct vm_info *info, char *image_path)
 		return -ENOENT;
 	}
 
-	hdr = (boot_img_hdr *)malloc(sizeof(boot_img_hdr));
-	if (!hdr)
+	mvm_vm = malloc(sizeof(struct vm));
+	if (!mvm_vm) {
+		close(image_fd);
 		return -ENOMEM;
+	}
 
-	ret = read_bootimage_header(image_fd, hdr);
+	memset(mvm_vm, 0, sizeof(struct vm));
+	mvm_vm->os = os;
+	mvm_vm->image_fd = image_fd;
+	mvm_vm->flags = flags;
+	memcpy(&mvm_vm->vm_info, info, sizeof(struct vm_info));
+
+	/* free the unused memory */
+	free(info);
+	free(image_path);
+
+	ret = os->early_init(mvm_vm);
 	if (ret) {
-		printf("%s is not a vaild bootimage\n", image_path);
-		goto free_hdr;
+		printf("* error - os early init faild %d\n", ret);
+		goto release_vm;
 	}
 
-	info->entry = hdr->kernel_addr;
-	info->setup_data = hdr->second_addr;
-	info->mem_start = info->entry & ~(0x200000 - 1);
+	/* ensure the below field is not modified */
+	mvm_vm->vmid = 0;
+	mvm_vm->vm_fd = -1;
 
-	vmid = create_new_vm(info);
-	if (vmid <= 0)
-		goto close_fd;
-
-	memset(path, 0, 32);
-	sprintf(path, "/dev/mvm/mvm%d", vmid);
-	vm_fd = open(path, O_RDWR | O_NONBLOCK);
-	if (vm_fd < 0) {
-		perror(path);
-		ret =-ENOENT;
-		goto destory_vm;
-	}
-
-	ret = load_boot_image(vm_fd, image_fd, info, hdr);
+	ret = create_and_init_vm(mvm_vm);
 	if (ret)
-		goto destory_vm;
+		goto release_vm;
 
-	/*
-	 * do other setup things
-	 */
-	setup_vm_dts(vm_fd, info, hdr);
-
+	/* do loop */
 	while (1) {
 
 	}
 
-destory_vm:
-	destory_vm(vmid);
-close_fd:
-	close(image_fd);
-free_hdr:
-	free(hdr);
+release_vm:
+	destory_vm(mvm_vm);
 	return ret;
 }
 
@@ -372,11 +289,11 @@ static int parse_vm_memsize(char *buf, uint64_t *size)
 
 	len = strlen(buf) - 1;
 
-	if ((buf[len] = 'm') && (buf[len] != 'M'))
+	if ((buf[len] != 'm') && (buf[len] != 'M'))
 		return -EINVAL;
 
 	buf[len] = '\0';
-	*size = atol(buf);
+	*size = atol(buf) * 1024 * 1024;
 
 	return 0;
 }
@@ -397,21 +314,21 @@ static int parse_vm_membase(char *buf, unsigned long *value)
 int main(int argc, char **argv)
 {
 	int ret, opt, idx;
-	struct vm_info *info;
-	char *image_path;
+	struct vm_info *info = NULL;
+	char *image_path = NULL;
 	char *optstr = "c:m:i:s:n:t:b:?h";
+	unsigned long flags = 0;
 
 	info = (struct vm_info *)malloc(sizeof(struct vm_info));
 	if (!info)
 		return -ENOMEM;
 
-	image_path = malloc(256);
-	if (!image_path) {
-		free(info);
-		return -ENOMEM;
-	}
+	/*
+	 * default is 64 bit, 1 vcpus and 32M memory
+	 */
+	memset(info, 0, sizeof(struct vm_info));
+	info->bit64 = 1;
 
-	memset(&info, 0, sizeof(struct vm_info));
 	while ((opt = getopt_long(argc, argv, optstr, options, &idx)) != -1) {
 		switch(opt) {
 		case 'c':
@@ -423,6 +340,12 @@ int main(int argc, char **argv)
 				print_usage();
 			break;
 		case 'i':
+			image_path = malloc(256);
+			if (!image_path) {
+				free(info);
+				return -ENOMEM;
+			}
+
 			strcpy(image_path, optarg);
 			break;
 		case 's':
@@ -443,7 +366,7 @@ int main(int argc, char **argv)
 			info->bit64 = ret == 64 ? 1 : 0;
 			break;
 		case 'r':
-			no_ramdisk = 1;
+			flags |= MVM_FLAGS_NO_RAMDISK;
 			break;
 		case 'h':
 			print_usage();
@@ -451,16 +374,15 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (info->nr_vcpus > VM_MAX_VCPUS)
-		info->nr_vcpus = VM_MAX_VCPUS;
-
-	ret = main_loop(info, image_path);
-	if (ret) {
-		perror("run vm failed\n");
-		free(info);
-		free(image_path);
-		return ret;
+	if (!image_path) {
+		printf("* error - please point the image for this VM\n");
+		return -1;
 	}
 
-	return 0;
+	if (info->nr_vcpus > VM_MAX_VCPUS) {
+		printf("* warning - support max %d vcpus\n", VM_MAX_VCPUS);
+		info->nr_vcpus = VM_MAX_VCPUS;
+	}
+
+	return mvm_main(info, image_path, flags);
 }

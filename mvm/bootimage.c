@@ -20,7 +20,7 @@ static void dump_bootimg_hdr(boot_img_hdr *hdr)
 	memset(buf, 0, 1024);
 	strncpy(buf, (char *)hdr->magic, BOOT_MAGIC_SIZE);
 
-	printf("magic        - %s", buf);
+	printf("magic        - %s\n", buf);
 	printf("kernel_size  - 0x%x\n", hdr->kernel_size);
 	printf("kernel_addr  - 0x%x\n", hdr->kernel_addr);
 	printf("ramdisk_size - 0x%x\n", hdr->ramdisk_size);
