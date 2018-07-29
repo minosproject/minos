@@ -18,7 +18,7 @@
 #ifndef __MVM_BOOTIMAGE_H__
 #define __MVM_BOOTIMAGE_H__
 
-#define BOOT_MAGIC		"MINOSVM!"
+#define BOOT_MAGIC		"ANDROID!"
 #define BOOT_MAGIC_SIZE		(8)
 #define BOOT_NAME_SIZE		(16)
 #define BOOT_ARGS_SIZE		(512)

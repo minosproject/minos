@@ -58,8 +58,8 @@ void *map_vm_memory(int fd, uint64_t offset, uint64_t *size)
 	}
 
 	vbase = mmap(0, args[1], PROT_READ | PROT_WRITE,
-			MAP_HUGETLB, mem_fd, args[0]);
-	if (!vbase) {
+			MAP_SHARED | MAP_HUGETLB, mem_fd, args[0]);
+	if (vbase == (void *)-1) {
 		printf("* error - mmap memory failed 0x%lx 0x%lx\n",
 				offset, *size);
 		return NULL;
@@ -316,7 +316,7 @@ int main(int argc, char **argv)
 	int ret, opt, idx;
 	struct vm_info *info = NULL;
 	char *image_path = NULL;
-	char *optstr = "c:m:i:s:n:t:b:?h";
+	char *optstr = "c:m:i:s:n:t:b:rv?h";
 	unsigned long flags = 0;
 
 	info = (struct vm_info *)malloc(sizeof(struct vm_info));
@@ -367,6 +367,9 @@ int main(int argc, char **argv)
 			break;
 		case 'r':
 			flags |= MVM_FLAGS_NO_RAMDISK;
+			break;
+		case 'v':
+			verbose = 1;
 			break;
 		case 'h':
 			print_usage();
