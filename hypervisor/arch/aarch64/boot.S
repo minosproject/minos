@@ -80,6 +80,7 @@ _start:
 
 	.global drop_to_el2
 drop_to_el2:
+	mov	x0, #0x83e00000		// x0 is the dtb memory
 	adr	x1, el2_entry_aarch64
 	msr	ELR_EL3, X1
 	mov	x1, #(AARCH64_SPSR_EL2h | \
@@ -92,6 +93,7 @@ drop_to_el2:
 	.global el2_entry_aarch64
 	.type el2_entry_aarch64, "function"
 el2_entry_aarch64:
+	mov	x27, x0			//back up dtb address
 	ldr	x1, =el2_vectors
 	msr	VBAR_EL2, x1
 
@@ -251,6 +253,7 @@ el2_entry_aarch64:
 	bl	uart_init
 	nop
 
+	mov	x0, x27		//restore the dtb address
 	bl	boot_main
 	nop
 

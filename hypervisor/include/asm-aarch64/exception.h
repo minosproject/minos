@@ -176,7 +176,7 @@ struct esr_dabt {
 	unsigned long cache:1; /* Cache Maintenance */
 	unsigned long eat:1;   /* External Abort Type */
 	unsigned long fnv:1;   /* FAR not Valid */
-#ifdef CONFIG_ARM_AARCH32
+#ifdef ARM_AARCH32
 	unsigned long sbzp0:5;
 #else
 	unsigned long sbzp0:3;
@@ -204,7 +204,7 @@ struct esr_xabt {
 	unsigned long ec:6;     /* Exception Class */
 };
 
-#ifdef CONFIG_ARM_AARCH64
+#ifdef ARM_AARCH64
 struct esr_brk {
 	unsigned long comment:16;   /* Comment */
         unsigned long res0:9;
