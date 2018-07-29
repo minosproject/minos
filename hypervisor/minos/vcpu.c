@@ -439,10 +439,10 @@ int create_static_vms(void)
 	pr_info("found %d VMs config\n", mv_config->nr_vmtag);
 
 	for (i = 0; i < mv_config->nr_vmtag; i++) {
-		vm = create_vm(&vmtags[i]);
+		set_bit(vmtags[i].vmid, vmid_bitmap);
+		vm = __create_vm(&vmtags[i]);
 		if (!vm) {
-			pr_error("create %d VM:%s failed\n",
-					vm->vmid, vmtags[i].name);
+			pr_error("create %d VM:%s failed\n", vmtags[i].name);
 			continue;
 		}
 
