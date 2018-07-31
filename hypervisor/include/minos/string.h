@@ -25,6 +25,8 @@ void *memcpy(void *dest, const void *src, size_t n);
 void *memchr(const void *s, int c, size_t n);
 int vsprintf(char *buf, const char *fmt, va_list arg);
 int sprintf(char *str, const char *format, ...);
+char *strrchr(const char *s, int c);
+unsigned long strtoul(const char *cp, char **endp, unsigned int base);
 
 static inline int is_digit(char ch)
 {

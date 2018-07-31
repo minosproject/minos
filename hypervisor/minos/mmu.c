@@ -161,7 +161,7 @@ static int create_table_entry(struct mapping_struct *info)
 			config->range_offset;
 		value = *(tbase + offset);
 
-		if (value == 0) {
+		if (!value) {
 			value = (unsigned long)
 				info->get_free_pages(1, info->data);
 			if (!value)

@@ -364,3 +364,34 @@ void memset(char *base, char ch, int size)
 	}
 }
 #endif
+
+#define TOLOWER(x)	((x) | 0x20)
+
+#define isdigit(ch)	((ch >= '0') && (ch <= '9'))
+#define isxdigit(ch)	(isdigit(ch) || ((ch >= 'a') && (ch <= 'f')))
+
+unsigned long strtoul(const char *cp, char **endp, unsigned int base)
+{
+	unsigned long result = 0;
+
+	if (!base)
+		base = 10;
+
+	if (base == 16 && cp[0] == '0' && TOLOWER(cp[1]) == 'x')
+		cp += 2;
+
+	while (isxdigit(*cp)) {
+		unsigned int value;
+
+		value = isdigit(*cp) ? *cp - '0' : TOLOWER(*cp) - 'a' + 10;
+		if (value >= base)
+			break;
+		result = result * base + value;
+		cp++;
+	}
+
+	if (endp)
+		*endp = (char *)cp;
+
+	return result;
+}

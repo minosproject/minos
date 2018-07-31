@@ -160,12 +160,18 @@ el2_entry_aarch64:
 	bl	memset
 	ldr	x21, = __el2_ttb0_pud
 	mov	x0, x21
+	mov	x1, #0
+	mov	x2, #4096
 	bl	memset
 	ldr	x23, = __el2_ttb0_pmd_code
 	mov	x0, x23
+	mov	x1, #0
+	mov	x2, #4096
 	bl	memset
 	ldr	x24, = __el2_ttb0_pmd_io
 	mov	x0, x24
+	mov	x1, #0
+	mov	x2, #4096
 	bl	memset
 
 	ldr	x7, =0x1fffff
