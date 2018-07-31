@@ -255,6 +255,12 @@ static int mvm_vm_mmap(struct file *file, struct vm_area_struct *vma)
 	vma->vm_pgoff = 0;
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
+	/*
+	 * maped as a IO memory to usersapce, on arm64, there
+	 * will be a issue when the address is not 4byte or 8bytes
+	 * align, if using memcpy, there will be alignmeng fault
+	 * error. -- To Be Fix ---
+	 */
 	if (vm_iomap_memory(vma, vm->pmem_map, vma->vm_page_prot)) {
 		pr_err("map vm-%d memory to userspace failed\n", vm->vmid);
 		return -EAGAIN;

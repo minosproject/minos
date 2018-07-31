@@ -119,9 +119,9 @@ static int fdt_setup_memory(void *dtb, uint64_t mstart,
 	for (i = 0; i < offset; i++)
 		fdt_del_mem_rsv(dtb, 0);
 
-	printv("* add rsv memory region : 0x%lx 0x%lx\n",
-			mstart, msize);
-	fdt_add_mem_rsv(dtb, mstart, 0x100000);
+	printv("* add rsv memory region : 0x%lx 0x%x\n",
+			mstart, 0x10000);
+	fdt_add_mem_rsv(dtb, mstart, 0x10000);
 
 	memset(buf, 0, 64);
 	sprintf(buf, "memory@%lx", mstart);
@@ -180,37 +180,52 @@ static int linux_setup_env(struct vm *vm)
 {
 	int ret;
 	void *vbase;
-	uint32_t dtb_header_offset;
-	uint32_t size;
-	uint32_t offset, dtb_size, dtb_addr;
-	int vm_fd = vm->vm_fd;
+	uint32_t pages, seek, offset, load_offset, load_size;
 	struct vm_info *info = &vm->vm_info;
 	boot_img_hdr *hdr = (boot_img_hdr *)vm->os_data;
 
-	dtb_size = hdr->second_size;
-	dtb_addr = hdr->second_addr;
+	if (hdr->second_size == 0)
+		return -EINVAL;
 
-	offset = dtb_addr - info->mem_start;
-	offset = MEM_BLOCK_ALIGN(offset);
-	dtb_header_offset = dtb_addr - offset - info->mem_start;
-	size = MEM_BLOCK_BALIGN(dtb_size);
+	pages = BALIGN(hdr->kernel_size, hdr->page_size) +
+		BALIGN(hdr->ramdisk_size, hdr->page_size);
+	pages = (pages / hdr->page_size) + 1;
+	seek = pages * hdr->page_size;
+	load_size = BALIGN(hdr->second_size, hdr->page_size);
+	offset = MEM_BLOCK_ALIGN(hdr->second_addr - info->mem_start);
+	load_offset = hdr->second_addr - offset - info->mem_start;
 
-	printf("0x%x 0x%x 0x%x\n", offset, dtb_header_offset, size);
-	ret = map_vm_memory(vm_fd, offset, size);
-	if (ret)
+	printv("0x%x 0x%x 0x%x 0x%x\n", seek, load_size,
+			offset, load_offset);
+
+	if (lseek(vm->image_fd, seek, SEEK_SET) == -1)
+		return -EIO;
+
+	/*
+	 * the max size of dtb region is 2M
+	 */
+	vbase = malloc(MEM_BLOCK_SIZE);
+	if (!vbase)
 		return -ENOMEM;
 
-	vbase = vm->mmap + dtb_header_offset;
+	ret = read(vm->image_fd, vbase, load_size);
+	if (ret <= 0) {
+		printf("* error - read dtb image failed\n");
+		ret = -EIO;
+		goto free_mem;
+	}
 
 	if (fdt_check_header(vbase)) {
 		printf("* error - invalid DTB please check the bootimage\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto free_mem;
 	}
 
-	fdt_open_into(vbase, vbase, 0x100000);
+	fdt_open_into(vbase, vbase, 0x200000);
 	if (fdt_check_header(vbase)) {
 		printf("* error - invalid DTB after open into\n");
-		return -EINVAL;
+		ret = -EINVAL;
+		goto free_mem;
 	}
 
 	/*
@@ -219,7 +234,6 @@ static int linux_setup_env(struct vm *vm)
 	 * 3: setup mem attr
 	 */
 	fdt_setup_commandline(vbase, (char *)hdr->cmdline);
-	fdt_setup_commandline(vbase, "this is test for libfdt");
 	fdt_setup_cpu(vbase, info->nr_vcpus);
 	fdt_setup_memory(vbase, info->mem_start,
 			info->mem_size, info->bit64);
@@ -227,9 +241,24 @@ static int linux_setup_env(struct vm *vm)
 	if (!(vm->flags & (MVM_FLAGS_NO_RAMDISK)))
 		fdt_setup_ramdisk(vbase, hdr->ramdisk_addr,
 				hdr->ramdisk_size);
-
 	fdt_pack(vbase);
-	return 0;
+
+	/*
+	 * copy the new fdt to dtb addr, since max size
+	 * is 2M, so map one time.
+	 */
+	ret = map_vm_memory(vm->vm_fd, offset, MEM_BLOCK_SIZE);
+	if (ret) {
+		printf("* error - map dtb memory failed\n");
+		goto free_mem;
+	}
+
+	ret = 0;
+	memcpy(vm->mmap + load_offset, vbase, MEM_BLOCK_SIZE);
+
+free_mem:
+	free(vbase);
+	return ret;
 }
 
 static int load_image(struct vm *vm, uint32_t load_offset,
@@ -301,7 +330,7 @@ static int linux_load_image(struct vm *vm)
 
 	/* load the ramdisk image */
 	if (vm->flags & (MVM_FLAGS_NO_RAMDISK))
-		goto load_dtb_image;
+		return 0;
 
 	offset = MEM_BLOCK_ALIGN(hdr->ramdisk_addr - info->mem_start);
 	load_offset = hdr->ramdisk_addr - offset - info->mem_start;
@@ -313,21 +342,6 @@ static int linux_load_image(struct vm *vm)
 	ret = load_image(vm, load_offset, seek, offset, load_size);
 	if (ret) {
 		perror("* error - load ramdisk image failed\n");
-		return ret;
-	}
-
-load_dtb_image:
-	tmp += (hdr->ramdisk_size + hdr->page_size - 1) / hdr->page_size;
-	offset = MEM_BLOCK_ALIGN(hdr->second_addr - info->mem_start);
-	load_offset = hdr->second_addr - offset - info->mem_start;
-	load_size = hdr->second_size;
-	seek = tmp * hdr->page_size;
-
-	printv("* load dtb image: 0x%x 0x%x 0x%x 0x%x\n",
-			offset, load_offset, seek, load_size);
-	ret = load_image(vm, load_offset, seek, offset, load_size);
-	if (ret) {
-		perror("* error - load dtb image failed\n");
 		return ret;
 	}
 

@@ -69,11 +69,14 @@ struct vm {
 #define MEM_BLOCK_SHIFT			(21)
 #define VM_MAX_MMAP_SIZE		(MEM_BLOCK_SIZE * 8)
 
+#define ALIGN(v, s)			((v) & ~((s) - 1))
+#define BALIGN(v, s)			(((v) + (s) - 1) & ~((s) - 1))
+
 #define MEM_BLOCK_ALIGN(v)		((v) & ~(MEM_BLOCK_SIZE - 1))
 #define MEM_BLOCK_BALIGN(v) \
 	(((v) + MEM_BLOCK_SIZE - 1) & ~(MEM_BLOCK_SIZE - 1))
 
-#define VM_MAX_VCPUS			(2)
+#define VM_MAX_VCPUS			(4)
 
 int map_vm_memory(int fd, uint64_t offset, uint64_t size);
 
