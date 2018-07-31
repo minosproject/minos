@@ -92,7 +92,8 @@ static inline void create_host_level_mapping(int lvl, unsigned long tt,
 	create_level_mapping(lvl, tt, value, MEM_TYPE_NORMAL, map_type, 1);
 }
 
-int vm_mmap(struct vm *vm, unsigned long *offset, unsigned long *size);
+unsigned long get_vm_mmap_info(int vmid, unsigned long *size);
+int vm_mmap(struct vm *vm, unsigned long offset, unsigned long size);
 void vm_unmmap(struct vm *vm);
 
 #endif

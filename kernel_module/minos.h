@@ -27,15 +27,19 @@
 #define HVC_VM_POWER_UP			HVC_VM_FN(3)
 #define HVC_VM_POWER_DOWN		HVC_VM_FN(4)
 #define HVC_VM_MMAP			HVC_VM_FN(5)
-#define HVC_VM_UNMMAP			HVC_VM_FN(6)
+#define HVC_VM_UNMAP			HVC_VM_FN(6)
+#define HVC_VM_GET_MMAP_INFO		HVC_VM_FN(7)
 
-#define MINOS_IOCTL_CREATE_VM		(0xf001)
-#define MINOS_IOCTL_DESTORY_VM		(0xf002)
-#define MINOS_IOCTL_RESTART_VM		(0xf003)
-#define MINOS_IOCTL_POWER_DOWN_VM	(0xf004)
-#define MINOS_IOCTL_POWER_UP_VM		(0xf005)
-#define MINOS_IOCTL_MMAP		(0xf006)
-#define MINOS_IOCTL_UNMMAP		(0xf007)
+#define IOCTL_CREATE_VM			(0xf000)
+#define IOCTL_DESTORY_VM		(0xf001)
+#define IOCTL_RESTART_VM		(0xf002)
+#define IOCTL_POWER_DOWN_VM		(0xf003)
+#define IOCTL_POWER_UP_VM		(0xf004)
+#define IOCTL_VM_MMAP			(0xf005)
+#define IOCTL_VM_UNMAP			(0xf006)
+#define IOCTL_VM_MMAP_INFO		(0xf007)
+
+#define IOCTL_GET_VM_MAP_SIZE		(0xf100)
 
 #define MINOS_VM_MAX			(64)
 
@@ -54,6 +58,9 @@ struct vm_info {
 struct vm_device {
 	int vmid;
 	atomic_t opened;
+	phys_addr_t pmem_map;
+	void __iomem *vmem_map;
+	unsigned long map_size;
 	struct list_head list;
 	struct vm_info vm_info;
 	struct device *parent;
@@ -61,7 +68,7 @@ struct vm_device {
 	struct file_operations *fops;
 };
 
-extern int __minos_hvc(uint32_t id, unsigned long a0,
+extern unsigned long __minos_hvc(uint32_t id, unsigned long a0,
 		unsigned long a1, unsigned long a2, unsigned long a3,
 		unsigned long a4, unsigned long a5);
 
@@ -101,20 +108,24 @@ static inline int hvc_vm_power_down(int vmid)
 	return minos_hvc1(HVC_VM_POWER_DOWN, vmid);
 }
 
-static inline int hvc_vm_mmap(int vmid, uint64_t offset, uint64_t size,
-		uint64_t *maddr, uint64_t *msize)
+static inline int hvc_vm_mmap(int vmid, uint64_t offset, uint64_t size)
 {
-	int ret;
-
-	ret = minos_hvc3(HVC_VM_MMAP, vmid, offset, size);
-	minos_hvc_result2(maddr, msize);
-
-	return ret;
+	return minos_hvc3(HVC_VM_MMAP, vmid, offset, size);
 }
 
-static inline void hvc_vm_unmmap(int vmid)
+static inline void hvc_vm_unmap(int vmid)
 {
-	minos_hvc1(HVC_VM_UNMMAP, vmid);
+	minos_hvc1(HVC_VM_UNMAP, vmid);
+}
+
+static inline void *hvc_get_mmap_info(int vmid, unsigned long *size)
+{
+	void *ret;
+
+	ret = (void *)minos_hvc1(HVC_VM_GET_MMAP_INFO, vmid);
+	minos_hvc_result1(size);
+
+	return ret;
 }
 
 #endif

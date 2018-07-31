@@ -1,3 +1,19 @@
+/*
+ * Copyright (C) 2018 Min Le (lemin9538@gmail.com)
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <sys/types.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -21,7 +37,7 @@
 #include <sys/mman.h>
 #include <getopt.h>
 
-#include <mvm/mvm.h>
+#include <mvm.h>
 
 struct vm *mvm_vm = NULL;
 
@@ -36,37 +52,20 @@ static struct vm_os *vm_oses[] = {
 	NULL,
 };
 
-void *map_vm_memory(int fd, uint64_t offset, uint64_t *size)
+int map_vm_memory(int fd, uint64_t offset, uint64_t size)
 {
-	int ret, mem_fd;
 	uint64_t args[2];
-	void *vbase;
 
 	args[0] = offset;
-	args[1] = *size;
+	args[1] = size;
 
-	ret = ioctl(fd, MINOS_IOCTL_MMAP, args);
-	if (ret)
-		return NULL;
-
-	/* mmap the memory to userspace */
-	mem_fd = open("/dev/mem", O_RDWR | O_SYNC);
-	if (mem_fd < 0) {
-		perror("/dev/mem");
-		// ioctl umap guest mem
-		return NULL;
-	}
-
-	vbase = mmap(0, args[1], PROT_READ | PROT_WRITE,
-			MAP_SHARED | MAP_HUGETLB, mem_fd, args[0]);
-	if (vbase == (void *)-1) {
+	if (ioctl(fd, IOCTL_VM_MMAP, args)) {
 		printf("* error - mmap memory failed 0x%lx 0x%lx\n",
-				offset, *size);
-		return NULL;
+				offset, size);
+		return -EIO;
 	}
 
-	*size = args[1];
-	return vbase;
+	return 0;
 }
 
 static int create_new_vm(struct vm_info *vminfo)
@@ -79,7 +78,7 @@ static int create_new_vm(struct vm_info *vminfo)
 		return -EIO;
 	}
 
-	printv("* create new vm *");
+	printv("* create new vm *\n");
 	printv("        -name       : %s\n", vminfo->name);
 	printv("        -os_type    : %s\n", vminfo->os_type);
 	printv("        -nr_vcpus   : %d\n", vminfo->nr_vcpus);
@@ -89,7 +88,7 @@ static int create_new_vm(struct vm_info *vminfo)
 	printv("        -entry      : 0x%lx\n", vminfo->entry);
 	printv("        -setup_data : 0x%lx\n", vminfo->setup_data);
 
-	vmid = ioctl(fd, MINOS_IOCTL_CREATE_VM, vminfo);
+	vmid = ioctl(fd, IOCTL_CREATE_VM, vminfo);
 	if (vmid <= 0) {
 		perror("vmid");
 		return vmid;
@@ -102,7 +101,7 @@ static int create_new_vm(struct vm_info *vminfo)
 
 static int release_vm(int fd)
 {
-	return ioctl(fd, MINOS_IOCTL_DESTORY_VM, NULL);
+	return ioctl(fd, IOCTL_DESTORY_VM, NULL);
 }
 
 int destory_vm(struct vm *vm)
@@ -147,6 +146,7 @@ static int create_and_init_vm(struct vm *vm)
 {
 	int ret;
 	char path[32];
+	unsigned long size;
 	struct vm_info *info = &vm->vm_info;
 
 	/* set the default value of vm_info if not give */
@@ -169,6 +169,23 @@ static int create_and_init_vm(struct vm *vm)
 	if (vm->vm_fd < 0) {
 		perror(path);
 		return -EIO;
+	}
+
+	ret = ioctl(vm->vm_fd, IOCTL_GET_VM_MMAP_SIZE, &size);
+	if (ret || (size == 0))
+		return -EAGAIN;
+
+	/*
+	 * map a fix region for this vm, need to call ioctl
+	 * to informe hypervisor to map the really physical
+	 * memory
+	 */
+	vm->mmap_size = size;
+	vm->mmap = mmap(0, size, PROT_READ | PROT_WRITE,
+			MAP_SHARED, vm->vm_fd, 0);
+	if (vm->mmap == (void *)-1) {
+		printf("* error - can not mmap the vm's memory\n");
+		return -EAGAIN;
 	}
 
 	/* load the image into the vm memory */
@@ -217,8 +234,6 @@ static int mvm_main(struct vm_info *info, char *image_path, unsigned long flags)
 	os = get_vm_os(info->os_type);
 	if (!os)
 		return -EINVAL;
-
-	printv("* target vm os type - %s\n", os->name);
 
 	/* read the image to get the entry and other args */
 	image_fd = open(image_path, O_RDWR | O_NONBLOCK);

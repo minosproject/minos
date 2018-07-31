@@ -335,9 +335,9 @@ void create_level_mapping(int lvl, unsigned long tt, unsigned long addr,
 	unsigned long offset;
 	struct pagetable_attr *ar = attrs[lvl];
 
-	offset = addr >> ar->range_offset;
+	//offset = addr >> ar->range_offset;
 	attr = get_tt_description(host, mem_type, map_type);
 
-	*(unsigned long *)(tt + offset * sizeof(uint64_t)) =
+	*(unsigned long *)(tt) =
 		(addr & 0xfffffffffffff000) | attr;
 }

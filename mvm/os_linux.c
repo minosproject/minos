@@ -1,3 +1,19 @@
+/*
+ * Copyright (C) 2018 Min Le (lemin9538@gmail.com)
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <sys/types.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -21,8 +37,8 @@
 #include <sys/mman.h>
 #include <getopt.h>
 
-#include <mvm/mvm.h>
-#include <mvm/bootimage.h>
+#include <mvm.h>
+#include <bootimage.h>
 #include <libfdt/libfdt.h>
 
 static int fdt_setup_commandline(void *dtb, char *cmdline)
@@ -30,6 +46,9 @@ static int fdt_setup_commandline(void *dtb, char *cmdline)
 	int nodeoffset;
 
 	printv("* add command - %s\n", cmdline);
+
+	if (!cmdline || (strlen(cmdline) == 0))
+		return -EINVAL;
 
 	nodeoffset = fdt_path_offset(dtb, "/chosen");
 	if (nodeoffset < 0) {
@@ -159,9 +178,10 @@ static int fdt_setup_ramdisk(void *dtb, uint32_t start, uint32_t size)
 
 static int linux_setup_env(struct vm *vm)
 {
-	uint32_t dtb_header_offset;
+	int ret;
 	void *vbase;
-	uint64_t size;
+	uint32_t dtb_header_offset;
+	uint32_t size;
 	uint32_t offset, dtb_size, dtb_addr;
 	int vm_fd = vm->vm_fd;
 	struct vm_info *info = &vm->vm_info;
@@ -172,21 +192,22 @@ static int linux_setup_env(struct vm *vm)
 
 	offset = dtb_addr - info->mem_start;
 	offset = MEM_BLOCK_ALIGN(offset);
-	dtb_header_offset = dtb_addr - offset;
+	dtb_header_offset = dtb_addr - offset - info->mem_start;
 	size = MEM_BLOCK_BALIGN(dtb_size);
 
-	vbase = map_vm_memory(vm_fd, offset, &size);
-	if (vbase == 0)
+	printf("0x%x 0x%x 0x%x\n", offset, dtb_header_offset, size);
+	ret = map_vm_memory(vm_fd, offset, size);
+	if (ret)
 		return -ENOMEM;
 
-	vbase += dtb_header_offset;
+	vbase = vm->mmap + dtb_header_offset;
 
 	if (fdt_check_header(vbase)) {
 		printf("* error - invalid DTB please check the bootimage\n");
 		return -EINVAL;
 	}
 
-	fdt_open_into(vbase, vbase, 0x200000 - dtb_header_offset);
+	fdt_open_into(vbase, vbase, 0x100000);
 	if (fdt_check_header(vbase)) {
 		printf("* error - invalid DTB after open into\n");
 		return -EINVAL;
@@ -198,6 +219,7 @@ static int linux_setup_env(struct vm *vm)
 	 * 3: setup mem attr
 	 */
 	fdt_setup_commandline(vbase, (char *)hdr->cmdline);
+	fdt_setup_commandline(vbase, "this is test for libfdt");
 	fdt_setup_cpu(vbase, info->nr_vcpus);
 	fdt_setup_memory(vbase, info->mem_start,
 			info->mem_size, info->bit64);
@@ -206,42 +228,40 @@ static int linux_setup_env(struct vm *vm)
 		fdt_setup_ramdisk(vbase, hdr->ramdisk_addr,
 				hdr->ramdisk_size);
 
-	return fdt_pack(vbase);
+	fdt_pack(vbase);
+	return 0;
 }
 
-static int load_image(int vm_fd, int image_fd,
-		uint32_t load_offset, uint32_t image_offset,
-		uint64_t mem_offset, uint32_t load_size)
+static int load_image(struct vm *vm, uint32_t load_offset,
+		uint32_t image_offset, uint64_t mem_offset,
+		uint32_t load_size)
 {
 	int ret;
 	uint32_t w_size;
-	void *vbase;
 	uint64_t offset = mem_offset, size;
+	int vm_fd = vm->vm_fd, image_fd = vm->image_fd;
 
-	size = VM_MAX_MMAP_SIZE;
+	size = vm->mmap_size;
 
 	if (lseek(image_fd, image_offset, SEEK_SET) == -1)
 		return -EIO;
 
 	while (load_size > 0) {
-		vbase = map_vm_memory(vm_fd, offset, &size);
-		if (vbase == 0) {
+		ret = map_vm_memory(vm_fd, offset, size);
+		if (ret) {
 			printf("map guest memory failed\n");
 			return -ENOMEM;
 		}
 
-		printv("* map guest memory successed 0x%lx 0x%lx\n",
-				(unsigned long)vbase, size);
-
 		w_size = load_size > size ? size : load_size;
-		ret = read(image_fd, (char *)(vbase + load_offset), w_size);
-		if (ret != w_size)
-			return -EIO;
+		ret = read(image_fd, (char *)(vm->mmap + load_offset), w_size);
+		if (ret <= 0)
+			return ret;
 
 		load_size -= w_size;
 		offset += size;
 		load_offset = 0;
-		printv("* load image 0x%x size remain:0x%x",
+		printv("* load image 0x%x size remain:0x%x\n",
 				w_size, load_size);
 	}
 
@@ -250,12 +270,11 @@ static int load_image(int vm_fd, int image_fd,
 
 static int linux_load_image(struct vm *vm)
 {
-	int ret;
-	uint64_t offset;
-	uint32_t load_size, load_offset, seek, tmp;
+	int ret = 0;
+	uint32_t offset;
 	struct vm_info *info = &vm->vm_info;
+	uint32_t load_size, load_offset, seek, tmp = 1;
 	boot_img_hdr *hdr = (boot_img_hdr *)vm->os_data;
-	int vm_fd = vm->vm_fd, image_fd = vm->image_fd;
 
 	/*
 	 * map vm memory to vm0 space and using mmap
@@ -264,20 +283,17 @@ static int linux_load_image(struct vm *vm)
 	 */
 
 	/* load the kernel image to guest memory */
-	offset = hdr->kernel_addr - info->mem_start;
-	offset = MEM_BLOCK_ALIGN(offset);
-	load_offset = hdr->kernel_addr - offset;
+	offset = MEM_BLOCK_ALIGN(hdr->kernel_addr - info->mem_start);
+	load_offset = hdr->kernel_addr - offset - info->mem_start;
 	load_size = hdr->kernel_size;
-	tmp = 1;
-	seek = tmp* hdr->page_size;
+	seek = tmp * hdr->page_size;
 
-	printv("* load kernel image: 0x%lx 0x%x 0x%x 0x%x\n",
+	printv("* load kernel image: 0x%x 0x%x 0x%x 0x%x\n",
 			offset, load_offset, seek, load_size);
 
-	ret = load_image(vm_fd, image_fd, load_offset,
-			seek, offset, load_size);
+	ret = load_image(vm, load_offset,seek, offset, load_size);
 	if (ret) {
-		printf("* error - load kernel image failed\n");
+		perror("* error - load kernel image failed\n");
 		return ret;
 	}
 
@@ -287,40 +303,35 @@ static int linux_load_image(struct vm *vm)
 	if (vm->flags & (MVM_FLAGS_NO_RAMDISK))
 		goto load_dtb_image;
 
-	offset = hdr->ramdisk_addr - info->mem_start;
-	offset = MEM_BLOCK_ALIGN(offset);
-	load_offset = hdr->ramdisk_addr - offset;
+	offset = MEM_BLOCK_ALIGN(hdr->ramdisk_addr - info->mem_start);
+	load_offset = hdr->ramdisk_addr - offset - info->mem_start;
 	load_size = hdr->ramdisk_size;
 	seek = tmp * hdr->page_size;
 
-	printv("* load ramdisk image: 0x%lx 0x%x 0x%x 0x%x\n",
+	printv("* load ramdisk image: 0x%x 0x%x 0x%x 0x%x\n",
 			offset, load_offset, seek, load_size);
-	ret = load_image(vm_fd, image_fd, load_offset,
-			seek, offset, load_size);
+	ret = load_image(vm, load_offset, seek, offset, load_size);
 	if (ret) {
-		printf("* error - load ramdisk image failed\n");
+		perror("* error - load ramdisk image failed\n");
 		return ret;
 	}
 
 load_dtb_image:
 	tmp += (hdr->ramdisk_size + hdr->page_size - 1) / hdr->page_size;
-	offset = hdr->ramdisk_addr - info->mem_start;
-	offset = MEM_BLOCK_ALIGN(offset);
-	load_offset = hdr->second_addr - offset;
+	offset = MEM_BLOCK_ALIGN(hdr->second_addr - info->mem_start);
+	load_offset = hdr->second_addr - offset - info->mem_start;
 	load_size = hdr->second_size;
 	seek = tmp * hdr->page_size;
 
-	printv("* load dtb image: 0x%lx 0x%x 0x%x 0x%x\n",
+	printv("* load dtb image: 0x%x 0x%x 0x%x 0x%x\n",
 			offset, load_offset, seek, load_size);
-	ret = load_image(vm_fd, image_fd, load_offset,
-			seek, offset, load_size);
+	ret = load_image(vm, load_offset, seek, offset, load_size);
 	if (ret) {
-		printf("* error - load dtb image failed\n");
+		perror("* error - load dtb image failed\n");
 		return ret;
 	}
 
 	return 0;
-
 }
 
 static int linux_early_init(struct vm *vm)

@@ -23,5 +23,6 @@
 #define HVC_VM_POWER_DOWN		HVC_VM_FN(4)
 #define HVC_VM_MMAP			HVC_VM_FN(5)
 #define HVC_VM_UNMMAP			HVC_VM_FN(6)
+#define HVC_VM_GET_MMAP_INFO		HVC_VM_FN(7)
 
 #endif

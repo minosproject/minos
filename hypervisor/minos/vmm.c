@@ -347,14 +347,24 @@ static inline unsigned long get_host_mapping_pgd(unsigned long vir)
 	return get_mapping_pgd(el2_ttb0_pgd, vir, 1);
 }
 
-int vm_mmap(struct vm *vm, unsigned long *o, unsigned long *s)
+unsigned long get_vm_mmap_info(int vmid, unsigned long *size)
+{
+	unsigned long vir;
+
+	vir = VM0_MMAP_REGION_START + (vmid * VM_MMAP_MAX_SIZE);
+	*size = VM_MMAP_MAX_SIZE;
+
+	return vir;
+}
+
+int vm_mmap(struct vm *vm, unsigned long o, unsigned long s)
 {
 	unsigned long vir;
 	unsigned long *vm_pmd;
 	struct mm_struct *mm = &vm->mm;
 	int start = 0, i, off, count;
-	unsigned long offset = *o, value;
-	unsigned long size = *s;
+	unsigned long offset = o, value;
+	unsigned long size = s;
 	uint64_t attr;
 
 	offset = ALIGN(offset, MEM_BLOCK_SIZE);
@@ -380,21 +390,18 @@ int vm_mmap(struct vm *vm, unsigned long *o, unsigned long *s)
 	 * map the memory as a IO memory in guest to
 	 * avoid the cache issue
 	 */
-	attr = get_tt_description(0, MEM_TYPE_IO, DESCRIPTION_BLOCK);
+	attr = get_tt_description(0, MEM_TYPE_NORMAL, DESCRIPTION_BLOCK);
 
 	for (i = 0; i < count; i++) {
 		value = *(vm_pmd + off + i);
 		value &= PAGETABLE_ATTR_MASK;
 		value |= attr;
-		*(vm0_mmap_base + start + i) = attr;
+		*(vm0_mmap_base + start + i) = value;
 	}
 
 	flush_dcache_range((unsigned long)(vm0_mmap_base + start),
 			sizeof(unsigned long) * count);
 	flush_local_tlb_guest();
-
-	*o = vir;
-	*s = size;
 
 	return 0;
 }
@@ -535,6 +542,7 @@ int vmm_init(void)
 	struct mm_struct *mm;
 	struct memory_region *region;
 	unsigned long pud;
+	unsigned long *tbase;
 
 	/* map all vm0 dram memory to host */
 	vm = get_vm_by_id(0);
@@ -565,7 +573,9 @@ int vmm_init(void)
 		panic("no more memory\n");
 
 	memset((void *)pud, 0, PAGE_SIZE);
-	create_guest_level_mapping(PUD, mm->page_table_base,
+	tbase = (unsigned long *)mm->page_table_base;
+	tbase += VM0_MMAP_REGION_START >> PUD_RANGE_OFFSET;
+	create_guest_level_mapping(PUD, (unsigned long)tbase,
 			pud, DESCRIPTION_TABLE);
 	vm0_mmap_base = (unsigned long *)pud;
 

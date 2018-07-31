@@ -48,14 +48,13 @@
  *     OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  *     EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 #include <libfdt/libfdt_env.h>
 
 #include <libfdt/fdt.h>
 #include <libfdt/libfdt.h>
 
 #include "libfdt_internal.h"
-
-#include <string.h>
 
 int fdt_setprop_inplace_namelen_partial(void *fdt, int nodeoffset,
 					const char *name, int namelen,
@@ -84,7 +83,7 @@ int fdt_setprop_inplace(void *fdt, int nodeoffset, const char *name,
 	int proplen;
 
 	propval = fdt_getprop(fdt, nodeoffset, name, &proplen);
-	if (! propval)
+	if (!propval)
 		return proplen;
 
 	if (proplen != len)
@@ -95,7 +94,7 @@ int fdt_setprop_inplace(void *fdt, int nodeoffset, const char *name,
 						   val, len);
 }
 
-static void _fdt_nop_region(void *start, int len)
+static void fdt_nop_region_(void *start, int len)
 {
 	fdt32_t *p;
 
@@ -109,15 +108,15 @@ int fdt_nop_property(void *fdt, int nodeoffset, const char *name)
 	int len;
 
 	prop = fdt_get_property_w(fdt, nodeoffset, name, &len);
-	if (! prop)
+	if (!prop)
 		return len;
 
-	_fdt_nop_region(prop, len + sizeof(*prop));
+	fdt_nop_region_(prop, len + sizeof(*prop));
 
 	return 0;
 }
 
-int _fdt_node_end_offset(void *fdt, int offset)
+int fdt_node_end_offset_(void *fdt, int offset)
 {
 	int depth = 0;
 
@@ -131,11 +130,11 @@ int fdt_nop_node(void *fdt, int nodeoffset)
 {
 	int endoffset;
 
-	endoffset = _fdt_node_end_offset(fdt, nodeoffset);
+	endoffset = fdt_node_end_offset_(fdt, nodeoffset);
 	if (endoffset < 0)
 		return endoffset;
 
-	_fdt_nop_region(fdt_offset_ptr_w(fdt, nodeoffset, 0),
+	fdt_nop_region_(fdt_offset_ptr_w(fdt, nodeoffset, 0),
 			endoffset - nodeoffset);
 	return 0;
 }

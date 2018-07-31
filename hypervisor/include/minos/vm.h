@@ -82,7 +82,7 @@ static inline int is_32bit_vm(struct vm *vm)
 }
 
 static inline int
-create_vm_mmap(int vmid,  unsigned long *offset, unsigned long *size)
+create_vm_mmap(int vmid,  unsigned long offset, unsigned long size)
 {
 	struct vm *vm = get_vm_by_id(vmid);
 

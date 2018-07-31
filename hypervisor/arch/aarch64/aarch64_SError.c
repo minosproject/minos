@@ -186,7 +186,7 @@ static int misaligned_pc_handler(gp_regs *reg, uint32_t esr_value)
 	return 0;
 }
 
-static inline int get_faulting_ipa(unsigned long vaddr)
+static inline unsigned long get_faulting_ipa(unsigned long vaddr)
 {
 	uint64_t hpfar = read_sysreg(HPFAR_EL2);
 	unsigned long ipa;
@@ -199,10 +199,10 @@ static inline int get_faulting_ipa(unsigned long vaddr)
 
 static int dataabort_tfl_handler(gp_regs *regs, uint32_t esr_value)
 {
+	int ret;
 	struct esr_dabt *dabt = (struct esr_dabt *)&esr_value;
 	unsigned long vaddr;
 	unsigned long paddr;
-	int ret;
 	unsigned long value;
 
 	vaddr = read_sysreg(FAR_EL2);

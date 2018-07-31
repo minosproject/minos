@@ -29,6 +29,8 @@ static int vcpu_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 {
 	int vmid = -1;
+	unsigned long addr;
+	unsigned long size;
 
 	switch (id) {
 	case HVC_VM_CREATE:
@@ -44,14 +46,17 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 	case HVC_VM_POWER_DOWN:
 		break;
 	case HVC_VM_MMAP:
-		vmid = create_vm_mmap((int)args[0], (unsigned long *)&args[1],
-				(unsigned long *)&args[2]);
-		HVC_RET3(c, vmid, args[1], args[2]);
+		addr = create_vm_mmap((int)args[0], args[1], args[2]);
+		HVC_RET1(c, addr);
 		break;
 	case HVC_VM_UNMMAP:
 		destory_vm_mmap((int)args[0]);
 		HVC_RET1(c, 0);
 		break;
+
+	case HVC_VM_GET_MMAP_INFO:
+		addr = get_vm_mmap_info((int)args[0], &size);
+		HVC_RET2(c, addr, size);
 	}
 
 	return 0;

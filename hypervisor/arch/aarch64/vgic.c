@@ -482,7 +482,7 @@ static int vgic_mmio_write(gp_regs *regs,
 
 static int vgic_mmio_check(gp_regs *regs, unsigned long address)
 {
-	if ((address >= 0x2f000000) && (address < 0x2f2000000))
+	if ((address >= 0x2f000000) && (address < 0x2f200000))
 		return 1;
 
 	return 0;

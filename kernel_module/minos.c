@@ -1,3 +1,19 @@
+/*
+ * Copyright (C) 2018 Min Le (lemin9538@gmail.com)
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/errno.h>
@@ -13,6 +29,7 @@
 #include <linux/kmod.h>
 #include <linux/gfp.h>
 #include <linux/slab.h>
+#include <asm/io.h>
 
 #include "minos.h"
 
@@ -179,61 +196,68 @@ static int vm_open(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static int map_guest_memory(struct vm_device *vm, uint64_t *args)
-{
-	int ret;
-	uint64_t offset, size;
-	uint64_t mstart = 0, msize = 0;
-
-	offset = args[0];
-	size = args[1];
-
-	printk("map guest memory 0x%llx 0x%llx\n", offset, size);
-	ret = hvc_vm_mmap(vm->vmid, offset, size, &mstart, &msize);
-	if (ret)
-		return ret;
-
-	args[0] = mstart;
-	args[1] = msize;
-
-	return 0;
-}
-
 static long vm_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
-	int ret;
-	uint64_t args[2];
 	struct vm_device *vm = file_to_vm(filp);
+	uint64_t kernel_arg[2];
 
 	if (!vm)
 		return -ENOENT;
 
 	switch (cmd) {
-	case MINOS_IOCTL_DESTORY_VM:
+	case IOCTL_DESTORY_VM:
+		break;
+	case IOCTL_RESTART_VM:
+		break;
+	case IOCTL_POWER_DOWN_VM:
 		break;
 
-	case MINOS_IOCTL_RESTART_VM:
-		break;
-
-	case MINOS_IOCTL_POWER_DOWN_VM:
-		break;
-
-	case MINOS_IOCTL_POWER_UP_VM:
+	case IOCTL_POWER_UP_VM:
 		hvc_vm_power_up(vm->vmid);
 		break;
 
-	case MINOS_IOCTL_MMAP:
-		ret = copy_from_user(args, (void *)arg, sizeof(uint64_t) * 2);
-		if (ret)
+	case IOCTL_GET_VM_MAP_SIZE:
+		if (copy_to_user((void *)arg, &vm->map_size,
+				sizeof(unsigned long)))
+			return -EAGAIN;
+		return 0;
+
+	case IOCTL_VM_MMAP:
+		if (copy_from_user((void *)kernel_arg, (void *)arg,
+				sizeof(uint64_t) * 2))
 			return -EINVAL;
+		hvc_vm_mmap(vm->vmid, kernel_arg[0], kernel_arg[1]);
+		return 0;
 
-		ret = map_guest_memory(vm, args);
-		if (!ret) {
-			ret = copy_to_user((void *)arg, (void *)args,
-					sizeof(uint64_t) * 2);
-		}
+	case IOCTL_VM_UNMAP:
+		hvc_vm_unmap(vm->vmid);
+		break;
 
-		return ret;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static int mvm_vm_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	struct vm_device *vm = file_to_vm(file);
+	uint64_t vma_size = vma->vm_end - vma->vm_start;
+
+	if ((!vm) || (!vm->pmem_map) || (vm->map_size < vma_size))
+		return -ENOENT;
+
+	/*
+	 * must start at offset 0, for now can map
+	 * max 16M memory to userspace
+	 */
+	vma->vm_pgoff = 0;
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+
+	if (vm_iomap_memory(vma, vm->pmem_map, vma->vm_page_prot)) {
+		pr_err("map vm-%d memory to userspace failed\n", vm->vmid);
+		return -EAGAIN;
 	}
 
 	return 0;
@@ -243,6 +267,7 @@ static struct file_operations vm_fops = {
 	.open		= vm_open,
 	.release	= vm_release,
 	.unlocked_ioctl = vm_ioctl,
+	.mmap		= mvm_vm_mmap,
 	.owner		= THIS_MODULE,
 };
 
@@ -280,7 +305,7 @@ static long vm0_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	struct vm_info vm_info;
 
 	switch (cmd) {
-	case MINOS_IOCTL_CREATE_VM:
+	case IOCTL_CREATE_VM:
 		memset(&vm_info, 0, sizeof(struct vm_info));
 		ret = copy_from_user(&vm_info, (void *)arg, sizeof(struct vm_info));
 		if (ret)
@@ -304,6 +329,7 @@ static struct file_operations vm0_fops = {
 static int create_vm_device(int vmid, struct vm_info *vm_info)
 {
 	int ret;
+	unsigned long size;
 	struct vm_device *vm;
 
 	vm = kzalloc(sizeof(struct vm_device), GFP_KERNEL);
@@ -318,6 +344,19 @@ static int create_vm_device(int vmid, struct vm_info *vm_info)
 		vm->fops = &vm0_fops;
 	else
 		vm->fops = &vm_fops;
+
+	if (vmid != 0) {
+		vm->pmem_map = (phys_addr_t)hvc_get_mmap_info(vm->vmid, &size);
+		if ((!vm->pmem_map) || (size == 0)) {
+			ret = -EAGAIN;
+			goto out_free_vm;
+		}
+
+		vm->map_size = size;
+		pr_info("vm-%d MMAP : 0x%llx size:0x%lx vbase:0x%lx\n",
+					vm->vmid, vm->pmem_map, size,
+					(unsigned long)vm->vmem_map);
+	}
 
 	ret = vm_device_register(vm);
 	if (ret)
