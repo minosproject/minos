@@ -52,7 +52,7 @@ struct mapping_struct {
 };
 
 int create_mem_mapping(struct mapping_struct *);
-int destory_mem_mapping(struct mapping_struct *);
+int destroy_mem_mapping(struct mapping_struct *);
 unsigned long get_mapping_entry(unsigned long tt,
 		unsigned long vir, int start, int end);
 

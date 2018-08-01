@@ -98,7 +98,7 @@ int create_new_vm(struct vm_info *info)
 	return (vm->vmid);
 
 release_vm:
-	destory_vm(vm);
+	destroy_vm(vm);
 
 	return -ENOMEM;
 }

@@ -6,6 +6,7 @@
 #define _MINOS_SPINLOCK_H_
 
 #include <asm/arch.h>
+#include <minos/preempt.h>
 
 typedef struct spinlock {
 	volatile uint32_t lock;
@@ -26,11 +27,13 @@ static void inline spin_lock_init(spinlock_t *lock)
 
 static void inline spin_lock(spinlock_t *lock)
 {
+	preempt_disable();
 	arch_spin_lock(lock);
 }
 
 static void inline spin_unlock(spinlock_t *lock)
 {
+	preempt_enable();
 	arch_spin_unlock(lock);
 }
 

@@ -32,6 +32,7 @@ DEFINE_PER_CPU(struct vcpu *, percpu_current_vcpu);
 DEFINE_PER_CPU(struct vcpu *, percpu_next_vcpu);
 
 DEFINE_PER_CPU(int, need_resched);
+DEFINE_PER_CPU(atomic_t, preempt);
 
 void get_vcpu_affinity(int *aff, int nr)
 {
@@ -204,6 +205,7 @@ int sched_init(void)
 	struct pcpu *pcpu;
 
 	for (i = 0; i < NR_CPUS; i++) {
+		atomic_set(&get_per_cpu(preempt, i), 0);
 		pcpu = get_per_cpu(pcpu, i);
 		pcpu->sched_class = get_sched_class("fifo");
 		pcpu->sched_class->init_pcpu_data(pcpu);

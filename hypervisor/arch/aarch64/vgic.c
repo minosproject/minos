@@ -27,6 +27,8 @@
 #include <minos/sched.h>
 #include <minos/virq.h>
 
+static DEFINE_SPIN_LOCK(gicd_lock);
+
 static struct list_head gicd_list;
 static int vgic_vmodule_id = INVAILD_MODULE_ID;
 
@@ -144,6 +146,21 @@ static void vgic_state_restore(struct vcpu *vcpu, void *context)
 
 }
 
+static void vgic_vm_deinit(struct vm *vm)
+{
+	struct vgic_gicd *gicd;
+
+	gicd = attach_vgicd(vm->vmid);
+	if (!gicd)
+		pr_error("no gicd found for vm-%d\n", vm->vmid);
+
+	spin_lock(&gicd_lock);
+	list_del(&gicd->list);
+	spin_unlock(&gicd_lock);
+
+	free(gicd);
+}
+
 static void vgic_vm_init(struct vm *vm)
 {
 	struct vgic_gicd *gicd;
@@ -167,7 +184,9 @@ static void vgic_vm_init(struct vm *vm)
 	init_list(&gicd->gicr_list);
 	spin_lock_init(&gicd->gicd_lock);
 
+	spin_lock(&gicd_lock);
 	list_add_tail(&gicd_list, &gicd->list);
+	spin_unlock(&gicd_lock);
 
 	/*
 	 * init gicd TBD
@@ -504,6 +523,7 @@ static int vgic_vmodule_init(struct vmodule *vmodule)
 	vmodule->state_save = vgic_state_save;
 	vmodule->state_restore = vgic_state_restore;
 	vmodule->vm_init = vgic_vm_init;
+	vmodule->vm_deinit = vgic_vm_deinit;
 	vgic_vmodule_id = vmodule->id;
 
 	register_mmio_emulation_handler("vgic", &vgic_mmio_ops);

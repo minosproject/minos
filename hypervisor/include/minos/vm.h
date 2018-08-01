@@ -66,15 +66,10 @@ struct vm *get_vm_by_id(uint32_t vmid);
 
 void vm_mm_struct_init(struct vm *vm);
 
-int vm0_connect_host(void);
-unsigned long vm0_create_shmem(void);
-int vm0_destory_shmem(void);
-int vm0_set_shmem_size(size_t size);
 int vm_server_init(void);
-int vm0_disconnect_host(void);
 struct vm *create_dynamic_vm(struct vmtag *vme);
 int create_new_vm(struct vm_info *info);
-void destory_vm(struct vm *vm);
+void destroy_vm(struct vm *vm);
 int vm_power_up(int vmid);
 
 static inline int is_32bit_vm(struct vm *vm)
@@ -93,7 +88,7 @@ create_vm_mmap(int vmid,  unsigned long offset, unsigned long size)
 	return vm_mmap(vm, offset, size);
 }
 
-static inline void destory_vm_mmap(int vmid)
+static inline void destroy_vm_mmap(int vmid)
 {
 	struct vm *vm = get_vm_by_id(vmid);
 

@@ -344,7 +344,7 @@ static int create_vcpus(struct vm *vm)
 	return 0;
 }
 
-void destory_vm(struct vm *vm)
+void destroy_vm(struct vm *vm)
 {
 	int i;
 	struct vcpu *vcpu;
@@ -434,7 +434,7 @@ struct vm *create_dynamic_vm(struct vmtag *vme)
 	return vm;
 
 release_vm:
-	destory_vm(vm);
+	destroy_vm(vm);
 
 	return NULL;
 }

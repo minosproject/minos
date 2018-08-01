@@ -170,7 +170,7 @@ int create_host_mapping(unsigned long vir,
 	return ret;
 }
 
-int destory_host_mapping(unsigned long vir, size_t size, int type)
+int destroy_host_mapping(unsigned long vir, size_t size, int type)
 {
 	unsigned long end;
 	struct mapping_struct map_info;
@@ -189,7 +189,7 @@ int destory_host_mapping(unsigned long vir, size_t size, int type)
 	map_info.mem_type = type;
 	map_info.data = NULL;
 
-	return destory_mem_mapping(&map_info);
+	return destroy_mem_mapping(&map_info);
 }
 
 static int create_guest_mapping(struct vm *vm, unsigned long tbase,
@@ -218,7 +218,7 @@ static int create_guest_mapping(struct vm *vm, unsigned long tbase,
 	return create_mem_mapping(&map_info);
 }
 
-static int destory_guest_mapping(struct vm *vm, unsigned long tt,
+static int destroy_guest_mapping(struct vm *vm, unsigned long tt,
 		unsigned long vir, size_t size, int type)
 {
 	unsigned long end;
@@ -238,7 +238,7 @@ static int destory_guest_mapping(struct vm *vm, unsigned long tt,
 	map_info.mem_type = type;
 	map_info.data = (void *)vm;
 
-	return destory_mem_mapping(&map_info);
+	return destroy_mem_mapping(&map_info);
 }
 
 int map_vm_memory(struct vm *vm, unsigned long vir_base,
@@ -262,7 +262,7 @@ int unmap_vm_memory(struct vm *vm, unsigned long vir_addr,
 	struct mm_struct *mm = &vm->mm;
 
 	spin_lock(&mm->lock);
-	ret = destory_guest_mapping(vm, mm->page_table_base,
+	ret = destroy_guest_mapping(vm, mm->page_table_base,
 			vir_addr, size, type);
 	spin_unlock(&mm->lock);
 

@@ -110,7 +110,7 @@ void irq_exit(gp_regs *reg)
 {
 	irq_softirq_exit();
 
-	if (need_resched) {
+	if (need_resched && preempt_allowed()) {
 		sched_new();
 		need_resched = 0;
 	}

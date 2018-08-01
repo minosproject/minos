@@ -38,6 +38,8 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 		HVC_RET1(c, vmid);
 		break;
 	case HVC_VM_DESTORY:
+		destroy_vm(get_vm_by_id((int)(args[0])));
+		HVC_RET1(c, 0);
 		break;
 	case HVC_VM_RESTART:
 		break;
@@ -52,7 +54,7 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 		HVC_RET1(c, addr);
 		break;
 	case HVC_VM_UNMMAP:
-		destory_vm_mmap((int)args[0]);
+		destroy_vm_mmap((int)args[0]);
 		HVC_RET1(c, 0);
 		break;
 

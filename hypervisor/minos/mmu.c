@@ -245,7 +245,7 @@ int create_mem_mapping(struct mapping_struct *info)
 	return ret;
 }
 
-static int __destory_mem_mapping(struct mapping_struct *info)
+static int __destroy_mem_mapping(struct mapping_struct *info)
 {
 	int type;
 	int lvl = info->lvl;
@@ -292,12 +292,12 @@ static int __destory_mem_mapping(struct mapping_struct *info)
 	return 0;
 }
 
-int destory_mem_mapping(struct mapping_struct *info)
+int destroy_mem_mapping(struct mapping_struct *info)
 {
 	if (!info->config)
 		info->config = attrs[info->lvl];
 
-	__destory_mem_mapping(info);
+	__destroy_mem_mapping(info);
 
 	if (info->host)
 		flush_all_tlb_host();

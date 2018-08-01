@@ -10,6 +10,7 @@
 #include <minos/list.h>
 #include <minos/timer.h>
 #include <minos/sched_class.h>
+#include <minos/atomic.h>
 
 #define PCPU_AFFINITY_FAIL	(0xffff)
 
@@ -25,7 +26,7 @@ DECLARE_PER_CPU(int, need_resched);
 #define current_vm		current_vcpu->vm;
 
 #define get_vcpu_state(vcpu)	vcpu->state
-#define need_resched		get_cpu_var(need_resched)
+#define need_resched		(get_cpu_var(need_resched))
 
 #define SCHED_REASON_IRQ	(0x0)
 

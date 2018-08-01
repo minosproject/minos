@@ -66,7 +66,7 @@ int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size);
 void release_vm_memory(struct vm *vm);
 
 int create_host_mapping(unsigned long, unsigned long, size_t, int);
-int destory_host_mapping(unsigned long, size_t, int);
+int destroy_host_mapping(unsigned long, size_t, int);
 
 static inline int
 io_remap(unsigned long vir, unsigned long phy, size_t size)
@@ -77,7 +77,7 @@ io_remap(unsigned long vir, unsigned long phy, size_t size)
 static inline int
 io_unmap(unsigned long vir, size_t size)
 {
-	return destory_host_mapping(vir, size, MEM_TYPE_IO);
+	return destroy_host_mapping(vir, size, MEM_TYPE_IO);
 }
 
 static inline void create_guest_level_mapping(int lvl, unsigned long tt,
