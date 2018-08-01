@@ -41,7 +41,6 @@ static inline void vminfo_to_vmtag(struct vm_info *info, struct vmtag *tag)
 
 int vm_power_up(int vmid)
 {
-	int i;
 	struct vm *vm = get_vm_by_id(vmid);
 
 	if (vm == NULL) {
@@ -49,9 +48,7 @@ int vm_power_up(int vmid)
 		return -ENOENT;
 	}
 
-	for (i = 0; i < vm->vcpu_nr; i++)
-		vm->os->ops->vcpu_init(vm->vcpus[i]);
-
+	vm_vcpus_init(vm);
 	return 0;
 }
 

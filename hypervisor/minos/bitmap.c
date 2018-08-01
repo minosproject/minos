@@ -152,7 +152,7 @@ again:
 	if (end > size)
 		return end;
 
-	if (!(index & (~(align - 1)))) {
+	if ((index & ((align - 1)))) {
 		start = index + 1;
 		goto again;
 	}

@@ -298,9 +298,23 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 
 	vcpu_virq_struct_init(vcpu->virq_struct);
 	vm->vcpus[vcpu_id] = vcpu;
-	vcpu_vmodules_init(vcpu);
 
 	return vcpu;
+}
+
+int vm_vcpus_init(struct vm *vm)
+{
+	int i;
+
+	if (!vm)
+		return -EINVAL;
+
+	for (i = 0; i < vm->vcpu_nr; i++) {
+		vcpu_vmodules_init(vm->vcpus[i]);
+		vm->os->ops->vcpu_init(vm->vcpus[i]);
+	}
+
+	return 0;
 }
 
 static int create_vcpus(struct vm *vm)
@@ -454,7 +468,6 @@ int create_static_vms(void)
 
 int static_vms_init(void)
 {
-	int i;
 	struct vm *vm;
 
 	for_each_vm(vm) {
@@ -468,9 +481,7 @@ int static_vms_init(void)
 		create_vcpus(vm);
 		vm->os = get_vm_os(vm->os_type);
 		vm_vmodules_init(vm);
-
-		for (i = 0; i < vm->vcpu_nr; i++)
-			vm->os->ops->vcpu_init(vm->vcpus[i]);
+		vm_vcpus_init(vm);
 	}
 
 	return 0;

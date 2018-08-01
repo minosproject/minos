@@ -75,6 +75,7 @@ int vm0_disconnect_host(void);
 struct vm *create_dynamic_vm(struct vmtag *vme);
 int create_new_vm(struct vm_info *info);
 void destory_vm(struct vm *vm);
+int vm_power_up(int vmid);
 
 static inline int is_32bit_vm(struct vm *vm)
 {

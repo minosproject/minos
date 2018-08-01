@@ -42,6 +42,8 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 	case HVC_VM_RESTART:
 		break;
 	case HVC_VM_POWER_UP:
+		vmid = vm_power_up((int)args[0]);
+		HVC_RET1(c, vmid);
 		break;
 	case HVC_VM_POWER_DOWN:
 		break;

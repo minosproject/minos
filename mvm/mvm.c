@@ -272,6 +272,13 @@ static int mvm_main(struct vm_info *info, char *image_path, unsigned long flags)
 	if (ret)
 		goto release_vm;
 
+	/*
+	 * now start the vm
+	 */
+	ret = ioctl(mvm_vm->vm_fd, IOCTL_POWER_UP_VM, NULL);
+	if (ret)
+		goto release_vm;
+
 	/* do loop */
 	while (1) {
 

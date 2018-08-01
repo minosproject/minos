@@ -92,6 +92,7 @@ struct vcpu *get_vcpu_in_vm(struct vm *vm, uint32_t vcpu_id);
 struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id);
 
 struct vcpu *create_idle_vcpu(void);
+int vm_vcpus_init(struct vm *vm);
 
 void vcpu_idle(void);
 int vcpu_suspend(gp_regs *c, uint32_t state, unsigned long entry);

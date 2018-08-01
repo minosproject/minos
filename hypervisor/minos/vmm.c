@@ -384,7 +384,7 @@ int vm_mmap(struct vm *vm, unsigned long o, unsigned long s)
 	if (mapping_error(vm_pmd))
 		return -EIO;
 
-	off = (vir - ALIGN(vir, PMD_MAP_SIZE)) >> MEM_BLOCK_SHIFT;
+	off = (vir - ALIGN(vir, PUD_MAP_SIZE)) >> MEM_BLOCK_SHIFT;
 
 	/*
 	 * map the memory as a IO memory in guest to
