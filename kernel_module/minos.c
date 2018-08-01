@@ -123,7 +123,15 @@ static struct file_operations mvm_fops = {
 	.llseek		= noop_llseek,
 };
 
-int vm_device_register(struct vm_device *vm)
+static void vm_dev_free(struct device *dev)
+{
+	struct vm_device *vm = container_of(dev, struct vm_device, device);
+
+	pr_info("release vm-%d\n", vm->vmid);
+	kfree(vm);
+}
+
+static int vm_device_register(struct vm_device *vm)
 {
 	dev_t dev;
 	int err = 0;
@@ -134,6 +142,7 @@ int vm_device_register(struct vm_device *vm)
 	vm->device.class = vm_class;
 	vm->device.devt = dev;
 	vm->device.parent = NULL;
+	vm->device.release = vm_dev_free;
 	dev_set_name(&vm->device, "mvm%d", vm->vmid);
 	device_initialize(&vm->device);
 
@@ -159,12 +168,47 @@ int vm_device_register(struct vm_device *vm)
 	return 0;
 }
 
-int vm_device_unregister(struct vm_device *vm)
+static int destroy_vm(int vmid)
 {
+	struct vm_device *vm = NULL;
+	struct vm_device *tmp = NULL;
+
+	if (vmid == 0)
+		return -EINVAL;
+
+	mutex_lock(&vm_mutex);
+	list_for_each_entry(tmp, &vm_list, list) {
+		if (tmp->vmid == vmid) {
+			vm = tmp;
+			break;
+		}
+	}
+	mutex_unlock(&vm_mutex);
+
+	if (vm == NULL)
+		return -ENOENT;
+
+	if (atomic_cmpxchg(&vm->opened, 0, 1)) {
+		pr_err("vm%d has been opened, release it first\n", vm->vmid);
+		return -EBUSY;
+	}
+
 	mutex_lock(&vm_mutex);
 	list_del(&vm->list);
-	device_destroy(vm_class, MKDEV(MINOS_VM_MAJOR, vm->vmid));
 	mutex_unlock(&vm_mutex);
+
+	device_remove_file(&vm->device, &dev_attr_vmid);
+	device_remove_file(&vm->device, &dev_attr_nr_vcpus);
+	device_remove_file(&vm->device, &dev_attr_mem_size);
+	device_remove_file(&vm->device, &dev_attr_mem_start);
+	device_remove_file(&vm->device, &dev_attr_mem_end);
+	device_remove_file(&vm->device, &dev_attr_entry);
+	device_remove_file(&vm->device, &dev_attr_setup_data);
+	device_remove_file(&vm->device, &dev_attr_name);
+	device_remove_file(&vm->device, &dev_attr_os_type);
+	device_remove_file(&vm->device, &dev_attr_bit64);
+
+	device_destroy(vm_class, MKDEV(MINOS_VM_MAJOR, vm->vmid));
 
 	return 0;
 }
@@ -205,8 +249,6 @@ static long vm_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		return -ENOENT;
 
 	switch (cmd) {
-	case IOCTL_DESTORY_VM:
-		break;
 	case IOCTL_RESTART_VM:
 		break;
 	case IOCTL_POWER_DOWN_VM:
@@ -318,6 +360,10 @@ static long vm0_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 			return -EINVAL;
 
 		return create_new_vm(&vm_info);
+
+	case IOCTL_DESTROY_VM:
+		destroy_vm((int)arg);
+		break;
 	default:
 		break;
 	}
@@ -359,9 +405,8 @@ static int create_vm_device(int vmid, struct vm_info *vm_info)
 		}
 
 		vm->map_size = size;
-		pr_info("vm-%d MMAP : 0x%llx size:0x%lx vbase:0x%lx\n",
-					vm->vmid, vm->pmem_map, size,
-					(unsigned long)vm->vmem_map);
+		pr_info("vm-%d MMAP : 0x%llx size:0x%lx\n",
+				vm->vmid, vm->pmem_map, size);
 	}
 
 	ret = vm_device_register(vm);

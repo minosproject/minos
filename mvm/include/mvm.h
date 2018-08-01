@@ -2,7 +2,7 @@
 #define __MINOS_USER_H__
 
 #define IOCTL_CREATE_VM			(0xf000)
-#define IOCTL_DESTORY_VM		(0xf001)
+#define IOCTL_DESTROY_VM		(0xf001)
 #define IOCTL_RESTART_VM		(0xf002)
 #define IOCTL_POWER_DOWN_VM		(0xf003)
 #define IOCTL_POWER_UP_VM		(0xf004)

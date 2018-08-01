@@ -99,26 +99,41 @@ static int create_new_vm(struct vm_info *vminfo)
 	return vmid;
 }
 
-static int release_vm(int fd)
+static int release_vm(int vmid)
 {
-	return ioctl(fd, IOCTL_DESTORY_VM, NULL);
+	int fd, ret;
+
+	fd = open("/dev/mvm/mvm0", O_RDWR);
+	if (fd < 0)
+		return -ENODEV;
+
+	ret = ioctl(fd, IOCTL_DESTROY_VM, vmid);
+	close(fd);
+
+	return ret;
 }
 
-int destory_vm(struct vm *vm)
+int destroy_vm(struct vm *vm)
 {
 	if (!vm)
 		return -EINVAL;
 
-	if (vm->vmid)
-		release_vm(vm->vm_fd);
+	if (vm->mmap) {
+		if (vm->vm_fd)
+			ioctl(vm->vm_fd, IOCTL_VM_UNMAP, 0);
+		munmap(vm->mmap, vm->mmap_size);
+	}
 
-	if (vm->vm_fd)
+	if (vm->vm_fd > 0)
 		close(vm->vm_fd);
 
-	if (vm->image_fd)
+	if (vm->vmid > 0)
+		release_vm(vm->vmid);
+
+	if (vm->image_fd > 0)
 		close(vm->image_fd);
 
-	if (vm->os_data)
+	if (vm->os_data > 0)
 		free(vm->os_data);
 
 	free(vm);
@@ -138,6 +153,7 @@ void print_usage(void)
 	fprintf(stderr, "    -b <32 or 64>              (32bit or 64 bit )\n");
 	fprintf(stderr, "    -r                         (do not load ramdisk image)\n");
 	fprintf(stderr, "    -v                         (verbose print debug information)\n");
+	fprintf(stderr, "    -d                         (run as a daemon process)\n");
 	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);
 }
@@ -285,7 +301,7 @@ static int mvm_main(struct vm_info *info, char *image_path, unsigned long flags)
 	}
 
 release_vm:
-	destory_vm(mvm_vm);
+	destroy_vm(mvm_vm);
 	return ret;
 }
 
@@ -333,13 +349,35 @@ static int parse_vm_membase(char *buf, unsigned long *value)
 	return -EINVAL;
 }
 
+static void signal_handler(int signum)
+{
+	int vmid = 0xfff;
+
+	switch (signum) {
+	case SIGUSR1:
+	case SIGALRM:
+	case SIGCHLD:
+	case SIGINT:
+	case SIGTERM:
+		if (mvm_vm)
+			vmid = mvm_vm->vmid;
+
+		printf("* received signal %i vm-%d\n", signum, vmid);
+		destroy_vm(mvm_vm);
+		exit(0);
+	default:
+		break;
+	}
+}
+
 int main(int argc, char **argv)
 {
 	int ret, opt, idx;
 	struct vm_info *info = NULL;
 	char *image_path = NULL;
-	char *optstr = "c:m:i:s:n:t:b:rv?h";
+	char *optstr = "c:m:i:s:n:t:b:rv?hd";
 	unsigned long flags = 0;
+	int run_as_daemon = 0;
 
 	info = (struct vm_info *)malloc(sizeof(struct vm_info));
 	if (!info)
@@ -393,6 +431,9 @@ int main(int argc, char **argv)
 		case 'v':
 			verbose = 1;
 			break;
+		case 'd':
+			run_as_daemon = 1;
+			break;
 		case 'h':
 			print_usage();
 			break;
@@ -407,6 +448,16 @@ int main(int argc, char **argv)
 	if (info->nr_vcpus > VM_MAX_VCPUS) {
 		printf("* warning - support max %d vcpus\n", VM_MAX_VCPUS);
 		info->nr_vcpus = VM_MAX_VCPUS;
+	}
+
+	if (run_as_daemon) {
+		if (daemon(0, 0)) {
+			perror("failed to run as daemon\n");
+			exit(EXIT_FAILURE);
+		}
+	} else {
+		signal(SIGINT, signal_handler);
+		signal(SIGTERM, signal_handler);
 	}
 
 	return mvm_main(info, image_path, flags);

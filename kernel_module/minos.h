@@ -22,7 +22,7 @@
 #define HVC_VM0_FN(n)			(HVC_CALL_BASE + (HVC_TYPE_HVC_VM0 << 24) + n)
 
 #define	HVC_VM_CREATE			HVC_VM_FN(0)
-#define HVC_VM_DESTORY			HVC_VM_FN(1)
+#define HVC_VM_DESTROY			HVC_VM_FN(1)
 #define HVC_VM_RESTART			HVC_VM_FN(2)
 #define HVC_VM_POWER_UP			HVC_VM_FN(3)
 #define HVC_VM_POWER_DOWN		HVC_VM_FN(4)
@@ -31,7 +31,7 @@
 #define HVC_VM_GET_MMAP_INFO		HVC_VM_FN(7)
 
 #define IOCTL_CREATE_VM			(0xf000)
-#define IOCTL_DESTORY_VM		(0xf001)
+#define IOCTL_DESTROY_VM		(0xf001)
 #define IOCTL_RESTART_VM		(0xf002)
 #define IOCTL_POWER_DOWN_VM		(0xf003)
 #define IOCTL_POWER_UP_VM		(0xf004)
@@ -59,7 +59,6 @@ struct vm_device {
 	int vmid;
 	atomic_t opened;
 	phys_addr_t pmem_map;
-	void __iomem *vmem_map;
 	unsigned long map_size;
 	struct list_head list;
 	struct vm_info vm_info;
@@ -95,7 +94,7 @@ static inline int hvc_vm_create(struct vm_info *vminfo)
 
 static inline int hvc_vm_destory(int vmid)
 {
-	return minos_hvc1(HVC_VM_DESTORY, vmid);
+	return minos_hvc1(HVC_VM_DESTROY, vmid);
 }
 
 static inline int hvc_vm_power_up(int vmid)
