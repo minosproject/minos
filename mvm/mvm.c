@@ -354,9 +354,7 @@ static void signal_handler(int signum)
 	int vmid = 0xfff;
 
 	switch (signum) {
-	case SIGUSR1:
 	case SIGALRM:
-	case SIGCHLD:
 	case SIGINT:
 	case SIGTERM:
 		if (mvm_vm)
@@ -451,14 +449,14 @@ int main(int argc, char **argv)
 	}
 
 	if (run_as_daemon) {
-		if (daemon(0, 0)) {
-			perror("failed to run as daemon\n");
+		if (daemon(1, 1)) {
+			printf("failed to run as daemon\n");
 			exit(EXIT_FAILURE);
 		}
-	} else {
-		signal(SIGINT, signal_handler);
-		signal(SIGTERM, signal_handler);
 	}
+
+	signal(SIGINT, signal_handler);
+	signal(SIGTERM, signal_handler);
 
 	return mvm_main(info, image_path, flags);
 }
