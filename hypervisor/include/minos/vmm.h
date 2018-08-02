@@ -47,7 +47,7 @@ struct mm_struct {
 	size_t mem_size;
 	size_t mem_free;
 	unsigned long mem_base;
-	unsigned long page_table_base;
+	unsigned long pgd_base;
 	struct page *head;
 	struct list_head mem_list;
 	struct list_head block_list;
@@ -65,31 +65,20 @@ int unmap_vm_memory(struct vm *vm, unsigned long vir_addr,
 int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size);
 void release_vm_memory(struct vm *vm);
 
-int create_host_mapping(unsigned long, unsigned long, size_t, int);
-int destroy_host_mapping(unsigned long, size_t, int);
+int create_host_mapping(unsigned long vir, unsigned long phy,
+		size_t size, unsigned long flags);
+int destroy_host_mapping(unsigned long vir, size_t size);
 
 static inline int
 io_remap(unsigned long vir, unsigned long phy, size_t size)
 {
-	return create_host_mapping(vir, phy, size, MEM_TYPE_IO);
+	return create_host_mapping(vir, phy, size, VM_IO);
 }
 
 static inline int
 io_unmap(unsigned long vir, size_t size)
 {
-	return destroy_host_mapping(vir, size, MEM_TYPE_IO);
-}
-
-static inline void create_guest_level_mapping(int lvl, unsigned long tt,
-			unsigned long value, int map_type)
-{
-	create_level_mapping(lvl, tt, value, MEM_TYPE_NORMAL, map_type, 0);
-}
-
-static inline void create_host_level_mapping(int lvl, unsigned long tt,
-			unsigned long value, int map_type)
-{
-	create_level_mapping(lvl, tt, value, MEM_TYPE_NORMAL, map_type, 1);
+	return destroy_host_mapping(vir, size);
 }
 
 unsigned long get_vm_mmap_info(int vmid, unsigned long *size);

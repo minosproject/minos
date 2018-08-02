@@ -135,7 +135,7 @@ static void vmsa_state_init(struct vcpu *vcpu, void *context)
 	struct vmsa_context *c = (struct vmsa_context *)context;
 
 	c->vtcr_el2 = generate_vtcr_el2();
-	c->vttbr_el2 = generate_vttbr_el2(vm->vmid, vm->mm.page_table_base);
+	c->vttbr_el2 = generate_vttbr_el2(vm->vmid, vm->mm.pgd_base);
 	c->ttbr0_el1 = 0;
 	c->ttbr1_el1 = 0;
 	c->mair_el1 = 0;

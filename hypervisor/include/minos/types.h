@@ -45,19 +45,6 @@ typedef void (*void_func_t)(void);
 
 #define BIT(nr) (1UL << (nr))
 
-//#define ALIGN(num, size)	(((unsigned long)num) & ~((unsigned long)size - 1))
-//#define BALIGN(num, size)	((((unsigned long)num) + (size - 1)) & ~(size - 1))
-
-static inline unsigned long ALIGN(unsigned long num, size_t size)
-{
-	return ((num) & ~((unsigned long)size - 1));
-}
-
-static inline unsigned long BALIGN(unsigned long num, size_t size)
-{
-	return (((num) + (size - 1)) & ~(size - 1));
-}
-
 #define stringify_no_expansion(x) #x
 #define stringify(x) stringify_no_expansion(x)
 
@@ -96,6 +83,9 @@ static inline unsigned long BALIGN(unsigned long num, size_t size)
 #define __round_mask(x, y) 	((__typeof__(x))((y)-1))
 #define round_up(x, y) 		((((x)-1) | __round_mask(x, y))+1)
 #define round_down(x, y) 	((x) & ~__round_mask(x, y))
+
+#define ALIGN(x, y)	((x) & ~__round_mask(x, y))
+#define BALIGN(x, y)	((x + y - 1) & ~__round_mask(x, y))
 
 #define __stringify_1(x...) #x
 #define __stringify(x...)   __stringify_1(x)

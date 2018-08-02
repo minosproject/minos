@@ -73,12 +73,9 @@ static struct pagetable_attr *attrs[PTE + 1] = {
 	&pte_attr,
 };
 
-unsigned long get_tt_description(int host, int m_type, int d_type)
+unsigned long page_table_description(unsigned long flags)
 {
-	if (host)
-		return arch_host_tt_description(m_type, d_type);
-	else
-		return arch_guest_tt_description(m_type, d_type);
+	return arch_page_table_description(flags);
 }
 
 static int get_map_type(struct mapping_struct *info)
@@ -86,12 +83,12 @@ static int get_map_type(struct mapping_struct *info)
 	struct pagetable_attr *config = info->config;
 	unsigned long a, b;
 
-	if (info->host) {
+	if (info->flags & VM_HOST) {
 		if (info->lvl == PMD)
-			return DESCRIPTION_BLOCK;
+			return VM_DES_BLOCK;
 	} else {
 		if (info->lvl == PTE)
-			return DESCRIPTION_PAGE;
+			return VM_DES_PAGE;
 	}
 
 	/*
@@ -102,12 +99,27 @@ static int get_map_type(struct mapping_struct *info)
 	a = (info->size) & (config->map_size - 1);
 	b = (info->vir_base) & (config->map_size - 1);
 	if (a || b)
-		return DESCRIPTION_TABLE;
+		return VM_DES_TABLE;
 	else
-		return DESCRIPTION_BLOCK;
+		return VM_DES_BLOCK;
 }
 
-static int create_page_entry(struct mapping_struct *info)
+static unsigned long alloc_mapping_page(struct mm_struct *mm)
+{
+	struct page *page;
+
+	page = alloc_page();
+	if (!page)
+		return 0;
+
+	page->next = mm->head;
+	mm->head = page;
+
+	return (unsigned long)(page_to_addr(page));
+}
+
+static int create_page_entry(struct mm_struct *mm,
+		struct mapping_struct *info)
 {
 	int i, map_type;
 	uint32_t offset, index;
@@ -116,12 +128,12 @@ static int create_page_entry(struct mapping_struct *info)
 	unsigned long *tbase = (unsigned long *)info->table_base;
 
 	if (info->lvl != 3)
-		map_type = DESCRIPTION_BLOCK;
+		map_type = VM_DES_BLOCK;
 	else
-		map_type = DESCRIPTION_PAGE;
+		map_type = VM_DES_PAGE;
 
 	offset = config->range_offset;
-	attr = get_tt_description(info->host, info->mem_type, map_type);
+	attr = page_table_description(info->flags | map_type);
 
 	index = (info->vir_base & config->offset_mask) >> offset;
 
@@ -136,7 +148,8 @@ static int create_page_entry(struct mapping_struct *info)
 	return 0;
 }
 
-static int create_table_entry(struct mapping_struct *info)
+static int create_table_entry(struct mm_struct *mm,
+		struct mapping_struct *info)
 {
 	size_t size, map_size;
 	unsigned long attr;
@@ -147,8 +160,7 @@ static int create_table_entry(struct mapping_struct *info)
 	unsigned long *tbase = (unsigned long *)info->table_base;
 
 	size = info->size;
-	attr = get_tt_description(info->host,
-			info->mem_type, DESCRIPTION_TABLE);
+	attr = page_table_description(info->flags | VM_DES_TABLE);
 
 	while (size > 0) {
 		new_page = 0;
@@ -162,8 +174,7 @@ static int create_table_entry(struct mapping_struct *info)
 		value = *(tbase + offset);
 
 		if (!value) {
-			value = (unsigned long)
-				info->get_free_pages(1, info->data);
+			value = alloc_mapping_page(mm);
 			if (!value)
 				return -ENOMEM;
 
@@ -186,11 +197,8 @@ static int create_table_entry(struct mapping_struct *info)
 		map_info.phy_base = info->phy_base;
 		map_info.size = map_size;
 		map_info.lvl = info->lvl + 1;
-		map_info.mem_type = info->mem_type;
-		map_info.host = info->host;
-		map_info.data = info->data;
+		map_info.flags = info->flags;
 		map_info.config = config->next;
-		map_info.get_free_pages = info->get_free_pages;
 
 		/*
 		 * get next level map entry type, if the entry
@@ -203,10 +211,10 @@ static int create_table_entry(struct mapping_struct *info)
 		 */
 		map_type = get_map_type(&map_info);
 
-		if (map_type == DESCRIPTION_TABLE)
-			ret = create_table_entry(&map_info);
+		if (map_type == VM_DES_TABLE)
+			ret = create_table_entry(mm, &map_info);
 		else
-			ret = create_page_entry(&map_info);
+			ret = create_page_entry(mm, &map_info);
 		if (ret) {
 			if (new_page) {
 				free((void *)value);
@@ -225,19 +233,35 @@ static int create_table_entry(struct mapping_struct *info)
 	return ret;
 }
 
-int create_mem_mapping(struct mapping_struct *info)
+int create_mem_mapping(struct mm_struct *mm, unsigned long addr,
+		unsigned long phy, size_t size, unsigned long flags)
 {
 	int ret;
+	struct mapping_struct map_info;
 
-	if (!info->config)
-		info->config = attrs[info->lvl];
+	memset(&map_info, 0, sizeof(struct mapping_struct));
+	map_info.table_base = mm->pgd_base;
+	map_info.vir_base = addr;
+	map_info.phy_base = phy;
+	map_info.size = size;
+	map_info.flags = flags;
 
-	ret = create_table_entry(info);
+	if (flags & VM_HOST) {
+		map_info.lvl = PGD;
+		map_info.config = attrs[PGD];
+	} else {
+		map_info.lvl = PUD;
+		map_info.config = attrs[PUD];
+	}
+
+	spin_lock(&mm->lock);
+	ret = create_table_entry(mm, &map_info);
+	spin_unlock(&mm->lock);
+
 	if (ret)
-		pr_error("map host 0x%x->0x%x size:%x failed\n",
-				info->vir_base, info->phy_base, info->size);
+		pr_error("map fail 0x%x->0x%x size:%x\n", addr, phy, size);
 
-	if (info->host)
+	if (flags & VM_HOST)
 		flush_all_tlb_host();
 	else
 		flush_local_tlb_guest();
@@ -267,10 +291,10 @@ static int __destroy_mem_mapping(struct mapping_struct *info)
 			}
 
 			type = get_mapping_type(lvl, des);
-			if (type == DESCRIPTION_FAULT)
+			if (type == VM_DES_FAULT)
 				return -EINVAL;
 
-			if (type == DESCRIPTION_TABLE) {
+			if (type == VM_DES_TABLE) {
 				lvl++;
 				table = (unsigned long *)des;
 				attr = attr->next;
@@ -292,14 +316,23 @@ static int __destroy_mem_mapping(struct mapping_struct *info)
 	return 0;
 }
 
-int destroy_mem_mapping(struct mapping_struct *info)
+int destroy_mem_mapping(struct mm_struct *mm, unsigned long vir,
+		size_t size, unsigned long flags)
 {
-	if (!info->config)
-		info->config = attrs[info->lvl];
+	struct mapping_struct map_info;
 
-	__destroy_mem_mapping(info);
+	memset(&map_info, 0, sizeof(struct mapping_struct));
+	map_info.table_base = mm->pgd_base;
+	map_info.vir_base = vir;
+	map_info.lvl = PGD;
+	map_info.size = size;
+	map_info.config = attrs[PGD];
 
-	if (info->host)
+	spin_lock(&mm->lock);
+	__destroy_mem_mapping(&map_info);
+	spin_unlock(&mm->lock);
+
+	if (flags & VM_HOST)
 		flush_all_tlb_host();
 	else
 		flush_local_tlb_guest();
@@ -323,21 +356,45 @@ unsigned long get_mapping_entry(unsigned long tt,
 
 		attr = attr->next;
 		table = (unsigned long *)(value & 0xfffffffffffff000);
-	} while (attr->lvl < end);
+	} while (attr->lvl <= end);
 
 	return (unsigned long)table;
 }
 
-void create_level_mapping(int lvl, unsigned long tt, unsigned long addr,
-			int mem_type, int map_type, int host)
+static void create_level_mapping(int lvl, unsigned long tt,
+		unsigned long vir, unsigned long addr, unsigned long flags)
 {
 	unsigned long attr;
 	unsigned long offset;
 	struct pagetable_attr *ar = attrs[lvl];
 
-	//offset = addr >> ar->range_offset;
-	attr = get_tt_description(host, mem_type, map_type);
+	offset = vir >> ar->range_offset;
+	attr = page_table_description(flags);
 
-	*(unsigned long *)(tt) =
+	*((unsigned long *)(tt) + offset) =
 		(addr & 0xfffffffffffff000) | attr;
+}
+
+void create_pgd_mapping(unsigned long pgd, unsigned long vir,
+		unsigned long value, unsigned long flags)
+{
+	create_level_mapping(PGD, pgd, vir, value, flags);
+}
+
+void create_pud_mapping(unsigned long pud, unsigned long vir,
+		unsigned long value, unsigned long flags)
+{
+	create_level_mapping(PUD, pud, vir, value, flags);
+}
+
+void create_pmd_mapping(unsigned long pmd, unsigned long vir,
+		unsigned long value, unsigned long flags)
+{
+	create_level_mapping(PMD, pmd, vir, value, flags);
+}
+
+void create_pte_mapping(unsigned long pte, unsigned long vir,
+		unsigned long value, unsigned long flags)
+{
+	create_level_mapping(PTE, pte, vir, value, flags);
 }

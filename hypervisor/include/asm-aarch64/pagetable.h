@@ -1,6 +1,7 @@
 #ifndef __MINOS_ARCH_PAGETABLE_H__
 #define __MINOS_ARCH_PAGETABLE_H__
 
+#include <minos/types.h>
 #include <minos/memattr.h>
 #include <asm/asm_mmu.h>
 
@@ -29,11 +30,11 @@ static inline unsigned long arch_guest_tt_description(int m_type, int d_type)
 {
 	uint64_t attr;
 
-	if (d_type == DESCRIPTION_TABLE)
+	if (d_type == VM_DES_TABLE)
 		return (uint64_t)TT_S2_ATTR_TABLE;
 
-	if (d_type == DESCRIPTION_BLOCK) {
-		if (m_type == MEM_TYPE_NORMAL) {
+	if (d_type == VM_DES_BLOCK) {
+		if (m_type == VM_NORMAL) {
 			attr = TT_S2_ATTR_BLOCK | TT_S2_ATTR_AP_RW | \
 			       TT_S2_ATTR_SH_INNER | TT_S2_ATTR_AF | \
 			       TT_S2_ATTR_MEMATTR_OUTER_WB | \
@@ -48,8 +49,8 @@ static inline unsigned long arch_guest_tt_description(int m_type, int d_type)
 		return attr;
 	}
 
-	if (d_type == DESCRIPTION_PAGE) {
-		if (m_type == MEM_TYPE_NORMAL) {
+	if (d_type == VM_DES_PAGE) {
+		if (m_type == VM_NORMAL) {
 			attr = TT_S2_ATTR_PAGE | TT_S2_ATTR_AP_RW | \
 			       TT_S2_ATTR_SH_INNER | TT_S2_ATTR_AF | \
 			       TT_S2_ATTR_MEMATTR_OUTER_WB | \
@@ -71,11 +72,11 @@ static inline unsigned long arch_host_tt_description(int m_type, int d_type)
 {
 	uint64_t attr;
 
-	if (d_type == DESCRIPTION_TABLE)
+	if (d_type == VM_DES_TABLE)
 		return (uint64_t)TT_S1_ATTR_TABLE;
 
-	if (d_type == DESCRIPTION_BLOCK) {
-		if (m_type == MEM_TYPE_NORMAL) {
+	if (d_type == VM_DES_BLOCK) {
+		if (m_type == VM_NORMAL) {
 			attr = TT_S1_ATTR_BLOCK | \
 			       (1 << TT_S1_ATTR_MATTR_LSB) | \
 			       TT_S1_ATTR_NS | \
@@ -96,8 +97,8 @@ static inline unsigned long arch_host_tt_description(int m_type, int d_type)
 		return attr;
 	}
 
-	if (d_type == DESCRIPTION_PAGE) {
-		if (m_type == MEM_TYPE_NORMAL) {
+	if (d_type == VM_DES_PAGE) {
+		if (m_type == VM_NORMAL) {
 			attr = TT_S1_ATTR_PAGE | \
 			       (1 << TT_S1_ATTR_MATTR_LSB) | \
 			       TT_S1_ATTR_NS | \
@@ -121,37 +122,52 @@ static inline unsigned long arch_host_tt_description(int m_type, int d_type)
 	return 0;
 }
 
+static inline unsigned long
+arch_page_table_description(unsigned long flags)
+{
+	int host, mtype, dtype;
+
+	host = !!(flags & VM_HOST);
+	mtype = flags & VM_TYPE_MAKS;
+	dtype = flags & VM_DES_MASK;
+
+	if (host)
+		return arch_host_tt_description(mtype, dtype);
+
+	return arch_guest_tt_description(mtype, dtype);
+}
+
 static inline int get_mapping_type(int lvl, unsigned long addr)
 {
 	unsigned long type = addr & 0x03;
 
 	if (lvl == PTE) {
 		if (type != TT_S1_ATTR_PAGE)
-			return DESCRIPTION_FAULT;
+			return VM_DES_FAULT;
 		else
-			return DESCRIPTION_PAGE;
+			return VM_DES_PAGE;
 	} else if (lvl == PMD) {
 		if (type == TT_S1_ATTR_PAGE)
-			return DESCRIPTION_FAULT;
+			return VM_DES_FAULT;
 		else if (type == TT_S1_ATTR_BLOCK)
-			return DESCRIPTION_BLOCK;
+			return VM_DES_BLOCK;
 		else
-			return DESCRIPTION_TABLE;
+			return VM_DES_TABLE;
 	} else if (lvl == PUD) {
 		if (type == TT_S1_ATTR_PAGE)
-			return DESCRIPTION_FAULT;
+			return VM_DES_FAULT;
 		else if (type == TT_S1_ATTR_BLOCK)
-			return DESCRIPTION_BLOCK;
+			return VM_DES_BLOCK;
 		else
-			return DESCRIPTION_TABLE;
+			return VM_DES_TABLE;
 	} else if (lvl == PGD) {
 		if (type != TT_S1_ATTR_TABLE)
-			return DESCRIPTION_FAULT;
+			return VM_DES_FAULT;
 		else
-			return DESCRIPTION_PAGE;
+			return VM_DES_PAGE;
 	}
 
-	return DESCRIPTION_FAULT;
+	return VM_DES_FAULT;
 }
 
 #endif

@@ -25,11 +25,10 @@ extern unsigned char __el2_ttb0_pud;
 extern unsigned char __el2_ttb0_pmd_code;
 extern unsigned char __el2_ttb0_pmd_io;
 
-static unsigned long el2_ttb0_pgd;
+static struct mm_struct host_mm;
 
 LIST_HEAD(mem_list);
 static LIST_HEAD(shared_mem_list);
-static DEFINE_SPIN_LOCK(host_lock);
 
 static unsigned long *vm0_mmap_base;
 
@@ -88,7 +87,7 @@ int register_memory_region(struct memtag *res)
 	return 0;
 }
 
-static unsigned long alloc_guest_page_table(void)
+static unsigned long alloc_pgd(void)
 {
 	/*
 	 * return the table base address, this function
@@ -99,7 +98,8 @@ static unsigned long alloc_guest_page_table(void)
 	 */
 	void *page;
 
-	page = __get_free_pages(GUEST_PGD_PAGE_NR, GUEST_PGD_PAGE_ALIGN);
+	page = __get_free_pages(GUEST_PGD_PAGE_NR,
+			GUEST_PGD_PAGE_ALIGN);
 	if (!page)
 		panic("No memory to map vm memory\n");
 
@@ -107,41 +107,10 @@ static unsigned long alloc_guest_page_table(void)
 	return (unsigned long)page;
 }
 
-void *get_host_translation_page(int pages, void *data)
+int create_host_mapping(unsigned long vir, unsigned long phy,
+		size_t size, unsigned long flags)
 {
-	return get_free_pages(pages);
-}
-
-void *get_guest_translation_page(int pages, void *data)
-{
-	struct vm *vm = (struct vm *)data;
-	struct page *page = NULL;
-	struct mm_struct *mm = NULL;
-
-	/*
-	 * this function will only be excuted in
-	 * map_vm_memory, map_vm_memory has alreadly
-	 * get the spin lock, so do not get it here
-	 */
-	page = alloc_pages(pages);
-	if (!page)
-		return NULL;
-
-	if (vm) {
-		mm = &vm->mm;
-		page->next = mm->head;
-		mm->head = page;
-	}
-
-	return page_to_addr(page);
-}
-
-int create_host_mapping(unsigned long vir,
-		unsigned long phy, size_t size, int type)
-{
-	int ret = 0;
 	unsigned long vir_base, phy_base, tmp;
-	struct mapping_struct map_info;
 
 	/*
 	 * for host mapping, IO and Normal memory all mapped
@@ -151,122 +120,49 @@ int create_host_mapping(unsigned long vir,
 	phy_base = ALIGN(phy, MEM_BLOCK_SIZE);
 	tmp = BALIGN(vir_base + size, MEM_BLOCK_SIZE);
 	size = tmp - vir_base;
+	flags |= VM_HOST;
 
-	memset(&map_info, 0, sizeof(struct mapping_struct));
-	map_info.table_base = el2_ttb0_pgd;
-	map_info.vir_base = vir_base;
-	map_info.phy_base = phy_base;
-	map_info.size = size;
-	map_info.lvl = PGD;
-	map_info.host = 1;
-	map_info.data = NULL;
-	map_info.mem_type = type;
-	map_info.get_free_pages = get_host_translation_page;
-
-	spin_lock(&host_lock);
-	ret = create_mem_mapping(&map_info);
-	spin_unlock(&host_lock);
-
-	return ret;
+	return create_mem_mapping(&host_mm,
+			vir_base, phy_base, size, flags);
 }
 
-int destroy_host_mapping(unsigned long vir, size_t size, int type)
+int destroy_host_mapping(unsigned long vir, size_t size)
 {
 	unsigned long end;
-	struct mapping_struct map_info;
 
 	end = vir + size;
 	end = BALIGN(end, PAGE_SIZE);
 	vir = ALIGN(vir, PAGE_SIZE);
 	size = end - vir;
 
-	memset(&map_info, 0, sizeof(struct mapping_struct));
-	map_info.table_base = el2_ttb0_pgd;
-	map_info.vir_base = vir;
-	map_info.size = size;
-	map_info.lvl = PGD;
-	map_info.host = 1;
-	map_info.mem_type = type;
-	map_info.data = NULL;
-
-	return destroy_mem_mapping(&map_info);
+	return destroy_mem_mapping(&host_mm, vir, size, VM_HOST);
 }
 
-static int create_guest_mapping(struct vm *vm, unsigned long tbase,
-			unsigned long vir, unsigned long phy,
-			size_t size, int type)
+static int create_guest_mapping(struct vm *vm, unsigned long vir,
+		unsigned long phy, size_t size, unsigned long flags)
 {
 	unsigned long vir_base, phy_base, tmp;
-	struct mapping_struct map_info;
 
 	vir_base = ALIGN(vir, SIZE_4K);
 	phy_base = ALIGN(phy, SIZE_4K);
 	tmp = BALIGN(vir_base + size, SIZE_4K);
 	size = tmp - vir_base;
 
-	memset(&map_info, 0, sizeof(struct mapping_struct));
-	map_info.table_base = tbase;
-	map_info.vir_base = vir_base;
-	map_info.phy_base = phy_base;
-	map_info.size = size;
-	map_info.lvl = PUD;
-	map_info.host = 0;
-	map_info.data = (void *)vm;
-	map_info.mem_type = type;
-	map_info.get_free_pages = get_host_translation_page;
-
-	return create_mem_mapping(&map_info);
+	return create_mem_mapping(&vm->mm, vir_base,
+			phy_base, size, flags);
 }
 
-static int destroy_guest_mapping(struct vm *vm, unsigned long tt,
-		unsigned long vir, size_t size, int type)
+static int __used destroy_guest_mapping(struct vm *vm,
+		unsigned long vir, size_t size)
 {
 	unsigned long end;
-	struct mapping_struct map_info;
 
 	end = vir + size;
 	end = BALIGN(end, PAGE_SIZE);
 	vir = ALIGN(vir, PAGE_SIZE);
 	size = end - vir;
 
-	memset(&map_info, 0, sizeof(struct mapping_struct));
-	map_info.table_base = tt;
-	map_info.vir_base = vir;
-	map_info.size = size;
-	map_info.lvl = PUD;
-	map_info.host = 0;
-	map_info.mem_type = type;
-	map_info.data = (void *)vm;
-
-	return destroy_mem_mapping(&map_info);
-}
-
-int map_vm_memory(struct vm *vm, unsigned long vir_base,
-		unsigned long phy_base, size_t size, int type)
-{
-	int ret;
-	struct mm_struct *mm = &vm->mm;
-
-	spin_lock(&mm->lock);
-	ret = create_guest_mapping(vm, mm->page_table_base,
-			vir_base, phy_base, size, type);
-	spin_unlock(&mm->lock);
-
-	return ret;
-}
-
-int unmap_vm_memory(struct vm *vm, unsigned long vir_addr,
-			size_t size, int type)
-{
-	int ret;
-	struct mm_struct *mm = &vm->mm;
-
-	spin_lock(&mm->lock);
-	ret = destroy_guest_mapping(vm, mm->page_table_base,
-			vir_addr, size, type);
-	spin_unlock(&mm->lock);
-
-	return ret;
+	return destroy_mem_mapping(&vm->mm, vir, size, 0);
 }
 
 void release_vm_memory(struct vm *vm)
@@ -297,54 +193,8 @@ void release_vm_memory(struct vm *vm)
 		page = tmp;
 	}
 
-	free_pages((void *)mm->page_table_base);
+	free_pages((void *)mm->pgd_base);
 	memset(mm, 0, sizeof(struct mm_struct));
-}
-
-static inline unsigned long
-get_vm_mapping_pte(struct vm *vm, unsigned long vir)
-{
-	return get_mapping_pte(vm->mm.page_table_base, vir, 0);
-}
-
-static inline unsigned long
-get_vm_mapping_pmd(struct vm *vm, unsigned long vir)
-{
-	return get_mapping_pmd(vm->mm.page_table_base, vir, 0);
-}
-
-static inline unsigned long
-get_vm_mapping_pud(struct vm *vm, unsigned long vir)
-{
-	return get_mapping_pud(vm->mm.page_table_base, vir, 0);
-}
-
-static inline unsigned long
-get_vm_mapping_pgd(struct vm *vm, unsigned long vir)
-{
-	return get_mapping_pgd(vm->mm.page_table_base, vir, 0);
-}
-
-static inline unsigned long get_host_mapping_pte(unsigned long vir)
-{
-	return get_mapping_pte(el2_ttb0_pgd, vir, 1);
-}
-
-static inline unsigned long get_host_mapping_pmd(unsigned long vir)
-{
-
-	return get_mapping_pmd(el2_ttb0_pgd, vir, 1);
-}
-
-static inline unsigned long get_host_mapping_pud(unsigned long vir)
-{
-
-	return get_mapping_pud(el2_ttb0_pgd, vir, 1);
-}
-
-static inline unsigned long get_host_mapping_pgd(unsigned long vir)
-{
-	return get_mapping_pgd(el2_ttb0_pgd, vir, 1);
 }
 
 unsigned long get_vm_mmap_info(int vmid, unsigned long *size)
@@ -362,7 +212,7 @@ int vm_mmap(struct vm *vm, unsigned long o, unsigned long s)
 	unsigned long vir;
 	unsigned long *vm_pmd;
 	struct mm_struct *mm = &vm->mm;
-	int start = 0, i, off, count;
+	int start = 0, i, off, count, left;
 	unsigned long offset = o, value;
 	unsigned long size = s;
 	uint64_t attr;
@@ -374,33 +224,39 @@ int vm_mmap(struct vm *vm, unsigned long o, unsigned long s)
 	if (size > VM_MMAP_MAX_SIZE)
 		size = VM_MMAP_MAX_SIZE;
 
-	count = size >> MEM_BLOCK_SHIFT;
+	left = size >> MEM_BLOCK_SHIFT;
 	start = VM_MMAP_ENTRY_COUNT * vm->vmid;
 
 	/* clear the previous map */
 	memset(vm0_mmap_base + start, 0, VM_MMAP_ENTRY_COUNT);
 
-	vm_pmd = (unsigned long *)get_vm_mapping_pmd(vm, vir);
-	if (mapping_error(vm_pmd))
-		return -EIO;
-
-	off = (vir - ALIGN(vir, PUD_MAP_SIZE)) >> MEM_BLOCK_SHIFT;
-
 	/*
 	 * map the memory as a IO memory in guest to
 	 * avoid the cache issue
 	 */
-	attr = get_tt_description(0, MEM_TYPE_NORMAL, DESCRIPTION_BLOCK);
+	attr = page_table_description(VM_IO | VM_DES_BLOCK);
 
-	for (i = 0; i < count; i++) {
-		value = *(vm_pmd + off + i);
-		value &= PAGETABLE_ATTR_MASK;
-		value |= attr;
-		*(vm0_mmap_base + start + i) = value;
+	while (left > 0) {
+		vm_pmd = (unsigned long *)get_mapping_pud(mm->pgd_base, vir, 0);
+		if (mapping_error(vm_pmd))
+			return -EIO;
+
+		off = (vir - ALIGN(vir, PUD_MAP_SIZE)) >> MEM_BLOCK_SHIFT;
+		count = (PUD_MAP_SIZE >> MEM_BLOCK_SHIFT) - off;
+
+		for (i = 0; i < count; i++) {
+			value = *(vm_pmd + off + i);
+			value &= PAGETABLE_ATTR_MASK;
+			value |= attr;
+			*(vm0_mmap_base + start + i) = value;
+		}
+
+		left -= count;
+		vir += count << MEM_BLOCK_SHIFT;
 	}
 
 	flush_dcache_range((unsigned long)(vm0_mmap_base + start),
-			sizeof(unsigned long) * count);
+				sizeof(unsigned long) * count);
 	flush_local_tlb_guest();
 
 	return 0;
@@ -436,8 +292,8 @@ int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size)
 	 * the vm is not running, do not need to get
 	 * the spin lock
 	 */
-	mm->page_table_base = alloc_guest_page_table();
-	if (!mm->page_table_base)
+	mm->pgd_base = alloc_pgd();
+	if (!mm->pgd_base)
 		return -ENOMEM;
 
 	mm->mem_base = base;
@@ -460,8 +316,8 @@ int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size)
 
 	/* begin to map the memory */
 	list_for_each_entry(block, &mm->block_list, list) {
-		i = map_vm_memory(vm, base, block->phy_base,
-				MEM_BLOCK_SIZE, MEM_TYPE_NORMAL);
+		i = create_guest_mapping(vm, base, block->phy_base,
+				MEM_BLOCK_SIZE, VM_NORMAL);
 		if (i)
 			goto free_vm_memory;
 
@@ -483,7 +339,7 @@ void vm_mm_struct_init(struct vm *vm)
 	init_list(&mm->mem_list);
 	init_list(&mm->block_list);
 	mm->head = NULL;
-	mm->page_table_base = 0;
+	mm->pgd_base = 0;
 	spin_lock_init(&mm->lock);
 }
 
@@ -512,8 +368,8 @@ int vm_mm_init(struct vm *vm)
 		}
 	}
 
-	mm->page_table_base = alloc_guest_page_table();
-	if (mm->page_table_base == 0) {
+	mm->pgd_base = alloc_pgd();
+	if (mm->pgd_base == 0) {
 		pr_error("No memory for vm page table\n");
 		return -ENOMEM;
 	}
@@ -524,13 +380,13 @@ int vm_mm_init(struct vm *vm)
 	}
 
 	list_for_each_entry(region, &mm->mem_list, list) {
-		create_guest_mapping(vm, mm->page_table_base, region->mem_base,
-				region->vir_base, region->size, region->type);
+		create_guest_mapping(vm, region->mem_base, region->vir_base,
+				region->size, region->type);
 	}
 
 	list_for_each_entry(region, &shared_mem_list, list) {
-		create_guest_mapping(vm, mm->page_table_base, region->mem_base,
-				region->vir_base, region->size, region->type);
+		create_guest_mapping(vm, region->mem_base, region->vir_base,
+				region->size, region->type);
 	}
 
 	return 0;
@@ -564,7 +420,7 @@ int vmm_init(void)
 	 * n region, one vm has a region, so if the system has
 	 * max 64 vms, then each vm can mmap 16M max one time
 	 */
-	pud = get_vm_mapping_pud(vm, VM0_MMAP_REGION_START);
+	pud = get_mapping_pud(mm->pgd_base, VM0_MMAP_REGION_START, 0);
 	if (pud > INVALID_MAPPING)
 		panic("mmap region should not mapped for vm0\n");
 
@@ -573,10 +429,11 @@ int vmm_init(void)
 		panic("no more memory\n");
 
 	memset((void *)pud, 0, PAGE_SIZE);
-	tbase = (unsigned long *)mm->page_table_base;
-	tbase += VM0_MMAP_REGION_START >> PUD_RANGE_OFFSET;
-	create_guest_level_mapping(PUD, (unsigned long)tbase,
-			pud, DESCRIPTION_TABLE);
+	tbase = (unsigned long *)mm->pgd_base;
+	create_pud_mapping((unsigned long)tbase,
+			VM0_MMAP_REGION_START,
+			pud, VM_DES_TABLE | VM_IO | VM_HOST);
+
 	vm0_mmap_base = (unsigned long *)pud;
 
 	return 0;
@@ -584,7 +441,9 @@ int vmm_init(void)
 
 static int vmm_early_init(void)
 {
-	el2_ttb0_pgd = (unsigned long)&__el2_ttb0_pgd;
+	memset(&host_mm, 0, sizeof(struct mm_struct));
+	spin_lock_init(&host_mm.lock);
+	host_mm.pgd_base = (unsigned long)&__el2_ttb0_pgd;
 
 	return 0;
 }

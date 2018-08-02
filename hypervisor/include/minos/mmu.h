@@ -36,7 +36,7 @@
 
 #define mapping_error(r)	(((unsigned long)(r) > 0) && ((unsigned long)(r) <= 6))
 
-struct vm;
+struct mm_struct;
 
 struct mapping_struct {
 	unsigned long table_base;
@@ -44,71 +44,63 @@ struct mapping_struct {
 	unsigned long phy_base;
 	size_t size;
 	int lvl;
-	int host;
-	int mem_type;
-	void *data;
-	void *(*get_free_pages)(int pages, void *data);
+	unsigned long flags;
 	struct pagetable_attr *config;
 };
 
-int create_mem_mapping(struct mapping_struct *);
-int destroy_mem_mapping(struct mapping_struct *);
+int create_mem_mapping(struct mm_struct *mm, unsigned long addr,
+		unsigned long phy, size_t size, unsigned long flags);
+
+int destroy_mem_mapping(struct mm_struct *mm, unsigned long vir,
+		size_t size, unsigned long flags);
+
 unsigned long get_mapping_entry(unsigned long tt,
 		unsigned long vir, int start, int end);
 
-void create_level_mapping(int lvl, unsigned long tt, unsigned long addr,
-		int mem_type, int map_type, int host);
-
-unsigned long get_tt_description(int host, int m_type, int d_type);
+unsigned long page_table_description(unsigned long flags);
 
 static inline unsigned long
-get_mapping_pte(unsigned long tt, unsigned long vir, int host)
+get_mapping_pte(unsigned long pgd, unsigned long vir, unsigned long flags)
 {
-	if (host)
-		return INVALID_MAPPING;
-
-	return get_mapping_entry(tt, vir, PUD, PTE);
+	if (flags & VM_HOST)
+		return get_mapping_entry(pgd, vir, PGD, PTE);
+	else
+		return get_mapping_entry(pgd, vir, PUD, PTE);
 }
 
 static inline unsigned long
-get_mapping_pgd(unsigned long tt, unsigned long vir, int host)
+get_mapping_pgd(unsigned long pgd, unsigned long vir, unsigned long flags)
 {
-	if (!host)
-		return INVALID_MAPPING;
+	if (!(flags & VM_HOST))
+		return 0;
 
-	return get_mapping_entry(tt, vir, PGD, PGD);
+	return get_mapping_entry(pgd, vir, PGD, PGD);
 }
 
 static inline unsigned long
-get_mapping_pud(unsigned long tt, unsigned long vir, int host)
+get_mapping_pud(unsigned long pgd, unsigned long vir, unsigned long flags)
 {
-	int start, end;
-
-	if (host) {
-		start = PGD;
-		end = PUD;
-	} else {
-		start = PUD;
-		end = PUD;
-	}
-
-	return get_mapping_entry(tt, vir, start, end);
+	if (flags & VM_HOST)
+		return get_mapping_entry(pgd, vir, PGD, PUD);
+	else
+		return get_mapping_entry(pgd, vir, PUD, PUD);
 }
 
 static inline unsigned long
-get_mapping_pmd(unsigned long tt, unsigned long vir, int host)
+get_mapping_pmd(unsigned long pgd, unsigned long vir, unsigned long flags)
 {
-	int start, end;
-
-	if (host) {
-		start = PGD;
-		end = PMD;
-	} else {
-		start = PUD;
-		end = PMD;
-	}
-
-	return get_mapping_entry(tt, vir, start, end);
+	if (flags & VM_HOST)
+		return get_mapping_entry(pgd, vir, PGD, PMD);
+	else
+		return get_mapping_entry(pgd, vir, PUD, PMD);
 }
 
+void create_pud_mapping(unsigned long pud, unsigned long vir,
+		unsigned long value, unsigned long flags);
+void create_pmd_mapping(unsigned long pmd, unsigned long vir,
+		unsigned long value, unsigned long flags);
+void create_pte_mapping(unsigned long pte, unsigned long vir,
+		unsigned long value, unsigned long flags);
+void create_pgd_mapping(unsigned long pgd, unsigned long vir,
+		unsigned long value, unsigned long flags);
 #endif
