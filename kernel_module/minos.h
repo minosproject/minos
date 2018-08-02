@@ -92,7 +92,7 @@ static inline int hvc_vm_create(struct vm_info *vminfo)
 	return minos_hvc1(HVC_VM_CREATE, vminfo);
 }
 
-static inline int hvc_vm_destory(int vmid)
+static inline int hvc_vm_destroy(int vmid)
 {
 	return minos_hvc1(HVC_VM_DESTROY, vmid);
 }

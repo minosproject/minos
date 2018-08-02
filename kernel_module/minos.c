@@ -209,6 +209,7 @@ static int destroy_vm(int vmid)
 	device_remove_file(&vm->device, &dev_attr_bit64);
 
 	device_destroy(vm_class, MKDEV(MINOS_VM_MAJOR, vm->vmid));
+	hvc_vm_destroy(vmid);
 
 	return 0;
 }
