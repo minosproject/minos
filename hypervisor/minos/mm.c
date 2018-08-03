@@ -169,7 +169,7 @@ static int add_memory_section(unsigned long mem_base, size_t size)
 	free_blocks += ms->nr_blocks;
 
 	nr_sections++;
-	pr_info("add memory section start:0x%x size:0x%x\n", mem_base, size);
+	pr_info("MEM SECTION : start:0x%x size:0x%x\n", mem_base, size);
 
 	/*
 	 * TBD : need to map all host memory before
@@ -255,7 +255,7 @@ static int mem_sections_init(void)
 	struct mem_block *block;
 
 	mem_start = (unsigned long)&__code_end;
-	pr_info("minos : code_start:0x%x code_end:0x%x\n",
+	pr_info("code_start:0x%x code_end:0x%x\n",
 			code_base, mem_start);
 
 	mem_start = BALIGN(mem_start, sizeof(unsigned long));
@@ -263,7 +263,7 @@ static int mem_sections_init(void)
 
 	mem_start = BALIGN(mem_start, sizeof(unsigned long));
 	mem_start = blocks_bitmap_init(mem_start);
-	pr_info("minos : code_start after blocks_init:0x%x\n", mem_start);
+	pr_info("code_start after blocks_init:0x%x\n", mem_start);
 
 	/*
 	 * find the boot section, boot section do not need
@@ -391,34 +391,19 @@ __alloc_mem_block(struct mem_section *section, unsigned long f)
 {
 	unsigned long bit;
 	struct mem_block *block;
-	unsigned long flags;
 
-	/*
-	 * fix me: use spin_lock_irqsave or spin_lock ?
-	 *
-	 * TBD: using spin_try_lock, if can not get the
-	 * lock then switch to next section
-	 */
-	spin_lock_irqsave(&section->lock, flags);
+	spin_lock(&section->lock);
 	if (section->free_blocks == 0) {
-		spin_unlock_irqrestore(&section->lock, flags);
+		spin_unlock(&section->lock);
 		return NULL;
 	}
 
-again:
-	bit = find_next_zero_bit(section->bitmap, section->nr_blocks,
+	bit = find_next_zero_bit_loop(section->bitmap, section->nr_blocks,
 			section->bm_current);
-	if (bit >= section->nr_blocks) {
-		if (section->bm_current != 0) {
-			section->bm_current = 0;
-			goto again;
-		}
-	}
-
 	if (bit >= section->nr_blocks) {
 		pr_warn("section->free_blocks may be incorrect %d\n",
 				section->free_blocks);
-		spin_unlock_irqrestore(&section->lock, flags);
+		spin_unlock(&section->lock);
 		return NULL;
 	}
 
@@ -433,7 +418,7 @@ again:
 	 */
 	set_bit(bit, section->bitmap);
 	free_blocks--;
-	spin_unlock_irqrestore(&section->lock, flags);
+	spin_unlock(&section->lock);
 
 	block = &section->blocks[bit];
 	memset(block, 0, sizeof(struct mem_block));
@@ -467,18 +452,12 @@ static unsigned long *get_page_meta(void)
 	struct mem_block *block = NULL, *n = NULL;
 
 	list_for_each_entry_safe(block, n, &page_pool->meta_list, list) {
-again:
-		bit = find_next_zero_bit(block->pages_bitmap,
+		bit = find_next_zero_bit_loop(block->pages_bitmap,
 				PAGE_METAS_IN_BLOCK, block->bm_current);
 		if (bit >= PAGE_METAS_IN_BLOCK) {
-			if (block->bm_current != 0) {
-				block->bm_current = 0;
-				goto again;
-			} else {
-				pr_error("block meta free_pages is not correct\n");
-				list_del(&block->list);
-				continue;
-			}
+			pr_error("block meta free_pages is not correct\n");
+			list_del(&block->list);
+			continue;
 		}
 
 		block->free_pages--;
@@ -524,20 +503,12 @@ static struct page *alloc_pages_from_block(struct mem_block *block,
 	if (block->free_pages < count)
 		return NULL;
 
-	if (count == 1) {
-again:
+	if (count == 1)
 		bit = find_next_zero_bit(block->pages_bitmap,
 				PAGES_IN_BLOCK, block->bm_current);
-		if (bit >= PAGES_IN_BLOCK) {
-			if (block->bm_current != 0) {
-				block->bm_current = 0;
-				goto again;
-			}
-		}
-	} else {
+	else
 		bit = bitmap_find_next_zero_area_align(block->pages_bitmap,
 				PAGES_IN_BLOCK, 0, count, align);
-	}
 
 	if (bit >= PAGES_IN_BLOCK)
 		return NULL;
@@ -569,14 +540,13 @@ again:
 struct page *__alloc_pages(int count, int align)
 {
 	struct mem_block *block = NULL, *n = NULL;
-	unsigned long f;
 	unsigned long *page_meta = NULL;
 	struct page *page = NULL;
 
 	if (count <= 0)
 		return NULL;
 
-	spin_lock_irqsave(&page_pool->lock, f);
+	spin_lock(&page_pool->lock);
 
 	list_for_each_entry_safe(block, n, &page_pool->block_list, list) {
 		page = alloc_pages_from_block(block, count, align);
@@ -608,7 +578,7 @@ struct page *__alloc_pages(int count, int align)
 	page = alloc_pages_from_block(block, count, align);
 
 out:
-	spin_unlock_irqrestore(&page_pool->lock, f);
+	spin_unlock(&page_pool->lock);
 	return page;
 }
 
@@ -833,13 +803,12 @@ void *malloc(size_t size)
 	int i = 0;
 	void *ret = NULL;
 	slab_alloc_func func;
-	unsigned long flags;
 
 	if (size == 0)
 		return NULL;
 
 	size = get_slab_alloc_size(size);
-	spin_lock_irqsave(&pslab->lock, flags);
+	spin_lock(&pslab->lock);
 
 	while (1) {
 		func = alloc_func[i];
@@ -852,7 +821,7 @@ void *malloc(size_t size)
 		i++;
 	}
 
-	spin_unlock_irqrestore(&pslab->lock, flags);
+	spin_unlock(&pslab->lock);
 
 	return ret;
 }
@@ -872,7 +841,6 @@ void *zalloc(size_t size)
 void release_mem_block(struct mem_block *block)
 {
 	unsigned long start;
-	unsigned long flags = 0;
 	struct mem_section *section = NULL;
 	struct mem_block *meta_block = NULL;
 
@@ -883,7 +851,7 @@ void release_mem_block(struct mem_block *block)
 		goto out;
 
 	section = block_to_mem_section(block);
-	spin_lock_irqsave(&section->lock, flags);
+	spin_lock(&section->lock);
 	start = offset_in_section_bitmap(block->phy_base, section);
 	bitmap_clear(section->bitmap, start, 1);
 	free_blocks++;
@@ -901,14 +869,13 @@ void release_mem_block(struct mem_block *block)
 		clear_bit(start, meta_block->pages_bitmap);
 	}
 out:
-	spin_unlock_irqrestore(&section->lock, flags);
+	spin_unlock(&section->lock);
 }
 
 void free_pages(void *addr)
 {
 	struct mem_block *block;
 	unsigned long start;
-	unsigned long flags;
 	struct page *meta;
 	int i, count;
 
@@ -920,7 +887,7 @@ void free_pages(void *addr)
 		return;
 	}
 
-	spin_lock_irqsave(&page_pool->lock, flags);
+	spin_lock(&page_pool->lock);
 
 	meta = (struct page *)block_meta_base(block);
 	count = meta->phy_base & 0xfff;
@@ -940,7 +907,7 @@ void free_pages(void *addr)
 		meta++;
 	}
 
-	spin_unlock_irqrestore(&page_pool->lock, flags);
+	spin_unlock(&page_pool->lock);
 }
 
 void release_pages(struct page *page)
@@ -952,7 +919,6 @@ void free(void *addr)
 {
 	struct slab_header *header;
 	struct slab_pool *slab_pool;
-	unsigned long flags;
 	struct mem_block *block;
 
 	if (!addr)
@@ -968,15 +934,15 @@ void free(void *addr)
 	if (header->magic != SLAB_MAGIC)
 		return;
 
-	spin_lock_irqsave(&pslab->lock, flags);
+	spin_lock(&pslab->lock);
 	slab_pool = &pslab->pool[slab_pool_id(header->size)];
 	add_slab_to_slab_pool(header, slab_pool);
-	spin_unlock_irqrestore(&pslab->lock, flags);
+	spin_unlock(&pslab->lock);
 }
 
 static void slab_init(void)
 {
-	pr_info("Slab memory allocator init...\n");
+	pr_info("slab memory allocator init...\n");
 	memset(pslab, 0, sizeof(struct slab));
 	init_list(&pslab->block_list);
 	pslab->pool = slab_pool;

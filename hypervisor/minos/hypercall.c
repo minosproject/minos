@@ -77,7 +77,7 @@ static int misc_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 }
 
 DEFINE_HVC_HANDLER("vcpu_hvc_handler", HVC_TYPE_HVC_VCPU,
-		HVC_TYPE_HVC_VM, vcpu_hvc_handler);
+		HVC_TYPE_HVC_VCPU, vcpu_hvc_handler);
 
 DEFINE_HVC_HANDLER("vm_hvc_handler", HVC_TYPE_HVC_VM,
 		HVC_TYPE_HVC_VM, vm_hvc_handler);

@@ -110,7 +110,11 @@ void irq_exit(gp_regs *reg)
 {
 	irq_softirq_exit();
 
-	if (need_resched && preempt_allowed()) {
+	/*
+	 * if preempt is not allowed and irq is taken from
+	 * guest, then will sched()
+	 */
+	if (need_resched && preempt_allowed() && taken_from_guest(reg)) {
 		sched_new();
 		need_resched = 0;
 	}

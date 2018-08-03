@@ -34,7 +34,7 @@ struct page {
 struct memory_region {
 	int type;
 	uint32_t vmid;
-	unsigned long mem_base;
+	unsigned long phy_base;
 	unsigned long vir_base;
 	size_t size;
 	struct list_head list;

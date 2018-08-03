@@ -95,7 +95,7 @@
 		"sectype": "S/NS",
 		"enable": 1,
 		"type": 1,
-		"vmid": 1,
+		"vmid": 0,
 		"name": "ve sys reg"
 	},
 	{
@@ -225,7 +225,7 @@
 		"sectype": "S/NS",
 		"enable": 1,
 		"type": 1,
-		"vmid": 1,
+		"vmid": 0,
 		"name": "timer0 sp804"
 	},
 	{
@@ -275,7 +275,7 @@
 		"sectype": "S/NS",
 		"enable": 1,
 		"type": 1,
-		"vmid": 1,
+		"vmid": 0,
 		"name": "color lcd pl111"
 	},
 	{
@@ -533,7 +533,7 @@
 		"host": 0,
 		"sectype": "S/NS",
 		"enable": 1,
-		"type": 0,
+		"type": 2,
 		"vmid": 0,
 		"name": "dram"
 	},
@@ -543,8 +543,8 @@
 		"host": 0,
 		"sectype": "S/NS",
 		"enable": 1,
-		"type": 0,
-		"vmid": 1,
+		"type": 2,
+		"vmid": 65535,
 		"name": "dram"
 	},
 	{
@@ -553,7 +553,7 @@
 		"host": 0,
 		"sectype": "S/NS",
 		"enable": 1,
-		"type": 0,
+		"type": 2,
 		"vmid": 65535,
 		"name": "dram"
 	},
@@ -563,7 +563,7 @@
 		"host": 0,
 		"sectype": "S/NS",
 		"enable": 1,
-		"type": 0,
+		"type": 2,
 		"vmid": 65535,
 		"name": "dram"
 	},
@@ -573,7 +573,7 @@
 		"host": 0,
 		"sectype": "S/NS",
 		"enable": 1,
-		"type": 0,
+		"type": 2,
 		"vmid": 65535,
 		"name": "dram"
 	}

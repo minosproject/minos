@@ -44,7 +44,7 @@ static int alloc_new_vmid(void)
 	int vmid, start = total_vms;
 
 	spin_lock(&vms_lock);
-	vmid = find_next_zero_bit_loop(vmid_bitmap, CONFIG_MAX_VM, start);
+	vmid = find_next_zero_bit_loop(vmid_bitmap, CONFIG_MAX_VM, 0);
 	if (vmid >= CONFIG_MAX_VM)
 		goto out;
 

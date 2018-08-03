@@ -65,10 +65,19 @@ int create_new_vm(struct vm_info *info)
 		return VMID_INVALID;
 
 	/*
-	 * first check whether there are enough
-	 * memory for this vm
+	 * first check whether there are enough memory for
+	 * this vm and the vm's memory base need to be start
+	 * at 0xc0000000 or higher, if the mem_start is 0,
+	 * then set it to default 0xc0000000
 	 */
 	size = vm_info->mem_size;
+
+	if (vm_info->mem_start == 0)
+		vm_info->mem_start = GUEST_NORMAL_MEM_START;
+
+	if (vm_info->mem_start < GUEST_NORMAL_MEM_START)
+		return -EINVAL;
+
 	if ((vm_info->mem_start + size) > GUSET_MEMORY_END)
 		return -EINVAL;
 

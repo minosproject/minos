@@ -57,13 +57,9 @@ int register_memory_region(struct memtag *res)
 			res->mem_end, res->type,
 			res->vmid, res->name);
 
-	memset((char *)region, 0, sizeof(struct memory_region));
+	memset(region, 0, sizeof(struct memory_region));
 
-	/*
-	 * minos no using phy --> phy mapping
-	 */
-	region->vir_base = res->mem_base;
-	region->mem_base = res->mem_base;
+	region->phy_base = res->mem_base;
 	region->size = res->mem_end - res->mem_base + 1;
 	region->vmid = res->vmid;
 
@@ -72,17 +68,20 @@ int register_memory_region(struct memtag *res)
 	/*
 	 * shared memory is for all vm to ipc purpose
 	 */
-	if (res->type == 0x2) {
+	if (res->type == MEM_TYPE_SHARED) {
 		region->type = MEM_TYPE_NORMAL;
 		list_add(&shared_mem_list, &region->list);
 	} else {
-		if (res->type == 0x0)
-			region->type = MEM_TYPE_NORMAL;
-		else
-			region->type = MEM_TYPE_IO;
-
+		region->type = res->type;
 		list_add_tail(&mem_list, &region->list);
 	}
+
+	if (region->type == MEM_TYPE_IO)
+		region->vir_base = res->mem_base -
+				CONFIG_PLATFORM_IO_BASE + GUEST_IO_MEM_START;
+	else
+		region->vir_base = res->mem_base -
+			CONFIG_PLATFORM_DRAM_BASE + GUEST_NORMAL_MEM_START;
 
 	return 0;
 }
@@ -201,7 +200,7 @@ unsigned long get_vm_mmap_info(int vmid, unsigned long *size)
 {
 	unsigned long vir;
 
-	vir = VM0_MMAP_REGION_START + (vmid * VM_MMAP_MAX_SIZE);
+	vir = VM0_MMAP_MEM_START + (vmid * VM_MMAP_MAX_SIZE);
 	*size = VM_MMAP_MAX_SIZE;
 
 	return vir;
@@ -282,6 +281,7 @@ int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size)
 	unsigned long base;
 	struct mm_struct *mm = &vm->mm;
 	struct mem_block *block;
+	struct memory_region *region;
 
 	base = ALIGN(start, MEM_BLOCK_SIZE);
 	if (base != start)
@@ -312,9 +312,13 @@ int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size)
 
 		block->vmid = vm->vmid;
 		list_add_tail(&mm->block_list, &block->list);
+		mm->mem_free -= MEM_BLOCK_SIZE;
 	}
 
-	/* begin to map the memory */
+	/*
+	 * begin to map the memory for guest, actually
+	 * this is map the ipa to pa in stage 2
+	 */
 	list_for_each_entry(block, &mm->block_list, list) {
 		i = create_guest_mapping(vm, base, block->phy_base,
 				MEM_BLOCK_SIZE, VM_NORMAL);
@@ -322,6 +326,19 @@ int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size)
 			goto free_vm_memory;
 
 		base += MEM_BLOCK_SIZE;
+	}
+
+	/* any hardware IO space for this space */
+	list_for_each_entry(region, &mem_list, list) {
+		if ((region->vmid != vm->vmid) ||
+				(region->type != MEM_TYPE_IO))
+			continue;
+
+		pr_info("mapping 0x%x to vm-%d\n",
+				region->phy_base, vm->vmid);
+
+		create_guest_mapping(vm, region->phy_base, region->vir_base,
+				region->size, region->type);
 	}
 
 	return 0;
@@ -347,26 +364,8 @@ int vm_mm_init(struct vm *vm)
 {
 	struct memory_region *region;
 	struct mm_struct *mm = &vm->mm;
-	struct list_head *list = mem_list.next;
-	struct list_head *head = &mem_list;
 
 	vm_mm_struct_init(vm);
-
-	/*
-	 * this function will excuted at bootup
-	 * stage, so do not to aquire lock or
-	 * disable irq
-	 */
-	while (list != head) {
-		region = list_entry(list, struct memory_region, list);
-		list = list->next;
-
-		/* put this memory region to related vm */
-		if (region->vmid == vm->vmid) {
-			list_del(&region->list);
-			list_add_tail(&mm->mem_list, &region->list);
-		}
-	}
 
 	mm->pgd_base = alloc_pgd();
 	if (mm->pgd_base == 0) {
@@ -374,18 +373,16 @@ int vm_mm_init(struct vm *vm)
 		return -ENOMEM;
 	}
 
-	if (is_list_empty(&mm->mem_list)) {
-		pr_error("No memory config for this vm\n");
-		return -EINVAL;
-	}
+	list_for_each_entry(region, &mem_list, list) {
+		if (region->vmid != vm->vmid)
+			continue;
 
-	list_for_each_entry(region, &mm->mem_list, list) {
-		create_guest_mapping(vm, region->mem_base, region->vir_base,
+		create_guest_mapping(vm, region->vir_base, region->phy_base,
 				region->size, region->type);
 	}
 
 	list_for_each_entry(region, &shared_mem_list, list) {
-		create_guest_mapping(vm, region->mem_base, region->vir_base,
+		create_guest_mapping(vm, region->vir_base, region->phy_base,
 				region->size, region->type);
 	}
 
@@ -400,17 +397,15 @@ int vmm_init(void)
 	unsigned long pud;
 	unsigned long *tbase;
 
-	/* map all vm0 dram memory to host */
-	vm = get_vm_by_id(0);
-	if (!vm)
-		panic("no vm found for vmid 0\n");
-
-	mm = &vm->mm;
-	list_for_each_entry(region, &mm->mem_list, list) {
+	/* map all normal memory to host memory space */
+	list_for_each_entry(region, &mem_list, list) {
 		if (region->type != MEM_TYPE_NORMAL)
 			continue;
 
-		create_host_mapping(region->vir_base, region->mem_base,
+		if (region->vmid == VMID_HOST)
+			continue;
+
+		create_host_mapping(region->phy_base, region->phy_base,
 				region->size, region->type);
 	}
 
@@ -420,7 +415,12 @@ int vmm_init(void)
 	 * n region, one vm has a region, so if the system has
 	 * max 64 vms, then each vm can mmap 16M max one time
 	 */
-	pud = get_mapping_pud(mm->pgd_base, VM0_MMAP_REGION_START, 0);
+	vm = get_vm_by_id(0);
+	if (!vm)
+		panic("no vm found for vmid 0\n");
+
+	mm = &vm->mm;
+	pud = get_mapping_pud(mm->pgd_base, VM0_MMAP_MEM_START, 0);
 	if (pud > INVALID_MAPPING)
 		panic("mmap region should not mapped for vm0\n");
 
@@ -431,7 +431,7 @@ int vmm_init(void)
 	memset((void *)pud, 0, PAGE_SIZE);
 	tbase = (unsigned long *)mm->pgd_base;
 	create_pud_mapping((unsigned long)tbase,
-			VM0_MMAP_REGION_START,
+			VM0_MMAP_MEM_START,
 			pud, VM_DES_TABLE | VM_IO | VM_HOST);
 
 	vm0_mmap_base = (unsigned long *)pud;

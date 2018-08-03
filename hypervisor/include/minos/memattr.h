@@ -4,6 +4,7 @@
 #define GUEST_PGD_PAGE_NR	(__GUEST_PGD_PAGE_NR)
 #define GUEST_PGD_PAGE_ALIGN	(__GUEST_PGD_PAGE_ALIGN)
 
+#define MEM_TYPE_SHARED		(0x0)
 #define MEM_TYPE_IO		(0x1)
 #define MEM_TYPE_NORMAL		(0x2)
 

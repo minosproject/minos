@@ -26,7 +26,6 @@ void parse_memtags(void)
 
 	for (i = 0; i < size; i++)
 		register_memory_region(&memtags[i]);
-
 }
 
 void parse_virqs(void)
