@@ -15,6 +15,7 @@
 #include <minos/device_id.h>
 #include <minos/arch.h>
 #include <minos/calltrace.h>
+#include <minos/preempt.h>
 
 struct vcpu;
 
@@ -23,7 +24,7 @@ struct vcpu;
 		do { ; } while (1); \
 	}
 
-typedef void (*hook_func_t)(struct vcpu *vcpu, void *contex);
+typedef void (*hook_func_t)(void *item, void *contex);
 
 enum hook_type {
 	MINOS_HOOK_TYPE_EXIT_FROM_GUEST = 0,
@@ -40,8 +41,7 @@ struct hook {
 void irq_enter(gp_regs *regs);
 void irq_exit(gp_regs *regs);
 
-int do_hooks(struct vcpu *vcpu, void *context,
-		enum hook_type type);
+int do_hooks(void *item, void *context, enum hook_type type);
 
 void *get_module_pdata(unsigned long s, unsigned long e,
 		int (*check)(struct module_id *module));

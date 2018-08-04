@@ -66,12 +66,12 @@ int register_hook(hook_func_t fn, enum hook_type type)
 	return 0;
 }
 
-int do_hooks(struct vcpu *vcpu, void *context, enum hook_type type)
+int do_hooks(void *item, void *context, enum hook_type type)
 {
 	struct hook *hook;
 
 	list_for_each_entry(hook, &hook_lists[type], list)
-		hook->fn(vcpu, context);
+		hook->fn(item, context);
 
 	return 0;
 }

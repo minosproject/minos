@@ -21,8 +21,8 @@
 #define __PTE_DES_OFFSET		(12)
 #define __PTE_ENTRY_OFFSET_MASK		(0x1ffUL << __PTE_RANGE_OFFSET)
 
-#define __GUEST_PGD_PAGE_NR		(2)
-#define __GUEST_PGD_PAGE_ALIGN		(2)
+#define __GVM_PGD_PAGE_NR		(2)
+#define __GVM_PGD_PAGE_ALIGN		(2)
 
 #define __PAGETABLE_ATTR_MASK		(0x0000ffffffe00000UL)
 

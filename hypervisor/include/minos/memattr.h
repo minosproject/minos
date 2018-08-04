@@ -1,8 +1,8 @@
 #ifndef __MINOS_MEM_ATTR_H__
 #define __MINOS_MEM_ATTR_H__
 
-#define GUEST_PGD_PAGE_NR	(__GUEST_PGD_PAGE_NR)
-#define GUEST_PGD_PAGE_ALIGN	(__GUEST_PGD_PAGE_ALIGN)
+#define GVM_PGD_PAGE_NR		(__GVM_PGD_PAGE_NR)
+#define GVM_PGD_PAGE_ALIGN	(__GVM_PGD_PAGE_ALIGN)
 
 #define MEM_TYPE_SHARED		(0x0)
 #define MEM_TYPE_IO		(0x1)
@@ -11,6 +11,7 @@
 #define VM_NONE			(0x00000000)
 #define VM_IO			(0x00000001)
 #define VM_NORMAL		(0x00000002)
+#define VM_RO			(0x00000004)
 #define VM_TYPE_MAKS		(0x000000ff)
 
 #define VM_DES_FAULT		(0x00000000)
@@ -20,6 +21,10 @@
 #define VM_DES_MASK		(0x00000f00)
 
 #define VM_HOST			(0x00001000)
+
+#define VM_FORCE_4K		(0x00010000)
+#define VM_FORCE_2M		(0x00020000)
+#define VM_FORCE_1G		(0x00040000)
 
 #define MEM_REGION_NAME_SIZE	32
 

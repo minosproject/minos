@@ -36,6 +36,7 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <getopt.h>
+#include <sys/mount.h>
 
 #include <mvm.h>
 
@@ -52,20 +53,29 @@ static struct vm_os *vm_oses[] = {
 	NULL,
 };
 
-int map_vm_memory(int fd, uint64_t offset, uint64_t size)
+void *map_vm_memory(struct vm *vm)
 {
 	uint64_t args[2];
+	void *addr = NULL;
 
-	args[0] = offset;
-	args[1] = size;
+	args[0] = 0;
+	args[1] = vm->vm_info.mem_size;
 
-	if (ioctl(fd, IOCTL_VM_MMAP, args)) {
+	addr = mmap(NULL, args[1], PROT_READ | PROT_WRITE,
+			MAP_SHARED, vm->vm_fd, args[0]);
+	if (addr == (void *)-1)
+		return NULL;
+
+	printv("mmap addr is 0x%lx\n", (unsigned long)addr);
+
+	if (ioctl(vm->vm_fd, IOCTL_VM_MMAP, args)) {
 		printf("* error - mmap memory failed 0x%lx 0x%lx\n",
-				offset, size);
-		return -EIO;
+				args[0], vm->vm_info.mem_size);
+		munmap(addr, vm->vm_info.mem_size);
+		addr = 0;
 	}
 
-	return 0;
+	return addr;
 }
 
 static int create_new_vm(struct vm_info *vminfo)
@@ -121,7 +131,7 @@ int destroy_vm(struct vm *vm)
 	if (vm->mmap) {
 		if (vm->vm_fd)
 			ioctl(vm->vm_fd, IOCTL_VM_UNMAP, 0);
-		munmap(vm->mmap, vm->mmap_size);
+		munmap(vm->mmap, vm->vm_info.mem_size);
 	}
 
 	if (vm->vm_fd > 0)
@@ -160,16 +170,15 @@ void print_usage(void)
 
 static int create_and_init_vm(struct vm *vm)
 {
-	int ret;
+	int ret = 0;
 	char path[32];
-	unsigned long size;
 	struct vm_info *info = &vm->vm_info;
 
 	/* set the default value of vm_info if not give */
 	if (info->entry == 0)
 		info->entry = VM_MEM_START;
 	if (info->mem_start == 0)
-		info->entry = VM_MEM_START;
+		info->mem_start = VM_MEM_START;
 	if (info->mem_size == 0)
 		info->mem_size = VM_MIN_MEM_SIZE;
 	if (info->nr_vcpus == 0)
@@ -187,22 +196,16 @@ static int create_and_init_vm(struct vm *vm)
 		return -EIO;
 	}
 
-	ret = ioctl(vm->vm_fd, IOCTL_GET_VM_MMAP_SIZE, &size);
-	if (ret || (size == 0))
-		return -EAGAIN;
-
 	/*
 	 * map a fix region for this vm, need to call ioctl
 	 * to informe hypervisor to map the really physical
 	 * memory
 	 */
-	vm->mmap_size = size;
-	vm->mmap = mmap(0, size, PROT_READ | PROT_WRITE,
-			MAP_SHARED, vm->vm_fd, 0);
-	if (vm->mmap == (void *)-1) {
-		printf("* error - can not mmap the vm's memory\n");
+	vm->mmap = map_vm_memory(vm);
+	if (!vm->mmap)
 		return -EAGAIN;
-	}
+
+	*(unsigned long *)vm->mmap = 0xdeadbeef;
 
 	/* load the image into the vm memory */
 	ret = vm->os->load_image(vm);
@@ -268,6 +271,7 @@ static int mvm_main(struct vm_info *info, char *image_path, unsigned long flags)
 	mvm_vm->os = os;
 	mvm_vm->image_fd = image_fd;
 	mvm_vm->flags = flags;
+	info->mmap_base = 0;
 	memcpy(&mvm_vm->vm_info, info, sizeof(struct vm_info));
 
 	/* free the unused memory */

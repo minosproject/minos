@@ -29,31 +29,6 @@ extern int create_static_vms(void);
 extern struct virt_config virt_config;
 struct virt_config *mv_config = &virt_config;
 
-int taken_from_guest(gp_regs *regs)
-{
-	return arch_taken_from_guest(regs);
-}
-
-void exit_from_guest(struct vcpu *vcpu, gp_regs *regs)
-{
-	do_hooks(vcpu, (void *)regs, MINOS_HOOK_TYPE_EXIT_FROM_GUEST);
-}
-
-void enter_to_guest(struct vcpu *vcpu, gp_regs *regs)
-{
-	do_hooks(vcpu, (void *)regs, MINOS_HOOK_TYPE_ENTER_TO_GUEST);
-}
-
-void save_vcpu_vcpu_state(struct vcpu *vcpu)
-{
-	save_vcpu_vmodule_state(vcpu);
-}
-
-void restore_vcpu_vcpu_state(struct vcpu *vcpu)
-{
-	restore_vcpu_vmodule_state(vcpu);
-}
-
 int virt_init(void)
 {
 	int ret;

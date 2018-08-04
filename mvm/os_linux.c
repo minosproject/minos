@@ -178,9 +178,9 @@ static int fdt_setup_ramdisk(void *dtb, uint32_t start, uint32_t size)
 
 static int linux_setup_env(struct vm *vm)
 {
-	int ret;
+	int ret = 0;
 	void *vbase;
-	uint32_t pages, seek, offset, load_offset, load_size;
+	uint32_t pages, seek, offset, load_size;
 	struct vm_info *info = &vm->vm_info;
 	boot_img_hdr *hdr = (boot_img_hdr *)vm->os_data;
 
@@ -192,18 +192,14 @@ static int linux_setup_env(struct vm *vm)
 	pages = (pages / hdr->page_size) + 1;
 	seek = pages * hdr->page_size;
 	load_size = BALIGN(hdr->second_size, hdr->page_size);
-	offset = MEM_BLOCK_ALIGN(hdr->second_addr - info->mem_start);
-	load_offset = hdr->second_addr - offset - info->mem_start;
+	offset = hdr->second_addr - info->mem_start;
 
-	printv("0x%x 0x%x 0x%x 0x%x\n", seek, load_size,
-			offset, load_offset);
+	printv("dtb-0x%x 0x%x 0x%x\n", seek, load_size, offset);
 
 	if (lseek(vm->image_fd, seek, SEEK_SET) == -1)
 		return -EIO;
 
-	/*
-	 * the max size of dtb region is 2M
-	 */
+	/* the max size of dtb region is 2M */
 	vbase = malloc(MEM_BLOCK_SIZE);
 	if (!vbase)
 		return -ENOMEM;
@@ -243,18 +239,8 @@ static int linux_setup_env(struct vm *vm)
 				hdr->ramdisk_size);
 	fdt_pack(vbase);
 
-	/*
-	 * copy the new fdt to dtb addr, since max size
-	 * is 2M, so map one time.
-	 */
-	ret = map_vm_memory(vm->vm_fd, offset, MEM_BLOCK_SIZE);
-	if (ret) {
-		printf("* error - map dtb memory failed\n");
-		goto free_mem;
-	}
-
 	ret = 0;
-	memcpy(vm->mmap + load_offset, vbase, MEM_BLOCK_SIZE);
+	memcpy(vm->mmap + offset, vbase, MEM_BLOCK_SIZE);
 
 free_mem:
 	free(vbase);
@@ -262,37 +248,17 @@ free_mem:
 }
 
 static int load_image(struct vm *vm, uint32_t load_offset,
-		uint32_t image_offset, uint64_t mem_offset,
-		uint32_t load_size)
+		uint32_t image_offset, uint32_t load_size)
 {
 	int ret;
-	uint32_t w_size;
-	uint64_t offset = mem_offset, size;
-	int vm_fd = vm->vm_fd, image_fd = vm->image_fd;
-
-	size = vm->mmap_size;
+	int image_fd = vm->image_fd;
 
 	if (lseek(image_fd, image_offset, SEEK_SET) == -1)
 		return -EIO;
 
-	while (load_size > 0) {
-		ret = map_vm_memory(vm_fd, offset, size);
-		if (ret) {
-			printf("map guest memory failed\n");
-			return -ENOMEM;
-		}
-
-		w_size = load_size > size ? size : load_size;
-		ret = read(image_fd, (char *)(vm->mmap + load_offset), w_size);
-		if (ret <= 0)
-			return ret;
-
-		load_size -= w_size;
-		offset += size;
-		load_offset = 0;
-		printv("* load image 0x%x size remain:0x%x\n",
-				w_size, load_size);
-	}
+	ret = read(image_fd, (char *)(vm->mmap + load_offset), load_size);
+	if (ret <= 0)
+		return ret;
 
 	return 0;
 }
@@ -300,27 +266,19 @@ static int load_image(struct vm *vm, uint32_t load_offset,
 static int linux_load_image(struct vm *vm)
 {
 	int ret = 0;
-	uint32_t offset;
 	struct vm_info *info = &vm->vm_info;
 	uint32_t load_size, load_offset, seek, tmp = 1;
 	boot_img_hdr *hdr = (boot_img_hdr *)vm->os_data;
 
-	/*
-	 * map vm memory to vm0 space and using mmap
-	 * to map them into vm0 userspace, 16M is the
-	 * max map size supported now.
-	 */
-
 	/* load the kernel image to guest memory */
-	offset = MEM_BLOCK_ALIGN(hdr->kernel_addr - info->mem_start);
-	load_offset = hdr->kernel_addr - offset - info->mem_start;
+	load_offset = hdr->kernel_addr - info->mem_start;
 	load_size = hdr->kernel_size;
 	seek = tmp * hdr->page_size;
 
-	printv("* load kernel image: 0x%x 0x%x 0x%x 0x%x\n",
-			offset, load_offset, seek, load_size);
+	printv("* load kernel image: 0x%x 0x%x 0x%x\n",
+			load_offset, seek, load_size);
 
-	ret = load_image(vm, load_offset,seek, offset, load_size);
+	ret = load_image(vm, load_offset, seek, load_size);
 	if (ret) {
 		perror("* error - load kernel image failed\n");
 		return ret;
@@ -332,14 +290,13 @@ static int linux_load_image(struct vm *vm)
 	if (vm->flags & (MVM_FLAGS_NO_RAMDISK))
 		return 0;
 
-	offset = MEM_BLOCK_ALIGN(hdr->ramdisk_addr - info->mem_start);
-	load_offset = hdr->ramdisk_addr - offset - info->mem_start;
+	load_offset = hdr->ramdisk_addr - info->mem_start;
 	load_size = hdr->ramdisk_size;
 	seek = tmp * hdr->page_size;
 
-	printv("* load ramdisk image: 0x%x 0x%x 0x%x 0x%x\n",
-			offset, load_offset, seek, load_size);
-	ret = load_image(vm, load_offset, seek, offset, load_size);
+	printv("* load ramdisk image:0x%x 0x%x 0x%x\n",
+			load_offset, seek, load_size);
+	ret = load_image(vm, load_offset, seek, load_size);
 	if (ret) {
 		perror("* error - load ramdisk image failed\n");
 		return ret;

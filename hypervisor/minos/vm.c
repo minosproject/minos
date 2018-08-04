@@ -59,7 +59,7 @@ int create_new_vm(struct vm_info *info)
 	struct vmtag vme;
 	size_t size;
 	struct vm_info *vm_info = (struct vm_info *)
-			guest_va_to_ipa((unsigned long)info, 1);
+			guest_va_to_pa((unsigned long)info, 1);
 
 	if (!vm_info)
 		return VMID_INVALID;
@@ -73,12 +73,12 @@ int create_new_vm(struct vm_info *info)
 	size = vm_info->mem_size;
 
 	if (vm_info->mem_start == 0)
-		vm_info->mem_start = GUEST_NORMAL_MEM_START;
+		vm_info->mem_start = GVM_NORMAL_MEM_START;
 
-	if (vm_info->mem_start < GUEST_NORMAL_MEM_START)
+	if (vm_info->mem_start < GVM_NORMAL_MEM_START)
 		return -EINVAL;
 
-	if ((vm_info->mem_start + size) > GUSET_MEMORY_END)
+	if ((vm_info->mem_start + size) >= GVM_NORMAL_MEM_END)
 		return -EINVAL;
 
 	if (!has_enough_memory(size))
@@ -100,9 +100,20 @@ int create_new_vm(struct vm_info *info)
 	vm->bit64 = !!vm_info->bit64;
 	vm_mm_struct_init(vm);
 
+	ret = vm_mmap_init(vm, size);
+	if (ret) {
+		pr_error("no more mmap space for vm\n");
+		goto release_vm;
+	}
+
+	vm_info->mmap_base = vm->mm.hvm_mmap_base;
+
 	ret = alloc_vm_memory(vm, vm_info->mem_start, size);
 	if (ret)
 		goto release_vm;
+
+	do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_CREATE_VM);
+	dsb();
 
 	return (vm->vmid);
 

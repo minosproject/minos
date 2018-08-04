@@ -20,6 +20,7 @@
 #include <minos/virt.h>
 #include <minos/vm.h>
 #include <minos/hypercall.h>
+#include <minos/virq.h>
 
 static int vcpu_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 {
@@ -30,40 +31,50 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 {
 	int vmid = -1;
 	unsigned long addr;
-	unsigned long size;
 
 	switch (id) {
 	case HVC_VM_CREATE:
 		vmid = create_new_vm((struct vm_info *)args[0]);
 		HVC_RET1(c, vmid);
 		break;
+
 	case HVC_VM_DESTORY:
 		destroy_vm(get_vm_by_id((int)(args[0])));
 		HVC_RET1(c, 0);
 		break;
+
 	case HVC_VM_RESTART:
 		break;
+
 	case HVC_VM_POWER_UP:
 		vmid = vm_power_up((int)args[0]);
 		HVC_RET1(c, vmid);
 		break;
+
 	case HVC_VM_POWER_DOWN:
 		break;
+
 	case HVC_VM_MMAP:
 		addr = create_vm_mmap((int)args[0], args[1], args[2]);
 		HVC_RET1(c, addr);
 		break;
+
 	case HVC_VM_UNMMAP:
 		destroy_vm_mmap((int)args[0]);
 		HVC_RET1(c, 0);
 		break;
 
-	case HVC_VM_GET_MMAP_INFO:
-		addr = get_vm_mmap_info((int)args[0], &size);
-		HVC_RET2(c, addr, size);
+	case HVC_VM_SEND_VIRQ:
+		send_virq_to_vm((int)args[0], (int)args[1]);
+		HVC_RET1(c, 0);
+		break;
+
+	default:
+		pr_error("unsupport vm hypercall");
+		break;
 	}
 
-	return 0;
+	HVC_RET1(c, -EINVAL);
 }
 
 static int pm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)

@@ -28,6 +28,8 @@
 #define PMD_MAP_SIZE		(1UL << PMD_RANGE_OFFSET)
 #define PTE_MAP_SIZE		(1UL << PTE_RANGE_OFFSET)
 
+#define PAGE_MAPPING_COUNT	(PAGE_SIZE / sizeof(unsigned long))
+
 #define PGD_NOT_MAPPED		(PGD + 1)
 #define PUD_NOT_MAPPED		(PUD + 1)
 #define PMD_NOT_MAPPED		(PMD + 1)
@@ -35,6 +37,10 @@
 #define INVALID_MAPPING		(6)
 
 #define mapping_error(r)	(((unsigned long)(r) > 0) && ((unsigned long)(r) <= 6))
+
+#define pud_offset(vir)		((vir - ALIGN(vir, PGD_OFFSET)) >> PUD_RANGE_OFFSET)
+#define pmd_offset(vir)		((vir - ALIGN(vir, PUD_MAP_SIZE)) >> PMD_RANGE_OFFSET)
+#define pte_offset(vir)		((vir - ALIGN(vir, PMD_MAP_SIZE)) >> PTE_RANGE_OFFSET)
 
 struct mm_struct;
 
@@ -103,4 +109,7 @@ void create_pte_mapping(unsigned long pte, unsigned long vir,
 		unsigned long value, unsigned long flags);
 void create_pgd_mapping(unsigned long pgd, unsigned long vir,
 		unsigned long value, unsigned long flags);
+
+unsigned long alloc_guest_pud(struct mm_struct *mm, unsigned long phy);
+
 #endif

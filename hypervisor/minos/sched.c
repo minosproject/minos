@@ -125,7 +125,7 @@ void sched(void)
 	vcpu = pcpu->sched_class->pick_vcpu(pcpu);
 	local_irq_restore(flags);
 
-	if ((vcpu != current) && (!need_resched)) {
+	if (vcpu != current) {
 		local_irq_save(flags);
 		pcpu->sched_class->sched(pcpu, current, vcpu);
 		switch_to_vcpu(current, vcpu);

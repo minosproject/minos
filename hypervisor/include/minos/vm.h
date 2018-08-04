@@ -32,6 +32,7 @@ struct vm_info {
 	uint64_t mem_start;
 	uint64_t entry;
 	uint64_t setup_data;
+	uint64_t mmap_base;
 };
 
 struct vm {

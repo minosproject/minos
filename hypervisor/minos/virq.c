@@ -344,13 +344,14 @@ void clear_pending_virq(uint32_t irq)
 	spin_unlock_irqrestore(&virq_struct->lock, flags);
 }
 
-static void irq_enter_to_guest(struct vcpu *vcpu, void *data)
+static void irq_enter_to_guest(void *item, void *data)
 {
 	/*
 	 * here we send the real virq to the vcpu
 	 * before it enter to guest
 	 */
 	struct virq *virq, *n;
+	struct vcpu *vcpu = (struct vcpu *)item;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
 
 	spin_lock(&virq_struct->lock);
@@ -374,7 +375,7 @@ static void irq_enter_to_guest(struct vcpu *vcpu, void *data)
 	spin_unlock(&virq_struct->lock);
 }
 
-static void irq_exit_from_guest(struct vcpu *vcpu, void *data)
+static void irq_exit_from_guest(void *item, void *data)
 {
 	/*
 	 * here we update the states of the irq state
@@ -384,6 +385,7 @@ static void irq_exit_from_guest(struct vcpu *vcpu, void *data)
 	 */
 	int status;
 	struct virq *virq, *n;
+	struct vcpu *vcpu = (struct vcpu *)item;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
 
 	spin_lock(&virq_struct->lock);

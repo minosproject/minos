@@ -112,6 +112,7 @@ static unsigned long alloc_mapping_page(struct mm_struct *mm)
 	if (!page)
 		return 0;
 
+	memset(page_to_addr(page), 0, PAGE_SIZE);
 	page->next = mm->head;
 	mm->head = page;
 
@@ -397,4 +398,25 @@ void create_pte_mapping(unsigned long pte, unsigned long vir,
 		unsigned long value, unsigned long flags)
 {
 	create_level_mapping(PTE, pte, vir, value, flags);
+}
+
+unsigned long alloc_guest_pud(struct mm_struct *mm, unsigned long phy)
+{
+	unsigned long pud;
+
+	if (!mm->pgd_base)
+		return 0;
+
+	pud = get_mapping_entry(mm->pgd_base, phy, PUD, PUD);
+	if (pud)
+		return pud;
+
+	/* alloc a new pmd mapping page */
+	spin_lock(&mm->lock);
+	pud = alloc_mapping_page(mm);
+	if (pud)
+		create_pud_mapping(mm->pgd_base, phy, pud, VM_DES_TABLE);
+
+	spin_unlock(&mm->lock);
+	return pud;
 }

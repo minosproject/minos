@@ -8,9 +8,6 @@
 #define IOCTL_POWER_UP_VM		(0xf004)
 #define IOCTL_VM_MMAP			(0xf005)
 #define IOCTL_VM_UNMAP			(0xf006)
-#define IOCTL_VM_MMAP_INFO		(0xf007)
-
-#define IOCTL_GET_VM_MMAP_SIZE		(0xf100)
 
 /*
  * MVM_FLAGS_NO_RAMDISK - used for linux to indicate
@@ -35,6 +32,7 @@ struct vm_info {
 	uint64_t mem_start;
 	uint64_t entry;
 	uint64_t setup_data;
+	uint64_t mmap_base;
 };
 
 struct vm;
@@ -60,11 +58,10 @@ struct vm {
 	struct vm_os *os;
 	void *os_data;
 	void *mmap;
-	unsigned long mmap_size;
 };
 
 #define VM_MEM_START			(0x80000000UL)
-#define VM_MIN_MEM_SIZE			(32 * 1024 * 1024)
+#define VM_MIN_MEM_SIZE			(64 * 1024 * 1024)
 #define MEM_BLOCK_SIZE			(0x200000)
 #define MEM_BLOCK_SHIFT			(21)
 #define VM_MAX_MMAP_SIZE		(MEM_BLOCK_SIZE * 8)
@@ -78,6 +75,6 @@ struct vm {
 
 #define VM_MAX_VCPUS			(4)
 
-int map_vm_memory(int fd, uint64_t offset, uint64_t size);
+void *map_vm_memory(struct vm *vm);
 
 #endif

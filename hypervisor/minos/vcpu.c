@@ -44,7 +44,7 @@ static int alloc_new_vmid(void)
 	int vmid, start = total_vms;
 
 	spin_lock(&vms_lock);
-	vmid = find_next_zero_bit_loop(vmid_bitmap, CONFIG_MAX_VM, 0);
+	vmid = find_next_zero_bit_loop(vmid_bitmap, CONFIG_MAX_VM, start);
 	if (vmid >= CONFIG_MAX_VM)
 		goto out;
 
@@ -199,9 +199,6 @@ struct vm *create_vm(struct vmtag *vme)
 			return NULL;
 	}
 
-	if (vme->nr_vcpu <= 0)
-		return NULL;
-
 	return __create_vm(vme);
 }
 
@@ -234,7 +231,8 @@ struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id)
 
 static void release_vcpu(struct vcpu *vcpu)
 {
-	vcpu_vmodules_deinit(vcpu);
+	if (vcpu->vmodule_context)
+		vcpu_vmodules_deinit(vcpu);
 	free(vcpu->stack_origin);
 	free(vcpu->virq_struct);
 	free(vcpu);
