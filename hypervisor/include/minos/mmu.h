@@ -2,8 +2,14 @@
 #define _MINOS_MMU_H_
 
 #include <minos/types.h>
+#include <config/config.h>
 #include <minos/memattr.h>
 #include <asm/pagetable.h>
+
+typedef __pgd_t pgd_t;
+typedef __pud_t pud_t;
+typedef __pmd_t pmd_t;
+typedef __pte_t pte_t;
 
 #define PGD_RANGE_OFFSET	(__PGD_RANGE_OFFSET)
 #define PGD_DES_OFFSET		(__PGD_DES_OFFSET)
@@ -28,7 +34,17 @@
 #define PMD_MAP_SIZE		(1UL << PMD_RANGE_OFFSET)
 #define PTE_MAP_SIZE		(1UL << PTE_RANGE_OFFSET)
 
-#define PAGE_MAPPING_COUNT	(PAGE_SIZE / sizeof(unsigned long))
+#define PAGE_MAPPING_COUNT	(PAGE_SIZE / sizeof(pgd_t))
+
+#define PGD_SHIFT		PGD_RANGE_OFFSET
+#define PUD_SHIFT		PUD_RANGE_OFFSET
+#define PMD_SHIFT		PMD_RANGE_OFFSET
+#define PTE_SHIFT		PMD_RANGE_OFFSET
+
+#define PGD_MASK		(~(PGD_MAP_SIZE - 1))
+#define PUD_MASK		(~(PUD_MAP_SIZE - 1))
+#define PMD_MASK		(~(PMD_MAP_SIZE - 1))
+#define PTE_MASK		(~(PTE_MAP_SIZE - 1))
 
 #define PGD_NOT_MAPPED		(PGD + 1)
 #define PUD_NOT_MAPPED		(PUD + 1)
@@ -38,9 +54,37 @@
 
 #define mapping_error(r)	(((unsigned long)(r) > 0) && ((unsigned long)(r) <= 6))
 
-#define pud_offset(vir)		((vir - ALIGN(vir, PGD_OFFSET)) >> PUD_RANGE_OFFSET)
-#define pmd_offset(vir)		((vir - ALIGN(vir, PUD_MAP_SIZE)) >> PMD_RANGE_OFFSET)
-#define pte_offset(vir)		((vir - ALIGN(vir, PMD_MAP_SIZE)) >> PTE_RANGE_OFFSET)
+#define pgd_idx(vir)		((vir >> PGD_SHIFT) & (PAGE_MAPPING_COUNT - 1))
+#define pud_idx(vir)		((vir >> PUD_SHIFT) & (PAGE_MAPPING_COUNT - 1))
+#define pmd_idx(vir)		((vir >> PMD_SHIFT) & (PAGE_MAPPING_COUNT - 1))
+#define ptd_idx(vir)		((vir >> PTE_SHIFT) & (PAGE_MAPPING_COUNT - 1))
+
+#ifdef ARCH_AARCH64
+#define guest_pgd_idx(vir)	BUG()
+#define guest_pud_idx(vir)	((vir >> PUD_SHIFT) & ((PAGE_MAPPING_COUNT * 2) - 1))
+#define guest_pmd_idx(vir)	pmd_idx(vir)
+#define guest_pte_idx(vir)	pte_idx(vir)
+#else
+#define guest_pgd_idx(vir)	pgd_idx(vir)
+#define guest_pud_idx(vir)	pud_idx(vir)
+#define guest_pmd_idx(vir)	pmd_idx(vir)
+#define guest_pte_idx(vir)	pte_idx(vir)
+#endif
+
+#define pgd_offset(ppgd, vir)	((pgd_t *)ppgd + pgd_idx(vir))
+#define pud_offset(ppud, vir)	((pud_t *)ppud + pud_idx(vir))
+#define pmd_offset(ppmd, vir)	((pmd_t *)ppmd + pmd_idx(vir))
+#define pte_offset(ppte, vir)	((pte_t *)ppte + pte_idx(vir))
+
+#ifdef ARCH_AARCH64
+#define guest_pgd_offset(ppgd, vir) 	((pgd_t *)ppgd)
+#else
+#define guest_pgd_offset(ppgd, vir) 	pgd_offset(ppgd, vir)
+#endif
+
+#define guest_pud_offset(ppud, vir) 	pud_offset(ppud, vir)
+#define guest_pmd_offset(ppmd, vir)	pmd_offset(ppmu, vir)
+#define guest_pte_offset(ppte, vir)	pte_offset(ppte, vir)
 
 struct mm_struct;
 
@@ -75,21 +119,12 @@ get_mapping_pte(unsigned long pgd, unsigned long vir, unsigned long flags)
 }
 
 static inline unsigned long
-get_mapping_pgd(unsigned long pgd, unsigned long vir, unsigned long flags)
-{
-	if (!(flags & VM_HOST))
-		return 0;
-
-	return get_mapping_entry(pgd, vir, PGD, PGD);
-}
-
-static inline unsigned long
 get_mapping_pud(unsigned long pgd, unsigned long vir, unsigned long flags)
 {
 	if (flags & VM_HOST)
 		return get_mapping_entry(pgd, vir, PGD, PUD);
 	else
-		return get_mapping_entry(pgd, vir, PUD, PUD);
+		return 0;
 }
 
 static inline unsigned long
@@ -110,6 +145,6 @@ void create_pte_mapping(unsigned long pte, unsigned long vir,
 void create_pgd_mapping(unsigned long pgd, unsigned long vir,
 		unsigned long value, unsigned long flags);
 
-unsigned long alloc_guest_pud(struct mm_struct *mm, unsigned long phy);
+unsigned long alloc_guest_pmd(struct mm_struct *mm, unsigned long phy);
 
 #endif

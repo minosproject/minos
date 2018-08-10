@@ -1,19 +1,32 @@
 #ifndef __MINOS_USER_H__
 #define __MINOS_USER_H__
 
-#define IOCTL_CREATE_VM			(0xf000)
-#define IOCTL_DESTROY_VM		(0xf001)
-#define IOCTL_RESTART_VM		(0xf002)
-#define IOCTL_POWER_DOWN_VM		(0xf003)
-#define IOCTL_POWER_UP_VM		(0xf004)
-#define IOCTL_VM_MMAP			(0xf005)
-#define IOCTL_VM_UNMAP			(0xf006)
+#include <sys/types.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <termios.h>
+#include <inttypes.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/ioctl.h>
+#include <list.h>
+
+#include <mvm_ioctl.h>
+#include <compiler.h>
 
 /*
  * MVM_FLAGS_NO_RAMDISK - used for linux to indicate
  * that the system has no ramdisk image
  */
 #define MVM_FLAGS_NO_RAMDISK		(1 << 0)
+
+#define DEFINE_OS(os) \
+	static void *os_##os __section("mvm_os") __used = &os;
+
+extern unsigned char __start_mvm_os;
+extern unsigned char __stop_mvm_os;
 
 extern int verbose;
 
@@ -76,5 +89,10 @@ struct vm {
 #define VM_MAX_VCPUS			(4)
 
 void *map_vm_memory(struct vm *vm);
+
+static inline void send_virq_to_vm(struct vm *vm, int virq)
+{
+	ioctl(vm->vm_fd, IOCTL_SEND_VIRQ, (long)virq);
+}
 
 #endif

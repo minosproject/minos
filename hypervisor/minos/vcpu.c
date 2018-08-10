@@ -148,12 +148,25 @@ int vcpu_suspend(gp_regs *c, uint32_t state, unsigned long entry)
 static struct vm *__create_vm(struct vmtag *vme)
 {
 	struct vm *vm;
+	int count;
 
 	vm = (struct vm *)malloc(sizeof(struct vm));
 	if (!vm)
 		return NULL;
 
+	if (vme->vmid == 0)
+		count = MAX_HVM_VIRQ;
+	else
+		count = MAX_GVM_VIRQ;
+
 	memset((char *)vm, 0, sizeof(struct vm));
+	vm->virq_map = malloc(BITS_TO_LONGS(count));
+	if (!vm->virq_map) {
+		free(vm);
+		return NULL;
+	}
+
+	memset(vm->virq_map, 0, BITS_TO_LONGS(count));
 	vm->vcpus = (struct vcpu **)malloc(sizeof(struct vcpu *) * vme->nr_vcpu);
 	if (!vm->vcpus) {
 		free(vm);
@@ -169,6 +182,7 @@ static struct vm *__create_vm(struct vmtag *vme)
 	vm->bit64 = vme->bit64;
 	vm->entry_point = vme->entry;
 	vm->setup_data = vme->setup_data;
+	init_list(&vm->vdev_list);
 	memcpy(vm->vcpu_affinity, vme->vcpu_affinity,
 			sizeof(int) * CONFIG_VM_MAX_VCPU);
 
@@ -364,6 +378,9 @@ void destroy_vm(struct vm *vm)
 
 	release_vm_memory(vm);
 	free(vm->vcpus);
+
+	if (vm->virq_map)
+		free(vm->virq_map);
 
 	/*
 	 * update the vmid bitmap and other things

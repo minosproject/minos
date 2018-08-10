@@ -20,6 +20,8 @@
 #include <minos/virq.h>
 #include <minos/virt.h>
 
+static DEFINE_SPIN_LOCK(hvm_irq_lock);
+
 enum virq_domain_type {
 	VIRQ_DOMAIN_SGI = 0,
 	VIRQ_DOMAIN_PPI,
@@ -275,27 +277,12 @@ int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq)
 {
 	int ret;
 	unsigned long flags;
-	struct virq_desc *desc;
-
-	desc = get_virq_desc(virq);
-	if (!desc)
-		return -ENOENT;
 
 	local_irq_save(flags);
-	ret = __send_virq(vcpu, virq, 0, 0, desc->pr);
+	ret = __send_virq(vcpu, virq, 0, 0, 0xa0);
 	local_irq_restore(flags);
 
 	return ret;
-}
-
-int send_virq_to_vm(uint32_t vmid, uint32_t virq)
-{
-	/*
-	 * default all the virq do not attached to
-	 * the hardware irq will send to the vcpu0
-	 * of a vm
-	 */
-	return send_virq_to_vcpu(get_vcpu_by_id(vmid, 0), virq);
 }
 
 void send_vsgi(struct vcpu *sender, uint32_t sgi, cpumask_t *cpumask)
@@ -523,11 +510,45 @@ int register_virq(struct virqtag *v)
 	return 0;
 }
 
+int alloc_vm_virq(struct vm *vm, int count)
+{
+	int virq;
+	int base;
+
+	if (vm->vmid == 0) {
+		spin_lock(&hvm_irq_lock);
+		base = HVM_VIRQ_BASE;
+	} else
+		base = GVM_VIRQ_BASE;
+
+	virq = find_next_zero_bit_loop(vm->virq_map, count, 0);
+	if (virq >= count)
+		virq = -1;
+
+	if (vm->vmid == 0)
+		spin_unlock(&hvm_irq_lock);
+
+	return virq + base;
+}
+
+void release_vm_virq(struct vm *vm, int virq)
+{
+	int base;
+
+	if (vm->vmid == 0) {
+		spin_lock(&hvm_irq_lock);
+		base = HVM_VIRQ_BASE;
+	} else
+		base = GVM_VIRQ_BASE;
+
+	clear_bit(virq - base, vm->virq_map);
+
+	if (vm->vmid == 0)
+		spin_unlock(&hvm_irq_lock);
+}
+
 void virqs_init(void)
 {
-	alloc_virtual_irqs(VIRQ_BASE, MAX_VIRQ_NR,
-			VIRQ_DOMAIN_VIRTUAL);
-
 	register_hook(irq_exit_from_guest,
 			MINOS_HOOK_TYPE_EXIT_FROM_GUEST);
 

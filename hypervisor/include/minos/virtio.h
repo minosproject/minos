@@ -1,25 +1,16 @@
 #ifndef __MINOS_VIRTIO_H__
 #define __MINOS_VIRTIO_H__
 
-#define VIRTIO_IRQ_START		(256)
-#define VIRTIO_IRQ_COUNT		(640)
+#include <minos/vdev.h>
 
-/* below is the GVM IRQ NUM for each device */
-#define VIRTIO_GVM_IRQ_START		(64)
-#define VIRTIO_GVM_NET_IRQ		(VIRTIO_GVM_IRQ_START + 1)
-#define VIRTIO_GVM_BLOCK_IRQ		(VIRTIO_GVM_IRQ_START + 2)
-#define VIRTIO_GVM_CONSOLE_IRQ		(VIRTIO_GVM_IRQ_START + 3)
-#define VIRTIO_GVM_ENTROPY_IRQ		(VIRTIO_GVM_IRQ_START + 4)
-#define VIRTIO_GVM_BALLOON_IRQ		(VIRTIO_GVM_IRQ_START + 5)
-#define VIRTIO_GVM_IOMEMORY_IRQ		(VIRTIO_GVM_IRQ_START + 6)
-#define VIRTIO_GVM_RPMSG_IRQ		(VIRTIO_GVM_IRQ_START + 7)
-#define VIRTIO_GVM_SCSI_IRQ		(VIRTIO_GVM_IRQ_START + 8)
-#define VIRTIO_GVM_9P_IRQ		(VIRTIO_GVM_IRQ_START + 9)
-#define VIRTIO_GVM_INPUT_IRQ		(VIRTIO_GVM_IRQ_START + 18)
+struct vm;
 
-#define VIRTIO_DEV_TYPE_MAX		(20)
+struct virtio_device {
+	struct vdev vdev;
+	int hvm_irq;
+	int gvm_irq;
+};
 
-
-void *create_virtio_device(struct vm *vm, int dtype);
+void *create_virtio_device(struct vm *vm);
 
 #endif

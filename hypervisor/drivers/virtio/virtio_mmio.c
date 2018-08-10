@@ -23,41 +23,22 @@
 #include <minos/mmio.h>
 #include <minos/io.h>
 #include <minos/sched.h>
+#include <minos/vdev.h>
+#include <minos/virq.h>
 
-/*
- * each virtio device has 0x200 byte memory space, the max
- * count of virtio device is 1024 if there max have 64 vms
- */
+#define vdev_to_virtio(vd) container_of(vd, struct virtio_device, vdev)
 
-#define VIRTIO_IO_OFFSET(addr) (addr - ALIGN(address , PAGE_SIZE))
-
-static DECLARE_BITMAP(virtio_hvmirq_bitmap, VIRTIO_IRQ_COUNT);
-
-static inline void *virtio_device_address(unsigned long address)
-{
-	struct vm *vm = get_vm_by_id(get_vmid(current_vcpu));
-
-	return vm->virtio_iomem_table[(address -
-			VIRTIO_PHY_MEM_BASE) >> PAGE_SHIFT];
-}
-
-static int vaild_virtio_address(gp_regs *regs, unsigned long addr)
-{
-	return !((addr < VIRTIO_PHY_MEM_BASE) ||
-			(addr >= VIRTIO_PHY_MEM_END));
-}
-
-static int virtio_mmio_read(gp_regs *regs, unsigned long address,
-		unsigned long *read_value)
+static int virtio_mmio_read(struct vdev *vdev, gp_regs *regs,
+		unsigned long address, unsigned long *read_value)
 {
 	return 0;
 }
 
-static int virtio_mmio_write(gp_regs *regs, unsigned long address,
-		unsigned long *write_value)
+static int virtio_mmio_write(struct vdev *vdev, gp_regs *regs,
+		unsigned long address, unsigned long *write_value)
 {
-	unsigned long offset = VIRTIO_IO_OFFSET(address);
-	void *iomem = virtio_device_address(address);
+	void *iomem = vdev->iomem;
+	unsigned long offset = address - vdev->gvm_paddr;
 
 	switch (offset) {
 	case VIRTIO_MMIO_HOST_FEATURES:
@@ -93,55 +74,69 @@ static int virtio_mmio_write(gp_regs *regs, unsigned long address,
 	return 0;
 }
 
-static int alloc_virtio_hvm_virq(void)
+static inline void virtio_device_init(struct vm *vm,
+		struct virtio_device *dev)
 {
-	int virq = -1;
+	void *base = dev->vdev.iomem;
 
-	preempt_disable();
-	virq = find_next_zero_bit(virtio_hvmirq_bitmap, VIRTIO_IRQ_COUNT, 0);
-	if (virq >= VIRTIO_IRQ_COUNT)
-		virq = -1;
-	preempt_enable();
-
-	return virq;
+	iowrite32(base + VIRTIO_MMIO_GVM_ADDR, dev->vdev.gvm_paddr);
+	iowrite32(base + VIRTIO_MMIO_MEM_SIZE, dev->vdev.mem_size);
+	iowrite32(base + VIRTIO_MMIO_HVM_IRQ, dev->hvm_irq);
+	iowrite32(base + VIRTIO_MMIO_GVM_IRQ, dev->gvm_irq);
 }
 
-static int virtio_device_init(struct vm *vm, void *base, int hi, int gi)
+void release_virtio_dev(struct vm *vm, struct virtio_device *dev)
 {
-	iowrite32(base + VIRTIO_MMIO_VMINFO, vm->vmid);
-	iowrite32(base + VIRTIO_MMIO_HVM_IRQ, hi);
-	iowrite32(base + VIRTIO_MMIO_GVM_IRQ, gi);
+	if (!dev)
+		return;
 
-	return 0;
+	vdev_release(&dev->vdev);
+
+	if (dev->hvm_irq)
+		release_hvm_virq(dev->hvm_irq);
+	if (dev->gvm_irq)
+		release_gvm_virq(vm, dev->gvm_irq);
+
+	free(dev);
 }
 
-void *create_virtio_device(struct vm *vm, int dtype)
+static void virtio_dev_deinit(struct vdev *vdev)
 {
-	int hvm_virq;
-	void *vm0_base;
-	unsigned long vir;
-	void *base;
+	struct virtio_device *dev = vdev_to_virtio(vdev);
+
+	release_virtio_dev(vdev->vm, dev);
+}
+
+void *create_virtio_device(struct vm *vm)
+{
+	int ret;
+	struct vdev *vdev;
+	struct virtio_device *virtio_dev = NULL;
 
 	if (!vm)
 		return NULL;
 
-	if ((dtype > 18) || (dtype == 0) ||
-			((dtype > 9) && (dtype < 18))) {
-		pr_error("invaild virtio device type %d\n", dtype);
-		return NULL;
-	}
-
-	vir = VIRTIO_PHY_MEM_BASE + PAGE_SIZE * dtype;
-
-	/* get the hvm irq for this vm */
-	hvm_virq = alloc_virtio_hvm_virq();
-	if (hvm_virq < 0)
+	virtio_dev = malloc(sizeof(struct virtio_device));
+	if (!virtio_dev)
 		return NULL;
 
-	/* first alloc IO pages for the devices 4K align*/
-	base = vm_alloc_pages(vm, 1);
-	if (!base)
-		return NULL;
+	memset(virtio_dev, 0, sizeof(struct virtio_device));
+	vdev = &virtio_dev->vdev;
+	ret = vdev_init(vm, vdev, PAGE_SIZE);
+	if (ret)
+		goto out;
+
+	vdev->read = virtio_mmio_read;
+	vdev->write = virtio_mmio_write;
+	vdev->deinit = virtio_dev_deinit;
+
+	virtio_dev->hvm_irq = alloc_hvm_virq();
+	if (virtio_dev->hvm_irq < 0)
+		goto out;
+
+	virtio_dev->gvm_irq = alloc_gvm_virq(vm);
+	if (virtio_dev->gvm_irq < 0)
+		goto out;
 
 	/*
 	 * virtio's io memory need to mapped to host vm mem space
@@ -149,51 +144,16 @@ void *create_virtio_device(struct vm *vm, int dtype)
 	 * by the way, this memory also need to mapped to the
 	 * guest vm 's memory space
 	 */
-	if (create_guest_mapping(vm, vir, (unsigned long)base,
-			PAGE_SIZE, VM_IO | VM_RO))
-		return NULL;
+	if (create_guest_mapping(vm, vdev->gvm_paddr,
+				(unsigned long)vdev->iomem,
+				PAGE_SIZE, VM_IO | VM_RO))
+		goto out;
 
-	/*
-	 * the memory will free when the vm is destoried
-	 */
-	vm0_base = create_hvm_iomem_mmap((unsigned long)base, PAGE_SIZE);
-	if (!vm0_base)
-		return NULL;
+	virtio_device_init(vm, virtio_dev);
 
-	memset((void *)base, 0, PAGE_SIZE);
-	virtio_device_init(vm, base, hvm_virq,
-			VIRTIO_GVM_IRQ_START + dtype);
-	vm->virtio_iomem_table[dtype] = base;
+	return (void *)vdev->hvm_paddr;
 
-	return vm0_base;
+out:
+	release_virtio_dev(vm, virtio_dev);
+	return NULL;
 }
-
-static struct mmio_ops virtio_mmio_ops = {
-	.read	= virtio_mmio_read,
-	.write	= virtio_mmio_write,
-	.check	= vaild_virtio_address,
-};
-
-static void virtio_create_vm(void *item, void *arg)
-{
-	struct vm *vm = (struct vm *)item;
-
-	vm->virtio_iomem_table = malloc(sizeof(void *) * VIRTIO_DEV_TYPE_MAX);
-	if (!vm->virtio_iomem_table)
-		pr_error("no memory for vm virito iomem table\n");
-
-	memset(vm->virtio_iomem_table, 0,
-			sizeof(void *) * VIRTIO_DEV_TYPE_MAX);
-}
-
-static int virtio_init(void)
-{
-	bitmap_clear(virtio_hvmirq_bitmap, 0, VIRTIO_IRQ_COUNT);
-	register_hook(virtio_create_vm, MINOS_HOOK_TYPE_CREATE_VM);
-
-	register_mmio_emulation_handler("virtio", &virtio_mmio_ops);
-
-	return 0;
-}
-
-device_initcall(virtio_init);

@@ -26,6 +26,11 @@
 
 #define __PAGETABLE_ATTR_MASK		(0x0000ffffffe00000UL)
 
+typedef unsigned long __pgd_t;
+typedef unsigned long __pud_t;
+typedef unsigned long __pmd_t;
+typedef unsigned long __pte_t;
+
 static inline unsigned long arch_guest_tt_description(unsigned long flags)
 {
 	unsigned long attr = 0;

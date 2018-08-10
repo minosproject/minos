@@ -20,6 +20,8 @@ struct mm_struct {
 	unsigned long mem_base;
 	unsigned long pgd_base;
 	unsigned long hvm_mmap_base;
+	unsigned long gvm_iomem_base;
+	unsigned long gvm_iomem_size;
 	struct page *head;
 	struct list_head mem_list;
 	struct list_head block_list;
@@ -61,6 +63,7 @@ void vm_unmmap(struct vm *vm);
 int vm_mmap_init(struct vm *vm, size_t memsize);
 void *vm_alloc_pages(struct vm *vm, int pages);
 
-void *create_hvm_iomem_mmap(unsigned long phy, uint32_t size);
+unsigned long create_hvm_iomem_map(unsigned long phy, uint32_t size);
+void destroy_hvm_iomem_map(unsigned long vir, uint32_t size);
 
 #endif

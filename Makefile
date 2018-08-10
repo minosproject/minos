@@ -1,14 +1,10 @@
-all: hypervisor kernel_module mvm
+all: hypervisor mvm
 
-.PHONY: hypervisor kernel_module mvm clean distclean
+.PHONY: hypervisor mvm clean distclean
 
 hypervisor:
 	@ echo "build hypervisor"
 	@ cd hypervisor && make
-
-kernel_module:
-	@ echo "build kernel driver module"
-	@ cd kernel_module && make
 
 mvm:
 	@ echo "build minos userspace tools"
@@ -17,11 +13,9 @@ mvm:
 clean:
 	@ echo "clean all things"
 	@ cd hypervisor && make clean
-	@ cd kernel_module && make clean
 	@ cd mvm && make clean
 
 distclean:
 	@ echo "clean all things"
 	@ cd hypervisor && make distclean
-	@ cd kernel_module && make clean
 	@ cd mvm && make clean

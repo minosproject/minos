@@ -338,3 +338,5 @@ struct vm_os os_linux = {
 	.load_image = linux_load_image,
 	.setup_vm_env    = linux_setup_env,
 };
+
+DEFINE_OS(os_linux);

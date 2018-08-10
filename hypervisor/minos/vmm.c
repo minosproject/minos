@@ -217,7 +217,7 @@ void release_vm_memory(struct vm *vm)
 	memset(mm, 0, sizeof(struct mm_struct));
 }
 
-void *create_hvm_iomem_mmap(unsigned long phy, uint32_t size)
+unsigned long create_hvm_iomem_map(unsigned long phy, uint32_t size)
 {
 	unsigned long base = 0;
 	struct vm *vm0 = get_vm_by_id(0);
@@ -238,7 +238,12 @@ void *create_hvm_iomem_mmap(unsigned long phy, uint32_t size)
 	if (create_guest_mapping(vm0, base, phy, size, VM_RW))
 		base = 0;
 out:
-	return (void *)base;
+	return base;
+}
+
+void destroy_hvm_iomem_map(unsigned long vir, uint32_t size)
+{
+	/* TBD */
 }
 
 int vm_mmap_init(struct vm *vm, size_t memsize)
@@ -261,7 +266,7 @@ out:
 int vm_mmap(struct vm *vm, unsigned long offset, unsigned long size)
 {
 	unsigned long vir, phy, value;
-	unsigned long *vm_pud, *vm0_pud;
+	unsigned long *vm_pmd, *vm0_pmd;
 	uint64_t attr;
 	int i, vir_off, phy_off, count, left;
 	struct vm *vm0 = get_vm_by_id(0);
@@ -280,9 +285,9 @@ int vm_mmap(struct vm *vm, unsigned long offset, unsigned long size)
 		size = (mm->mem_size - offset);
 
 	left = size >> PMD_RANGE_OFFSET;
-	phy_off = pmd_offset(phy);
-	vm0_pud = (unsigned long *)alloc_guest_pud(mm0, phy);
-	if (!vm0_pud)
+	phy_off = pmd_idx(phy);
+	vm0_pmd = (unsigned long *)alloc_guest_pmd(mm0, phy);
+	if (!vm0_pmd)
 		return -ENOMEM;
 
 	/*
@@ -292,33 +297,33 @@ int vm_mmap(struct vm *vm, unsigned long offset, unsigned long size)
 	attr = page_table_description(VM_IO | VM_DES_BLOCK);
 
 	while (left > 0) {
-		vm_pud = (unsigned long *)get_mapping_pud(mm->pgd_base, vir, 0);
-		if (mapping_error(vm_pud))
+		vm_pmd = (unsigned long *)get_mapping_pmd(mm->pgd_base, vir, 0);
+		if (mapping_error(vm_pmd))
 			return -EIO;
 
-		vir_off = pmd_offset(vir);
+		vir_off = pmd_idx(vir);
 		count = (PAGE_MAPPING_COUNT - vir_off);
 		count = count > left ? left : count;
 
 		for (i = 0; i < count; i++) {
-			value = *(vm_pud + vir_off);
+			value = *(vm_pmd + vir_off);
 			value &= PAGETABLE_ATTR_MASK;
 			value |= attr;
 
-			*(vm0_pud + phy_off) = value;
+			*(vm0_pmd + phy_off) = value;
 
 			vir += PMD_MAP_SIZE;
 			phy += PMD_MAP_SIZE;
 			vir_off++;
 			phy_off++;
 
-			flush_dcache_range((unsigned long)(vm0_pud + phy_off),
+			flush_dcache_range((unsigned long)(vm0_pmd + phy_off),
 					sizeof(unsigned long));
 
 			if ((phy_off & (PAGE_MAPPING_COUNT - 1)) == 0) {
 				phy_off = 0;
-				vm0_pud = (unsigned long *)alloc_guest_pud(mm0, phy);
-				if (!vm0_pud)
+				vm0_pmd = (unsigned long *)alloc_guest_pmd(mm0, phy);
+				if (!vm0_pmd)
 					return -ENOMEM;
 			}
 		}
@@ -334,7 +339,7 @@ int vm_mmap(struct vm *vm, unsigned long offset, unsigned long size)
 void vm_unmmap(struct vm *vm)
 {
 	unsigned long phy;
-	unsigned long *vm0_pud;
+	unsigned long *vm0_pmd;
 	int left, count, offset;
 	struct vm *vm0 = get_vm_by_id(0);
 	struct mm_struct *mm0 = &vm0->mm;
@@ -344,15 +349,15 @@ void vm_unmmap(struct vm *vm)
 	left = mm->mem_size >> PMD_RANGE_OFFSET;
 
 	while (left > 0) {
-		vm0_pud = (unsigned long *)get_mapping_pud(mm0->pgd_base, phy, 0);
-		if (mapping_error(vm0_pud))
+		vm0_pmd = (unsigned long *)get_mapping_pmd(mm0->pgd_base, phy, 0);
+		if (mapping_error(vm0_pmd))
 			return;
 
-		offset = pmd_offset(phy);
+		offset = pmd_idx(phy);
 		count = PAGE_MAPPING_COUNT - offset;
-		memset((void *)(vm0_pud + offset), 0,
+		memset((void *)(vm0_pmd + offset), 0,
 				count * sizeof(unsigned long));
-		flush_dcache_range((unsigned long)(vm0_pud + offset),
+		flush_dcache_range((unsigned long)(vm0_pmd + offset),
 				count *sizeof(unsigned long));
 
 		if ((offset == 0) && (count == PAGE_MAPPING_COUNT)) {
@@ -449,6 +454,16 @@ void vm_mm_struct_init(struct vm *vm)
 	mm->head = NULL;
 	mm->pgd_base = 0;
 	spin_lock_init(&mm->lock);
+
+	/*
+	 * 0x0 - 0x3fffffff for vdev which controlled by
+	 * hypervisor, like gic and timer
+	 *
+	 * 0x40000000 - 0x7fffffff for vdev which controlled
+	 * by vm0, like virtio device, rtc device
+	 */
+	mm->gvm_iomem_base = GVM_IO_MEM_START + SIZE_1G;
+	mm->gvm_iomem_size = GVM_IO_MEM_SIZE - SIZE_1G;
 }
 
 int vm_mm_init(struct vm *vm)

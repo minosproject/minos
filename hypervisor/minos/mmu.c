@@ -357,7 +357,7 @@ unsigned long get_mapping_entry(unsigned long tt,
 
 		attr = attr->next;
 		table = (unsigned long *)(value & 0xfffffffffffff000);
-	} while (attr->lvl <= end);
+	} while (attr->lvl < end);
 
 	return (unsigned long)table;
 }
@@ -400,23 +400,23 @@ void create_pte_mapping(unsigned long pte, unsigned long vir,
 	create_level_mapping(PTE, pte, vir, value, flags);
 }
 
-unsigned long alloc_guest_pud(struct mm_struct *mm, unsigned long phy)
+unsigned long alloc_guest_pmd(struct mm_struct *mm, unsigned long phy)
 {
-	unsigned long pud;
+	unsigned long pmd;
 
 	if (!mm->pgd_base)
 		return 0;
 
-	pud = get_mapping_entry(mm->pgd_base, phy, PUD, PUD);
-	if (pud)
-		return pud;
+	pmd = get_mapping_entry(mm->pgd_base, phy, PUD, PMD);
+	if (pmd)
+		return pmd;
 
 	/* alloc a new pmd mapping page */
 	spin_lock(&mm->lock);
-	pud = alloc_mapping_page(mm);
-	if (pud)
-		create_pud_mapping(mm->pgd_base, phy, pud, VM_DES_TABLE);
+	pmd = alloc_mapping_page(mm);
+	if (pmd)
+		create_pud_mapping(mm->pgd_base, phy, pmd, VM_DES_TABLE);
 
 	spin_unlock(&mm->lock);
-	return pud;
+	return pmd;
 }

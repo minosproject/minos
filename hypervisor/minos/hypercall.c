@@ -94,8 +94,7 @@ static int virtio_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 
 	switch (id) {
 	case HVC_VIRTIO_CREATE_DEVICE:
-		addr = create_virtio_device(get_vm_by_id((int)args[0]),
-				(int)args[1]);
+		addr = create_virtio_device(get_vm_by_id((int)args[0]));
 		HVC_RET1(c, addr);
 		break;
 	}

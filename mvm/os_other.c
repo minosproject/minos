@@ -59,3 +59,5 @@ struct vm_os os_other = {
 	.load_image	= os_load_image,
 	.setup_vm_env   = os_setup_env,
 };
+
+DEFINE_OS(os_other);

@@ -77,7 +77,7 @@ static int inline virtq_need_event(uint16_t event_idx,
 				(uint16_t)(new_idx - old_idx);
 }
 
-static int inline uint16_t *virtq_used_event(struct virt_queue *vq)
+static inline uint16_t *virtq_used_event(struct virt_queue *vq)
 {
 	return (uint16_t *)&vq->avail->ring[vq->num];
 }

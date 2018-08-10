@@ -106,4 +106,7 @@ typedef void (*void_func_t)(void);
 #define INT_MAX 	(2147483647)
 #define INT_MIN		(-2147483648)
 
+#define BUG() \
+	while (1)
+
 #endif
