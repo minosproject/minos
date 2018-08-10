@@ -26,51 +26,64 @@
 
 #define __PAGETABLE_ATTR_MASK		(0x0000ffffffe00000UL)
 
-static inline unsigned long arch_guest_tt_description(int m_type, int d_type)
+static inline unsigned long arch_guest_tt_description(unsigned long flags)
 {
-	uint64_t attr;
+	unsigned long attr = 0;
+	unsigned long d_type, m_type, rw;
+
+	d_type = flags & VM_DES_MASK;
+	m_type = flags & VM_TYPE_MASK;
+	rw = flags & VM_RW_MASK;
 
 	if (d_type == VM_DES_TABLE)
 		return (uint64_t)TT_S2_ATTR_TABLE;
 
 	if (d_type == VM_DES_BLOCK) {
 		if (m_type == VM_NORMAL) {
-			attr = TT_S2_ATTR_BLOCK | TT_S2_ATTR_AP_RW | \
+			attr = TT_S2_ATTR_BLOCK | \
 			       TT_S2_ATTR_SH_INNER | TT_S2_ATTR_AF | \
 			       TT_S2_ATTR_MEMATTR_OUTER_WB | \
 			       TT_S2_ATTR_MEMATTR_NORMAL_INNER_WB;
 		} else {
-			attr = TT_S2_ATTR_BLOCK | TT_S2_ATTR_AP_RW | \
+			attr = TT_S2_ATTR_BLOCK | \
 			       TT_S2_ATTR_SH_INNER | TT_S2_ATTR_AF | \
 			       TT_S2_ATTR_XN | TT_S2_ATTR_MEMATTR_DEVICE | \
 			       TT_S2_ATTR_MEMATTR_DEV_nGnRnE;
 		}
-
-		return attr;
 	}
 
 	if (d_type == VM_DES_PAGE) {
 		if (m_type == VM_NORMAL) {
-			attr = TT_S2_ATTR_PAGE | TT_S2_ATTR_AP_RW | \
+			attr = TT_S2_ATTR_PAGE | \
 			       TT_S2_ATTR_SH_INNER | TT_S2_ATTR_AF | \
 			       TT_S2_ATTR_MEMATTR_OUTER_WB | \
 			       TT_S2_ATTR_MEMATTR_NORMAL_INNER_WB;
 		} else {
-			attr = TT_S2_ATTR_PAGE | TT_S2_ATTR_AP_RW | \
+			attr = TT_S2_ATTR_PAGE | \
 			       TT_S2_ATTR_SH_INNER | TT_S2_ATTR_AF | \
 			       TT_S2_ATTR_XN | TT_S2_ATTR_MEMATTR_DEVICE | \
 			       TT_S2_ATTR_MEMATTR_DEV_nGnRnE;
 		}
-
-		return attr;
 	}
 
-	return 0;
+	if (rw == VM_RO)
+		attr |= TT_S2_ATTR_AP_RO;
+	else if (rw == VM_WO)
+		attr |= TT_S2_ATTR_AP_WO;
+	else
+		attr |= TT_S2_ATTR_AP_RW;
+
+	return attr;
 }
 
-static inline unsigned long arch_host_tt_description(int m_type, int d_type)
+static inline unsigned long arch_host_tt_description(unsigned long flags)
 {
-	uint64_t attr;
+	unsigned long attr = 0;
+	unsigned long d_type, m_type, rw;
+
+	d_type = flags & VM_DES_MASK;
+	m_type = flags & VM_TYPE_MASK;
+	rw = flags & VM_RW_MASK;
 
 	if (d_type == VM_DES_TABLE)
 		return (uint64_t)TT_S1_ATTR_TABLE;
@@ -80,7 +93,6 @@ static inline unsigned long arch_host_tt_description(int m_type, int d_type)
 			attr = TT_S1_ATTR_BLOCK | \
 			       (1 << TT_S1_ATTR_MATTR_LSB) | \
 			       TT_S1_ATTR_NS | \
-			       TT_S1_ATTR_AP_RW_PL1 | \
 			       TT_S1_ATTR_SH_INNER | \
 			       TT_S1_ATTR_AF | \
 			       TT_S1_ATTR_nG;
@@ -88,13 +100,10 @@ static inline unsigned long arch_host_tt_description(int m_type, int d_type)
 			attr = TT_S1_ATTR_BLOCK | \
 			       (2 << TT_S1_ATTR_MATTR_LSB) | \
 			       TT_S1_ATTR_NS | \
-			       TT_S1_ATTR_AP_RW_PL1 | \
 			       TT_S1_ATTR_AF | \
 			       TT_S1_ATTR_XN | \
 			       TT_S1_ATTR_nG;
 		}
-
-		return attr;
 	}
 
 	if (d_type == VM_DES_PAGE) {
@@ -102,7 +111,6 @@ static inline unsigned long arch_host_tt_description(int m_type, int d_type)
 			attr = TT_S1_ATTR_PAGE | \
 			       (1 << TT_S1_ATTR_MATTR_LSB) | \
 			       TT_S1_ATTR_NS | \
-			       TT_S1_ATTR_AP_RW_PL1 | \
 			       TT_S1_ATTR_SH_INNER | \
 			       TT_S1_ATTR_AF | \
 			       TT_S1_ATTR_nG;
@@ -110,31 +118,27 @@ static inline unsigned long arch_host_tt_description(int m_type, int d_type)
 			attr = TT_S1_ATTR_PAGE | \
 			       (2 << TT_S1_ATTR_MATTR_LSB) | \
 			       TT_S1_ATTR_NS | \
-			       TT_S1_ATTR_AP_RW_PL1 | \
 			       TT_S1_ATTR_AF | \
 			       TT_S1_ATTR_XN | \
 			       TT_S1_ATTR_nG;
 		}
-
-		return attr;
 	}
 
-	return 0;
+	if (rw == VM_RO)
+		attr |= TT_S1_ATTR_AP_RO_PL1;
+	else
+		attr |= TT_S1_ATTR_AP_RW_PL1;
+
+	return attr;
 }
 
 static inline unsigned long
 arch_page_table_description(unsigned long flags)
 {
-	int host, mtype, dtype;
-
-	host = !!(flags & VM_HOST);
-	mtype = flags & VM_TYPE_MAKS;
-	dtype = flags & VM_DES_MASK;
-
-	if (host)
-		return arch_host_tt_description(mtype, dtype);
-
-	return arch_guest_tt_description(mtype, dtype);
+	if (!!(flags & VM_HOST))
+		return arch_host_tt_description(flags);
+	else
+		return arch_guest_tt_description(flags);
 }
 
 static inline int get_mapping_type(int lvl, unsigned long addr)

@@ -19,6 +19,7 @@ src_dir-y			+= minos arch/$(ARCH) platform/$(PLATFORM)
 src_dir-$(CONFIG_UART_PL011)	+= drivers/pl011
 src_dir-$(CONFIG_LIBFDT)	+= external/libfdt
 src_dir-$(CONFIG_JSON_SJSON)	+= external/sjson
+src_dir-y			+= drivers/virtio
 
 inc_dir-y			+= include/minos include/asm include/config config/$(PLATFORM)
 inc_dir-$(CONFIG_LIBFDT)	+= include/libfdt

@@ -28,6 +28,5 @@
 
 /* hypercall for virtio releate operation */
 #define HVC_VIRTIO_CREATE_DEVICE	HVC_VIRTIO_FN(0)
-#define HVC_VIRTIO_DESTORY_DEVICE	HVC_VIRTIO_FN(1)
 
 #endif

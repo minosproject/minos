@@ -41,6 +41,9 @@ int create_host_mapping(unsigned long vir, unsigned long phy,
 		size_t size, unsigned long flags);
 int destroy_host_mapping(unsigned long vir, size_t size);
 
+int create_guest_mapping(struct vm *vm, unsigned long vir,
+		unsigned long phy, size_t size, unsigned long flags);
+
 static inline int
 io_remap(unsigned long vir, unsigned long phy, size_t size)
 {
@@ -56,5 +59,8 @@ io_unmap(unsigned long vir, size_t size)
 int vm_mmap(struct vm *vm, unsigned long offset, unsigned long size);
 void vm_unmmap(struct vm *vm);
 int vm_mmap_init(struct vm *vm, size_t memsize);
+void *vm_alloc_pages(struct vm *vm, int pages);
+
+void *create_hvm_iomem_mmap(unsigned long phy, uint32_t size);
 
 #endif

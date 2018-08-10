@@ -21,6 +21,7 @@
 #include <minos/vm.h>
 #include <minos/hypercall.h>
 #include <minos/virq.h>
+#include <minos/virtio.h>
 
 static int vcpu_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 {
@@ -87,6 +88,21 @@ static int misc_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 	return 0;
 }
 
+static int virtio_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
+{
+	void *addr;
+
+	switch (id) {
+	case HVC_VIRTIO_CREATE_DEVICE:
+		addr = create_virtio_device(get_vm_by_id((int)args[0]),
+				(int)args[1]);
+		HVC_RET1(c, addr);
+		break;
+	}
+
+	HVC_RET1(c, -EINVAL);
+}
+
 DEFINE_HVC_HANDLER("vcpu_hvc_handler", HVC_TYPE_HVC_VCPU,
 		HVC_TYPE_HVC_VCPU, vcpu_hvc_handler);
 
@@ -98,3 +114,6 @@ DEFINE_HVC_HANDLER("pm_hvc_handler", HVC_TYPE_HVC_PM,
 
 DEFINE_HVC_HANDLER("misc_hvc_handler", HVC_TYPE_HVC_MISC,
 		HVC_TYPE_HVC_MISC, misc_hvc_handler);
+
+DEFINE_HVC_HANDLER("virtio_hvc_handler", HVC_TYPE_HVC_VIRTIO,
+		HVC_TYPE_HVC_VIRTIO, virtio_hvc_handler);

@@ -11,8 +11,7 @@
 #define VM_NONE			(0x00000000)
 #define VM_IO			(0x00000001)
 #define VM_NORMAL		(0x00000002)
-#define VM_RO			(0x00000004)
-#define VM_TYPE_MAKS		(0x000000ff)
+#define VM_TYPE_MASK		(0x000000ff)
 
 #define VM_DES_FAULT		(0x00000000)
 #define VM_DES_BLOCK		(0x00000100)
@@ -25,6 +24,11 @@
 #define VM_FORCE_4K		(0x00010000)
 #define VM_FORCE_2M		(0x00020000)
 #define VM_FORCE_1G		(0x00040000)
+
+#define VM_RO			(0x00100000)
+#define VM_WO			(0x00200000)
+#define VM_RW			(VM_RO | VM_WO)
+#define VM_RW_MASK		(0x00300000)
 
 #define MEM_REGION_NAME_SIZE	32
 

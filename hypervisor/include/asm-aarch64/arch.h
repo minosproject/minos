@@ -76,10 +76,10 @@ static inline void arch_restore_irqflags(unsigned long flags)
 	(gp_regs *)(base - sizeof(gp_regs))
 
 #define get_reg_value(regs, index)	\
-	*((uint64_t *)(regs) + index + 3)
+	*((unsigned long *)(regs) + index + 3)
 
 #define set_reg_value(regs, index, value)	\
-	*((uint64_t *)(regs) + index + 3) = value
+	*((unsigned long *)(regs) + index + 3) = (unsigned long)value
 
 #define read_sysreg32(name) ({                          \
     uint32_t _r;                                        \

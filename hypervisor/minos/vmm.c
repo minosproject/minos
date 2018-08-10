@@ -30,8 +30,11 @@ static struct mm_struct host_mm;
 LIST_HEAD(mem_list);
 static LIST_HEAD(shared_mem_list);
 
+static DEFINE_SPIN_LOCK(mmap_lock);
 static unsigned long hvm_normal_mmap_base = HVM_NORMAL_MMAP_START;
 static size_t hvm_normal_mmap_size = HVM_NORMAL_MMAP_SIZE;
+static unsigned long hvm_iomem_mmap_base = HVM_NORMAL_MMAP_START;
+static size_t hvm_iomem_mmap_size = HVM_NORMAL_MMAP_SIZE;
 
 int register_memory_region(struct memtag *res)
 {
@@ -155,7 +158,7 @@ int destroy_host_mapping(unsigned long vir, size_t size)
 	return destroy_mem_mapping(&host_mm, vir, size, VM_HOST);
 }
 
-static int create_guest_mapping(struct vm *vm, unsigned long vir,
+int create_guest_mapping(struct vm *vm, unsigned long vir,
 		unsigned long phy, size_t size, unsigned long flags)
 {
 	unsigned long vir_base, phy_base, tmp;
@@ -214,16 +217,35 @@ void release_vm_memory(struct vm *vm)
 	memset(mm, 0, sizeof(struct mm_struct));
 }
 
-unsigned long create_hvm_iomem_mmap(struct vm *vm, unsigned long phy, uint32_t size)
+void *create_hvm_iomem_mmap(unsigned long phy, uint32_t size)
 {
-	return 0;
+	unsigned long base = 0;
+	struct vm *vm0 = get_vm_by_id(0);
+
+	size = PAGE_BALIGN(size);
+
+	spin_lock(&mmap_lock);
+	if (hvm_iomem_mmap_size < size) {
+		spin_unlock(&mmap_lock);
+		goto out;
+	}
+
+	base = hvm_iomem_mmap_base;
+	hvm_iomem_mmap_size -= size;
+	hvm_normal_mmap_base += size;
+	spin_unlock(&mmap_lock);
+
+	if (create_guest_mapping(vm0, base, phy, size, VM_RW))
+		base = 0;
+out:
+	return (void *)base;
 }
 
 int vm_mmap_init(struct vm *vm, size_t memsize)
 {
 	int ret = -ENOMEM;
 
-	preempt_disable();
+	spin_lock(&mmap_lock);
 	if (hvm_normal_mmap_size < memsize)
 		goto out;
 
@@ -232,7 +254,7 @@ int vm_mmap_init(struct vm *vm, size_t memsize)
 	hvm_normal_mmap_base += memsize;
 	ret = 0;
 out:
-	preempt_enable();
+	spin_unlock(&mmap_lock);
 	return ret;
 }
 

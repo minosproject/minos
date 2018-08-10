@@ -53,6 +53,7 @@ struct vm {
 	struct list_head vm_list;
 
 	unsigned long time_offset;
+	void **virtio_iomem_table;
 
 	/*
 	 * each vm may have its own stage2 memory map
