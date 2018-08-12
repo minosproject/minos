@@ -38,7 +38,7 @@
 		}
 #endif
 	],
-	#include "fvp_virq.json.cc"
+	#include "fvp_irq.json.cc"
 	#include "fvp_mem.json.cc"
 
 	"others" : {

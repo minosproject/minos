@@ -38,11 +38,8 @@ struct vm_info {
 struct vm {
 	int vmid;
 	uint32_t vcpu_nr;
-	uint32_t mmu_on;
-	uint32_t index;
-	int vcpu_pr;
-	int bit64;
-	uint32_t vcpu_affinity[CONFIG_VM_MAX_VCPU];
+	int8_t bit64;
+	uint8_t vcpu_affinity[CONFIG_VM_MAX_VCPU];
 	unsigned long entry_point;
 	unsigned long setup_data;
 	char name[MINOS_VM_NAME_SIZE];
@@ -56,12 +53,10 @@ struct vm {
 
 	struct list_head vdev_list;
 
+	uint32_t virq_nr;
+	int virq_same_page;
+	struct virq_desc *virq_desc;
 	unsigned long *virq_map;
-
-	/*
-	 * each vm may have its own stage2 memory map
-	 * to control the memory access
-	 */
 } __align(sizeof(unsigned long));
 
 #define for_each_vm(vm)	\

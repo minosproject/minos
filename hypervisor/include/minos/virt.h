@@ -17,14 +17,11 @@ struct vmtag {
 	int vcpu_affinity[4];
 };
 
-struct virqtag {
+struct irqtag {
 	uint16_t vno;
 	uint16_t hno;
 	uint16_t vmid;
 	uint16_t vcpu_id;
-	uint8_t enable;
-	uint8_t hw;
-	unsigned int type;
 	char *name;
 };
 
@@ -44,11 +41,11 @@ struct virt_config {
 	char *platform;
 
 	size_t nr_vmtag;
-	size_t nr_virqtag;
+	size_t nr_irqtag;
 	size_t nr_memtag;
 
 	struct vmtag *vmtags;
-	struct virqtag *virqtags;
+	struct irqtag *irqtags;
 	struct memtag *memtags;
 };
 

@@ -21,28 +21,35 @@
 #include <minos/virt.h>
 
 extern void virqs_init(void);
-extern void parse_memtags(void);
-extern void parse_virqs(void);
 extern int static_vms_init(void);
 extern int create_static_vms(void);
 
 extern struct virt_config virt_config;
 struct virt_config *mv_config = &virt_config;
 
+void parse_memtags(void)
+{
+	int i;
+	size_t size = mv_config->nr_memtag;
+	struct memtag *memtags = mv_config->memtags;
+
+	for (i = 0; i < size; i++)
+		register_memory_region(&memtags[i]);
+}
+
 int virt_init(void)
 {
 	int ret;
 
 	vmodules_init();
+	virqs_init();
+	parse_memtags();
 
 	ret = create_static_vms();
 	if (!ret)
 		return -ENOENT;
 
-	parse_memtags();
 	static_vms_init();
-	parse_virqs();
-	virqs_init();
 
 	return 0;
 }

@@ -131,11 +131,11 @@ void *create_virtio_device(struct vm *vm)
 	vdev->deinit = virtio_dev_deinit;
 
 	virtio_dev->hvm_irq = alloc_hvm_virq();
-	if (virtio_dev->hvm_irq < 0)
+	if (virtio_dev->hvm_irq <= 0)
 		goto out;
 
 	virtio_dev->gvm_irq = alloc_gvm_virq(vm);
-	if (virtio_dev->gvm_irq < 0)
+	if (virtio_dev->gvm_irq <= 0)
 		goto out;
 
 	/*

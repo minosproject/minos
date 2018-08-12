@@ -279,13 +279,13 @@ static int vgic_gicd_mmio_write(struct vcpu *vcpu,
 		x = (offset - GICD_ISENABLER) / 4;
 		y = x * 32;
 		for_each_set_bit(bit, value, 32)
-			virq_unmask(y + bit);
+			virq_enable(vcpu, y + bit);
 		break;
 	case GICD_ICENABLER...GICD_ICENABLER_END:
 		x = (offset - GICD_ICENABLER) / 4;
 		y = x * 32;
 		for_each_set_bit(bit, value, 32)
-			virq_mask(y + bit);
+			virq_disable(vcpu, y + bit);
 		break;
 
 	case GICD_IPRIORITYR...GICD_IPRIORITYR_END:
@@ -293,13 +293,18 @@ static int vgic_gicd_mmio_write(struct vcpu *vcpu,
 		x = (offset - GICD_IPRIORITYR) / 4;
 		y = x * 4 - 1;
 		bit = (t & 0x000000ff);
-		virq_set_priority(y + 1, bit);
+		virq_set_priority(vcpu, y + 1, bit);
 		bit = (t & 0x0000ff00) >> 8;
-		virq_set_priority(y + 2, bit);
+		virq_set_priority(vcpu, y + 2, bit);
 		bit = (t & 0x00ff0000) >> 16;
-		virq_set_priority(y + 3, bit);
+		virq_set_priority(vcpu, y + 3, bit);
 		bit = (t & 0xff000000) >> 24;
-		virq_set_priority(y + 4, bit);
+		virq_set_priority(vcpu, y + 4, bit);
+		break;
+	case GICD_ICFGR...GICD_ICFGR_END:
+		break;
+
+	default:
 		break;
 	}
 
@@ -368,7 +373,7 @@ static int vgic_gicr_sgi_mmio(struct vcpu *vcpu, struct vgic_gicr *gicr,
 			spin_lock(&gicr->gicr_lock);
 			for_each_set_bit(bit, value, 32) {
 				gicr->gicr_ispender &= ~BIT(bit);
-				clear_pending_virq(bit);
+				clear_pending_virq(vcpu, bit);
 			}
 			spin_unlock(&gicr->gicr_lock);
 			break;
@@ -376,7 +381,7 @@ static int vgic_gicr_sgi_mmio(struct vcpu *vcpu, struct vgic_gicr *gicr,
 			spin_lock(&gicr->gicr_lock);
 			for_each_set_bit(bit, value, 32) {
 				if (!(gicr->gicr_enabler0 & BIT(bit))) {
-					virq_unmask(bit);
+					virq_enable(vcpu, bit);
 					gicr->gicr_enabler0 |= BIT(bit);
 				}
 			}
@@ -386,7 +391,7 @@ static int vgic_gicr_sgi_mmio(struct vcpu *vcpu, struct vgic_gicr *gicr,
 			spin_lock(&gicr->gicr_lock);
 			for_each_set_bit(bit, value, 32) {
 				if (gicr->gicr_enabler0 & BIT(bit)) {
-					virq_mask(bit);
+					virq_disable(vcpu, bit);
 					gicr->gicr_enabler0 &= ~BIT(bit);
 				}
 			}

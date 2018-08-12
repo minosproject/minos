@@ -4,7 +4,7 @@
 #include <minos/vcpu.h>
 #include <minos/cpumask.h>
 
-struct virqtag;
+struct irqtag;
 
 #define VIRQ_STATE_INACTIVE		(0x0)
 #define VIRQ_STATE_PENDING		(0x1)
@@ -18,21 +18,50 @@ struct virqtag;
 
 #define VIRQ_AFFINITY_ANY	(0xffff)
 
-#define MAX_HVM_VIRQ		(512)
-#define HVM_VIRQ_BASE		(256)
+#define VM_SGI_VIRQ_NR		(16)
+#define VM_PPI_VIRQ_NR		(16)
+#define VM_LOCAL_VIRQ_NR	(VM_SGI_VIRQ_NR + VM_PPI_VIRQ_NR)
 
-#define MAX_GVM_VIRQ		(128)
-#define GVM_VIRQ_BASE		(256)
+#define HVM_SPI_VIRQ_NR		(512)
+#define HVM_SPI_VIRQ_BASE	(VM_LOCAL_VIRQ_NR)
+
+#define GVM_SPI_VIRQ_NR		(128)
+#define GVM_SPI_VIRQ_BASE	(VM_LOCAL_VIRQ_NR)
+
+#define VM_VIRQ_NR(nr)		(nr & 0x7fffffff)
+#define VIRQ_SPI_OFFSET(virq)	((virq) - VM_LOCAL_VIRQ_NR)
+#define VIRQ_SPI_NR(count)	((count) > VM_LOCAL_VIRQ_NR ? VIRQ_SPI_OFFSET((count)) : 0)
+
+#define MAX_HVM_VIRQ		(HVM_SPI_VIRQ_NR + VM_LOCAL_VIRQ_NR)
+#define MAX_GVM_VIRQ		(GVM_SPI_VIRQ_NR + VM_LOCAL_VIRQ_NR)
+
+enum virq_domain_type {
+	VIRQ_DOMAIN_SGI = 0,
+	VIRQ_DOMAIN_PPI,
+	VIRQ_DOMAIN_SPI,
+	VIRQ_DOMAIN_LPI,
+	VIRQ_DOMAIN_MAX,
+};
+
+struct virq_desc {
+	int8_t hw;
+	uint8_t enable;
+	uint8_t pr;
+	uint8_t vcpu_id;
+	uint16_t vmid;
+	uint16_t vno;
+	uint16_t hno;
+} __packed__;
 
 struct virq {
-	uint32_t h_intno;
-	uint32_t v_intno;
+	uint16_t h_intno;
+	uint16_t v_intno;
 	uint8_t hw;
 	uint8_t state;
-	uint16_t id;
-	uint16_t pr;
+	uint8_t id;
+	uint8_t pr;
 	struct list_head list;
-};
+} __packed__ ;
 
 struct virq_struct {
 	uint32_t active_count;
@@ -42,21 +71,19 @@ struct virq_struct {
 	struct list_head pending_list;
 	struct list_head active_list;
 	DECLARE_BITMAP(irq_bitmap, CONFIG_VCPU_MAX_ACTIVE_IRQS);
-	DECLARE_BITMAP(local_irq_mask, VCPU_MAX_LOCAL_IRQS);
 	struct virq virqs[CONFIG_VCPU_MAX_ACTIVE_IRQS];
+	struct virq_desc local_desc[VM_LOCAL_VIRQ_NR];
 };
 
-int virq_enable(uint32_t virq, int enable);
-void vcpu_virq_struct_init(struct virq_struct *irq_struct);
+int virq_enable(struct vcpu *vcpu, uint32_t virq);
+int virq_disable(struct vcpu *vcpu, uint32_t virq);
+void vcpu_virq_struct_init(struct vcpu *vcpu);
 
-int send_virq_hw(uint32_t vmid, uint32_t virq, uint32_t hirq);
 int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq);
 void send_vsgi(struct vcpu *sender,
 		uint32_t sgi, cpumask_t *cpumask);
-void clear_pending_virq(uint32_t irq);
-int register_virq(struct virqtag *v);
-int virq_set_priority(uint32_t virq, int pr);
-int alloc_virtual_irqs(uint32_t start, uint32_t count, int type);
+void clear_pending_virq(struct vcpu *vcpu, uint32_t irq);
+int virq_set_priority(struct vcpu *vcpu, uint32_t virq, int pr);
 
 static inline int send_virq_to_vm(uint32_t vmid, uint32_t virq)
 {
@@ -82,16 +109,6 @@ static inline int vcpu_has_irq(struct vcpu *vcpu)
 {
 	return ((vcpu->virq_struct->pending_hirq +
 			vcpu->virq_struct->pending_virq));
-}
-
-static inline void virq_mask(uint32_t virq)
-{
-	virq_enable(virq, 0);
-}
-
-static inline void virq_unmask(uint32_t virq)
-{
-	virq_enable(virq, 1);
 }
 
 int alloc_vm_virq(struct vm *vm, int count);

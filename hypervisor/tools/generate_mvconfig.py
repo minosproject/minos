@@ -54,19 +54,16 @@ patten = [
         ]
     },
     {
-        'struct_name': 'virqtag',
-        'member_name': 'virqtags',
+        'struct_name': 'irqtag',
+        'member_name': 'irqtags',
         'type': 'ARRAY',
         'static': True,
-        'json_name': 'virqtags',
+        'json_name': 'irqtags',
         'members': [
             {'name': 'vno', 'type': 'NUM', 'data': None},
             {'name': 'hno', 'type': 'NUM', 'data': None},
-            {'name': 'enable', 'type': 'NUM', 'data': None},
-            {'name': 'hw', 'type': 'NUM', 'data': None},
             {'name': 'vmid', 'type': 'NUM', 'data': None},
             {'name': 'vcpu_id', 'type': 'NUM', 'data': None},
-            {'name': 'type', 'type': 'NUM', 'data': None},
             {'name': 'name', 'type': 'STRING', 'data': None}
         ]
     },
@@ -97,10 +94,10 @@ patten = [
             {'name': 'version', 'type': 'STRING', 'data': None},
             {'name': 'platform', 'type': "STRING", 'data': None},
             {'name': 'vmtags', 'type': "CONFIG", 'data': 0},
-            {'name': 'virqtags', 'type': "CONFIG", 'data': 1},
+            {'name': 'irqtags', 'type': "CONFIG", 'data': 1},
             {'name': "memtags", 'type': "CONFIG", 'data': 2},
             {'name': 'nr_vmtag', 'type': "GET_STRUCT_SIZE", 'data': 0},
-            {'name': 'nr_virqtag', 'type': "GET_STRUCT_SIZE", 'data': 1},
+            {'name': 'nr_irqtag', 'type': "GET_STRUCT_SIZE", 'data': 1},
             {'name': "nr_memtag", 'type': "GET_STRUCT_SIZE", 'data': 2}
         ]
     }

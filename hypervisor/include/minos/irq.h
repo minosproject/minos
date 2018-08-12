@@ -83,8 +83,8 @@ struct irq_chip {
  * to the handler and pass the virq to the vm
  */
 struct irq_desc {
-	uint32_t hno;
-	uint32_t affinity;
+	uint16_t hno;
+	uint16_t affinity;
 	unsigned long flags;
 	spinlock_t lock;
 	unsigned long irq_count;
@@ -121,8 +121,7 @@ void setup_irqs(void);
 int do_irq_handler(void);
 
 int request_irq(uint32_t irq, irq_handle_t handler,
-		unsigned long flags,
-		const char *name, void *data);
+		unsigned long flags, char *name, void *data);
 
 int irq_alloc_spi(uint32_t start, uint32_t cnt);
 int irq_alloc_sgi(uint32_t start, uint32_t cnt);

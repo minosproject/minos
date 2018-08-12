@@ -68,12 +68,13 @@ int register_hook(hook_func_t fn, enum hook_type type)
 
 int do_hooks(void *item, void *context, enum hook_type type)
 {
+	int err = 0;
 	struct hook *hook;
 
 	list_for_each_entry(hook, &hook_lists[type], list)
-		hook->fn(item, context);
+		err += hook->fn(item, context);
 
-	return 0;
+	return err;
 }
 
 void *get_module_pdata(unsigned long s, unsigned long e,

@@ -148,25 +148,12 @@ int vcpu_suspend(gp_regs *c, uint32_t state, unsigned long entry)
 static struct vm *__create_vm(struct vmtag *vme)
 {
 	struct vm *vm;
-	int count;
 
 	vm = (struct vm *)malloc(sizeof(struct vm));
 	if (!vm)
 		return NULL;
 
-	if (vme->vmid == 0)
-		count = MAX_HVM_VIRQ;
-	else
-		count = MAX_GVM_VIRQ;
-
 	memset((char *)vm, 0, sizeof(struct vm));
-	vm->virq_map = malloc(BITS_TO_LONGS(count));
-	if (!vm->virq_map) {
-		free(vm);
-		return NULL;
-	}
-
-	memset(vm->virq_map, 0, BITS_TO_LONGS(count));
 	vm->vcpus = (struct vcpu **)malloc(sizeof(struct vcpu *) * vme->nr_vcpu);
 	if (!vm->vcpus) {
 		free(vm);
@@ -184,9 +171,8 @@ static struct vm *__create_vm(struct vmtag *vme)
 	vm->setup_data = vme->setup_data;
 	init_list(&vm->vdev_list);
 	memcpy(vm->vcpu_affinity, vme->vcpu_affinity,
-			sizeof(int) * CONFIG_VM_MAX_VCPU);
+			sizeof(uint8_t) * CONFIG_VM_MAX_VCPU);
 
-	vm->index = total_vms;
 	vms[vme->vmid] = vm;
 	total_vms++;
 
@@ -195,6 +181,7 @@ static struct vm *__create_vm(struct vmtag *vme)
 	spin_unlock(&vms_lock);
 
 	vm_vmodules_init(vm);
+	vm->os = get_vm_os(vm->os_type);
 
 	return vm;
 }
@@ -308,7 +295,7 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 	strncpy(vcpu->name, name, strlen(name) > (VCPU_NAME_SIZE -1) ?
 			(VCPU_NAME_SIZE - 1) : strlen(name));
 
-	vcpu_virq_struct_init(vcpu->virq_struct);
+	vcpu_virq_struct_init(vcpu);
 	vm->vcpus[vcpu_id] = vcpu;
 
 	return vcpu;
@@ -365,26 +352,27 @@ void destroy_vm(struct vm *vm)
 		return;
 
 	/*
-	 * first release the vcpu allocate to
-	 * this vm
+	 * 1 : do hooks for each modules
+	 * 2 : release the vcpu allocated to this vm
+	 * 3 : free the memory for this VM
+	 * 4 : update the vmid bitmap
+	 * 5 : do vmodule deinit
 	 */
-	for (i = 0; i < vm->vcpu_nr; i++) {
-		vcpu = vm->vcpus[i];
-		if (!vcpu)
-			continue;
+	do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_DESTROY_VM);
 
-		release_vcpu(vcpu);
+	if (vm->vcpus) {
+		for (i = 0; i < vm->vcpu_nr; i++) {
+			vcpu = vm->vcpus[i];
+			if (!vcpu)
+				continue;
+			release_vcpu(vcpu);
+		}
+
+		free(vm->vcpus);
 	}
 
 	release_vm_memory(vm);
-	free(vm->vcpus);
 
-	if (vm->virq_map)
-		free(vm->virq_map);
-
-	/*
-	 * update the vmid bitmap and other things
-	 */
 	i = vm->vmid;
 	spin_lock(&vms_lock);
 	clear_bit(i, vmid_bitmap);
@@ -443,8 +431,10 @@ struct vm *create_dynamic_vm(struct vmtag *vme)
 		goto release_vm;
 	}
 
-	vm->os = get_vm_os(vm->os_type);
-	vm_vmodules_init(vm);
+	if (do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_CREATE_VM)) {
+		pr_error("create vm failed in hook function\n");
+		goto release_vm;
+	}
 
 	return vm;
 
@@ -475,6 +465,12 @@ int create_static_vms(void)
 			continue;
 		}
 
+		if (create_vcpus(vm))
+			panic("create vcpus for static vm failed\n");
+
+		if (do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_CREATE_VM))
+			panic("create vm failed in hook function\n");
+
 		count++;
 	}
 
@@ -493,9 +489,6 @@ int static_vms_init(void)
 		 * - prepare the vcpu for bootup
 		 */
 		vm_mm_init(vm);
-		create_vcpus(vm);
-		vm->os = get_vm_os(vm->os_type);
-		vm_vmodules_init(vm);
 		vm_vcpus_init(vm);
 	}
 

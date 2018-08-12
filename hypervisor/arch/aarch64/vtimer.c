@@ -293,5 +293,18 @@ static int vtimer_vmodule_init(struct vmodule *vmodule)
 	return 0;
 }
 
+static int virtual_timer_irq_handler(uint32_t irq, void *data)
+{
+	return send_virq_to_vcpu(current_vcpu, irq);
+}
+
+static int vsgi_irqs_init(void)
+{
+	return request_irq(27, virtual_timer_irq_handler,
+			IRQ_FLAGS_VCPU, "local irq", NULL);
+}
+
 MINOS_MODULE_DECLARE(armv8_vtimer, "armv8-vtimer",
 		(void *)vtimer_vmodule_init);
+
+device_initcall_percpu(vsgi_irqs_init);

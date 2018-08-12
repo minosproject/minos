@@ -112,7 +112,6 @@ int create_new_vm(struct vm_info *info)
 	if (ret)
 		goto release_vm;
 
-	do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_CREATE_VM);
 	dsb();
 
 	return (vm->vmid);

@@ -281,11 +281,6 @@ static int alloc_irqs(uint32_t start, uint32_t cnt, int type)
 		goto out;
 	}
 
-	ret = alloc_virtual_irqs(start, cnt, type);
-	if (ret) {
-		pr_error("add type:%d virq failed\n", type);
-		goto out;
-	}
 out:
 	return ret;
 }
@@ -438,8 +433,9 @@ error:
 }
 
 int request_irq(uint32_t irq, irq_handle_t handler,
-		unsigned long flags, const char *name, void *data)
+		unsigned long flags, char *name, void *data)
 {
+	int len;
 	struct irq_desc *irq_desc;
 	unsigned long flag;
 
@@ -454,6 +450,13 @@ int request_irq(uint32_t irq, irq_handle_t handler,
 	irq_desc->handler = handler;
 	irq_desc->pdata = data;
 	irq_desc->flags |= flags;
+	if (name) {
+		len = strlen(name);
+
+		if (len > MAX_IRQ_NAME_SIZE -1)
+			len = MAX_IRQ_NAME_SIZE -1;
+		strncpy(irq_desc->name, name, len);
+	}
 	spin_unlock_irqrestore(&irq_desc->lock, flag);
 
 	irq_unmask(irq);

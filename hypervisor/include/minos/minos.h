@@ -24,12 +24,13 @@ struct vcpu;
 		do { ; } while (1); \
 	}
 
-typedef void (*hook_func_t)(void *item, void *contex);
+typedef int (*hook_func_t)(void *item, void *contex);
 
 enum hook_type {
 	MINOS_HOOK_TYPE_EXIT_FROM_GUEST = 0,
 	MINOS_HOOK_TYPE_ENTER_TO_GUEST,
 	MINOS_HOOK_TYPE_CREATE_VM,
+	MINOS_HOOK_TYPE_DESTROY_VM,
 	MINOS_HOOK_TYPE_UNKNOWN,
 };
 
@@ -46,6 +47,5 @@ int do_hooks(void *item, void *context, enum hook_type type);
 void *get_module_pdata(unsigned long s, unsigned long e,
 		int (*check)(struct module_id *module));
 int register_hook(hook_func_t fn, enum hook_type type);
-
 
 #endif
