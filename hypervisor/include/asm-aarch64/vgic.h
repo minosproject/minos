@@ -1,13 +1,13 @@
 #ifndef _MINOS_VGIC_H_
 #define _MINOS_VGIC_H_
 
+#include <minos/smp.h>
+#include <minos/vdev.h>
+
 struct vgic_gicd {
 	uint32_t gicd_ctlr;
 	uint32_t gicd_typer;
 	uint32_t gicd_pidr2;
-	uint32_t vmid;
-	struct list_head list;
-	struct list_head gicr_list;
 	spinlock_t gicd_lock;
 	unsigned long base;
 	unsigned long end;
@@ -25,7 +25,12 @@ struct vgic_gicr {
 	unsigned long vlpi_base;
 	struct list_head list;
 	spinlock_t gicr_lock;
-	struct vgic_gicd *gicd;
+};
+
+struct vgic_dev {
+	struct vdev vdev;
+	struct vgic_gicd gicd;
+	struct vgic_gicr *gicr[NR_CPUS];
 };
 
 #define GIC_TYPE_GICD		(0x0)

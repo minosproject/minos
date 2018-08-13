@@ -20,7 +20,6 @@
 #include <minos/bitmap.h>
 #include <minos/virtio.h>
 #include <minos/virtio_mmio.h>
-#include <minos/mmio.h>
 #include <minos/io.h>
 #include <minos/sched.h>
 #include <minos/vdev.h>
@@ -122,7 +121,7 @@ void *create_virtio_device(struct vm *vm)
 
 	memset(virtio_dev, 0, sizeof(struct virtio_device));
 	vdev = &virtio_dev->vdev;
-	ret = vdev_init(vm, vdev, PAGE_SIZE);
+	ret = guest_vdev_init(vm, vdev, PAGE_SIZE);
 	if (ret)
 		goto out;
 

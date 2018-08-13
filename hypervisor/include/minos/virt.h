@@ -14,7 +14,7 @@ struct vmtag {
 	unsigned long entry;
 	int bit64;
 	unsigned long setup_data;
-	int vcpu_affinity[4];
+	uint8_t vcpu_affinity[4];
 };
 
 struct irqtag {

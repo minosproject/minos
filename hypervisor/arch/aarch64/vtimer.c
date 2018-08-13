@@ -17,7 +17,6 @@
 #include <minos/vmodule.h>
 #include <asm/vtimer.h>
 #include <minos/io.h>
-#include <minos/mmio.h>
 #include <asm/processer.h>
 #include <asm/exception.h>
 #include <minos/timer.h>
@@ -29,10 +28,7 @@ int vtimer_vmodule_id = INVAILD_MODULE_ID;
 
 #define get_access_vtimer(vtimer, c, access)		\
 	do {						\
-		if (access == ACCESS_MEM)		\
-			vtimer = &c->phy_mem_timer;	\
-		else					\
-			vtimer = &c->phy_timer;		\
+		vtimer = &c->phy_timer;			\
 	} while (0)
 
 static void phys_timer_expire_function(unsigned long data)
@@ -113,15 +109,6 @@ static void vtimer_state_init(struct vcpu *vcpu, void *context)
 	vtimer->timer.function = phys_timer_expire_function;
 	vtimer->timer.data = (unsigned long)vtimer;
 	vtimer->virq = 30;
-	vtimer->cnt_ctl = 0;
-	vtimer->cnt_cval = 0;
-
-	vtimer = &c->phy_mem_timer;
-	vtimer->vcpu = vcpu;
-	init_timer_on_cpu(&vtimer->timer, vcpu->affinity);
-	vtimer->timer.function = phys_timer_expire_function;
-	vtimer->timer.data = (unsigned long)vtimer;
-	vtimer->virq = 58;
 	vtimer->cnt_ctl = 0;
 	vtimer->cnt_cval = 0;
 }
@@ -252,32 +239,6 @@ static inline int vtimer_phy_mem_handler(gp_regs *regs, int read,
 	return 0;
 }
 
-static int vtimer_phy_mem_read(gp_regs *regs,
-		unsigned long address, unsigned long *read_value)
-{
-	return vtimer_phy_mem_handler(regs, 1, address, read_value);
-}
-
-static int vtimer_phy_mem_write(gp_regs *regs,
-		unsigned long address, unsigned long *write_value)
-{
-	return vtimer_phy_mem_handler(regs, 0, address, write_value);
-}
-
-static int vtimer_phy_mem_check(gp_regs *regs, unsigned long address)
-{
-	if ((address >= 0x2a830000) && (address < 0x2a840000))
-		return 1;
-
-	return 0;
-}
-
-static struct mmio_ops vtimer_phy_mem_ops = {
-	.read = vtimer_phy_mem_read,
-	.write = vtimer_phy_mem_write,
-	.check = vtimer_phy_mem_check,
-};
-
 static int vtimer_vmodule_init(struct vmodule *vmodule)
 {
 	vmodule->context_size = sizeof(struct vtimer_context);
@@ -288,23 +249,8 @@ static int vtimer_vmodule_init(struct vmodule *vmodule)
 	vmodule->vm_init = vtimer_vm_init;
 	vtimer_vmodule_id = vmodule->id;
 
-	register_mmio_emulation_handler("vtimer", &vtimer_phy_mem_ops);
-
 	return 0;
-}
-
-static int virtual_timer_irq_handler(uint32_t irq, void *data)
-{
-	return send_virq_to_vcpu(current_vcpu, irq);
-}
-
-static int vsgi_irqs_init(void)
-{
-	return request_irq(27, virtual_timer_irq_handler,
-			IRQ_FLAGS_VCPU, "local irq", NULL);
 }
 
 MINOS_MODULE_DECLARE(armv8_vtimer, "armv8-vtimer",
 		(void *)vtimer_vmodule_init);
-
-device_initcall_percpu(vsgi_irqs_init);

@@ -122,6 +122,11 @@ void sched_tick_enable(unsigned long exp)
 	isb();
 }
 
+static int virtual_timer_irq_handler(uint32_t irq, void *data)
+{
+	return send_virq_to_vcpu(current_vcpu, irq);
+}
+
 static int timers_init(void)
 {
 	write_sysreg64(0, CNTVOFF_EL2);
@@ -140,6 +145,9 @@ static int timers_init(void)
 
 	request_irq(PHYS_TIMER_NONSEC_INT, timer_interrupt_handler,
 			0, "nonsec timer int", NULL);
+
+	return request_irq(VIRT_TIMER_INT, virtual_timer_irq_handler,
+			IRQ_FLAGS_VCPU, "local irq", NULL);
 	return 0;
 }
 

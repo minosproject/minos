@@ -383,7 +383,7 @@ void vcpu_virq_struct_init(struct vcpu *vcpu)
 	for (i = 0; i < VM_LOCAL_VIRQ_NR; i++) {
 		desc = &virq_struct->local_desc[i];
 		desc->hw = 0;
-		desc->enable = 0;
+		desc->enable = 1;
 		desc->vcpu_id = vcpu->vcpu_id;
 		desc->vmid = vcpu->vm->vmid;
 		desc->vno = i;

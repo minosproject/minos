@@ -39,7 +39,6 @@ struct vtimer {
 struct vtimer_context {
 	struct vtimer phy_timer;
 	struct vtimer virt_timer;
-	struct vtimer phy_mem_timer;
 	unsigned long offset;
 };
 

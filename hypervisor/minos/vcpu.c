@@ -436,6 +436,8 @@ struct vm *create_dynamic_vm(struct vmtag *vme)
 		goto release_vm;
 	}
 
+	do_hooks(vm, NULL, MINOS_HOOK_TYPE_CREATE_VM_VDEV);
+
 	return vm;
 
 release_vm:
@@ -470,6 +472,9 @@ int create_static_vms(void)
 
 		if (do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_CREATE_VM))
 			panic("create vm failed in hook function\n");
+
+
+		do_hooks(vm, NULL, MINOS_HOOK_TYPE_CREATE_VM_VDEV);
 
 		count++;
 	}

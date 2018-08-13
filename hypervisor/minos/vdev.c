@@ -17,6 +17,21 @@
 #include <minos/minos.h>
 #include <minos/vdev.h>
 #include <minos/virq.h>
+#include <minos/sched.h>
+
+void vdev_set_name(struct vdev *vdev, char *name)
+{
+	int len;
+
+	if (!vdev || !name)
+		return;
+
+	len = strlen(name);
+	if (len > VDEV_NAME_SIZE)
+		len = VDEV_NAME_SIZE;
+
+	strncpy(vdev->name, name, len);
+}
 
 void vdev_release(struct vdev *vdev)
 {
@@ -26,16 +41,18 @@ void vdev_release(struct vdev *vdev)
 	if (vdev->hvm_paddr)
 		destroy_hvm_iomem_map(vdev->hvm_paddr, vdev->mem_size);
 
-	list_del(&vdev->list);
+	if (vdev->list.next != NULL)
+		list_del(&vdev->list);
 }
 
 static void vdev_deinit(struct vdev *vdev)
 {
+	pr_warn("using default vdev deinit routine\n");
 	vdev_release(vdev);
 	free(vdev);
 }
 
-int vdev_init(struct vm *vm, struct vdev *vdev, uint32_t size)
+int guest_vdev_init(struct vm *vm, struct vdev *vdev, uint32_t size)
 {
 	struct mm_struct *mm = &vm->mm;
 
@@ -67,6 +84,8 @@ int vdev_init(struct vm *vm, struct vdev *vdev, uint32_t size)
 	mm->gvm_iomem_size -= size;
 	vdev->vm = vm;
 	vdev->deinit = vdev_deinit;
+	vdev->list.next = NULL;
+	vdev->host = 0;
 	list_add_tail(&vm->vdev_list, &vdev->list);
 
 	return 0;
@@ -80,12 +99,30 @@ struct vdev *create_guest_vdev(struct vm *vm, uint32_t size)
 	if (!vdev)
 		return NULL;
 
-	if (vdev_init(vm, vdev, size)) {
+	if (guest_vdev_init(vm, vdev, size)) {
 		free(vdev);
 		return NULL;
 	}
 
 	return vdev;
+}
+
+int host_vdev_init(struct vm *vm, struct vdev *vdev,
+		unsigned long base, uint32_t size)
+{
+	if (!vdev)
+		return -EINVAL;
+
+	memset(vdev, 0, sizeof(struct vdev));
+	vdev->gvm_paddr = base;
+	vdev->mem_size = size;
+	vdev->vm = vm;
+	vdev->host = 1;
+	vdev->list.next = NULL;
+	vdev->deinit = vdev_deinit;
+	list_add_tail(&vm->vdev_list, &vdev->list);
+
+	return 0;
 }
 
 struct vdev *create_host_vdev(struct vm *vm, unsigned long base, uint32_t size)
@@ -98,12 +135,26 @@ struct vdev *create_host_vdev(struct vm *vm, unsigned long base, uint32_t size)
 	if (!vdev)
 		return NULL;
 
-	memset(vdev, 0, sizeof(struct vdev));
-	vdev->gvm_paddr = base;
-	vdev->mem_size = size;
-	vdev->vm = vm;
-	vdev->deinit = vdev_deinit;
-	list_add_tail(&vm->vdev_list, &vdev->list);
+	host_vdev_init(vm, vdev, base, size);
 
-	return 0;
+	return vdev;
+}
+
+int vdev_mmio_emulation(gp_regs *regs, int write,
+		unsigned long address, unsigned long *value)
+{
+	struct vm *vm = current_vm;
+	struct vdev *vdev;
+
+	list_for_each_entry(vdev, &vm->vdev_list, list) {
+		if ((address >= vdev->gvm_paddr) &&
+			(address < vdev->gvm_paddr + vdev->mem_size)) {
+			if (write)
+				return vdev->write(vdev, regs, address, value);
+			else
+				return vdev->read(vdev, regs, address, value);
+		}
+	}
+
+	return -ENOENT;
 }

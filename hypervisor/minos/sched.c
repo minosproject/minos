@@ -34,7 +34,7 @@ DEFINE_PER_CPU(struct vcpu *, percpu_next_vcpu);
 DEFINE_PER_CPU(int, need_resched);
 DEFINE_PER_CPU(atomic_t, preempt);
 
-void get_vcpu_affinity(int *aff, int nr)
+void get_vcpu_affinity(uint8_t *aff, int nr)
 {
 	int i, base = NR_CPUS - 1;
 

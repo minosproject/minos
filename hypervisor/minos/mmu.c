@@ -353,7 +353,7 @@ unsigned long get_mapping_entry(unsigned long tt,
 		offset = (vir & attr->offset_mask) >> attr->range_offset;
 		value = *(table + offset);
 		if ((value == 0) && (attr->lvl < end))
-			return attr->lvl;
+			return 0;
 
 		attr = attr->next;
 		table = (unsigned long *)(value & 0xfffffffffffff000);

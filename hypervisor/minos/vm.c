@@ -23,7 +23,7 @@
 #include <minos/os.h>
 #include <minos/sched.h>
 
-extern void get_vcpu_affinity(int *aff, int nr);
+extern void get_vcpu_affinity(uint8_t *aff, int nr);
 
 static inline void vminfo_to_vmtag(struct vm_info *info, struct vmtag *tag)
 {

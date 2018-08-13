@@ -20,13 +20,13 @@
 #include <minos/minos.h>
 #include <minos/smp.h>
 #include <asm/processer.h>
-#include <minos/mmio.h>
 #include <minos/sched.h>
 #include <asm/vgic.h>
 #include <minos/irq.h>
 #include <asm/svccc.h>
 #include <asm/vtimer.h>
 #include <minos/virt.h>
+#include <minos/vdev.h>
 
 extern unsigned char __serror_desc_start;
 extern unsigned char __serror_desc_end;
@@ -200,10 +200,10 @@ static inline unsigned long get_faulting_ipa(unsigned long vaddr)
 static int dataabort_tfl_handler(gp_regs *regs, uint32_t esr_value)
 {
 	int ret;
-	struct esr_dabt *dabt = (struct esr_dabt *)&esr_value;
 	unsigned long vaddr;
 	unsigned long paddr;
 	unsigned long value;
+	struct esr_dabt *dabt = (struct esr_dabt *)&esr_value;
 
 	vaddr = read_sysreg(FAR_EL2);
 	paddr = get_faulting_ipa(vaddr);
@@ -214,11 +214,13 @@ static int dataabort_tfl_handler(gp_regs *regs, uint32_t esr_value)
 	 * now only handle translation fault
 	 */
 	switch (dabt->dfsc & ~FSC_LL_MASK) {
+	case FSC_FLT_PERM:
+	case FSC_FLT_ACCESS:
 	case FSC_FLT_TRANS:
 		if (dabt->write)
 			value = get_reg_value(regs, dabt->reg);
 
-		ret = do_mmio_emulation(regs, dabt->write, paddr, &value);
+		ret = vdev_mmio_emulation(regs, dabt->write, paddr, &value);
 		if (ret) {
 			pr_warn("handle mmio read/write fail 0x%x vmid:%d\n",
 					paddr, get_vmid(current_vcpu));
