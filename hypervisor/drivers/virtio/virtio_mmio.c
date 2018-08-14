@@ -19,13 +19,35 @@
 #include <minos/mm.h>
 #include <minos/bitmap.h>
 #include <minos/virtio.h>
-#include <minos/virtio_mmio.h>
 #include <minos/io.h>
 #include <minos/sched.h>
 #include <minos/vdev.h>
 #include <minos/virq.h>
+#include <minos/virtio_mmio.h>
 
-#define vdev_to_virtio(vd) container_of(vd, struct virtio_device, vdev)
+#define vdev_to_virtio(vd) \
+	container_of(vd, struct virtio_device, vdev)
+
+struct virtio_queue_info {
+	uint32_t desc_low;
+	uint32_t desc_high;
+	uint32_t avail_low;
+	uint32_t avail_high;
+	uint32_t used_low;
+	uint32_t used_high;
+	uint32_t ready;
+	uint32_t qnum;
+};
+
+static inline struct virtio_queue_info *
+get_current_vqueue_info(void *iomem)
+{
+	int index = ioread32(iomem + VIRTIO_MMIO_QUEUE_SEL);
+
+	return (struct virtio_queue_info *)
+		(iomem + VIRTIO_MMIO_VQUEUE_INFO_BASE + index *
+		 VIRTIO_QUEUE_INFO_SIZE);
+}
 
 static int virtio_mmio_read(struct vdev *vdev, gp_regs *regs,
 		unsigned long address, unsigned long *read_value)
@@ -36,39 +58,103 @@ static int virtio_mmio_read(struct vdev *vdev, gp_regs *regs,
 static int virtio_mmio_write(struct vdev *vdev, gp_regs *regs,
 		unsigned long address, unsigned long *write_value)
 {
+	uint32_t tmp;
+	uint32_t value = *write_value;
 	void *iomem = vdev->iomem;
 	unsigned long offset = address - vdev->gvm_paddr;
+	struct virtio_queue_info *queue_info;
+	struct virtio_device *dev = vdev_to_virtio(vdev);
 
 	switch (offset) {
 	case VIRTIO_MMIO_HOST_FEATURES:
 		break;
 	case VIRTIO_MMIO_HOST_FEATURES_SEL:
+		if (value > 3) {
+			pr_warn("invalid features sel value %d\n", value);
+			break;
+		}
+		tmp = ioread32(iomem + VIRTIO_MMIO_HOST_FEATURE0 +
+				value * sizeof(uint32_t));
+		iowrite32(iomem + VIRTIO_MMIO_HOST_FEATURES, tmp);
+		break;
+	case VIRTIO_MMIO_GUEST_FEATURES_SEL:
+		iowrite32(iomem + VIRTIO_MMIO_GUEST_FEATURES_SEL, value);
+		break;
+	case VIRTIO_MMIO_GUEST_FEATURES:
+		tmp = ioread32(iomem + VIRTIO_MMIO_GUEST_FEATURES_SEL);
+		tmp = tmp * sizeof(uint32_t) + VIRTIO_MMIO_DRIVER_FEATURE0;
+		iowrite32(iomem + tmp, value);
 		break;
 	case VIRTIO_MMIO_GUEST_PAGE_SIZE:
+		/* version 1 virtio device */
+		iowrite32(iomem + VIRTIO_MMIO_GUEST_PAGE_SIZE, value);
 		break;
 	case VIRTIO_MMIO_QUEUE_SEL:
+		iowrite32(iomem, VIRTIO_MMIO_QUEUE_SEL);
 		break;
 	case VIRTIO_MMIO_QUEUE_NUM:
+		tmp = ioread32(iomem + VIRTIO_MMIO_QUEUE_NUM_MAX);
+		if (value > tmp)
+			pr_warn("invalid queue sel %d\n", value);
+		queue_info = get_current_vqueue_info(iomem);
+		queue_info->qnum = value;
 		break;
 	case VIRTIO_MMIO_QUEUE_ALIGN:
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_ALIGN, value);
 		break;
 	case VIRTIO_MMIO_QUEUE_PFN:
+		/* this is for version 1 virtio device */
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_PFN, value);
 		break;
 	case VIRTIO_MMIO_QUEUE_NOTIFY:
+		/*
+		 * indicate a queue is ready, need send a
+		 * event to hvm ?
+		 */
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_NOTIFY, value);
+		iowrite32(iomem + VIRTIO_MMIO_EVENT, VIRTIO_EVENT_BUFFER_READY);
+		vdev_notify_hvm(vdev, dev->hvm_irq);
 		break;
 	case VIRTIO_MMIO_INTERRUPT_ACK:
 		break;
 	case VIRTIO_MMIO_STATUS:
+		iowrite32(iomem + VIRTIO_MMIO_STATUS, value);
+		iowrite32(iomem + VIRTIO_MMIO_EVENT, VIRTIO_EVENT_STATUS_CHANGE);
+		vdev_notify_hvm(vdev, dev->hvm_irq);
 		break;
 	case VIRTIO_MMIO_QUEUE_DESC_LOW:
+		queue_info = get_current_vqueue_info(iomem);
+		queue_info->desc_low = value;
 		break;
 	case VIRTIO_MMIO_QUEUE_AVAIL_LOW:
+		queue_info = get_current_vqueue_info(iomem);
+		queue_info->avail_low = value;
 		break;
 	case VIRTIO_MMIO_QUEUE_USED_LOW:
+		queue_info = get_current_vqueue_info(iomem);
+		queue_info->used_low = value;
+		break;
+	case VIRTIO_MMIO_QUEUE_DESC_HIGH:
+		queue_info = get_current_vqueue_info(iomem);
+		queue_info->desc_high = value;
+		break;
+	case VIRTIO_MMIO_QUEUE_USED_HIGH:
+		queue_info = get_current_vqueue_info(iomem);
+		queue_info->used_high = value;
+		break;
+	case VIRTIO_MMIO_QUEUE_AVAIL_HIGH:
+		queue_info = get_current_vqueue_info(iomem);
+		queue_info->avail_high = value;
+		break;
+	case VIRTIO_MMIO_QUEUE_READY:
+		queue_info = get_current_vqueue_info(iomem);
+		queue_info->ready = value;
 		break;
 	default:
 		break;
 	}
+
+	dsb();
 
 	return 0;
 }

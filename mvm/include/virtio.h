@@ -3,6 +3,7 @@
 
 #include <sys/types.h>
 #include <inttypes.h>
+#include <vdev.h>
 
 #define VRING_DESC_F_NEXT		(0)
 #define VRING_DESC_F_WRITE		(1)
@@ -93,5 +94,8 @@ static inline uint32_t vring_size (unsigned int qsz)
 		 (sizeof(uint16_t) * (2 + qsz)), VRING_ALIGN_SIZE) +
 	       ALIGN(sizeof(struct vring_used_elem) * qsz, VRING_ALIGN_SIZE);
 }
+
+int virtio_device_init(struct vdev *vdev, void *iomem);
+void *hv_create_virtio_device(struct vm *vm);
 
 #endif

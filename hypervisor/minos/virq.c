@@ -208,7 +208,7 @@ static inline int virq_is_enabled(struct vcpu *vcpu, uint32_t virq)
 	return desc->enable;
 }
 
-int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq)
+int __send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq, int hw)
 {
 	int ret;
 	unsigned long flags;
@@ -218,8 +218,56 @@ int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq)
 	if (!desc || !desc->enable)
 		return -EINVAL;
 
+	if (desc->hw != hw) {
+		pr_error("virq is %s irq\n", desc->hw ?
+				"hardware" : "virtual");
+		return -EINVAL;
+	}
+
 	local_irq_save(flags);
-	ret = __send_virq(vcpu, desc->vno, desc->hno, desc->hw, 0xa0);
+	ret = __send_virq(vcpu, desc->vno, desc->hno,
+			desc->hw, desc->pr);
+	local_irq_restore(flags);
+
+	return ret;
+}
+
+int send_hirq_to_vcpu(struct vcpu *vcpu, uint32_t virq)
+{
+	return __send_virq_to_vcpu(vcpu, virq, 1);
+}
+
+int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq)
+{
+	return __send_virq_to_vcpu(vcpu, virq, 0);
+}
+
+int send_virq_to_vm(struct vm *vm, uint32_t virq)
+{
+	int ret;
+	unsigned long flags;
+	struct virq_desc *desc;
+	struct vcpu *vcpu;
+
+	if ((!vm) || (virq < VM_LOCAL_VIRQ_NR))
+		return -EINVAL;
+
+	desc = get_virq_desc(vm->vcpus[0], virq);
+	if (!desc)
+		return -ENOENT;
+
+	if (desc->hw) {
+		pr_error("can not send hw irq in here\n");
+		return -EPERM;
+	}
+
+	vcpu = get_vcpu_in_vm(vm, desc->vcpu_id);
+	if (!vcpu)
+		return -ENOENT;
+
+	local_irq_save(flags);
+	ret = __send_virq(vcpu, desc->vno, desc->hno,
+			desc->hw, desc->pr);
 	local_irq_restore(flags);
 
 	return ret;
@@ -440,9 +488,10 @@ static void vm_config_virq(struct vm *vm)
 	}
 }
 
-int alloc_vm_virq(struct vm *vm, int count)
+int alloc_vm_virq(struct vm *vm)
 {
 	int virq;
+	int count = vm->virq_nr;
 	struct virq_desc *desc;
 
 	if (vm->vmid == 0)
@@ -450,19 +499,20 @@ int alloc_vm_virq(struct vm *vm, int count)
 
 	virq = find_next_zero_bit_loop(vm->virq_map, count, 0);
 	if (virq >= count)
-		virq = 0;
+		virq = -1;
 
-	if (virq) {
+	if (virq >= 0) {
 		desc = &vm->virq_desc[virq];
 		desc->vno = virq;
 		desc->hw = 0;
 		desc->vmid = vm->vmid;
+		set_bit(virq, vm->virq_map);
 	}
 
 	if (vm->vmid == 0)
 		spin_unlock(&hvm_irq_lock);
 
-	return (virq ? virq + VM_LOCAL_VIRQ_NR : 0);
+	return (virq >= 0 ? virq + VM_LOCAL_VIRQ_NR : 0);
 }
 
 void release_vm_virq(struct vm *vm, int virq)

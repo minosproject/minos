@@ -17,24 +17,43 @@
 #include <mvm.h>
 #include <virtio.h>
 #include <virtio_mmio.h>
-#include <mvm_device.h>
+#include <vdev.h>
+#include <io.h>
 
-static int virtio_console_init(struct mvm_device *mdev, char *class)
+static int virtio_console_init(struct vdev *vdev, char *class)
+{
+	int ret = 0;
+	void *iomem;
+
+	iomem = hv_create_virtio_device(vdev->vm);
+	if (!iomem) {
+		printf("hypervisor create device failed\n");
+		return 0;
+	}
+
+	printv("get new virtio dev at 0x%lx\n", (unsigned long)iomem);
+
+	ret = virtio_device_init(vdev, iomem);
+	if (ret) {
+		printf("failed to init vdev %d\n", ret);
+		return ret;
+	}
+
+	return 0;
+}
+
+static int virtio_console_deinit(struct vdev *vdev)
 {
 	return 0;
 }
 
-static int virtio_console_deinit(struct mvm_device *mdev)
+static int virtio_console_event(struct vdev *vdev)
 {
+	printf("virtio console event\n");
 	return 0;
 }
 
-static int virtio_console_event(struct mvm_device *mdev)
-{
-	return 0;
-}
-
-struct dev_ops virtio_console_ops = {
+struct vdev_ops virtio_console_ops = {
 	.name 		= "virtio_console",
 	.dev_init	= virtio_console_init,
 	.dev_deinit	= virtio_console_deinit,

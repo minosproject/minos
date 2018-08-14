@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <list.h>
+#include <linux/netlink.h>
 
 #include <mvm_ioctl.h>
 #include <compiler.h>
@@ -25,8 +26,8 @@
 #define DEFINE_OS(os) \
 	static void *os_##os __section("mvm_os") __used = &os;
 
-extern unsigned char __start_mvm_os;
-extern unsigned char __stop_mvm_os;
+extern void *__start_mvm_os;
+extern void *__stop_mvm_os;
 
 extern int verbose;
 
@@ -71,6 +72,11 @@ struct vm {
 	struct vm_os *os;
 	void *os_data;
 	void *mmap;
+
+	struct nlmsghdr *nlh;
+	int sock_fd;
+	int event_fd;
+	int epfd;
 };
 
 #define VM_MEM_START			(0x80000000UL)

@@ -82,9 +82,11 @@ typedef __pte_t pte_t;
 #define guest_pgd_offset(ppgd, vir) 	pgd_offset(ppgd, vir)
 #endif
 
-#define guest_pud_offset(ppud, vir) 	pud_offset(ppud, vir)
+#define guest_pud_offset(ppud, vir) 	((pud_t *)ppud + guest_pud_idx(vir))
 #define guest_pmd_offset(ppmd, vir)	pmd_offset(ppmu, vir)
 #define guest_pte_offset(ppte, vir)	pte_offset(ppte, vir)
+
+#define get_pmd(ppud) (pmd_t *)((*(pud_t *)ppud) & PAGETABLE_ATTR_MASK)
 
 struct mm_struct;
 

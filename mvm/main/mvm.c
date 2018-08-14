@@ -40,7 +40,7 @@
 #include <sys/eventfd.h>
 
 #include <mvm.h>
-#include <mvm_device.h>
+#include <vdev.h>
 
 #define RECV_BUFFER_SIZE	(64)
 #define MVM_NETLINK		(29)
@@ -49,20 +49,11 @@ struct vm *mvm_vm = NULL;
 
 int verbose;
 
-extern struct vm_os os_other;
-extern struct vm_os os_linux;
-
 static struct sockaddr_nl src_addr, dest_addr;
 static struct msghdr msg;
-static struct nlmsghdr *nlh = NULL;
-static int sock_fd = -1;
 static char *dbuffer;
-
-static int mvm_event_fd = -1;
-
 static struct epoll_event event;
 static struct epoll_event wait_event;
-static int epfd;
 
 void *map_vm_memory(struct vm *vm)
 {
@@ -138,6 +129,19 @@ int destroy_vm(struct vm *vm)
 {
 	if (!vm)
 		return -EINVAL;
+
+	if (vm->nlh)
+		free(vm->nlh);
+	if (vm->sock_fd > 0)
+		close(vm->sock_fd);
+	if (vm->epfd > 0)
+		close(vm->epfd);
+	if (vm->event_fd)
+		close(vm->event_fd);
+
+	vm->nlh = NULL;
+	vm->sock_fd = -1;
+	vm->epfd = -1;
 
 	if (vm->mmap) {
 		if (vm->vm_fd)
@@ -232,29 +236,32 @@ static int create_and_init_vm(struct vm *vm)
 
 static struct vm_os *get_vm_os(char *os_type)
 {
-	struct vm_os *os_start = (struct vm_os *)&__start_mvm_os;
-	struct vm_os *os_end = (struct vm_os *)&__stop_mvm_os;
+	struct vm_os **os_start = (struct vm_os **)&__start_mvm_os;
+	struct vm_os **os_end = (struct vm_os **)&__stop_mvm_os;
 	struct vm_os *default_os = NULL;
+	struct vm_os *os;
 
 	for (; os_start < os_end; os_start++) {
-		if (strcmp(os_type, os_start->name) == 0)
-			return os_start;
+		os = *os_start;
+		printf("%s %s\n", os_type, os->name);
+		if (strcmp(os_type, os->name) == 0)
+			return os;
 
-		if (strcmp("default", os_start->name) == 0)
-			default_os = os_start;
+		if (strcmp("default", os->name) == 0)
+			default_os = os;
 	}
 
 	return default_os;
 }
 
-static int mvm_netlink_init(void)
+static int mvm_netlink_init(struct vm *vm)
 {
 	int ret;
-	int sz = 8 * 1024;
+	int sz = 4 * 1024;
 	int on = 1;
 
-	sock_fd = socket(AF_NETLINK, SOCK_RAW, MVM_NETLINK);
-	if (sock_fd < 0) {
+	vm->sock_fd = socket(AF_NETLINK, SOCK_RAW, MVM_NETLINK);
+	if (vm->sock_fd < 0) {
 		perror("can not open sock fd for slgps\n");
 		return -EIO;
 	}
@@ -264,28 +271,28 @@ static int mvm_netlink_init(void)
 	src_addr.nl_pid = getpid();
 	src_addr.nl_groups = 0;
 
-	if (setsockopt(sock_fd, SOL_SOCKET, SO_RCVBUFFORCE,
+	if (setsockopt(vm->sock_fd, SOL_SOCKET, SO_RCVBUFFORCE,
 				&sz, sizeof(sz)) < 0) {
 		printf("Unable to set event socket SO_RCVBUFFORCE\n");
 		goto out;
 	}
 
-	if (setsockopt(sock_fd, SOL_SOCKET, SO_PASSCRED,
+	if (setsockopt(vm->sock_fd, SOL_SOCKET, SO_PASSCRED,
 				&on, sizeof(on)) < 0) {
 		printf("Unable to set event socket SO_PASSCRED\n");
 		goto out;
 	}
 
-	ret = bind(sock_fd, (struct sockaddr *)&src_addr, sizeof(src_addr));
+	ret = bind(vm->sock_fd, (struct sockaddr *)&src_addr, sizeof(src_addr));
 	if (ret) {
 		perror("bind netlink faild\n");
 		goto out;
 	}
 
-	nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(RECV_BUFFER_SIZE));
-	if (!nlh) {
+	vm->nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(RECV_BUFFER_SIZE));
+	if (!vm->nlh) {
 		perror("alloc netlink memory failed\n");
-		return -ENOMEM;
+		goto out;
 	}
 
 	memset(&dest_addr, 0, sizeof(dest_addr));
@@ -293,53 +300,50 @@ static int mvm_netlink_init(void)
 	dest_addr.nl_pid = 0;
 	dest_addr.nl_groups = 0;
 
-	memset(nlh, 0, NLMSG_SPACE(RECV_BUFFER_SIZE));
-	dbuffer = (char *)NLMSG_DATA(nlh);
+	memset(vm->nlh, 0, NLMSG_SPACE(RECV_BUFFER_SIZE));
+	dbuffer = (char *)NLMSG_DATA(vm->nlh);
 
 	return 0;
 
 out:
-	close(sock_fd);
+	close(vm->sock_fd);
+	vm->sock_fd = -1;
 	return -EINVAL;
 }
 
 static int vm_rest_init(struct vm *vm)
 {
+	create_vdev(vm, "virtio_console", NULL);
 	return 0;
 }
 
-static void mvm_handle_event(struct mvm_device *mdev)
+static void mvm_handle_event(struct vdev *vdev)
 {
-	if (!mdev)
+	if (!vdev)
 		return;
 
-	mdev->ops->handle_event(mdev);
+	vdev->ops->handle_event(vdev);
 }
 
 static void *mvm_event_thread(void *arg)
 {
 	int ret;
 	uint64_t vm_event;
+	struct vm *vm = mvm_vm;
 
 	memset(&event, 0, sizeof(struct epoll_event));
 	memset(&wait_event, 0, sizeof(struct epoll_event));
 
-	event.data.fd = sock_fd;
+	event.data.fd = vm->event_fd;
 	event.events = EPOLLIN;
-	ret = epoll_ctl(epfd, EPOLL_CTL_ADD, mvm_event_fd, &event);
+	ret = epoll_ctl(vm->epfd, EPOLL_CTL_ADD, vm->event_fd, &event);
 	if (ret) {
 		perror("add epoll event failed\n");
 		return NULL;
 	}
 
-	epfd = epoll_create(10);
-	if (epfd < 0) {
-		perror("Open epoll file failed\n");
-		return NULL;
-	}
-
 	while (1) {
-		ret = epoll_wait(epfd, &wait_event, 1, -1);
+		ret = epoll_wait(vm->epfd, &wait_event, 1, -1);
 		if (ret == 0) {
 			printf("epoll timeout try to recovery\n");
 			continue;
@@ -347,13 +351,13 @@ static void *mvm_event_thread(void *arg)
 			perror("epoll error\n");
 			continue;
 		} else {
-			ret = eventfd_read(mvm_event_fd, &vm_event);
+			ret = eventfd_read(vm->event_fd, &vm_event);
 			if (ret) {
 				printf("read mvm event failed\n");
 				continue;
 			}
 
-			mvm_handle_event((struct mvm_device *)&vm_event);
+			mvm_handle_event((struct vdev *)&vm_event);
 		}
 	}
 
@@ -363,15 +367,24 @@ static void *mvm_event_thread(void *arg)
 static int mvm_main_loop(void)
 {
 	int ret;
+	struct vm *vm = mvm_vm;
 	pthread_t eh_thread;
 
-	ret = mvm_netlink_init();
+	ret = mvm_netlink_init(vm);
 	if (ret)
 		return ret;
 
-	mvm_event_fd = eventfd(0, EFD_SEMAPHORE);
-	if (mvm_event_fd < 0)
+	vm->epfd = epoll_create(10);
+	if (vm->epfd < 0) {
+		perror("Open epoll file failed\n");
 		goto out;
+	}
+
+	vm->event_fd = eventfd(0, EFD_SEMAPHORE);
+	if (vm->event_fd < 0) {
+		printf("create event fd failed\n");
+		goto out;
+	}
 
 	ret = pthread_create(&eh_thread, NULL,
 			mvm_event_thread, NULL);
@@ -379,26 +392,26 @@ static int mvm_main_loop(void)
 		goto out;
 
 	while (1) {
-		ret = recvmsg(sock_fd, &msg, 0);;
-		if (nlh->nlmsg_len <= 0)
+		ret = recvmsg(vm->sock_fd, &msg, 0);;
+		if (vm->nlh->nlmsg_len <= 0)
 			continue;
 
-		eventfd_write(mvm_event_fd, *(uint64_t *)dbuffer);
+		eventfd_write(vm->event_fd, *(uint64_t *)dbuffer);
 	}
 
 out:
-	if (nlh)
-		free(nlh);
+	if (vm->nlh)
+		free(vm->nlh);
 
-	if (sock_fd > 0)
-		close(sock_fd);
+	if (vm->sock_fd > 0)
+		close(vm->sock_fd);
 
-	if (epfd > 0)
-		close(epfd);
+	if (vm->epfd > 0)
+		close(vm->epfd);
 
-	nlh = NULL;
-	sock_fd = -1;
-	epfd = -1;
+	vm->nlh = NULL;
+	vm->sock_fd = -1;
+	vm->epfd = -1;
 
 	return 0;
 }
@@ -545,8 +558,10 @@ int main(int argc, char **argv)
 	int run_as_daemon = 0;
 
 	info = (struct vm_info *)malloc(sizeof(struct vm_info));
-	if (!info)
+	if (!info) {
+		printf("no memory for vm_info\n");
 		return -ENOMEM;
+	}
 
 	/*
 	 * default is 64 bit, 1 vcpus and 32M memory

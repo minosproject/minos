@@ -17,3 +17,41 @@
 #include <mvm.h>
 #include <virtio.h>
 #include <virtio_mmio.h>
+#include <io.h>
+
+void *hv_create_virtio_device(struct vm *vm)
+{
+	int ret;
+	void *iomem;
+
+	ret = ioctl(vm->vm_fd, IOCTL_CREATE_VIRTIO_DEVICE, &iomem);
+	if (ret) {
+		printf("create virtio device failed %d\n", ret);
+		return NULL;
+	}
+
+	return iomem;
+}
+
+int virtio_device_init(struct vdev *vdev, void *iomem)
+{
+	void *base;
+
+	vdev->iomem_physic = iomem;
+	base = vdev_map_iomem(iomem, 4096);
+	if (base == (void *)-1)
+		return -ENOMEM;
+
+	vdev->iomem = base;
+	vdev->gvm_irq = ioread32(base + VIRTIO_MMIO_GVM_IRQ);
+	vdev->hvm_irq = ioread32(base + VIRTIO_MMIO_HVM_IRQ);
+
+	/* TO BE FIX need to covert to 64bit address */
+	vdev->guest_iomem = (unsigned long)ioread32(base +
+			VIRTIO_MMIO_GVM_ADDR);
+
+	printv("vdev : %d %d 0x%lx 0x%lx\n", vdev->gvm_irq,
+			vdev->hvm_irq, (unsigned long)vdev->iomem,
+			vdev->guest_iomem);
+	return 0;
+}

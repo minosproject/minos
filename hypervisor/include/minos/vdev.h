@@ -4,6 +4,7 @@
 #include <minos/types.h>
 #include <minos/list.h>
 #include <asm/arch.h>
+#include <minos/virq.h>
 
 #define VDEV_NAME_SIZE	(15)
 
@@ -34,5 +35,15 @@ int host_vdev_init(struct vm *vm, struct vdev *vdev,
 int vdev_mmio_emulation(gp_regs *regs, int write,
 		unsigned long address, unsigned long *value);
 void vdev_set_name(struct vdev *vdev, char *name);
+
+static int inline vdev_notify_gvm(struct vdev *vdev, uint32_t irq)
+{
+	return send_virq_to_vm(vdev->vm, irq);
+}
+
+static int inline vdev_notify_hvm(struct vdev *vdev, uint32_t irq)
+{
+	return send_virq_to_vm(get_vm_by_id(0), irq);
+}
 
 #endif

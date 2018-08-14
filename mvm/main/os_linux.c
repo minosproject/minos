@@ -333,10 +333,10 @@ static int linux_early_init(struct vm *vm)
 }
 
 struct vm_os os_linux = {
-	.name	    = "linux",
-	.early_init = linux_early_init,
-	.load_image = linux_load_image,
-	.setup_vm_env    = linux_setup_env,
+	.name	    	= "linux",
+	.early_init 	= linux_early_init,
+	.load_image 	= linux_load_image,
+	.setup_vm_env   = linux_setup_env,
 };
 
 DEFINE_OS(os_linux);

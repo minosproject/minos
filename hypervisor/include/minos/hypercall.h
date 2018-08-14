@@ -14,7 +14,6 @@
 #define HVC_VM_FN(n)			(HVC_CALL_BASE + (HVC_TYPE_HVC_VM << 24) + n)
 #define HVC_PM_FN(n) 			(HVC_CALL_BASE + (HVC_TYPE_HVC_PM << 24) + n)
 #define HVC_MISC_FN(n)			(HVC_CALL_BASE + (HVC_TYPE_HVC_MISC << 24) + n)
-#define HVC_VIRTIO_FN(n)		(HVC_CALL_BASE + (HVC_TYPE_HVC_VIRTIO << 24) + n)
 
 /* hypercall for vm releated operation */
 #define	HVC_VM_CREATE			HVC_VM_FN(0)
@@ -27,6 +26,6 @@
 #define HVC_VM_SEND_VIRQ		HVC_VM_FN(7)
 
 /* hypercall for virtio releate operation */
-#define HVC_VIRTIO_CREATE_DEVICE	HVC_VIRTIO_FN(0)
+#define HVC_MISC_CREATE_VIRTIO_DEVICE	HVC_MISC_FN(0)
 
 #endif

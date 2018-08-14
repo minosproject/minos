@@ -31,7 +31,7 @@
 extern unsigned char __vm_start;
 extern unsigned char __vm_end;
 
-static struct vm *vms[CONFIG_MAX_VM];
+struct vm *vms[CONFIG_MAX_VM];
 static int total_vms = 0;
 
 DEFINE_SPIN_LOCK(vms_lock);
@@ -154,7 +154,8 @@ static struct vm *__create_vm(struct vmtag *vme)
 		return NULL;
 
 	memset((char *)vm, 0, sizeof(struct vm));
-	vm->vcpus = (struct vcpu **)malloc(sizeof(struct vcpu *) * vme->nr_vcpu);
+	vm->vcpus = (struct vcpu **)malloc(sizeof(struct vcpu *)
+			* vme->nr_vcpu);
 	if (!vm->vcpus) {
 		free(vm);
 		return NULL;
@@ -184,31 +185,6 @@ static struct vm *__create_vm(struct vmtag *vme)
 	vm->os = get_vm_os(vm->os_type);
 
 	return vm;
-}
-
-struct vm *create_vm(struct vmtag *vme)
-{
-	if (!vme)
-		return NULL;
-
-	if ((vme->vmid <= 0) || (vme->vmid >= CONFIG_MAX_VM)) {
-		vme->vmid = alloc_new_vmid();
-		if (vme->vmid == VMID_INVALID)
-			return NULL;
-	} else {
-		if (test_bit(vme->vmid, vmid_bitmap))
-			return NULL;
-	}
-
-	return __create_vm(vme);
-}
-
-struct vm *get_vm_by_id(uint32_t vmid)
-{
-	if (vmid >= CONFIG_MAX_VM)
-		return NULL;
-
-	return vms[vmid];
 }
 
 struct vcpu *get_vcpu_in_vm(struct vm *vm, uint32_t vcpu_id)
@@ -298,19 +274,26 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 	vcpu_virq_struct_init(vcpu);
 	vm->vcpus[vcpu_id] = vcpu;
 
+	vcpu->next = NULL;
+
+	if (vcpu_id != 0)
+		vm->vcpus[vcpu_id - 1]->next = vcpu;
+
 	return vcpu;
 }
 
 int vm_vcpus_init(struct vm *vm)
 {
-	int i;
+	struct vcpu *vcpu;
 
 	if (!vm)
 		return -EINVAL;
 
-	for (i = 0; i < vm->vcpu_nr; i++) {
-		vcpu_vmodules_init(vm->vcpus[i]);
-		vm->os->ops->vcpu_init(vm->vcpus[i]);
+	vm_for_each_vcpu(vm, vcpu) {
+		arch_init_vcpu(vcpu, (void *)vm->entry_point);
+		pcpu_add_vcpu(vcpu->affinity, vcpu);
+		vcpu_vmodules_init(vcpu);
+		vm->os->ops->vcpu_init(vcpu);
 	}
 
 	return 0;
@@ -335,9 +318,6 @@ static int create_vcpus(struct vm *vm)
 
 			return -ENOMEM;
 		}
-
-		arch_init_vcpu(vcpu, (void *)vm->entry_point);
-		pcpu_add_vcpu(vcpu->affinity, vcpu);
 	}
 
 	return 0;
@@ -412,15 +392,30 @@ struct vcpu *create_idle_vcpu(void)
 	return idle;
 }
 
-struct vm *create_dynamic_vm(struct vmtag *vme)
+struct vm *create_vm(struct vmtag *vme)
 {
-	int ret;
+	int ret = 0;
 	struct vm *vm;
 
 	if (!vme)
 		return NULL;
 
-	vm = create_vm(vme);
+	if ((vme->vmid < 0) || (vme->vmid >= CONFIG_MAX_VM)) {
+		vme->vmid = alloc_new_vmid();
+		if (vme->vmid == VMID_INVALID)
+			return NULL;
+	} else {
+		spin_lock(&vms_lock);
+		if (test_bit(vme->vmid, vmid_bitmap)) {
+			spin_unlock(&vms_lock);
+			return NULL;
+		}
+
+		set_bit(vme->vmid, vmid_bitmap);
+		spin_unlock(&vms_lock);
+	}
+
+	vm = __create_vm(vme);
 	if (!vm)
 		return NULL;
 
@@ -460,21 +455,11 @@ int create_static_vms(void)
 	pr_info("found %d VMs config\n", mv_config->nr_vmtag);
 
 	for (i = 0; i < mv_config->nr_vmtag; i++) {
-		set_bit(vmtags[i].vmid, vmid_bitmap);
-		vm = __create_vm(&vmtags[i]);
+		vm = create_vm(&vmtags[i]);
 		if (!vm) {
 			pr_error("create %d VM:%s failed\n", vmtags[i].name);
 			continue;
 		}
-
-		if (create_vcpus(vm))
-			panic("create vcpus for static vm failed\n");
-
-		if (do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_CREATE_VM))
-			panic("create vm failed in hook function\n");
-
-
-		do_hooks(vm, NULL, MINOS_HOOK_TYPE_CREATE_VM_VDEV);
 
 		count++;
 	}

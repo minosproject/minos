@@ -10,5 +10,6 @@
 #define IOCTL_VM_UNMAP			(0xf006)
 #define IOCTL_REGISTER_MDEV		(0xf007)
 #define IOCTL_SEND_VIRQ			(0xf008)
+#define IOCTL_CREATE_VIRTIO_DEVICE	(0xf009)
 
 #endif

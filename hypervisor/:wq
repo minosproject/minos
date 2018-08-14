@@ -97,6 +97,11 @@ static int misc_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 	HVC_RET1(c, -EINVAL);
 }
 
+static int virtio_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
+{
+
+}
+
 DEFINE_HVC_HANDLER("vcpu_hvc_handler", HVC_TYPE_HVC_VCPU,
 		HVC_TYPE_HVC_VCPU, vcpu_hvc_handler);
 

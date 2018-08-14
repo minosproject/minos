@@ -16,48 +16,72 @@
 
 #include <mvm.h>
 #include <sys/ioctl.h>
-#include <mvm_device.h>
+#include <vdev.h>
+#include <sys/mman.h>
 
-LIST_HEAD(mdev_list);
+LIST_HEAD(vdev_list);
 
-void mdev_send_irq(struct mvm_device *mdev)
+void *vdev_map_iomem(void *base, size_t size)
 {
-	if (!mdev->gvm_irq)
-		return;
+	void *iomem;
+	int fd = open("/dev/mvm/mvm0", O_RDWR);
 
-	send_virq_to_vm(mdev->vm, mdev->gvm_irq);
+	printf("vdev iomem is 0x%lx\n", (unsigned long)base);
+
+	if (fd < 0) {
+		printf("open /dev/mvm/mvm0 failed\n");
+		return (void *)-1;
+	}
+
+	iomem = mmap(NULL, size, PROT_READ | PROT_WRITE,
+			MAP_SHARED, fd, (unsigned long)base);
+	close(fd);
+
+	return iomem;
 }
 
-static struct dev_ops *get_dev_ops(char *class)
+void vdev_send_irq(struct vdev *vdev)
 {
-	struct dev_ops *start = (struct dev_ops *)&__start_mdev_ops;
-	struct dev_ops *end = (struct dev_ops *)&__stop_mdev_ops;
+	if (!vdev->gvm_irq)
+		return;
+
+	send_virq_to_vm(vdev->vm, vdev->gvm_irq);
+}
+
+static struct vdev_ops *get_vdev_ops(char *class)
+{
+	struct vdev_ops *ops;
+	struct vdev_ops **start = (struct vdev_ops **)&__start_vdev_ops;
+	struct vdev_ops **end = (struct vdev_ops **)&__stop_vdev_ops;
 
 	for (; start < end; start++) {
-		if (strcmp(start->name, class) == 0)
-			return start;
+		ops = *start;
+		if (strcmp(ops->name, class) == 0)
+			return ops;
 	}
 
 	return NULL;
 }
 
-static struct mvm_device *
-alloc_and_init_mvm_device(struct vm *vm, char *class, char *args)
+static struct vdev *
+alloc_and_init_vdev(struct vm *vm, char *class, char *args)
 {
 	int len, ret;
-	struct mvm_device *pdev;
-	struct dev_ops *plat_ops = NULL;
+	struct vdev *pdev;
+	struct vdev_ops *plat_ops = NULL;
 	char buf[32];
 
-	plat_ops = get_dev_ops(class);
-	if (!plat_ops)
+	plat_ops = get_vdev_ops(class);
+	if (!plat_ops) {
+		printf("can not find such vdev %s\n", class);
 		return NULL;
+	}
 
-	pdev = malloc(sizeof(struct mvm_device));
+	pdev = malloc(sizeof(struct vdev));
 	if (!pdev)
 		return NULL;
 
-	memset(pdev, 0, sizeof(struct mvm_device));
+	memset(pdev, 0, sizeof(struct vdev));
 	pdev->ops = plat_ops;
 	pdev->vm = vm;
 
@@ -78,7 +102,7 @@ alloc_and_init_mvm_device(struct vm *vm, char *class, char *args)
 	return pdev;
 }
 
-static int register_mvm_device(struct mvm_device *pdev)
+static int register_vdev(struct vdev *pdev)
 {
 	int ret;
 	unsigned long args[2];
@@ -93,7 +117,7 @@ static int register_mvm_device(struct mvm_device *pdev)
 
 		ret = ioctl(pdev->vm->vm_fd, IOCTL_REGISTER_MDEV, args);
 		if (ret) {
-			printf("register %s failed\n", pdev->name);
+			printf("register event for %s failed\n", pdev->name);
 			return ret;
 		}
 	}
@@ -101,33 +125,33 @@ static int register_mvm_device(struct mvm_device *pdev)
 	return 0;
 }
 
-void release_mvm_device(struct mvm_device *mdev)
+void release_vdev(struct vdev *vdev)
 {
-	if (!mdev)
+	if (!vdev)
 		return;
 
-	mdev->ops->dev_deinit(mdev);
-	free(mdev);
+	vdev->ops->dev_deinit(vdev);
+	free(vdev);
 }
 
-int create_mvm_device(struct vm *vm, char *class, char *args)
+int create_vdev(struct vm *vm, char *class, char *args)
 {
 	int ret = 0;
-	struct mvm_device *mdev;
+	struct vdev *vdev;
 
-	mdev = alloc_and_init_mvm_device(vm, class, args);
-	if (!mdev)
+	vdev = alloc_and_init_vdev(vm, class, args);
+	if (!vdev)
 		return -ENOMEM;
 
-	ret = register_mvm_device(mdev);
+	ret = register_vdev(vdev);
 	if (ret)
-		goto release_mdev;
+		goto release_vdev;
 
-	list_add_tail(&mdev_list, &mdev->list);
+	list_add_tail(&vdev_list, &vdev->list);
 
 	return 0;
 
-release_mdev:
-	release_mvm_device(mdev);
+release_vdev:
+	release_vdev(vdev);
 	return ret;
 }

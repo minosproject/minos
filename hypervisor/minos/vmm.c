@@ -33,8 +33,8 @@ static LIST_HEAD(shared_mem_list);
 static DEFINE_SPIN_LOCK(mmap_lock);
 static unsigned long hvm_normal_mmap_base = HVM_NORMAL_MMAP_START;
 static size_t hvm_normal_mmap_size = HVM_NORMAL_MMAP_SIZE;
-static unsigned long hvm_iomem_mmap_base = HVM_NORMAL_MMAP_START;
-static size_t hvm_iomem_mmap_size = HVM_NORMAL_MMAP_SIZE;
+static unsigned long hvm_iomem_mmap_base = HVM_IO_MMAP_START;
+static size_t hvm_iomem_mmap_size = HVM_IO_MMAP_SIZE;
 
 int register_memory_region(struct memtag *res)
 {
@@ -232,7 +232,7 @@ unsigned long create_hvm_iomem_map(unsigned long phy, uint32_t size)
 
 	base = hvm_iomem_mmap_base;
 	hvm_iomem_mmap_size -= size;
-	hvm_normal_mmap_base += size;
+	hvm_iomem_mmap_base += size;
 	spin_unlock(&mmap_lock);
 
 	if (create_guest_mapping(vm0, base, phy, size, VM_RW))

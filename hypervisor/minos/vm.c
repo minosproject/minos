@@ -90,7 +90,7 @@ int create_new_vm(struct vm_info *info)
 	memset(&vme, 0, sizeof(struct vmtag));
 	vminfo_to_vmtag(vm_info, &vme);
 
-	vm = create_dynamic_vm(&vme);
+	vm = create_vm(&vme);
 	if (!vm)
 		return VMID_INVALID;
 

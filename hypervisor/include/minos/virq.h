@@ -79,21 +79,14 @@ int virq_enable(struct vcpu *vcpu, uint32_t virq);
 int virq_disable(struct vcpu *vcpu, uint32_t virq);
 void vcpu_virq_struct_init(struct vcpu *vcpu);
 
-int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq);
 void send_vsgi(struct vcpu *sender,
 		uint32_t sgi, cpumask_t *cpumask);
 void clear_pending_virq(struct vcpu *vcpu, uint32_t irq);
 int virq_set_priority(struct vcpu *vcpu, uint32_t virq, int pr);
 
-static inline int send_virq_to_vm(uint32_t vmid, uint32_t virq)
-{
-	/*
-	 * default all the virq do not attached to
-	 * the hardware irq will send to the vcpu0
-	 * of a vm
-	 */
-	return send_virq_to_vcpu(get_vcpu_by_id(vmid, 0), virq);
-}
+int send_hirq_to_vcpu(struct vcpu *vcpu, uint32_t virq);
+int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq);
+int send_virq_to_vm(struct vm *vm, uint32_t virq);
 
 static inline int vcpu_has_virq_pending(struct vcpu *vcpu)
 {
@@ -111,17 +104,17 @@ static inline int vcpu_has_irq(struct vcpu *vcpu)
 			vcpu->virq_struct->pending_virq));
 }
 
-int alloc_vm_virq(struct vm *vm, int count);
+int alloc_vm_virq(struct vm *vm);
 void release_vm_virq(struct vm *vm, int virq);
 
 static inline int alloc_hvm_virq(void)
 {
-	return alloc_vm_virq(get_vm_by_id(0), MAX_HVM_VIRQ);
+	return alloc_vm_virq(get_vm_by_id(0));
 }
 
 static inline int alloc_gvm_virq(struct vm *vm)
 {
-	return alloc_vm_virq(vm, MAX_GVM_VIRQ);
+	return alloc_vm_virq(vm);
 }
 
 static void inline release_hvm_virq(int virq)

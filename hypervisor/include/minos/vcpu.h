@@ -51,6 +51,7 @@ struct vcpu {
 	uint32_t stack_size;
 	uint32_t vcpu_id;
 	struct vm *vm;
+	struct vcpu *next;
 
 	/*
 	 * member to record the irq list which the

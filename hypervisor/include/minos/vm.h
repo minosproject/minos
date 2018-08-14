@@ -45,6 +45,7 @@ struct vm {
 	char name[MINOS_VM_NAME_SIZE];
 	char os_type[OS_TYPE_SIZE];
 	struct vcpu **vcpus;
+	struct list_head vcpu_list;
 	struct mm_struct mm;
 	struct os *os;
 	struct list_head vm_list;
@@ -59,18 +60,29 @@ struct vm {
 	unsigned long *virq_map;
 } __align(sizeof(unsigned long));
 
+extern struct vm *vms[CONFIG_MAX_VM];
+
 #define for_each_vm(vm)	\
 	list_for_each_entry(vm, &vm_list, vm_list)
 
-struct vm *get_vm_by_id(uint32_t vmid);
+#define vm_for_each_vcpu(vm, vcpu)	\
+	for (vcpu = vm->vcpus[0]; vcpu->next != NULL; vcpu = vcpu->next)
 
 void vm_mm_struct_init(struct vm *vm);
 
-int vm_server_init(void);
-struct vm *create_dynamic_vm(struct vmtag *vme);
+struct vm *create_vm(struct vmtag *vme);
 int create_new_vm(struct vm_info *info);
 void destroy_vm(struct vm *vm);
 int vm_power_up(int vmid);
+
+static inline struct vm *get_vm_by_id(uint32_t vmid)
+{
+	if (vmid >= CONFIG_MAX_VM)
+		return NULL;
+
+	return vms[vmid];
+}
+
 
 static inline int is_32bit_vm(struct vm *vm)
 {
