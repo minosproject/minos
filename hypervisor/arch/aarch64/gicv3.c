@@ -678,6 +678,7 @@ int gicv3_init(void)
 	iowrite32(gicd_base + GICD_CTLR, 0);
 
 	type = ioread32(gicd_base + GICD_TYPER);
+	pr_info("typer reg of gicv3 is 0x%x\n", type);
 	nr_lines = 32 * ((type & 0x1f));
 
 	/* alloc LOCAL_IRQS for each cpus */

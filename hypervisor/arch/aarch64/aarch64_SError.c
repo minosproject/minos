@@ -204,16 +204,19 @@ static int dataabort_tfl_handler(gp_regs *regs, uint32_t esr_value)
 	unsigned long paddr;
 	unsigned long value;
 	struct esr_dabt *dabt = (struct esr_dabt *)&esr_value;
+	int dfsc = dabt->dfsc & ~FSC_LL_MASK;
 
 	vaddr = read_sysreg(FAR_EL2);
-	paddr = get_faulting_ipa(vaddr);
-	//pr_info("fault address is %x %x\n", vaddr, paddr);
+	if (dabt->s1ptw || (dfsc == FSC_FLT_TRANS))
+		paddr = get_faulting_ipa(vaddr);
+	else
+		paddr = guest_va_to_ipa(vaddr, 1);
 
 	/*
 	 * dfsc contain the fault type of the dataabort
 	 * now only handle translation fault
 	 */
-	switch (dabt->dfsc & ~FSC_LL_MASK) {
+	switch (dfsc) {
 	case FSC_FLT_PERM:
 	case FSC_FLT_ACCESS:
 	case FSC_FLT_TRANS:

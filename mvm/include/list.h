@@ -1,6 +1,8 @@
 #ifndef _MINOS_LIST_H_
 #define _MINOS_LIST_H_
 
+#define container_of(ptr, name, member) \
+	(name *)((unsigned char *)ptr - ((unsigned char *)&(((name *)0)->member)))
 struct list_head;
 
 struct list_head{

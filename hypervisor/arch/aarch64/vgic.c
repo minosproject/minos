@@ -384,6 +384,9 @@ static int vgic_mmio_write(struct vdev *vdev, gp_regs *regs,
 
 static void vgic_gicd_init(struct vm *vm, struct vgic_gicd *gicd)
 {
+	uint32_t typer = 0;
+	int nr_spi;
+
 	/*
 	 * when a vm is created need to create
 	 * one vgic for each vm since gicr is percpu
@@ -397,8 +400,15 @@ static void vgic_gicd_init(struct vm *vm, struct vgic_gicd *gicd)
 	spin_lock_init(&gicd->gicd_lock);
 
 	gicd->gicd_ctlr = 0;
-	gicd->gicd_pidr2 = ioread32((void *)gicd->base + GICD_PIDR2);
-	gicd->gicd_typer = ioread32((void *)gicd->base + GICD_TYPER);
+
+	/* GICV3 and provide vm->virq_nr interrupt */
+	gicd->gicd_pidr2 = (0X3 << 4);
+
+	typer |= vm->vcpu_nr << 5;
+	typer |= 9 << 19;
+	nr_spi = ((vm->virq_nr - VM_LOCAL_VIRQ_NR) >> 5) - 1;
+	typer |= nr_spi;
+	gicd->gicd_typer = typer;
 }
 
 

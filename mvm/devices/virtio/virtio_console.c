@@ -33,7 +33,7 @@ static int virtio_console_init(struct vdev *vdev, char *class)
 
 	printv("get new virtio dev at 0x%lx\n", (unsigned long)iomem);
 
-	ret = virtio_device_init(vdev, iomem);
+	ret = virtio_device_init(vdev, iomem, VIRTIO_TYPE_CONSOLE);
 	if (ret) {
 		printf("failed to init vdev %d\n", ret);
 		return ret;

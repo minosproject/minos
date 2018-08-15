@@ -52,8 +52,7 @@ int verbose;
 static struct sockaddr_nl src_addr, dest_addr;
 static struct msghdr msg;
 static char *dbuffer;
-static struct epoll_event event;
-static struct epoll_event wait_event;
+static struct iovec iov;
 
 void *map_vm_memory(struct vm *vm)
 {
@@ -134,14 +133,9 @@ int destroy_vm(struct vm *vm)
 		free(vm->nlh);
 	if (vm->sock_fd > 0)
 		close(vm->sock_fd);
-	if (vm->epfd > 0)
-		close(vm->epfd);
-	if (vm->event_fd)
-		close(vm->event_fd);
 
 	vm->nlh = NULL;
 	vm->sock_fd = -1;
-	vm->epfd = -1;
 
 	if (vm->mmap) {
 		if (vm->vm_fd)
@@ -227,10 +221,6 @@ static int create_and_init_vm(struct vm *vm)
 	if (ret)
 		return ret;
 
-	ret = vm->os->setup_vm_env(vm);
-	if (ret)
-		return ret;
-
 	return 0;
 }
 
@@ -300,6 +290,19 @@ static int mvm_netlink_init(struct vm *vm)
 	dest_addr.nl_pid = 0;
 	dest_addr.nl_groups = 0;
 
+	vm->nlh->nlmsg_len = RECV_BUFFER_SIZE;
+	vm->nlh->nlmsg_pid = getpid();
+	vm->nlh->nlmsg_flags = 0;
+
+	iov.iov_base = (void *)vm->nlh;
+	iov.iov_len = NLMSG_SPACE(RECV_BUFFER_SIZE);
+
+	memset(&msg, 0, sizeof(msg));
+	msg.msg_name = (void *)&dest_addr;
+	msg.msg_namelen = sizeof(dest_addr);
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+
 	memset(vm->nlh, 0, NLMSG_SPACE(RECV_BUFFER_SIZE));
 	dbuffer = (char *)NLMSG_DATA(vm->nlh);
 
@@ -325,93 +328,33 @@ static void mvm_handle_event(struct vdev *vdev)
 	vdev->ops->handle_event(vdev);
 }
 
-static void *mvm_event_thread(void *arg)
-{
-	int ret;
-	uint64_t vm_event;
-	struct vm *vm = mvm_vm;
-
-	memset(&event, 0, sizeof(struct epoll_event));
-	memset(&wait_event, 0, sizeof(struct epoll_event));
-
-	event.data.fd = vm->event_fd;
-	event.events = EPOLLIN;
-	ret = epoll_ctl(vm->epfd, EPOLL_CTL_ADD, vm->event_fd, &event);
-	if (ret) {
-		perror("add epoll event failed\n");
-		return NULL;
-	}
-
-	while (1) {
-		ret = epoll_wait(vm->epfd, &wait_event, 1, -1);
-		if (ret == 0) {
-			printf("epoll timeout try to recovery\n");
-			continue;
-		} else if (ret < 0) {
-			perror("epoll error\n");
-			continue;
-		} else {
-			ret = eventfd_read(vm->event_fd, &vm_event);
-			if (ret) {
-				printf("read mvm event failed\n");
-				continue;
-			}
-
-			mvm_handle_event((struct vdev *)&vm_event);
-		}
-	}
-
-	return NULL;
-}
-
 static int mvm_main_loop(void)
 {
 	int ret;
 	struct vm *vm = mvm_vm;
-	pthread_t eh_thread;
+	uint64_t value;
 
 	ret = mvm_netlink_init(vm);
 	if (ret)
 		return ret;
-
-	vm->epfd = epoll_create(10);
-	if (vm->epfd < 0) {
-		perror("Open epoll file failed\n");
-		goto out;
-	}
-
-	vm->event_fd = eventfd(0, EFD_SEMAPHORE);
-	if (vm->event_fd < 0) {
-		printf("create event fd failed\n");
-		goto out;
-	}
-
-	ret = pthread_create(&eh_thread, NULL,
-			mvm_event_thread, NULL);
-	if (ret)
-		goto out;
 
 	while (1) {
 		ret = recvmsg(vm->sock_fd, &msg, 0);;
 		if (vm->nlh->nlmsg_len <= 0)
 			continue;
 
-		eventfd_write(vm->event_fd, *(uint64_t *)dbuffer);
+		value = *(uint64_t *)dbuffer;
+		mvm_handle_event((struct vdev *)value);
 	}
 
-out:
 	if (vm->nlh)
 		free(vm->nlh);
 
 	if (vm->sock_fd > 0)
 		close(vm->sock_fd);
 
-	if (vm->epfd > 0)
-		close(vm->epfd);
-
 	vm->nlh = NULL;
 	vm->sock_fd = -1;
-	vm->epfd = -1;
 
 	return 0;
 }
@@ -448,6 +391,7 @@ static int mvm_main(struct vm_info *info, char *image_path, unsigned long flags)
 	mvm_vm->image_fd = image_fd;
 	mvm_vm->flags = flags;
 	info->mmap_base = 0;
+	init_list(&mvm_vm->vdev_list);
 	memcpy(&mvm_vm->vm_info, info, sizeof(struct vm_info));
 
 	/* free the unused memory */
@@ -471,6 +415,10 @@ static int mvm_main(struct vm_info *info, char *image_path, unsigned long flags)
 	ret = vm_rest_init(mvm_vm);
 	if (ret)
 		goto release_vm;
+
+	ret = mvm_vm->os->setup_vm_env(mvm_vm);
+	if (ret)
+		return ret;
 
 	/* now start the vm */
 	ret = ioctl(mvm_vm->vm_fd, IOCTL_POWER_UP_VM, NULL);

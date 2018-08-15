@@ -17,9 +17,9 @@
 #include <mvm.h>
 #include <sys/ioctl.h>
 #include <vdev.h>
+#include <list.h>
 #include <sys/mman.h>
-
-LIST_HEAD(vdev_list);
+#include <libfdt/libfdt.h>
 
 void *vdev_map_iomem(void *base, size_t size)
 {
@@ -67,6 +67,7 @@ static struct vdev *
 alloc_and_init_vdev(struct vm *vm, char *class, char *args)
 {
 	int len, ret;
+	static int vdev_id = 0;
 	struct vdev *pdev;
 	struct vdev_ops *plat_ops = NULL;
 	char buf[32];
@@ -87,11 +88,12 @@ alloc_and_init_vdev(struct vm *vm, char *class, char *args)
 
 	memset(buf, 0, 32);
 	len = strlen(class);
-	if (len > PDEV_NAME_SIZE - 4)
-		strncpy(buf, class, PDEV_NAME_SIZE - 4);
+	if (len > PDEV_NAME_SIZE - 2)
+		strncpy(buf, class, PDEV_NAME_SIZE - 2);
 	else
 		strcpy(buf, class);
-	sprintf(pdev->name, "dev-%s", buf);
+	sprintf(pdev->name, "%s%2d", buf, vdev_id);
+	vdev_id++;
 
 	ret = plat_ops->dev_init(pdev, args);
 	if (ret) {
@@ -147,11 +149,67 @@ int create_vdev(struct vm *vm, char *class, char *args)
 	if (ret)
 		goto release_vdev;
 
-	list_add_tail(&vdev_list, &vdev->list);
+	list_add_tail(&vm->vdev_list, &vdev->list);
 
 	return 0;
 
 release_vdev:
 	release_vdev(vdev);
 	return ret;
+}
+
+static void vdev_setup_dtb(struct vm *vm, char *dtb)
+{
+	struct vdev *vdev;
+	int offset, node;
+	char buf[64];
+	uint32_t args[3];
+	uint32_t addr;
+
+	offset = fdt_path_offset(dtb, "/smb/motherboard/vdev");
+	if (offset < 0) {
+		printf("set up vdev failed no vdev node\n");
+		return;
+	}
+
+	list_for_each_entry(vdev, &vm->vdev_list, list) {
+		memset(buf, 0, 64);
+		addr = (uint32_t)vdev->guest_iomem - 0x40000000;
+		sprintf(buf, "%s@%x", vdev->name, addr);
+		node = fdt_add_subnode(dtb, offset, buf);
+		if (node < 0) {
+			printf("add %s device to dtb failed\n", vdev->name);
+			continue;
+		}
+
+		fdt_setprop(dtb, node, "compatible", "virtio,mmio", 12);
+
+		/* setup the reg value */
+		args[0] = cpu_to_fdt32(addr);
+		args[1] = cpu_to_fdt32(PAGE_SIZE);
+		fdt_setprop(dtb, node, "reg", (void *)args,
+				2 * sizeof(uint32_t));
+
+		/* setup the interrupt */
+		if (vdev->gvm_irq) {
+			args[0] = cpu_to_fdt32(0x0);
+			args[1] = cpu_to_fdt32(vdev->gvm_irq - 32);
+			args[2] = cpu_to_fdt32(4);
+			fdt_setprop(dtb, node, "interrupt", (void *)args,
+					3 * sizeof(uint32_t));
+		}
+
+		printv("* - add vdev success 0x%x %d\n", addr, vdev->gvm_irq);
+	}
+}
+
+void vdev_setup_env(struct vm *vm, char *data, int os_type)
+{
+	switch (os_type) {
+	case OS_TYPE_LINUX:
+		vdev_setup_dtb(vm, data);
+		break;
+	default:
+		break;
+	}
 }

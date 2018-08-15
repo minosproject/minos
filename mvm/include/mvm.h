@@ -58,6 +58,8 @@ struct vm_os {
 	int (*setup_vm_env)(struct vm *vm);
 };
 
+#define OS_TYPE_LINUX		(1 << 0)
+
 /*
  * vmid	 : vmid allocated by hypervisor
  * flags : some flags of this vm
@@ -75,9 +77,11 @@ struct vm {
 
 	struct nlmsghdr *nlh;
 	int sock_fd;
-	int event_fd;
-	int epfd;
+
+	struct list_head vdev_list;
 };
+
+#define PAGE_SIZE			(4096)
 
 #define VM_MEM_START			(0x80000000UL)
 #define VM_MIN_MEM_SIZE			(64 * 1024 * 1024)

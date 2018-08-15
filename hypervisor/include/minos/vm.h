@@ -66,7 +66,7 @@ extern struct vm *vms[CONFIG_MAX_VM];
 	list_for_each_entry(vm, &vm_list, vm_list)
 
 #define vm_for_each_vcpu(vm, vcpu)	\
-	for (vcpu = vm->vcpus[0]; vcpu->next != NULL; vcpu = vcpu->next)
+	for (vcpu = vm->vcpus[0]; vcpu != NULL; vcpu = vcpu->next)
 
 void vm_mm_struct_init(struct vm *vm);
 

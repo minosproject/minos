@@ -20,7 +20,8 @@
 #define VRING_USED_ALIGN_SIZE		4
 #define VRING_DESC_ALIGN_SIZE		16
 
-#define VIRTIO_VENDER_id		(0x8888)
+#define VIRTIO_VENDER_ID		(0x8888)
+#define VIRTIO_VERSION			(0x2)
 
 #define	VIRTIO_TYPE_NET			1
 #define	VIRTIO_TYPE_BLOCK		2
@@ -95,7 +96,7 @@ static inline uint32_t vring_size (unsigned int qsz)
 	       ALIGN(sizeof(struct vring_used_elem) * qsz, VRING_ALIGN_SIZE);
 }
 
-int virtio_device_init(struct vdev *vdev, void *iomem);
+int virtio_device_init(struct vdev *vdev, void *iomem, int id);
 void *hv_create_virtio_device(struct vm *vm);
 
 #endif

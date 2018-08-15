@@ -33,7 +33,7 @@ void *hv_create_virtio_device(struct vm *vm)
 	return iomem;
 }
 
-int virtio_device_init(struct vdev *vdev, void *iomem)
+int virtio_device_init(struct vdev *vdev, void *iomem, int device_id)
 {
 	void *base;
 
@@ -53,5 +53,11 @@ int virtio_device_init(struct vdev *vdev, void *iomem)
 	printv("vdev : %d %d 0x%lx 0x%lx\n", vdev->gvm_irq,
 			vdev->hvm_irq, (unsigned long)vdev->iomem,
 			vdev->guest_iomem);
+
+	iowrite32(base + VIRTIO_MMIO_MAGIC_VALUE, VIRTIO_MMIO_MAGIG);
+	iowrite32(base + VIRTIO_MMIO_VERSION, VIRTIO_VERSION);
+	iowrite32(base + VIRTIO_MMIO_VENDOR_ID, VIRTIO_VENDER_ID);
+	iowrite32(base + VIRTIO_MMIO_DEVICE_ID, device_id);
+
 	return 0;
 }

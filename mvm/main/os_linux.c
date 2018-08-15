@@ -22,24 +22,15 @@
 #include <termios.h>
 #include <inttypes.h>
 #include <string.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <netinet/ether.h>
 #include <unistd.h>
-#include <arpa/inet.h>
-#include <net/if.h>
-#include <sys/epoll.h>
-#include <linux/netlink.h>
 #include <errno.h>
-#include <signal.h>
-#include <pthread.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <getopt.h>
 
 #include <mvm.h>
 #include <bootimage.h>
 #include <libfdt/libfdt.h>
+#include <vdev.h>
 
 static int fdt_setup_commandline(void *dtb, char *cmdline)
 {
@@ -148,8 +139,8 @@ static int fdt_setup_memory(void *dtb, uint64_t mstart,
 		args[3] = cpu_to_fdt32(msize);
 		size_cell = sizeof(uint32_t) * 4;
 	} else {
-		args[0] = mstart;
-		args[1] = msize;
+		args[0] = cpu_to_fdt32(mstart);
+		args[1] = cpu_to_fdt32(msize);
 		size_cell = sizeof(uint32_t) * 2;
 	}
 
@@ -237,6 +228,10 @@ static int linux_setup_env(struct vm *vm)
 	if (!(vm->flags & (MVM_FLAGS_NO_RAMDISK)))
 		fdt_setup_ramdisk(vbase, hdr->ramdisk_addr,
 				hdr->ramdisk_size);
+
+	/* call the vdev call back */
+	vdev_setup_env(vm, vbase, OS_TYPE_LINUX);
+
 	fdt_pack(vbase);
 
 	ret = 0;

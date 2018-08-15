@@ -503,7 +503,7 @@ int alloc_vm_virq(struct vm *vm)
 
 	if (virq >= 0) {
 		desc = &vm->virq_desc[virq];
-		desc->vno = virq;
+		desc->vno = virq + VM_LOCAL_VIRQ_NR;
 		desc->hw = 0;
 		desc->vmid = vm->vmid;
 		set_bit(virq, vm->virq_map);
