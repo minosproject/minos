@@ -38,7 +38,7 @@
 	{
 		"hno": 37,
 		"vno": 37,
-		"vmid": 0,
+		"vmid": 1,
 		"vcpu_id": 0,
 		"name": "pl011-uart0"
 	},
@@ -59,7 +59,7 @@
 	{
 		"hno": 40,
 		"vno": 40,
-		"vmid": 1,
+		"vmid": 0,
 		"vcpu_id": 0,
 		"name": "uart3"
 	},
@@ -101,7 +101,7 @@
 	{
 		"hno": 46,
 		"vno": 46,
-		"vmid": 1,
+		"vmid": 0,
 		"vcpu_id": 0,
 		"name": "color lcd pl111"
 	},

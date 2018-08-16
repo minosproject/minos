@@ -378,8 +378,23 @@ void __irq_enable(uint32_t irq, int enable)
 
 void irq_set_affinity(uint32_t irq, int cpu)
 {
+	struct irq_desc *irq_desc;
+
+	if (cpu >= NR_CPUS)
+		return;
+
+	/* update the hw irq affinity */
+	irq_desc = get_irq_desc(irq);
+	if (!irq_desc)
+		return;
+
+	spin_lock(&irq_desc->lock);
+	irq_desc->affinity = cpu;
+
 	if (irq_chip->irq_set_affinity)
 		irq_chip->irq_set_affinity(irq, cpu);
+
+	spin_unlock(&irq_desc->lock);
 }
 
 void irq_set_type(uint32_t irq, int type)
