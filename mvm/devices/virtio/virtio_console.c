@@ -20,26 +20,100 @@
 #include <vdev.h>
 #include <io.h>
 
+#define VIRTIO_CONSOLE_F_SIZE		(0)
+#define VIRTIO_CONSOLE_F_MULTIPORT	(1)
+#define VIRTIO_CONSOLE_F_EMERG_WRITE	(2)
+
+#define VRITIO_CONSOLE_RECQ_IDX		(0)
+#define VRITIO_CONSOLE_TRSQ_IDX		(1)
+
+#define VIRTIO_CONSOLE_DEVICE_READY     0
+#define VIRTIO_CONSOLE_PORT_ADD         1
+#define VIRTIO_CONSOLE_PORT_REMOVE      2
+#define VIRTIO_CONSOLE_PORT_READY       3
+#define VIRTIO_CONSOLE_CONSOLE_PORT     4
+#define VIRTIO_CONSOLE_RESIZE           5
+#define VIRTIO_CONSOLE_PORT_OPEN        6
+#define VIRTIO_CONSOLE_PORT_NAME        7
+
+#define VIRTIO_CONSOLE_RING_SIZE	(64)
+
+struct virtio_console_config {
+	uint16_t cols;
+	uint16_t rows;
+	uint32_t max_nr_ports;
+	uint32_t emerg_wr;
+};
+
+struct virtio_console_control {
+	uint32_t id;          /* Port number */
+	uint16_t event;       /* The kind of control event (see below) */
+	uint16_t value;       /* Extra information for the key */
+};
+
+struct virtio_console {
+	struct virtio_device virtio_dev;
+};
+
+static int vcon_rx_handler(struct virtio_device *dev,
+		struct virt_queue *queue)
+{
+	return 0;
+}
+
+static int vcon_tx_handler(struct virtio_device *dev,
+		struct virt_queue *queue)
+{
+	return 0;
+}
+
+static int vcon_init_vq(struct virtio_device *dev,
+		struct virt_queue *queue)
+{
+	if (queue->queue_index == 0) {
+		queue->callback = vcon_rx_handler;
+	} else if (queue->queue_index == 1) {
+		queue->callback = vcon_tx_handler;
+	} else
+		pr_err("only support signal port vcon\n");
+
+	return 0;
+}
+
+struct virtio_ops vcon_virtio_ops = {
+	.vq_init = vcon_init_vq,
+};
+
 static int virtio_console_init(struct vdev *vdev, char *class)
 {
 	int ret = 0;
-	void *iomem;
+	struct virtio_console *vcon;
 
-	iomem = hv_create_virtio_device(vdev->vm);
-	if (!iomem) {
-		printf("hypervisor create device failed\n");
-		return 0;
-	}
+	vcon = (struct virtio_console *)malloc(sizeof(*vcon));
+	if (!vcon)
+		return -ENOMEM;
 
-	printv("get new virtio dev at 0x%lx\n", (unsigned long)iomem);
-
-	ret = virtio_device_init(vdev, iomem, VIRTIO_TYPE_CONSOLE);
+	/* do not support mutilport only request 2 virt queue */
+	memset(vcon, 0, sizeof(struct virtio_console));
+	ret = virtio_device_init(&vcon->virtio_dev, vdev,
+			VIRTIO_TYPE_CONSOLE, 2, VIRTIO_CONSOLE_RING_SIZE);
 	if (ret) {
-		printf("failed to init vdev %d\n", ret);
-		return ret;
+		pr_err("failed to init vdev %d\n", ret);
+		goto free_vcon;
 	}
+
+	vdev_set_pdata(vdev, vcon);
+	vcon->virtio_dev.ops = &vcon_virtio_ops;
+
+	/* set the feature of the virtio dev */
+	virtio_set_feature(&vcon->virtio_dev, VIRTIO_CONSOLE_F_SIZE);
+	virtio_set_feature(&vcon->virtio_dev, VIRTIO_F_VERSION_1);
 
 	return 0;
+
+free_vcon:
+	free(vcon);
+	return ret;
 }
 
 static int virtio_console_deinit(struct vdev *vdev)
@@ -49,8 +123,16 @@ static int virtio_console_deinit(struct vdev *vdev)
 
 static int virtio_console_event(struct vdev *vdev)
 {
-	printf("virtio console event\n");
-	return 0;
+	struct virtio_console *vcon;
+
+	if (!vdev)
+		return -EINVAL;
+
+	vcon = (struct virtio_console *)vdev_get_pdata(vdev);
+	if (!vcon)
+		return -EINVAL;
+
+	return virtio_handle_event(&vcon->virtio_dev);
 }
 
 struct vdev_ops virtio_console_ops = {

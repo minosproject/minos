@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <list.h>
+#include <sys/uio.h>
 #include <linux/netlink.h>
 
 #include <mvm_ioctl.h>
@@ -31,11 +32,15 @@ extern void *__stop_mvm_os;
 
 extern int verbose;
 
-#define printv(fmt, arg...)	\
+#define pr_debug(...)	\
 	do {			\
 		if (verbose)	\
-			printf(fmt, ##arg); \
+			printf("[DEBUG] " __VA_ARGS__); \
 	} while (0)
+
+#define pr_err(...)	printf("[ERROR] " __VA_ARGS__)
+#define pr_info(...)	printf("[INFO ] " __VA_ARGS__)
+#define pr_warn(...)	printf("[WARN ] " __VA_ARGS__)
 
 struct vm_info {
 	char name[32];
@@ -70,16 +75,31 @@ struct vm {
 	int vm_fd;
 	int image_fd;
 	unsigned long flags;
-	struct vm_info vm_info;
 	struct vm_os *os;
 	void *os_data;
 	void *mmap;
+
+	/* information of the vm */
+	char name[32];
+	char os_type[32];
+	int32_t nr_vcpus;
+	int bit64;
+	uint64_t mem_size;
+	uint64_t mem_start;
+	uint64_t entry;
+	uint64_t setup_data;
+	uint64_t hvm_paddr;
 
 	struct nlmsghdr *nlh;
 	int sock_fd;
 
 	struct list_head vdev_list;
 };
+
+extern struct vm *mvm_vm;
+
+#define gpa_to_hvm_va(gpa) \
+	(unsigned long)(mvm_vm->mmap + ((gpa) - mvm_vm->mem_start))
 
 #define PAGE_SIZE			(4096)
 
@@ -100,9 +120,9 @@ struct vm {
 
 void *map_vm_memory(struct vm *vm);
 
-static inline void send_virq_to_vm(struct vm *vm, int virq)
+static inline void send_virq_to_vm(int virq)
 {
-	ioctl(vm->vm_fd, IOCTL_SEND_VIRQ, (long)virq);
+	ioctl(mvm_vm->vm_fd, IOCTL_SEND_VIRQ, (long)virq);
 }
 
 #endif

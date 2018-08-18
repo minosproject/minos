@@ -208,6 +208,11 @@ static inline unsigned long guest_va_to_ipa(unsigned long va, int read)
 	return pa;
 }
 
+static inline void cpu_relax(void)
+{
+	asm volatile("yield" ::: "memory");
+}
+
 int arch_taken_from_guest(gp_regs *regs);
 void arch_switch_vcpu_sw(void);
 void arch_dump_stack(gp_regs *regs, unsigned long *sp);

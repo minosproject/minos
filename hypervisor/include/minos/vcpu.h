@@ -85,6 +85,11 @@ static int inline get_vmid(struct vcpu *vcpu)
 	return (vcpu->vm->vmid);
 }
 
+static int inline vcpu_affinity(struct vcpu *vcpu)
+{
+	return vcpu->affinity;
+}
+
 struct vm *get_vm_by_id(uint32_t vmid);
 int arch_vm_init(struct vm *vm);
 int create_vms(void);

@@ -86,8 +86,8 @@ int level_print(char *fmt, ...)
 	 * the level to the current CPU
 	 */
 	i = smp_processor_id();
-	fmt[4] = (i / 10) + '0';
-	fmt[5] = (i % 10) + '0';
+	fmt[1] = (i / 10) + '0';
+	fmt[2] = (i % 10) + '0';
 
 	/*
 	 * TBD need to check the length of fmt

@@ -28,41 +28,49 @@
 #define vdev_to_virtio(vd) \
 	container_of(vd, struct virtio_device, vdev)
 
-struct virtio_queue_info {
-	uint32_t desc_low;
-	uint32_t desc_high;
-	uint32_t avail_low;
-	uint32_t avail_high;
-	uint32_t used_low;
-	uint32_t used_high;
-	uint32_t ready;
-	uint32_t qnum;
-};
-
-static inline struct virtio_queue_info *
-get_current_vqueue_info(void *iomem)
-{
-	int index = ioread32(iomem + VIRTIO_MMIO_QUEUE_SEL);
-
-	return (struct virtio_queue_info *)
-		(iomem + VIRTIO_MMIO_VQUEUE_INFO_BASE + index *
-		 VIRTIO_QUEUE_INFO_SIZE);
-}
-
 static int virtio_mmio_read(struct vdev *vdev, gp_regs *regs,
 		unsigned long address, unsigned long *read_value)
 {
 	return 0;
 }
 
+static inline void
+virtio_notify_hvm(struct virtio_device *dev, int nonblock)
+{
+	struct vdev *vdev = &dev->vdev;
+	struct vcpu * hvm_vcpu0 = get_vcpu_in_vm(get_vm_by_id(0), 0);
+
+	iowrite32(vdev->iomem + VIRTIO_MMIO_EVENT_ACK, 0);
+
+	/*
+	 * wait for the host vm handle this message
+	 * as default the virq will send the vcpu0
+	 * of the hvm, if the virtio's vcpu is as
+	 * same as the hvm vcpu0 then sched out otherwise
+	 * do loop
+	 */
+	vdev_notify_hvm(vdev, dev->hvm_irq);
+
+	if (!nonblock) {
+		while (!ioread32(vdev->iomem + VIRTIO_MMIO_EVENT_ACK)) {
+			if (vcpu_affinity(hvm_vcpu0) ==
+					vcpu_affinity(current_vcpu))
+				sched();
+			else
+				cpu_relax();
+		}
+
+		iowrite32(vdev->iomem + VIRTIO_MMIO_EVENT_ACK, 0);
+	}
+}
+
 static int virtio_mmio_write(struct vdev *vdev, gp_regs *regs,
 		unsigned long address, unsigned long *write_value)
 {
 	uint32_t tmp;
-	uint32_t value = *write_value;
+	uint32_t value = *(uint32_t *)write_value;
 	void *iomem = vdev->iomem;
 	unsigned long offset = address - vdev->gvm_paddr;
-	struct virtio_queue_info *queue_info;
 	struct virtio_device *dev = vdev_to_virtio(vdev);
 
 	switch (offset) {
@@ -90,14 +98,23 @@ static int virtio_mmio_write(struct vdev *vdev, gp_regs *regs,
 		iowrite32(iomem + VIRTIO_MMIO_GUEST_PAGE_SIZE, value);
 		break;
 	case VIRTIO_MMIO_QUEUE_SEL:
-		iowrite32(iomem, VIRTIO_MMIO_QUEUE_SEL);
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_SEL, value);
+
+		/* clear the queue information in the memory */
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_READY, 0);
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_NUM, 0);
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_DESC_LOW, 0);
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_DESC_HIGH, 0);
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_AVAIL_LOW, 0);
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_AVAIL_HIGH, 0);
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_USED_LOW, 0);
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_USED_HIGH, 0);
 		break;
 	case VIRTIO_MMIO_QUEUE_NUM:
 		tmp = ioread32(iomem + VIRTIO_MMIO_QUEUE_NUM_MAX);
 		if (value > tmp)
 			pr_warn("invalid queue sel %d\n", value);
-		queue_info = get_current_vqueue_info(iomem);
-		queue_info->qnum = value;
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_NUM, value);
 		break;
 	case VIRTIO_MMIO_QUEUE_ALIGN:
 		iowrite32(iomem + VIRTIO_MMIO_QUEUE_ALIGN, value);
@@ -112,43 +129,40 @@ static int virtio_mmio_write(struct vdev *vdev, gp_regs *regs,
 		 * event to hvm ?
 		 */
 		iowrite32(iomem + VIRTIO_MMIO_QUEUE_NOTIFY, value);
-		iowrite32(iomem + VIRTIO_MMIO_EVENT, VIRTIO_EVENT_BUFFER_READY);
-		vdev_notify_hvm(vdev, dev->hvm_irq);
+		iowrite32(iomem + VIRTIO_MMIO_EVENT, VIRTIO_EVENT_QUEUE_READY);
+		virtio_notify_hvm(dev, 0);
 		break;
 	case VIRTIO_MMIO_INTERRUPT_ACK:
 		break;
 	case VIRTIO_MMIO_STATUS:
+		tmp = ioread32(iomem + VIRTIO_MMIO_STATUS);
+		value = value - tmp;
 		iowrite32(iomem + VIRTIO_MMIO_STATUS, value);
 		iowrite32(iomem + VIRTIO_MMIO_EVENT, VIRTIO_EVENT_STATUS_CHANGE);
-		vdev_notify_hvm(vdev, dev->hvm_irq);
+		virtio_notify_hvm(dev, 0);
 		break;
 	case VIRTIO_MMIO_QUEUE_DESC_LOW:
-		queue_info = get_current_vqueue_info(iomem);
-		queue_info->desc_low = value;
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_DESC_LOW, value);
 		break;
 	case VIRTIO_MMIO_QUEUE_AVAIL_LOW:
-		queue_info = get_current_vqueue_info(iomem);
-		queue_info->avail_low = value;
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_AVAIL_LOW, value);
 		break;
 	case VIRTIO_MMIO_QUEUE_USED_LOW:
-		queue_info = get_current_vqueue_info(iomem);
-		queue_info->used_low = value;
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_USED_LOW, value);
 		break;
 	case VIRTIO_MMIO_QUEUE_DESC_HIGH:
-		queue_info = get_current_vqueue_info(iomem);
-		queue_info->desc_high = value;
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_DESC_HIGH, value);
 		break;
 	case VIRTIO_MMIO_QUEUE_USED_HIGH:
-		queue_info = get_current_vqueue_info(iomem);
-		queue_info->used_high = value;
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_USED_HIGH, value);
 		break;
 	case VIRTIO_MMIO_QUEUE_AVAIL_HIGH:
-		queue_info = get_current_vqueue_info(iomem);
-		queue_info->avail_high = value;
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_AVAIL_HIGH, value);
 		break;
 	case VIRTIO_MMIO_QUEUE_READY:
-		queue_info = get_current_vqueue_info(iomem);
-		queue_info->ready = value;
+		iowrite32(iomem + VIRTIO_MMIO_QUEUE_READY, value);
+		iowrite32(iomem + VIRTIO_MMIO_EVENT, VIRTIO_EVENT_BUFFER_READY);
+		virtio_notify_hvm(dev, 0);
 		break;
 	default:
 		break;

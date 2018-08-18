@@ -26,10 +26,8 @@ void *vdev_map_iomem(void *base, size_t size)
 	void *iomem;
 	int fd = open("/dev/mvm/mvm0", O_RDWR);
 
-	printf("vdev iomem is 0x%lx\n", (unsigned long)base);
-
 	if (fd < 0) {
-		printf("open /dev/mvm/mvm0 failed\n");
+		printf("* error - open /dev/mvm/mvm0 failed\n");
 		return (void *)-1;
 	}
 
@@ -45,7 +43,7 @@ void vdev_send_irq(struct vdev *vdev)
 	if (!vdev->gvm_irq)
 		return;
 
-	send_virq_to_vm(vdev->vm, vdev->gvm_irq);
+	send_virq_to_vm(vdev->gvm_irq);
 }
 
 static struct vdev_ops *get_vdev_ops(char *class)
@@ -74,7 +72,7 @@ alloc_and_init_vdev(struct vm *vm, char *class, char *args)
 
 	plat_ops = get_vdev_ops(class);
 	if (!plat_ops) {
-		printf("can not find such vdev %s\n", class);
+		printf("* error - can not find such vdev %s\n", class);
 		return NULL;
 	}
 
@@ -119,7 +117,8 @@ static int register_vdev(struct vdev *pdev)
 
 		ret = ioctl(pdev->vm->vm_fd, IOCTL_REGISTER_MDEV, args);
 		if (ret) {
-			printf("register event for %s failed\n", pdev->name);
+			printf("* error - register event for %s failed\n",
+					pdev->name);
 			return ret;
 		}
 	}
@@ -168,7 +167,7 @@ static void vdev_setup_dtb(struct vm *vm, char *dtb)
 
 	offset = fdt_path_offset(dtb, "/smb/motherboard/vdev");
 	if (offset < 0) {
-		printf("set up vdev failed no vdev node\n");
+		printf("* error - set up vdev failed no vdev node\n");
 		return;
 	}
 
@@ -178,7 +177,7 @@ static void vdev_setup_dtb(struct vm *vm, char *dtb)
 		sprintf(buf, "%s@%x", vdev->name, addr);
 		node = fdt_add_subnode(dtb, offset, buf);
 		if (node < 0) {
-			printf("add %s device to dtb failed\n", vdev->name);
+			printf("* error - add %s failed\n", vdev->name);
 			continue;
 		}
 
@@ -195,11 +194,11 @@ static void vdev_setup_dtb(struct vm *vm, char *dtb)
 			args[0] = cpu_to_fdt32(0x0);
 			args[1] = cpu_to_fdt32(vdev->gvm_irq - 32);
 			args[2] = cpu_to_fdt32(4);
-			fdt_setprop(dtb, node, "interrupt", (void *)args,
+			fdt_setprop(dtb, node, "interrupts", (void *)args,
 					3 * sizeof(uint32_t));
 		}
 
-		printv("* - add vdev success 0x%x %d\n", addr, vdev->gvm_irq);
+		pr_info("add vdev success 0x%x %d\n", addr, vdev->gvm_irq);
 	}
 }
 

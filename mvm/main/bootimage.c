@@ -28,6 +28,7 @@
 #include <sys/stat.h>
 
 #include <bootimage.h>
+#include <mvm.h>
 
 static void dump_bootimg_hdr(boot_img_hdr *hdr)
 {
@@ -36,20 +37,20 @@ static void dump_bootimg_hdr(boot_img_hdr *hdr)
 	memset(buf, 0, 1024);
 	strncpy(buf, (char *)hdr->magic, BOOT_MAGIC_SIZE);
 
-	printf("magic        - %s\n", buf);
-	printf("kernel_size  - 0x%x\n", hdr->kernel_size);
-	printf("kernel_addr  - 0x%x\n", hdr->kernel_addr);
-	printf("ramdisk_size - 0x%x\n", hdr->ramdisk_size);
-	printf("ramdisk_addr - 0x%x\n", hdr->ramdisk_addr);
-	printf("dtb_size     - 0x%x\n", hdr->second_size);
-	printf("dtb_addr     - 0x%x\n", hdr->second_addr);
-	printf("tags_addr    - 0x%x\n", hdr->tags_addr);
-	printf("page_size    - 0x%x\n", hdr->page_size);
+	pr_info("magic        - %s\n", buf);
+	pr_info("kernel_size  - 0x%x\n", hdr->kernel_size);
+	pr_info("kernel_addr  - 0x%x\n", hdr->kernel_addr);
+	pr_info("ramdisk_size - 0x%x\n", hdr->ramdisk_size);
+	pr_info("ramdisk_addr - 0x%x\n", hdr->ramdisk_addr);
+	pr_info("dtb_size     - 0x%x\n", hdr->second_size);
+	pr_info("dtb_addr     - 0x%x\n", hdr->second_addr);
+	pr_info("tags_addr    - 0x%x\n", hdr->tags_addr);
+	pr_info("page_size    - 0x%x\n", hdr->page_size);
 
 	strncpy(buf, (char *)hdr->name, BOOT_NAME_SIZE);
-	printf("name         - %s\n", buf);
+	pr_info("name         - %s\n", buf);
 	strncpy(buf, (char *)hdr->cmdline, BOOT_ARGS_SIZE);
-	printf("cmdline      - %s\n", buf);
+	pr_info("cmdline      - %s\n", buf);
 }
 
 int read_bootimage_header(int fd, boot_img_hdr *hdr)

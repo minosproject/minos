@@ -23,6 +23,7 @@ struct vdev {
 	unsigned long guest_iomem;
 	int guest_visable;
 	struct vdev_ops *ops;
+	void *pdata;
 	char name[PDEV_NAME_SIZE + 1];
 	struct list_head list;
 };
@@ -36,5 +37,17 @@ extern void *__stop_vdev_ops;
 int create_vdev(struct vm *vm, char *class, char *args);
 void *vdev_map_iomem(void *iomem, size_t size);
 void vdev_setup_env(struct vm *vm, char *data, int os_type);
+void vdev_send_irq(struct vdev *vdev);
+
+static void inline vdev_set_pdata(struct vdev *vdev, void *data)
+{
+	if (vdev)
+		vdev->pdata = data;
+}
+
+static inline void *vdev_get_pdata(struct vdev *vdev)
+{
+	return (vdev ? vdev->pdata : NULL);
+}
 
 #endif

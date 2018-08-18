@@ -36,7 +36,7 @@ static int fdt_setup_commandline(void *dtb, char *cmdline)
 {
 	int nodeoffset;
 
-	printv("* add command - %s\n", cmdline);
+	pr_debug("add command - %s\n", cmdline);
 
 	if (!cmdline || (strlen(cmdline) == 0))
 		return -EINVAL;
@@ -59,7 +59,7 @@ static int fdt_setup_cpu(void *dtb, int vcpus)
 	int offset, node, i;
 	char name[16];
 
-	printv("* setup vcpu\n");
+	pr_debug("setup vcpu\n");
 
 	/*
 	 * delete unused cpu node, currently only support
@@ -77,7 +77,7 @@ static int fdt_setup_cpu(void *dtb, int vcpus)
 		sprintf(name, "core%d", i);
 		node = fdt_subnode_offset(dtb, offset, name);
 		if (node >= 0) {
-			printv("        - delete %s\n", name);
+			pr_debug("        - delete %s\n", name);
 			fdt_del_node(dtb, node);
 		}
 	}
@@ -89,7 +89,7 @@ static int fdt_setup_cpu(void *dtb, int vcpus)
 		sprintf(name, "cpu@%d", i);
 		node = fdt_subnode_offset(dtb, offset, name);
 		if (node >= 0) {
-			printv("        - delete %s\n", name);
+			pr_debug("        - delete %s\n", name);
 			fdt_del_node(dtb, node);
 		}
 	}
@@ -106,11 +106,11 @@ static int fdt_setup_memory(void *dtb, uint64_t mstart,
 	char buf[64];
 
 	offset = fdt_num_mem_rsv(dtb);
-	printv("* found %d rsv memory region\n", offset);
+	pr_debug("found %d rsv memory region\n", offset);
 	for (i = 0; i < offset; i++)
 		fdt_del_mem_rsv(dtb, 0);
 
-	printv("* add rsv memory region : 0x%lx 0x%x\n",
+	pr_debug("add rsv memory region : 0x%lx 0x%x\n",
 			mstart, 0x10000);
 	fdt_add_mem_rsv(dtb, mstart, 0x10000);
 
@@ -138,10 +138,13 @@ static int fdt_setup_memory(void *dtb, uint64_t mstart,
 		args[2] = cpu_to_fdt32(msize >> 32);
 		args[3] = cpu_to_fdt32(msize);
 		size_cell = sizeof(uint32_t) * 4;
+		pr_debug("setup memory 0x%x 0x%x 0x%x 0x%x\n",
+				args[0], args[1], args[2], args[3]);
 	} else {
 		args[0] = cpu_to_fdt32(mstart);
 		args[1] = cpu_to_fdt32(msize);
 		size_cell = sizeof(uint32_t) * 2;
+		pr_debug("setup memory 0x%x 0x%x\n", args[0], args[1]);
 	}
 
 	return fdt_setprop(dtb, offset, "reg",
@@ -160,7 +163,7 @@ static int fdt_setup_ramdisk(void *dtb, uint32_t start, uint32_t size)
 			return offset;
 	}
 
-	printv("* set ramdisk : 0x%x 0x%x", start, size);
+	pr_debug("set ramdisk : 0x%x 0x%x\n", start, size);
 	fdt_setprop_cell(dtb, offset, "linux,initrd-start", start);
 	fdt_setprop_cell(dtb, offset, "linux,initrd-end", start + size);
 
@@ -172,7 +175,6 @@ static int linux_setup_env(struct vm *vm)
 	int ret = 0;
 	void *vbase;
 	uint32_t pages, seek, offset, load_size;
-	struct vm_info *info = &vm->vm_info;
 	boot_img_hdr *hdr = (boot_img_hdr *)vm->os_data;
 
 	if (hdr->second_size == 0)
@@ -183,9 +185,7 @@ static int linux_setup_env(struct vm *vm)
 	pages = (pages / hdr->page_size) + 1;
 	seek = pages * hdr->page_size;
 	load_size = BALIGN(hdr->second_size, hdr->page_size);
-	offset = hdr->second_addr - info->mem_start;
-
-	printv("dtb-0x%x 0x%x 0x%x\n", seek, load_size, offset);
+	offset = hdr->second_addr - vm->mem_start;
 
 	if (lseek(vm->image_fd, seek, SEEK_SET) == -1)
 		return -EIO;
@@ -221,9 +221,8 @@ static int linux_setup_env(struct vm *vm)
 	 * 3: setup mem attr
 	 */
 	fdt_setup_commandline(vbase, (char *)hdr->cmdline);
-	fdt_setup_cpu(vbase, info->nr_vcpus);
-	fdt_setup_memory(vbase, info->mem_start,
-			info->mem_size, info->bit64);
+	fdt_setup_cpu(vbase, vm->nr_vcpus);
+	fdt_setup_memory(vbase, vm->mem_start, vm->mem_size, vm->bit64);
 
 	if (!(vm->flags & (MVM_FLAGS_NO_RAMDISK)))
 		fdt_setup_ramdisk(vbase, hdr->ramdisk_addr,
@@ -261,21 +260,20 @@ static int load_image(struct vm *vm, uint32_t load_offset,
 static int linux_load_image(struct vm *vm)
 {
 	int ret = 0;
-	struct vm_info *info = &vm->vm_info;
 	uint32_t load_size, load_offset, seek, tmp = 1;
 	boot_img_hdr *hdr = (boot_img_hdr *)vm->os_data;
 
 	/* load the kernel image to guest memory */
-	load_offset = hdr->kernel_addr - info->mem_start;
+	load_offset = hdr->kernel_addr - vm->mem_start;
 	load_size = hdr->kernel_size;
 	seek = tmp * hdr->page_size;
 
-	printv("* load kernel image: 0x%x 0x%x 0x%x\n",
+	pr_debug("load kernel image: 0x%x 0x%x 0x%x\n",
 			load_offset, seek, load_size);
 
 	ret = load_image(vm, load_offset, seek, load_size);
 	if (ret) {
-		perror("* error - load kernel image failed\n");
+		perror("error - load kernel image failed\n");
 		return ret;
 	}
 
@@ -285,15 +283,15 @@ static int linux_load_image(struct vm *vm)
 	if (vm->flags & (MVM_FLAGS_NO_RAMDISK))
 		return 0;
 
-	load_offset = hdr->ramdisk_addr - info->mem_start;
+	load_offset = hdr->ramdisk_addr - vm->mem_start;
 	load_size = hdr->ramdisk_size;
 	seek = tmp * hdr->page_size;
 
-	printv("* load ramdisk image:0x%x 0x%x 0x%x\n",
+	pr_debug("load ramdisk image:0x%x 0x%x 0x%x\n",
 			load_offset, seek, load_size);
 	ret = load_image(vm, load_offset, seek, load_size);
 	if (ret) {
-		perror("* error - load ramdisk image failed\n");
+		pr_err("load ramdisk image failed\n");
 		return ret;
 	}
 
@@ -304,7 +302,6 @@ static int linux_early_init(struct vm *vm)
 {
 	int ret;
 	boot_img_hdr *hdr;
-	struct vm_info *info = &vm->vm_info;
 
 	if (vm->image_fd <= 0)
 		return -EINVAL;
@@ -319,9 +316,9 @@ static int linux_early_init(struct vm *vm)
 		return ret;
 	}
 
-	info->entry = hdr->kernel_addr;
-	info->setup_data = hdr->second_addr;
-	info->mem_start = info->entry & ~(0x200000 - 1);
+	vm->entry = hdr->kernel_addr;
+	vm->setup_data = hdr->second_addr;
+	vm->mem_start = vm->entry & ~(0x200000 - 1);
 	vm->os_data = (void *)hdr;
 
 	return 0;

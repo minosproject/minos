@@ -4,22 +4,30 @@
 #include <sys/types.h>
 #include <inttypes.h>
 #include <vdev.h>
+#include <io.h>
+#include <virtio_mmio.h>
 
-#define VRING_DESC_F_NEXT		(0)
-#define VRING_DESC_F_WRITE		(1)
+#define VRING_DESC_F_NEXT		(1)
+#define VRING_DESC_F_WRITE		(2)
 #define VRING_DESC_F_INDIRECT		(4)
 
 #define VRING_ALIGN_SIZE		(4096)
 
 #define VRING_AVAIL_F_NO_INTERRUPT	1
+#define VRING_USED_F_NO_NOTIFY		1
 
 #define VIRTIO_RING_F_INDIRECT_DESC	28
 #define VIRTIO_RING_F_EVENT_IDX		29
+
+#define VIRTIO_F_NOTIFY_ON_EMPTY	24
+#define VIRTIO_F_ANY_LAYOUT		27
+#define VIRTIO_F_VERSION_1		32
 
 #define VRING_AVAIL_ALIGN_SIZE		2
 #define VRING_USED_ALIGN_SIZE		4
 #define VRING_DESC_ALIGN_SIZE		16
 
+#define VIRTIO_MMIO_MAGIG		(0x74726976)
 #define VIRTIO_VENDER_ID		(0x8888)
 #define VIRTIO_VERSION			(0x2)
 
@@ -40,6 +48,15 @@
 #define VIRTIO_DEV_STATUS_FEATURES_OK	(8)
 #define VIRTIO_DEV_NEEDS_RESET		(64)
 #define VIRTIO_DEV_STATUS_FAILED	(128)
+
+#define VIRTQUEUE_MAX_SIZE		(512)
+#define VIRTIO_MAX_FEATURE_SIZE		(4)
+
+#define u32_to_u64(high, low) \
+	(((unsigned long)(high) << 32) | (low))
+
+#define u16_to_u32(high, low) \
+	(((unsigned long)(high) << 16) | (low))
 
 struct vring_used_elem {
 	uint32_t id;
@@ -65,28 +82,55 @@ struct vring_desc {
 	uint16_t next;
 } __attribute__((__packed__));
 
+struct virtio_device;
+
 struct virt_queue {
 	unsigned int num;
 	struct vring_desc *desc;
 	struct vring_avail *avail;
 	struct vring_used *used;
+	uint16_t last_avail_idx;
+	uint16_t avail_idx;
+	uint16_t last_used_idx;
+	uint16_t used_flags;
+	uint16_t signalled_used;
+	uint16_t signalled_used_valid;
+	uint16_t queue_index;
+	uint64_t guest_ack_features;
+
+	struct iovec iovec[VIRTQUEUE_MAX_SIZE];
+
+	int (*callback)(struct virtio_device *, struct virt_queue *);
 };
+
+#define virtq_used_event(vq) \
+	(uint16_t *)&vq->avail->ring[vq->num]
+#define virtq_avail_event(vq) \
+	(uint16_t *)&vq->used->ring[vq->num]
+
+struct virtio_ops {
+	int (*vq_init)(struct virtio_device *, struct virt_queue *);
+	void (*vq_deinit)(struct virtio_device *, struct virt_queue *);
+};
+
+struct virtio_device {
+	struct vdev *vdev;
+	struct virt_queue *vqs;
+	int nr_vq;
+	void *config;
+	struct virtio_ops *ops;
+};
+
+static int inline virtq_has_descs(struct virt_queue *vq)
+{
+	return vq->avail->idx != vq->last_avail_idx;
+}
 
 static int inline virtq_need_event(uint16_t event_idx,
 		uint16_t new_idx, uint16_t old_idx)
 {
 	return (uint16_t)(new_idx - event_idx - 1) <
 				(uint16_t)(new_idx - old_idx);
-}
-
-static inline uint16_t *virtq_used_event(struct virt_queue *vq)
-{
-	return (uint16_t *)&vq->avail->ring[vq->num];
-}
-
-static inline uint16_t *virtq_avail_event(struct virt_queue *vq)
-{
-	return (uint16_t *)&vq->used->ring[vq->num];
 }
 
 static inline uint32_t vring_size (unsigned int qsz)
@@ -96,7 +140,34 @@ static inline uint32_t vring_size (unsigned int qsz)
 	       ALIGN(sizeof(struct vring_used_elem) * qsz, VRING_ALIGN_SIZE);
 }
 
-int virtio_device_init(struct vdev *vdev, void *iomem, int id);
-void *hv_create_virtio_device(struct vm *vm);
+static inline void
+virtio_set_feature(struct virtio_device *dev, uint32_t feature)
+{
+	uint32_t value;
+	int index = feature / 32;
+
+	if (index >= VIRTIO_MAX_FEATURE_SIZE) {
+		pr_warn("invaild feature bit %d\n", feature);
+		return;
+	}
+
+	value = ioread32(dev->vdev->iomem + VIRTIO_FEATURE_OFFSET(index));
+	value |= (1 << (feature % 32));
+	iowrite32(dev->vdev->iomem + VIRTIO_FEATURE_OFFSET(index), value);
+}
+
+static int inline virtq_has_feature(struct virt_queue *vq, int fe)
+{
+	return !!(vq->guest_ack_features & (1UL << fe));
+}
+
+static inline void virtio_send_irq(struct virtio_device *dev)
+{
+	vdev_send_irq(dev->vdev);
+}
+
+int virtio_device_init(struct virtio_device *,
+		struct vdev *, int, int, int);
+int virtio_handle_event(struct virtio_device *dev);
 
 #endif
