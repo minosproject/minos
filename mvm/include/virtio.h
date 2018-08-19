@@ -95,12 +95,13 @@ struct virt_queue {
 	uint16_t used_flags;
 	uint16_t signalled_used;
 	uint16_t signalled_used_valid;
-	uint16_t queue_index;
-	uint64_t guest_ack_features;
+	uint16_t vq_index;
+	uint64_t acked_features;
 
+	struct virtio_device *dev;
 	struct iovec iovec[VIRTQUEUE_MAX_SIZE];
 
-	int (*callback)(struct virtio_device *, struct virt_queue *);
+	int (*callback)(struct virt_queue *);
 };
 
 #define virtq_used_event(vq) \
@@ -109,8 +110,9 @@ struct virt_queue {
 	(uint16_t *)&vq->used->ring[vq->num]
 
 struct virtio_ops {
-	int (*vq_init)(struct virtio_device *, struct virt_queue *);
-	void (*vq_deinit)(struct virtio_device *, struct virt_queue *);
+	int (*vq_init)(struct virt_queue *);
+	void (*vq_deinit)(struct virt_queue *);
+	int (*reset)(struct virtio_device *);
 };
 
 struct virtio_device {
@@ -158,7 +160,7 @@ virtio_set_feature(struct virtio_device *dev, uint32_t feature)
 
 static int inline virtq_has_feature(struct virt_queue *vq, int fe)
 {
-	return !!(vq->guest_ack_features & (1UL << fe));
+	return !!(vq->acked_features & (1UL << fe));
 }
 
 static inline void virtio_send_irq(struct virtio_device *dev)
@@ -169,5 +171,31 @@ static inline void virtio_send_irq(struct virtio_device *dev)
 int virtio_device_init(struct virtio_device *,
 		struct vdev *, int, int, int);
 int virtio_handle_event(struct virtio_device *dev);
+int virtq_enable_notify(struct virt_queue *vq);
+void virtq_disable_notify(struct virt_queue *vq);
+
+int virtq_get_descs(struct virt_queue *vq,
+		struct iovec *iov, unsigned int iov_size,
+		unsigned int *in_num, unsigned int *out_num);
+
+void virtq_discard_desc(struct virt_queue *vq, int n);
+
+int virtq_add_used_n(struct virt_queue *vq,
+			struct vring_used_elem *heads,
+			unsigned int count);
+
+int virtq_add_used(struct virt_queue *vq,
+		unsigned int head, uint32_t len);
+
+void virtq_notify(struct virt_queue *vq);
+
+void virtq_add_used_and_signal(struct virt_queue *vq,
+		unsigned int head, int len);
+
+void virtq_add_used_and_signal_n(struct virt_queue *vq,
+				struct vring_used_elem *heads,
+				unsigned int count);
+
+void virtio_device_reset(struct virtio_device *dev);
 
 #endif

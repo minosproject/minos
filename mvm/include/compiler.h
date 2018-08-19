@@ -8,4 +8,7 @@
 #define __align_cache_line	__align(__cache_line_size__)
 #define __packed		__attribute__((__packed__))
 
+#define container_of(ptr, name, member) \
+	(name *)((unsigned char *)ptr - ((unsigned char *)&(((name *)0)->member)))
+
 #endif

@@ -1,18 +1,35 @@
 /*
+ * BSD 3-Clause License
+ *
  * Copyright (C) 2018 Min Le (lemin9538@gmail.com)
+ * All rights reserved.
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * 3. Neither the name of the copyright holder nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR
+ * TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 
 #include <mvm.h>
 #include <virtio.h>
@@ -266,7 +283,7 @@ int virtq_add_used(struct virt_queue *vq,
 	return virtq_add_used_n(vq, &heads, 1);
 }
 
-int virtq_need_notify(struct virt_queue *vq)
+static int virtq_need_notify(struct virt_queue *vq)
 {
 	uint16_t old, new;
 	uint16_t event, flags;
@@ -294,26 +311,25 @@ int virtq_need_notify(struct virt_queue *vq)
 	return virtq_need_event(event, new, old);
 }
 
-void virtq_notify(struct virtio_device *dev, struct virt_queue *vq)
+void virtq_notify(struct virt_queue *vq)
 {
 	if (virtq_need_notify(vq))
-		virtio_send_irq(dev);
+		virtio_send_irq(vq->dev);
 }
 
-void virtq_add_used_and_signal(struct virtio_device *dev,
-		struct virt_queue *vq, unsigned int head, int len)
+void virtq_add_used_and_signal(struct virt_queue *vq,
+		unsigned int head, int len)
 {
 	virtq_add_used(vq, head, len);
-	virtq_notify(dev, vq);
+	virtq_notify(vq);
 }
 
-void virtq_add_used_and_signal_n(struct virtio_device *dev,
-				struct virt_queue *vq,
+void virtq_add_used_and_signal_n(struct virt_queue *vq,
 				struct vring_used_elem *heads,
 				unsigned int count)
 {
 	virtq_add_used_n(vq, heads, count);
-	virtq_notify(dev, vq);
+	virtq_notify(vq);
 }
 
 static int __virtio_vdev_init(struct vdev *vdev,
@@ -348,6 +364,11 @@ static int __virtio_vdev_init(struct vdev *vdev,
 	iowrite32(base + VIRTIO_MMIO_QUEUE_NUM_MAX, rs);
 
 	return 0;
+
+}
+
+void virtio_device_reset(struct virtio_device *dev)
+{
 
 }
 
@@ -388,7 +409,6 @@ int virtio_device_init(struct virtio_device *virt_dev,
 
 	virt_dev->nr_vq = queue_nr;
 	memset(virt_dev->vqs, 0, sizeof(struct virt_queue) * queue_nr);
-
 	return 0;
 
 release_virtio_dev:
@@ -408,6 +428,18 @@ static int virtio_status_event(struct virtio_device *dev, uint32_t arg)
 		break;
 
 	case VIRTIO_DEV_STATUS_OK:
+		break;
+
+	case VIRTIO_DEV_STATUS_ACK:
+		break;
+
+	case VIRTIO_DEV_STATUS_DRIVER:
+		break;
+
+	case VIRTIO_DEV_STATUS_FEATURES_OK:
+		break;
+
+	case VIRTIO_DEV_STATUS_FAILED:
 		break;
 	}
 
@@ -429,7 +461,12 @@ static int virtio_queue_event(struct virtio_device *dev, uint32_t arg)
 		return -ENOENT;
 	}
 
-	return queue->callback(dev, queue);
+	if (queue->callback)
+		return queue->callback(queue);
+	else
+		pr_err("no callback for this virt queue\n");
+
+	return 0;
 }
 
 static int virtio_mmio_event(struct virtio_device *dev, uint32_t arg)
@@ -439,7 +476,7 @@ static int virtio_mmio_event(struct virtio_device *dev, uint32_t arg)
 
 static int virtio_buffer_event(struct virtio_device *dev, uint32_t arg)
 {
-	struct virt_queue *queue;
+	struct virt_queue *vq;
 	void *iomem = dev->vdev->iomem;
 	uint32_t high, low;
 
@@ -448,43 +485,48 @@ static int virtio_buffer_event(struct virtio_device *dev, uint32_t arg)
 		return -EINVAL;
 	}
 
-	queue = &dev->vqs[arg];
-	queue->queue_index = arg;
-	queue->num = ioread32(iomem + VIRTIO_MMIO_QUEUE_NUM);
+	vq = &dev->vqs[arg];
+	vq->vq_index = arg;
+	vq->dev = dev;
+	vq->num = ioread32(iomem + VIRTIO_MMIO_QUEUE_NUM);
 
 	high = ioread32(iomem + VIRTIO_MMIO_QUEUE_DESC_HIGH);
 	low = ioread32(iomem + VIRTIO_MMIO_QUEUE_AVAIL_LOW);
-	queue->desc = (struct vring_desc *)u32_to_u64(high, low);
+	vq->desc = (struct vring_desc *)u32_to_u64(high, low);
 
 	high = ioread32(iomem + VIRTIO_MMIO_QUEUE_AVAIL_HIGH);
 	low = ioread32(iomem + VIRTIO_MMIO_QUEUE_AVAIL_LOW);
-	queue->avail = (struct vring_avail *)u32_to_u64(high, low);
+	vq->avail = (struct vring_avail *)u32_to_u64(high, low);
 
 	high = ioread32(iomem + VIRTIO_MMIO_QUEUE_USED_HIGH);
 	low = ioread32(iomem + VIRTIO_MMIO_QUEUE_USED_LOW);
-	queue->used = (struct vring_used *)u32_to_u64(high, low);
+	vq->used = (struct vring_used *)u32_to_u64(high, low);
 
-	pr_debug("find virt_queue %d 0x%p 0x%p 0x%p\n", queue->num,
-			queue->desc, queue->avail, queue->used);
+	pr_debug("find virt_queue %d 0x%p 0x%p 0x%p\n", vq->num,
+			vq->desc, vq->avail, vq->used);
 
-	queue->desc = (struct vring_desc *)
-		gpa_to_hvm_va((unsigned long)queue->desc);
-	queue->avail = (struct vring_avail *)
-		gpa_to_hvm_va((unsigned long)queue->avail);
-	queue->used = (struct vring_used *)
-		gpa_to_hvm_va((unsigned long)queue->used);
+	vq->desc = (struct vring_desc *)
+		gpa_to_hvm_va((unsigned long)vq->desc);
+	vq->avail = (struct vring_avail *)
+		gpa_to_hvm_va((unsigned long)vq->avail);
+	vq->used = (struct vring_used *)
+		gpa_to_hvm_va((unsigned long)vq->used);
 
-	pr_debug("find virt_queue %d 0x%p 0x%p 0x%p\n", queue->num,
-			queue->desc, queue->avail, queue->used);
+	pr_debug("find virt_queue %d 0x%p 0x%p 0x%p\n", vq->num,
+			vq->desc, vq->avail, vq->used);
 
-	queue->last_avail_idx = 0;
-	queue->avail_idx = 0;
-	queue->last_used_idx = 0;
-	queue->signalled_used = 0;
-	queue->signalled_used_valid = 0;
+	vq->last_avail_idx = 0;
+	vq->avail_idx = 0;
+	vq->last_used_idx = 0;
+	vq->signalled_used = 0;
+	vq->signalled_used_valid = 0;
+
+	vq->acked_features = u32_to_u64(
+			ioread32(iomem + VIRTIO_MMIO_DRIVER_FEATURE1),
+			ioread32(iomem + VIRTIO_MMIO_DRIVER_FEATURE0));
 
 	if (dev->ops && dev->ops->vq_init)
-		return dev->ops->vq_init(dev, queue);
+		return dev->ops->vq_init(vq);
 
 	return 0;
 }

@@ -10,7 +10,7 @@ struct vdev;
 struct vdev_ops {
 	char *name;
 	int (*dev_init)(struct vdev *, char *);
-	int (*dev_deinit)(struct vdev *);
+	void (*dev_deinit)(struct vdev *);
 	int (*handle_event)(struct vdev *);
 };
 
@@ -28,7 +28,7 @@ struct vdev {
 	struct list_head list;
 };
 
-#define DEFINE_MDEV_TYPE(ops)	\
+#define DEFINE_VDEV_TYPE(ops)	\
 	static void *mvdev_ops_##ops __used __section("vdev_ops") = &ops
 
 extern void * __start_vdev_ops;
