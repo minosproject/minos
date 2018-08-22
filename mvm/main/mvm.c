@@ -343,7 +343,9 @@ out:
 
 static int vm_rest_init(struct vm *vm)
 {
-	create_vdev(vm, "virtio_console", NULL);
+	char buf[256];
+	strcpy(buf, "@pty:,");
+	create_vdev(vm, "virtio_console", buf);
 	return 0;
 }
 

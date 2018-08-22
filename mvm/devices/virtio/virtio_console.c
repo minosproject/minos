@@ -250,8 +250,6 @@ virtio_console_control_tx(struct virtio_console_port *port, void *arg,
 	struct virtio_console_control resp, *ctrl;
 	int i;
 
-	assert(niov == 1);
-
 	console = port->console;
 	ctrl = (struct virtio_console_control *)iov->iov_base;
 
@@ -335,14 +333,13 @@ virtio_console_control_send(struct virtio_console *console,
 
 	idx = virtq_get_descs(vq, &iov, 1, &in, &out);
 
-	assert(out == 1);
-
 	memcpy(iov.iov_base, ctrl, sizeof(struct virtio_console_control));
 	if (payload != NULL && len > 0)
 		memcpy(iov.iov_base + sizeof(struct virtio_console_control),
 		     payload, len);
 
-	virtq_add_used_and_signal(vq, idx, sizeof(struct virtio_console_control) + len);
+	virtq_add_used_and_signal(vq, idx,
+		sizeof(struct virtio_console_control) + len);
 }
 
 static int
@@ -350,28 +347,38 @@ virtio_console_notify_tx(struct virt_queue *vq)
 {
 	struct virtio_console *console;
 	struct virtio_console_port *port;
-	struct iovec iov[1];
 	uint16_t idx;
-	unsigned int in, out;
+	unsigned int in = 0, out = 0;
 
 	console = virtio_dev_to_console(vq->dev);
 	port = virtio_console_vq_to_port(console, vq);
 
 	virtq_disable_notify(vq);
 
-	while (virtq_has_descs(vq)) {
-		idx = virtq_get_descs(vq, vq->iovec, VIRTQUEUE_MAX_SIZE,
+	for (;;) {
+		idx = virtq_get_descs(vq, vq->iovec,
+				VRING_USED_F_NO_NOTIFY,
 				&in, &out);
-		if (port != NULL)
-			port->cb(port, port->arg, iov, in);
+		if (idx < 0)
+			break;
 
-		/*
-		 * Release this chain and handle more
-		 */
+		if (idx == vq->num) {
+			if (virtq_enable_notify(vq)) {
+				virtq_disable_notify(vq);
+				continue;
+			}
+		}
+
+		if (in) {
+			pr_err("unexpected description from guest\n");
+			break;
+		}
+
+		if (port != NULL)
+			port->cb(port, port->arg, vq->iovec, out);
+
 		virtq_add_used_and_signal(vq, idx, 0);
 	}
-
-	virtq_enable_notify(vq);
 
 	return 0;
 }
@@ -438,8 +445,6 @@ virtio_console_backend_read(int fd __attribute__((unused)),
 		return;
 	}
 
-	virtq_disable_notify(vq);
-
 	if (!virtq_has_descs(vq)) {
 		len = read(be->fd, dummybuf, sizeof(dummybuf));
 		virtq_notify(vq);
@@ -448,16 +453,20 @@ virtio_console_backend_read(int fd __attribute__((unused)),
 		return;
 	}
 
+	virtq_disable_notify(vq);
+
 	do {
 		idx = virtq_get_descs(vq, &iov, 1, &in, &out);
-		len = readv(be->fd, &iov, out);
+		len = readv(be->fd, &iov, in);
 		if (len <= 0) {
 			virtq_discard_desc(vq, 1);
 			virtq_notify(vq);
 
 			/* no data available */
-			if (len == -1 && errno == EAGAIN)
+			if (len == -1 && errno == EAGAIN) {
+				virtq_enable_notify(vq);
 				return;
+			}
 
 			/* any other errors */
 			goto close;
@@ -467,7 +476,6 @@ virtio_console_backend_read(int fd __attribute__((unused)),
 	} while (virtq_has_descs(vq));
 
 close:
-	virtq_enable_notify(vq);
 	virtio_console_reset_backend(be);
 	pr_warn("vtcon: be read failed and close! len = %d, errno = %d\n",
 		len, errno);
@@ -484,6 +492,9 @@ virtio_console_backend_write(struct virtio_console_port *port, void *arg,
 
 	if (be->fd == -1)
 		return;
+
+	printf("iov fd-%d 0x%lx 0x%lx niov-%d\n", be->fd, (unsigned long)iov->iov_base,
+			iov->iov_len, niov);
 
 	ret = writev(be->fd, iov, niov);
 	if (ret <= 0) {
@@ -795,7 +806,7 @@ virtio_console_init(struct vdev *vdev, char *opts)
 				VIRTQUEUE_MAX_SIZE);
 	if (rc) {
 		pr_err("failed to init vdev %d\n", rc);
-		//goto free_vcon;
+		return rc;
 	}
 
 	vdev_set_pdata(vdev, console);
@@ -808,6 +819,9 @@ virtio_console_init(struct vdev *vdev, char *opts)
 
 	console->config = (struct virtio_console_config *)
 			console->virtio_dev.config;
+	console->config->max_nr_ports = VIRTIO_CONSOLE_MAXPORTS;
+	console->config->cols = 80;
+	console->config->rows = 25;
 
 	/* init mutex attribute properly to avoid deadlock */
 	rc = pthread_mutexattr_init(&attr);
@@ -851,7 +865,7 @@ virtio_console_init(struct vdev *vdev, char *opts)
 		if (be_type == VIRTIO_CONSOLE_BE_INVALID) {
 			pr_warn("vtcon: invalid backend %s!\n",
 				backend);
-			return -1;
+			return 0;
 		}
 
 		if (opt != NULL) {

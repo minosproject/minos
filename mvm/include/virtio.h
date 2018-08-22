@@ -163,8 +163,9 @@ static int inline virtq_has_feature(struct virt_queue *vq, int fe)
 	return !!(vq->acked_features & (1UL << fe));
 }
 
-static inline void virtio_send_irq(struct virtio_device *dev)
+static inline void virtio_send_irq(struct virtio_device *dev, int type)
 {
+	iowrite32(dev->vdev->iomem + VIRTIO_MMIO_INTERRUPT_STATUS, type);
 	vdev_send_irq(dev->vdev);
 }
 

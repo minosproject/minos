@@ -132,8 +132,6 @@ static int virtio_mmio_write(struct vdev *vdev, gp_regs *regs,
 		iowrite32(iomem + VIRTIO_MMIO_EVENT, VIRTIO_EVENT_QUEUE_READY);
 		virtio_notify_hvm(dev, 0);
 		break;
-	case VIRTIO_MMIO_INTERRUPT_ACK:
-		break;
 	case VIRTIO_MMIO_STATUS:
 		tmp = ioread32(iomem + VIRTIO_MMIO_STATUS);
 		value = value - tmp;
@@ -163,6 +161,10 @@ static int virtio_mmio_write(struct vdev *vdev, gp_regs *regs,
 		iowrite32(iomem + VIRTIO_MMIO_QUEUE_READY, value);
 		iowrite32(iomem + VIRTIO_MMIO_EVENT, VIRTIO_EVENT_BUFFER_READY);
 		virtio_notify_hvm(dev, 0);
+		break;
+	case VIRTIO_MMIO_INTERRUPT_ACK:
+		iowrite32(iomem + VIRTIO_MMIO_INTERRUPT_ACK, 0);
+		iowrite32(iomem + VIRTIO_MMIO_INTERRUPT_STATUS, 0);
 		break;
 	default:
 		break;

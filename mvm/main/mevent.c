@@ -163,7 +163,6 @@ mevent_handle(struct epoll_event *kev, int numev)
 	for (i = 0; i < numev; i++) {
 		mevp = kev[i].data.ptr;
 		/* XXX check for EV_ERROR ? */
-
 		(*mevp->me_func)(mevp->me_fd, mevp->me_type, mevp->me_param);
 	}
 }
