@@ -204,7 +204,7 @@ int __send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq, int hw)
 		return -EINVAL;
 
 	if (desc->hw != hw) {
-		pr_error("virq is %s irq\n", desc->hw ?
+		pr_error("virq %d is %s irq\n", virq, desc->hw ?
 				"hardware" : "virtual");
 		return -EINVAL;
 	}
@@ -504,7 +504,7 @@ int alloc_vm_virq(struct vm *vm)
 	if (vm->vmid == 0)
 		spin_unlock(&hvm_irq_lock);
 
-	return (virq >= 0 ? virq + VM_LOCAL_VIRQ_NR : 0);
+	return (virq >= 0 ? virq + VM_LOCAL_VIRQ_NR : -1);
 }
 
 void release_vm_virq(struct vm *vm, int virq)

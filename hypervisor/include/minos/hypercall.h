@@ -24,6 +24,8 @@
 #define HVC_VM_MMAP			HVC_VM_FN(5)
 #define HVC_VM_UNMMAP			HVC_VM_FN(6)
 #define HVC_VM_SEND_VIRQ		HVC_VM_FN(7)
+#define HVC_VM_CREATE_VMCS		HVC_VM_FN(8)
+#define HVC_VM_CREATE_VMCS_IRQ		HVC_VM_FN(9)
 
 /* hypercall for virtio releate operation */
 #define HVC_MISC_CREATE_VIRTIO_DEVICE	HVC_MISC_FN(0)

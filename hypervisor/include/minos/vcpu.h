@@ -9,6 +9,7 @@
 #include <config/config.h>
 #include <minos/list.h>
 #include <minos/vm.h>
+#include <minos/vmcs.h>
 #include <minos/spinlock.h>
 
 #define VCPU_VCPU_DEFAULT_STACK_SIZE	(SIZE_4K * 2)
@@ -70,6 +71,9 @@ struct vcpu {
 
 	void **vmodule_context;
 	void *arch_data;
+
+	struct vmcs *vmcs;
+	int vmcs_irq;
 } __align_cache_line;
 
 #define VCPU_SCHED_REASON_HIRQ	0x0

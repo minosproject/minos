@@ -60,17 +60,9 @@
 #include <vdev.h>
 #include <mevent.h>
 
-#define RECV_BUFFER_SIZE	(64)
-#define MVM_NETLINK		(29)
-
 struct vm *mvm_vm = NULL;
 
 int verbose;
-
-static struct sockaddr_nl src_addr, dest_addr;
-static struct msghdr msg;
-static char *dbuffer;
-static struct iovec iov;
 
 void *map_vm_memory(struct vm *vm)
 {
@@ -154,18 +146,32 @@ static int release_vm(int vmid)
 
 int destroy_vm(struct vm *vm)
 {
+	int i;
+	struct epoll_event ee;
+
 	if (!vm)
 		return -EINVAL;
 
+	memset(&ee, 0, sizeof(struct epoll_event));
+
+	for (i = 0; i < vm->nr_vcpus; i++) {
+		if ((vm->epfds[i] > 0) && (vm->eventfds[i] > 0)) {
+			ee.events = EPOLLIN;
+			epoll_ctl(vm->epfds[i], EPOLL_CTL_DEL, vm->eventfds[i], &ee);
+		}
+
+		if (vm->eventfds[i] > 0) {
+			close(vm->eventfds[i]);
+			vm->eventfds[i] = -1;
+		}
+
+		if (vm->epfds[i] > 0) {
+			close(vm->epfds[i]);
+			vm->epfds[i] = -1;
+		}
+	}
+
 	mevent_deinit();
-
-	if (vm->nlh)
-		free(vm->nlh);
-	if (vm->sock_fd > 0)
-		close(vm->sock_fd);
-
-	vm->nlh = NULL;
-	vm->sock_fd = -1;
 
 	if (vm->mmap) {
 		if (vm->vm_fd)
@@ -208,6 +214,42 @@ void print_usage(void)
 	exit(EXIT_FAILURE);
 }
 
+void *hvm_map_iomem(void *base, size_t size)
+{
+	void *iomem;
+	int fd = open("/dev/mvm/mvm0", O_RDWR);
+
+	if (fd < 0) {
+		printf("* error - open /dev/mvm/mvm0 failed\n");
+		return (void *)-1;
+	}
+
+	iomem = mmap(NULL, size, PROT_READ | PROT_WRITE,
+			MAP_SHARED, fd, (unsigned long)base);
+	close(fd);
+
+	return iomem;
+}
+
+static int vm_create_vmcs(struct vm *vm)
+{
+	int ret;
+	void *vmcs;
+
+	ret = ioctl(vm->vm_fd, IOCTL_CREATE_VMCS, &vmcs);
+	if (ret)
+		return ret;
+
+	if (!vmcs)
+		return -ENOMEM;
+
+	vm->vmcs = hvm_map_iomem(vmcs, VMCS_SIZE(vm->nr_vcpus));
+	if (vm->vmcs == (void *)-1)
+		return -ENOMEM;
+
+	return 0;
+}
+
 static int create_and_init_vm(struct vm *vm)
 {
 	int ret = 0;
@@ -233,6 +275,10 @@ static int create_and_init_vm(struct vm *vm)
 		perror(path);
 		return -EIO;
 	}
+
+	ret = vm_create_vmcs(vm);
+	if (ret)
+		return -ENOMEM;
 
 	/*
 	 * map a fix region for this vm, need to call ioctl
@@ -271,76 +317,6 @@ static struct vm_os *get_vm_os(char *os_type)
 	return default_os;
 }
 
-static int mvm_netlink_init(struct vm *vm)
-{
-	int ret;
-	int sz = 4 * 1024;
-	int on = 1;
-
-	vm->sock_fd = socket(AF_NETLINK, SOCK_RAW, MVM_NETLINK);
-	if (vm->sock_fd < 0) {
-		perror("can not open sock fd for slgps\n");
-		return -EIO;
-	}
-
-	memset(&src_addr, 0, sizeof(src_addr));
-	src_addr.nl_family = AF_NETLINK;
-	src_addr.nl_pid = getpid();
-	src_addr.nl_groups = 0;
-
-	if (setsockopt(vm->sock_fd, SOL_SOCKET, SO_RCVBUFFORCE,
-				&sz, sizeof(sz)) < 0) {
-		printf("Unable to set event socket SO_RCVBUFFORCE\n");
-		goto out;
-	}
-
-	if (setsockopt(vm->sock_fd, SOL_SOCKET, SO_PASSCRED,
-				&on, sizeof(on)) < 0) {
-		printf("Unable to set event socket SO_PASSCRED\n");
-		goto out;
-	}
-
-	ret = bind(vm->sock_fd, (struct sockaddr *)&src_addr, sizeof(src_addr));
-	if (ret) {
-		perror("bind netlink faild\n");
-		goto out;
-	}
-
-	vm->nlh = (struct nlmsghdr *)malloc(NLMSG_SPACE(RECV_BUFFER_SIZE));
-	if (!vm->nlh) {
-		perror("alloc netlink memory failed\n");
-		goto out;
-	}
-
-	memset(&dest_addr, 0, sizeof(dest_addr));
-	dest_addr.nl_family = AF_NETLINK;
-	dest_addr.nl_pid = 0;
-	dest_addr.nl_groups = 0;
-
-	vm->nlh->nlmsg_len = RECV_BUFFER_SIZE;
-	vm->nlh->nlmsg_pid = getpid();
-	vm->nlh->nlmsg_flags = 0;
-
-	iov.iov_base = (void *)vm->nlh;
-	iov.iov_len = NLMSG_SPACE(RECV_BUFFER_SIZE);
-
-	memset(&msg, 0, sizeof(msg));
-	msg.msg_name = (void *)&dest_addr;
-	msg.msg_namelen = sizeof(dest_addr);
-	msg.msg_iov = &iov;
-	msg.msg_iovlen = 1;
-
-	memset(vm->nlh, 0, NLMSG_SPACE(RECV_BUFFER_SIZE));
-	dbuffer = (char *)NLMSG_DATA(vm->nlh);
-
-	return 0;
-
-out:
-	close(vm->sock_fd);
-	vm->sock_fd = -1;
-	return -EINVAL;
-}
-
 static int vm_rest_init(struct vm *vm)
 {
 	char buf[256];
@@ -349,49 +325,152 @@ static int vm_rest_init(struct vm *vm)
 	return 0;
 }
 
-static void mvm_handle_event(struct vdev *vdev)
+static void vmcs_ack(struct vmcs *vmcs)
 {
-	if (!vdev)
+	if (vmcs->guest_index == vmcs->host_index)
 		return;
 
-	vdev->ops->handle_event(vdev);
+	vmcs->guest_index++;
+
+	if (vmcs->guest_index < vmcs->host_index)
+		pr_warn("something wrong or there are new message\n");
 }
 
-void *vm_rx_thread(void *data)
+static int vcpu_handle_mmio(struct vm *vm, int trap_reason,
+		uint64_t trap_data, uint64_t *trap_result)
+{
+	struct vdev *vdev;
+
+	list_for_each_entry(vdev, &vm->vdev_list, list) {
+		if ((trap_data >= vdev->guest_iomem) &&
+				(trap_data < vdev->guest_iomem + PAGE_SIZE))
+			return vdev->ops->handle_event(vdev, trap_reason,
+					trap_data, trap_result);
+	}
+
+	return -EIO;
+}
+
+static void handle_vcpu_event(struct vmcs *vmcs)
 {
 	int ret;
-	unsigned long value;
+	uint32_t trap_type = vmcs->trap_type;
+	uint32_t trap_reason = vmcs->trap_reason;
+	uint64_t trap_data = vmcs->trap_data;
+	uint64_t trap_result = vmcs->trap_result;
+
+	switch (trap_type) {
+	case VMTRAP_TYPE_COMMON:
+		break;
+
+	case VMTRAP_TYPE_MMIO:
+		ret = vcpu_handle_mmio(mvm_vm, trap_reason,
+				trap_data, &trap_result);
+		break;
+
+	default:
+		break;
+	}
+
+	vmcs->trap_ret = ret;
+	vmcs->trap_result = trap_result;
+
+	vmcs_ack(vmcs);
+}
+
+void *vm_vcpu_thread(void *data)
+{
+	int ret;
+	int eventfd;
+	int epfd;
 	struct vm *vm = mvm_vm;
+	struct epoll_event event;
+	struct epoll_event ep_events;
+	struct vmcs *vmcs;
+	unsigned long i = (unsigned long)data;
+	eventfd_t value;
+
+	if (i >= vm->nr_vcpus)
+		return NULL;
+
+	eventfd = vm->eventfds[i];
+	epfd = vm->epfds[i];
+	vmcs = (struct vmcs *)(vm->vmcs + i * sizeof(struct vmcs));
+
+	if (eventfd <= 0 || epfd <= 0)
+		return NULL;
+
+	memset(&event, 0, sizeof(struct epoll_event));
+	event.events = (unsigned long)EPOLLIN;
+	event.data.fd = eventfd;
+	ret = epoll_ctl(epfd, EPOLL_CTL_ADD, eventfd, &event);
+	if (ret)
+		return NULL;
 
 	while (1) {
-		ret = recvmsg(vm->sock_fd, &msg, 0);;
-		if ((ret <= 0) || (vm->nlh->nlmsg_len <= 0))
+		ret = epoll_wait(epfd, &ep_events, 1, -1);
+		if (ret <= 0) {
+			pr_err("epoll failed for vcpu\n");
 			continue;
+		}
 
-		value = *(unsigned long *)dbuffer;
-		mvm_handle_event((struct vdev *)value);
+		eventfd_read(eventfd, &value);
+		if (value > 1)
+			pr_err("invaild vmcs state\n");
+
+		handle_vcpu_event(vmcs);
 	}
+
+	return NULL;
 }
 
 static int mvm_main_loop(void)
 {
-	int ret;
+	int ret, i, irq;
 	struct vm *vm = mvm_vm;
-	pthread_t rx_thread;
-
-	ret = mvm_netlink_init(vm);
-	if (ret)
-		return ret;
+	pthread_t vcpu_thread;
+	int *base;
+	uint64_t arg;
 
 	/*
-	 * create a thread to handle the netlink
-	 * event reported by kernel, and those event
-	 * are all irqed by guest vm
+	 * create the eventfd and the epoll_fds for
+	 * this vm
 	 */
-	ret = pthread_create(&rx_thread, NULL, vm_rx_thread, NULL);
-	if (ret) {
-		pr_err("create rm thread failed\n");
-		return ret;
+	base = (int *)malloc(sizeof(int) * vm->nr_vcpus * 2);
+	if (!base)
+		return -ENOMEM;
+
+	memset(base, -1, sizeof(int) * vm->nr_vcpus * 2);
+	vm->eventfds = base;
+	vm->epfds = base + vm->nr_vcpus;
+
+	for (i = 0; i < vm->nr_vcpus; i++) {
+		irq = ioctl(vm->vm_fd, IOCTL_CREATE_VMCS_IRQ, (unsigned long)i);
+		if (irq < 0)
+			return -ENOENT;
+
+		vm->eventfds[i] = eventfd(0, 0);
+		if (vm->eventfds[i] < 0)
+			return -ENOENT;
+
+		vm->epfds[i] = epoll_create(1);
+		if (vm->epfds[i] < 0)
+			return -ENOENT;
+
+		/*
+		 * register the irq and eventfd to kernel
+		 */
+		arg = ((unsigned long)vm->eventfds[i] << 32) | irq;
+		ret = ioctl(vm->vm_fd, IOCTL_REGISTER_VCPU, &arg);
+		if (ret)
+			return ret;
+
+		ret = pthread_create(&vcpu_thread, NULL,
+				vm_vcpu_thread, (void *)(unsigned long)i);
+		if (ret) {
+			pr_err("create vcpu thread failed\n");
+			return ret;
+		}
 	}
 
 	/* now start the vm */

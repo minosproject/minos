@@ -22,6 +22,7 @@
 #include <minos/hypercall.h>
 #include <minos/virq.h>
 #include <minos/virtio.h>
+#include <minos/vmcs.h>
 
 static int vcpu_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 {
@@ -32,6 +33,7 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 {
 	int vmid = -1;
 	unsigned long addr;
+	struct vm *vm = get_vm_by_id((int)args[0]);
 
 	switch (id) {
 	case HVC_VM_CREATE:
@@ -40,7 +42,7 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 		break;
 
 	case HVC_VM_DESTORY:
-		destroy_vm(get_vm_by_id((int)(args[0])));
+		destroy_vm(vm);
 		HVC_RET1(c, 0);
 		break;
 
@@ -70,6 +72,15 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 		HVC_RET1(c, 0);
 		break;
 
+	case HVC_VM_CREATE_VMCS:
+		addr = vm_create_vmcs(vm);
+		HVC_RET1(c, addr);
+		break;
+
+	case HVC_VM_CREATE_VMCS_IRQ:
+		vmid = vm_create_vmcs_irq(vm, (int)args[1]);
+		HVC_RET1(c, vmid);
+		break;
 	default:
 		pr_error("unsupport vm hypercall");
 		break;

@@ -39,19 +39,7 @@
 
 void *vdev_map_iomem(void *base, size_t size)
 {
-	void *iomem;
-	int fd = open("/dev/mvm/mvm0", O_RDWR);
-
-	if (fd < 0) {
-		printf("* error - open /dev/mvm/mvm0 failed\n");
-		return (void *)-1;
-	}
-
-	iomem = mmap(NULL, size, PROT_READ | PROT_WRITE,
-			MAP_SHARED, fd, (unsigned long)base);
-	close(fd);
-
-	return iomem;
+	return hvm_map_iomem(base, size);
 }
 
 void vdev_send_irq(struct vdev *vdev)
@@ -118,30 +106,6 @@ alloc_and_init_vdev(struct vm *vm, char *class, char *args)
 	return pdev;
 }
 
-static int register_vdev(struct vdev *pdev)
-{
-	int ret;
-	unsigned long args[2];
-
-	if (!pdev)
-		return -EINVAL;
-
-	/* register irq and the event handler */
-	if (pdev->hvm_irq) {
-		args[0] = pdev->hvm_irq | ((unsigned long)getpid() << 32);
-		args[1] = (unsigned long)pdev;
-
-		ret = ioctl(pdev->vm->vm_fd, IOCTL_REGISTER_MDEV, args);
-		if (ret) {
-			printf("* error - register event for %s failed\n",
-					pdev->name);
-			return ret;
-		}
-	}
-
-	return 0;
-}
-
 void release_vdev(struct vdev *vdev)
 {
 	if (!vdev)
@@ -153,24 +117,15 @@ void release_vdev(struct vdev *vdev)
 
 int create_vdev(struct vm *vm, char *class, char *args)
 {
-	int ret = 0;
 	struct vdev *vdev;
 
 	vdev = alloc_and_init_vdev(vm, class, args);
 	if (!vdev)
 		return -ENOMEM;
 
-	ret = register_vdev(vdev);
-	if (ret)
-		goto release_vdev;
-
 	list_add_tail(&vm->vdev_list, &vdev->list);
 
 	return 0;
-
-release_vdev:
-	release_vdev(vdev);
-	return ret;
 }
 
 static void vdev_setup_dtb(struct vm *vm, char *dtb)

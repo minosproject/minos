@@ -58,6 +58,9 @@ struct vm {
 	int virq_same_page;
 	struct virq_desc *virq_desc;
 	unsigned long *virq_map;
+
+	void *vmcs;
+	void *hvm_vmcs;
 } __align(sizeof(unsigned long));
 
 extern struct vm *vms[CONFIG_MAX_VM];

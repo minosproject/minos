@@ -11,7 +11,8 @@ struct vdev_ops {
 	char *name;
 	int (*dev_init)(struct vdev *, char *);
 	void (*dev_deinit)(struct vdev *);
-	int (*handle_event)(struct vdev *);
+	int (*handle_event)(struct vdev *, int,
+			unsigned long, unsigned long *);
 };
 
 struct vdev {
@@ -19,7 +20,6 @@ struct vdev {
 	void *iomem;
 	void *iomem_physic;
 	int gvm_irq;
-	int hvm_irq;
 	unsigned long guest_iomem;
 	int guest_visable;
 	struct vdev_ops *ops;

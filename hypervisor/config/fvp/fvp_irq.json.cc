@@ -38,7 +38,7 @@
 	{
 		"hno": 37,
 		"vno": 37,
-		"vmid": 1,
+		"vmid": 0,
 		"vcpu_id": 0,
 		"name": "pl011-uart0"
 	},

@@ -17,6 +17,7 @@
 
 #include <mvm_ioctl.h>
 #include <compiler.h>
+#include <vmcs.h>
 
 /*
  * MVM_FLAGS_NO_RAMDISK - used for linux to indicate
@@ -90,8 +91,9 @@ struct vm {
 	uint64_t setup_data;
 	uint64_t hvm_paddr;
 
-	struct nlmsghdr *nlh;
-	int sock_fd;
+	void *vmcs;
+	int *eventfds;
+	int *epfds;
 
 	struct list_head vdev_list;
 };
@@ -118,11 +120,15 @@ extern struct vm *mvm_vm;
 
 #define VM_MAX_VCPUS			(4)
 
+#define VMCS_SIZE(nr) 	BALIGN(nr * sizeof(struct vmcs), PAGE_SIZE)
+
 void *map_vm_memory(struct vm *vm);
 
 static inline void send_virq_to_vm(int virq)
 {
 	ioctl(mvm_vm->vm_fd, IOCTL_SEND_VIRQ, (long)virq);
 }
+
+void *hvm_map_iomem(void *base, size_t size);
 
 #endif

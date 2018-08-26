@@ -153,6 +153,8 @@ static struct vm *__create_vm(struct vmtag *vme)
 	if (!vm)
 		return NULL;
 
+	vme->nr_vcpu = MIN(vme->nr_vcpu, CONFIG_VM_MAX_VCPU);
+
 	memset((char *)vm, 0, sizeof(struct vm));
 	vm->vcpus = (struct vcpu **)malloc(sizeof(struct vcpu *)
 			* vme->nr_vcpu);
@@ -166,7 +168,7 @@ static struct vm *__create_vm(struct vmtag *vme)
 		MIN(strlen(vme->name), MINOS_VM_NAME_SIZE - 1));
 	strncpy(vm->os_type, vme->type,
 		MIN(strlen(vme->type), OS_TYPE_SIZE - 1));
-	vm->vcpu_nr = MIN(vme->nr_vcpu, CONFIG_VM_MAX_VCPU);
+	vm->vcpu_nr = vme->nr_vcpu;
 	vm->bit64 = vme->bit64;
 	vm->entry_point = vme->entry;
 	vm->setup_data = vme->setup_data;
@@ -210,6 +212,10 @@ static void release_vcpu(struct vcpu *vcpu)
 {
 	if (vcpu->vmodule_context)
 		vcpu_vmodules_deinit(vcpu);
+
+	if (vcpu->vmcs_irq >= 0)
+		release_hvm_virq(vcpu->vmcs_irq);
+
 	free(vcpu->stack_origin);
 	free(vcpu->virq_struct);
 	free(vcpu);
@@ -238,6 +244,7 @@ static struct vcpu *alloc_vcpu(size_t size)
 	vcpu->stack_size = size;
 	vcpu->stack_base = stack_base + size;
 	vcpu->stack_origin = vcpu->stack_base;
+	vcpu->vmcs_irq = -1;
 
 	return vcpu;
 
@@ -275,7 +282,6 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 	vm->vcpus[vcpu_id] = vcpu;
 
 	vcpu->next = NULL;
-
 	if (vcpu_id != 0)
 		vm->vcpus[vcpu_id - 1]->next = vcpu;
 
@@ -351,6 +357,15 @@ void destroy_vm(struct vm *vm)
 		free(vm->vcpus);
 	}
 
+	if (vm->hvm_vmcs)
+		destroy_hvm_iomem_map((unsigned long)vm->hvm_vmcs,
+				VMCS_SIZE(vm->vcpu_nr));
+
+	if (vm->vmcs)
+		free(vm->vmcs);
+
+	vm->hvm_vmcs = NULL;
+	vm->vmcs = NULL;
 	release_vm_memory(vm);
 
 	i = vm->vmid;

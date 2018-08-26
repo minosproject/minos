@@ -86,6 +86,7 @@ struct virtio_device;
 
 struct virt_queue {
 	unsigned int num;
+	unsigned int iovec_size;
 	struct vring_desc *desc;
 	struct vring_avail *avail;
 	struct vring_used *used;
@@ -99,7 +100,7 @@ struct virt_queue {
 	uint64_t acked_features;
 
 	struct virtio_device *dev;
-	struct iovec iovec[VIRTQUEUE_MAX_SIZE];
+	struct iovec *iovec;
 
 	int (*callback)(struct virt_queue *);
 };
@@ -171,9 +172,11 @@ static inline void virtio_send_irq(struct virtio_device *dev, int type)
 
 int virtio_device_init(struct virtio_device *,
 		struct vdev *, int, int, int);
-int virtio_handle_event(struct virtio_device *dev);
 int virtq_enable_notify(struct virt_queue *vq);
 void virtq_disable_notify(struct virt_queue *vq);
+
+int virtio_handle_mmio(struct virtio_device *dev, int write,
+		unsigned long addr, unsigned long *value);
 
 int virtq_get_descs(struct virt_queue *vq,
 		struct iovec *iov, unsigned int iov_size,

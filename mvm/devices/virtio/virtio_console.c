@@ -144,6 +144,7 @@ static int stdio_in_use;
 extern int posix_openpt(int flags);
 extern int grantpt(int fd);
 extern int unlockpt(int fd);
+extern char *ptsname(int fd);
 static int virtio_console_notify_rx(struct virt_queue *);
 static int virtio_console_notify_tx(struct virt_queue *);
 static void virtio_console_control_send(struct virtio_console *,
@@ -357,8 +358,7 @@ virtio_console_notify_tx(struct virt_queue *vq)
 
 	for (;;) {
 		idx = virtq_get_descs(vq, vq->iovec,
-				VRING_USED_F_NO_NOTIFY,
-				&in, &out);
+				vq->iovec_size, &in, &out);
 		if (idx < 0)
 			break;
 
@@ -367,6 +367,8 @@ virtio_console_notify_tx(struct virt_queue *vq)
 				virtq_disable_notify(vq);
 				continue;
 			}
+
+			break;
 		}
 
 		if (in) {
@@ -475,6 +477,8 @@ virtio_console_backend_read(int fd __attribute__((unused)),
 		virtq_add_used_and_signal(vq, idx, len);
 	} while (virtq_has_descs(vq));
 
+	return;
+
 close:
 	virtio_console_reset_backend(be);
 	pr_warn("vtcon: be read failed and close! len = %d, errno = %d\n",
@@ -492,9 +496,6 @@ virtio_console_backend_write(struct virtio_console_port *port, void *arg,
 
 	if (be->fd == -1)
 		return;
-
-	printf("iov fd-%d 0x%lx 0x%lx niov-%d\n", be->fd, (unsigned long)iov->iov_base,
-			iov->iov_len, niov);
 
 	ret = writev(be->fd, iov, niov);
 	if (ret <= 0) {
@@ -587,7 +588,7 @@ virtio_console_config_backend(struct virtio_console_backend *be)
 	fd = be->fd;
 	switch (be->be_type) {
 	case VIRTIO_CONSOLE_BE_PTY:
-		pts_name = ttyname(fd);
+		pts_name = ptsname(fd);
 		if (pts_name == NULL) {
 			pr_warn("vtcon: ptsname return NULL, errno = %d\n",
 				errno);
@@ -803,7 +804,7 @@ virtio_console_init(struct vdev *vdev, char *opts)
 	rc = virtio_device_init(&console->virtio_dev, vdev,
 				VIRTIO_TYPE_CONSOLE,
 				VIRTIO_CONSOLE_MAXQ,
-				VIRTQUEUE_MAX_SIZE);
+				VIRTIO_CONSOLE_RINGSZ);
 	if (rc) {
 		pr_err("failed to init vdev %d\n", rc);
 		return rc;
@@ -891,7 +892,8 @@ virtio_console_init(struct vdev *vdev, char *opts)
 	return 0;
 }
 
-static int virtio_console_event(struct vdev *vdev)
+static int virtio_console_event(struct vdev *vdev, int read,
+		unsigned long addr, unsigned long *value)
 {
 	struct virtio_console *vcon;
 
@@ -902,7 +904,7 @@ static int virtio_console_event(struct vdev *vdev)
 	if (!vcon)
 		return -EINVAL;
 
-	return virtio_handle_event(&vcon->virtio_dev);
+	return virtio_handle_mmio(&vcon->virtio_dev, read, addr, value);
 }
 
 static void

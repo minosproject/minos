@@ -7,7 +7,6 @@ struct vm;
 
 struct virtio_device {
 	struct vdev vdev;
-	int hvm_irq;
 	int gvm_irq;
 };
 

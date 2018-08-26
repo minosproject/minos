@@ -344,15 +344,13 @@ static int __virtio_vdev_init(struct vdev *vdev,
 
 	vdev->iomem = base;
 	vdev->gvm_irq = ioread32(base + VIRTIO_MMIO_GVM_IRQ);
-	vdev->hvm_irq = ioread32(base + VIRTIO_MMIO_HVM_IRQ);
 
 	/* TO BE FIX need to covert to 64bit address */
 	vdev->guest_iomem = (unsigned long)ioread32(base +
 			VIRTIO_MMIO_GVM_ADDR);
 
-	pr_debug("vdev : %d %d 0x%lx 0x%lx\n", vdev->gvm_irq,
-			vdev->hvm_irq, (unsigned long)vdev->iomem,
-			vdev->guest_iomem);
+	pr_debug("vdev : irq-%d 0x%lx 0x%lx\n", vdev->gvm_irq,
+			(unsigned long)vdev->iomem, vdev->guest_iomem);
 
 	if (rs > VIRTQUEUE_MAX_SIZE)
 		rs = VIRTQUEUE_MAX_SIZE;
@@ -376,7 +374,8 @@ int virtio_device_init(struct virtio_device *virt_dev,
 		struct vdev *vdev, int type, int queue_nr, int rs)
 {
 	void *iomem;
-	int ret;
+	int ret, i;
+	struct virt_queue *vq;
 
 	if (!virt_dev || !vdev)
 		return -EINVAL;
@@ -400,6 +399,9 @@ int virtio_device_init(struct virtio_device *virt_dev,
 	virt_dev->vdev = vdev;
 	virt_dev->config = vdev->iomem + VIRTIO_MMIO_CONFIG;
 
+	if (rs > VIRTQUEUE_MAX_SIZE)
+		rs = VIRTQUEUE_MAX_SIZE;
+
 	/* alloc memory for virtio queue */
 	virt_dev->vqs = malloc(sizeof(struct virt_queue) * queue_nr);
 	if (!virt_dev->vqs) {
@@ -407,8 +409,22 @@ int virtio_device_init(struct virtio_device *virt_dev,
 		goto release_virtio_dev;
 	}
 
+
 	virt_dev->nr_vq = queue_nr;
 	memset(virt_dev->vqs, 0, sizeof(struct virt_queue) * queue_nr);
+
+	/* alloc the iovec */
+	for (i = 0; i < queue_nr; i++) {
+		vq = &virt_dev->vqs[i];
+		vq->iovec = malloc(sizeof(struct iovec) * rs);
+		if (!vq->iovec) {
+			pr_err("failed to get memory for iovec %d\n", i);
+			goto release_virtio_dev;
+		}
+
+		vq->iovec_size = rs;
+	}
+
 	return 0;
 
 release_virtio_dev:
@@ -469,11 +485,6 @@ static int virtio_queue_event(struct virtio_device *dev, uint32_t arg)
 	return 0;
 }
 
-static int virtio_mmio_event(struct virtio_device *dev, uint32_t arg)
-{
-	return 0;
-}
-
 static int virtio_buffer_event(struct virtio_device *dev, uint32_t arg)
 {
 	struct virt_queue *vq;
@@ -518,7 +529,6 @@ static int virtio_buffer_event(struct virtio_device *dev, uint32_t arg)
 	vq->acked_features = u32_to_u64(
 			ioread32(iomem + VIRTIO_MMIO_DRIVER_FEATURE1),
 			ioread32(iomem + VIRTIO_MMIO_DRIVER_FEATURE0));
-	printf("vq->acked_features - 0x%lx\n", vq->acked_features);
 
 	if (dev->ops && dev->ops->vq_init)
 		return dev->ops->vq_init(vq);
@@ -526,47 +536,53 @@ static int virtio_buffer_event(struct virtio_device *dev, uint32_t arg)
 	return 0;
 }
 
-int virtio_handle_event(struct virtio_device *dev)
+static int virtio_mmio_read(struct virtio_device *dev,
+		unsigned long addr, unsigned long *value)
 {
-	int ret;
+	pr_err("current guest can read the value directly\n");
+
+	return -EINVAL;
+}
+
+static int virtio_mmio_write(struct virtio_device *dev,
+		unsigned long addr, unsigned long *value)
+{
+	int ret = 0;
+	unsigned long offset;
+	uint32_t arg;
 	void *iomem = dev->vdev->iomem;
-	uint32_t event_type, arg, arg_offset = VIRTIO_MMIO_EVENT_ARG;
 
-	event_type = ioread32(iomem + VIRTIO_MMIO_EVENT);
-	if (event_type == VIRTIO_EVENT_STATUS_CHANGE)
-		arg_offset = VIRTIO_MMIO_STATUS;
-	else if (event_type == VIRTIO_EVENT_QUEUE_READY)
-		arg_offset = VIRTIO_MMIO_QUEUE_NOTIFY;
-	else if (event_type == VIRTIO_EVENT_BUFFER_READY)
-		arg_offset = VIRTIO_MMIO_QUEUE_SEL;
-	else
-		arg_offset = VIRTIO_MMIO_EVENT_ARG;
-
-	arg = ioread32(iomem + arg_offset);
-
-	/* ack guest that we are ready to handle this int */
-
-	switch (event_type) {
-	case VIRTIO_EVENT_STATUS_CHANGE:
+	offset = addr - dev->vdev->guest_iomem;
+	switch (offset) {
+	case VIRTIO_MMIO_STATUS:
+		arg = ioread32(iomem + VIRTIO_MMIO_STATUS);
 		ret = virtio_status_event(dev, arg);
 		break;
 
-	case VIRTIO_EVENT_QUEUE_READY:
+	case VIRTIO_MMIO_QUEUE_READY:
+		arg = ioread32(iomem + VIRTIO_MMIO_QUEUE_SEL);
+		ret = virtio_buffer_event(dev, arg);
+		break;
+
+	case VIRTIO_MMIO_QUEUE_NOTIFY:
+		arg = ioread32(iomem + VIRTIO_MMIO_QUEUE_NOTIFY);
 		ret = virtio_queue_event(dev, arg);
 		break;
 
-	case VIRTIO_EVENT_MMIO:
-		ret = virtio_mmio_event(dev, arg);
-		break;
-
-	case VIRTIO_EVENT_BUFFER_READY:
-		ret = virtio_buffer_event(dev, arg);
-		break;
 	default:
-		pr_err("unsupport virtio event %d\n", event_type);
 		break;
 	}
 
-	virtio_hvm_ack(dev);
 	return ret;
+}
+
+int virtio_handle_mmio(struct virtio_device *dev, int write,
+		unsigned long addr, unsigned long *value)
+{
+	if (write == VMTRAP_REASON_WRITE)
+		return virtio_mmio_write(dev, addr, value);
+	else if (write == VMTRAP_REASON_READ)
+		return virtio_mmio_read(dev, addr, value);
+
+	return -EINVAL;
 }
