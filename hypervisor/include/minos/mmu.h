@@ -52,6 +52,10 @@ typedef __pte_t pte_t;
 #define PTE_NOT_MAPPED		(PTE + 1)
 #define INVALID_MAPPING		(6)
 
+/* for early mapping use */
+#define VM_DESC_HOST_TABLE	__VM_DESC_HOST_TABLE
+#define VM_DESC_HOST_BLOCK	__VM_DESC_HOST_BLOCK
+
 #define mapping_error(r)	(((unsigned long)(r) > 0) && ((unsigned long)(r) <= 6))
 
 #define pgd_idx(vir)		((vir >> PGD_SHIFT) & (PAGE_MAPPING_COUNT - 1))
@@ -87,6 +91,11 @@ typedef __pte_t pte_t;
 #define guest_pte_offset(ppte, vir)	pte_offset(ppte, vir)
 
 #define get_pmd(ppud) (pmd_t *)((*(pud_t *)ppud) & PAGETABLE_ATTR_MASK)
+
+#define set_pte_at(ptep, val)	(*(pte_t *)ptep = val)
+#define set_pmd_at(pmdp, val)	(*(pmd_t *)pmdp = val)
+#define set_pud_at(pudp, val)	(*(pud_t *)pudp = val)
+#define set_pgd_at(pgdp, val)	(*(pgd_t *)pgdp = val)
 
 struct mm_struct;
 

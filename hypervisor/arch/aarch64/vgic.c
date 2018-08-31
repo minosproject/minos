@@ -26,6 +26,7 @@
 #include <minos/sched.h>
 #include <minos/virq.h>
 #include <minos/vdev.h>
+#include <asm/of.h>
 
 #define vdev_to_vgic(vdev) \
 	(struct vgic_dev *)container_of(vdev, struct vgic_dev, vdev)
@@ -382,7 +383,8 @@ static int vgic_mmio_write(struct vdev *vdev, gp_regs *regs,
 	return vgic_mmio_handler(vdev, regs, 0, address, write_value);
 }
 
-static void vgic_gicd_init(struct vm *vm, struct vgic_gicd *gicd)
+static void vgic_gicd_init(struct vm *vm, struct vgic_gicd *gicd,
+		unsigned long base, size_t size)
 {
 	uint32_t typer = 0;
 	int nr_spi;
@@ -394,15 +396,15 @@ static void vgic_gicd_init(struct vm *vm, struct vgic_gicd *gicd)
 	 */
 	memset((char *)gicd, 0, sizeof(struct vgic_gicd));
 
-	gicd->base = 0x2f000000;
-	gicd->end = 0x2f010000;
+	gicd->base = base;
+	gicd->end = base + size;
 
 	spin_lock_init(&gicd->gicd_lock);
 
 	gicd->gicd_ctlr = 0;
 
 	/* GICV3 and provide vm->virq_nr interrupt */
-	gicd->gicd_pidr2 = (0X3 << 4);
+	gicd->gicd_pidr2 = (0x3 << 4);
 
 	typer |= vm->vcpu_nr << 5;
 	typer |= 9 << 19;
@@ -412,16 +414,15 @@ static void vgic_gicd_init(struct vm *vm, struct vgic_gicd *gicd)
 }
 
 
-static void vgic_gicr_init(struct vcpu *vcpu, struct vgic_gicr *gicr)
+static void vgic_gicr_init(struct vcpu *vcpu,
+		struct vgic_gicr *gicr, unsigned long base)
 {
-	unsigned long base;
-
 	gicr->vcpu_id = get_vcpu_id(vcpu);
 
 	/*
 	 * now for gicv3 TBD
 	 */
-	base = 0x2f100000 + (128 * 1024) * vcpu->vcpu_id;
+	base = base + (128 * 1024) * vcpu->vcpu_id;
 	gicr->rd_base = base;
 	gicr->sgi_base = base + (64 * 1024);
 	gicr->vlpi_base = 0;
@@ -431,11 +432,11 @@ static void vgic_gicr_init(struct vcpu *vcpu, struct vgic_gicr *gicr)
 	spin_lock_init(&gicr->gicr_lock);
 
 	/* TBD */
-	gicr->gicr_typer = ioread64((void *)gicr->rd_base + GICR_TYPER);
-	gicr->gicr_pidr2 = ioread32((void *)gicr->rd_base + GICR_PIDR2);
+	gicr->gicr_typer = 0 | ((unsigned long)vcpu->vcpu_id << 32);
+	gicr->gicr_pidr2 = 0x3 << 4;
 }
 
-void vm_release_gic(struct vgic_dev *gic)
+static void vm_release_gic(struct vgic_dev *gic)
 {
 	int i;
 	struct vm *vm = gic->vdev.vm;
@@ -466,19 +467,43 @@ int vgic_create_vm(void *item, void *arg)
 {
 	int i, ret = 0;
 	struct vgic_gicr *gicr;
-	struct vm *vm = (struct vm *)vm;
+	struct vm *vm = (struct vm *)item;
 	struct vgic_dev *vgic_dev;
 	struct vcpu *vcpu;
+	uint64_t array[16];
+	uint64_t size;
 
-	vgic_dev = malloc(sizeof(struct vgic_dev));
+	vgic_dev = zalloc(sizeof(struct vgic_dev));
 	if (!vgic_dev)
 		return -ENOMEM;
 
-	memset(vgic_dev, 0, sizeof(struct vgic_dev));
-	host_vdev_init(vm, &vgic_dev->vdev, 0x2f000000, 0x200000);
+	/*
+	 * for host vm, get the gic's iomem space from
+	 * the dtb but for gvm, emulator the system of
+	 * arm FVP
+	 */
+	if (vm->vmid == 0) {
+		memset(array, 0, sizeof(array));
+		ret = of_get_u64_array("/interrupt-controller",
+				"reg", array, &i);
+		if (ret || i < 4)
+			return -ENOENT;
+
+		/* count the iomem size of gic */
+		size = array[2] + array[3] - array[0];
+		host_vdev_init(vm, &vgic_dev->vdev, array[0], size);
+	} else
+		host_vdev_init(vm, &vgic_dev->vdev,
+				GVM_VGIC_IOMEM_BASE,
+				GVM_VGIC_IOMEM_SIZE);
+
 	vdev_set_name(&vgic_dev->vdev, "vgic");
 
-	vgic_gicd_init(vm, &vgic_dev->gicd);
+	if (vm->vmid == 0)
+		vgic_gicd_init(vm, &vgic_dev->gicd, array[0], array[1]);
+	else
+		vgic_gicd_init(vm, &vgic_dev->gicd, GVM_VGICD_IOMEM_BASE,
+				GVM_VGICD_IOMEM_SIZE);
 
 	for (i = 0; i < vm->vcpu_nr; i++) {
 		vcpu = vm->vcpus[i];
@@ -488,7 +513,11 @@ int vgic_create_vm(void *item, void *arg)
 			goto release_gic;
 		}
 
-		vgic_gicr_init(vcpu, gicr);
+		if (vm->vmid == 0)
+			vgic_gicr_init(vcpu, gicr, array[2]);
+		else
+			vgic_gicr_init(vcpu, gicr, GVM_VGICR_IOMEM_BASE);
+
 		vgic_dev->gicr[i] = gicr;
 	}
 

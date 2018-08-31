@@ -46,7 +46,7 @@ typedef int (*init_call)(void);
 #define device_initcall_percpu(fn)	__define_initcall(fn, 9)
 
 void arch_init(void);
-void early_init(void);
+void early_init(void *data);
 void subsys_init(void);
 void module_init(void);
 void device_init(void);

@@ -62,7 +62,7 @@ typedef void (*void_func_t)(void);
 
 #define PAGE_SIZE	(SIZE_4K)
 #define PAGE_SHIFT	(12)
-#define PAGE_MASK	(0xfff)
+#define PAGE_MASK	(0xfffUL)
 
 #define BITS_PER_BYTE		(8)
 
@@ -85,7 +85,7 @@ typedef void (*void_func_t)(void);
 #define round_down(x, y) 	((x) & ~__round_mask(x, y))
 
 #define ALIGN(x, y)	((x) & ~__round_mask(x, y))
-#define BALIGN(x, y)	((x + y - 1) & ~__round_mask(x, y))
+#define BALIGN(x, y)	(((x) + (y) - 1) & ~__round_mask(x, y))
 
 #define PAGE_BALIGN(x)	BALIGN(x, PAGE_SIZE)
 #define PAGE_ALIGN(x)	ALIGN(x, PAGE_SIZE)

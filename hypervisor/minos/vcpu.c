@@ -494,6 +494,10 @@ int static_vms_init(void)
 		 * - prepare the vcpu for bootup
 		 */
 		vm_mm_init(vm);
+
+		if (vm->vmid == 0)
+			arch_hvm_init(vm);
+
 		vm_vcpus_init(vm);
 	}
 

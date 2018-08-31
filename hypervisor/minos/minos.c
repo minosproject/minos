@@ -33,6 +33,7 @@ extern int virt_init(void);
 extern void cpu_idle();
 extern void sched_tick_enable(unsigned long exp);
 extern void vmm_init(void);
+extern void bootmem_init(void);
 
 struct list_head hook_lists[MINOS_HOOK_TYPE_UNKNOWN];
 
@@ -121,13 +122,21 @@ void irq_exit(gp_regs *reg)
 	}
 }
 
-void boot_main(void)
+void boot_main(void *setup_data)
 {
 	log_init();
 
 	pr_info("Starting Minos ...\n");
 
-	early_init();
+	/*
+	 * at the early stage when the memory mangement
+	 * has not been finish init, system can using
+	 * alloc_boot_mem or alloc_boot_page to get
+	 * free mem or free pages
+	 */
+	bootmem_init();
+
+	early_init(setup_data);
 	early_init_percpu();
 
 	mm_init();

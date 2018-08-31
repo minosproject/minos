@@ -26,6 +26,15 @@
 
 #define __PAGETABLE_ATTR_MASK		(0x0000ffffffe00000UL)
 
+#define __VM_DESC_HOST_TABLE	(TT_S1_ATTR_TABLE)
+#define __VM_DESC_HOST_BLOCK	\
+		(TT_S1_ATTR_BLOCK | \
+		(1 << TT_S1_ATTR_MATTR_LSB) | \
+		TT_S1_ATTR_NS | \
+		TT_S1_ATTR_SH_INNER | \
+		TT_S1_ATTR_AF | \
+		TT_S1_ATTR_nG)
+
 typedef unsigned long __pgd_t;
 typedef unsigned long __pud_t;
 typedef unsigned long __pmd_t;

@@ -559,6 +559,16 @@
 	},
 	{
 		"mem_base": "0xc0000000",
+		"mem_end": "0xc3ffffff",
+		"host": 0,
+		"sectype": "S/NS",
+		"enable": 1,
+		"type": 2,
+		"vmid": 65535,
+		"name": "dram"
+	},
+	{
+		"mem_base": "0xc4000000",
 		"mem_end": "0xffffffff",
 		"host": 0,
 		"sectype": "S/NS",

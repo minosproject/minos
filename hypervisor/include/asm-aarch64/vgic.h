@@ -39,6 +39,14 @@ struct vgic_dev {
 #define GIC_TYPE_GICR_VLPI	(0x3)
 #define GIC_TYPE_INVAILD	(0xff)
 
+#define GVM_VGIC_IOMEM_BASE	(0x2f000000)
+#define GVM_VGIC_IOMEM_SIZE	(0x200000)
+
+#define GVM_VGICD_IOMEM_BASE	(GVM_VGIC_IOMEM_BASE)
+#define GVM_VGICD_IOMEM_SIZE	(0x10000)
+
+#define GVM_VGICR_IOMEM_BASE	(0x2f100000)
+
 void vgic_send_sgi(struct vcpu *vcpu, unsigned long sgi_value);
 
 #endif

@@ -5,6 +5,7 @@
 #include <asm/aarch64_helper.h>
 
 struct vcpu;
+struct vm;
 
 typedef struct aarch64_regs {
 	uint64_t elr_elx;
@@ -218,5 +219,6 @@ void arch_switch_vcpu_sw(void);
 void arch_dump_stack(gp_regs *regs, unsigned long *sp);
 unsigned long arch_get_fp(void);
 unsigned long arch_get_lr(void);
+void arch_hvm_init(struct vm *vm);
 
 #endif

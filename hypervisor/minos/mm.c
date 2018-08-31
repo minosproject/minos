@@ -24,7 +24,10 @@
 #include <minos/virt.h>
 
 extern unsigned char __code_start;
-extern unsigned char __code_end;
+extern void *bootmem_end;
+extern void *bootmem_start;
+extern void *bootmem_page_base;
+extern unsigned long bootmem_size;
 
 struct mem_section {
 	unsigned long phy_base;
@@ -154,6 +157,7 @@ static int add_memory_section(unsigned long mem_base, size_t size)
 	 */
 	ms = &mem_sections[nr_sections];
 	spin_lock_init(&ms->lock);
+
 	mem_end = ALIGN(mem_base + size, MEM_BLOCK_SIZE);
 	mem_base = BALIGN(mem_base, MEM_BLOCK_SIZE);
 	real_size = mem_end - mem_base;
@@ -171,12 +175,8 @@ static int add_memory_section(unsigned long mem_base, size_t size)
 	nr_sections++;
 	pr_info("MEM SECTION : start:0x%x size:0x%x\n", mem_base, size);
 
-	/*
-	 * TBD : need to map all host memory before
-	 * malloc is called
-	 */
 	size = size - real_size;
-	if (size > (SLAB_MIN_SIZE))
+	if (size > SLAB_MIN_SIZE)
 		add_boot_slab_mem(mem_base + real_size, size);
 
 	return 0;
@@ -192,6 +192,9 @@ static void parse_system_regions(void)
 	for (i = 0; i < size; i++) {
 		tag = &memtags[i];
 		if (tag->vmid != VMID_HOST)
+			continue;
+
+		if (tag->type != MEM_TYPE_NORMAL)
 			continue;
 
 		add_memory_section(tag->mem_base,
@@ -254,7 +257,7 @@ static int mem_sections_init(void)
 	unsigned long code_base = (unsigned long)&__code_start;
 	struct mem_block *block;
 
-	mem_start = (unsigned long)&__code_end;
+	mem_start = (unsigned long)bootmem_end;
 	pr_info("code_start:0x%x code_end:0x%x\n",
 			code_base, mem_start);
 
@@ -300,22 +303,30 @@ static int mem_sections_init(void)
 	mem_end = BALIGN(mem_start, MEM_BLOCK_SIZE);
 	pr_info("minos : free_memory_start:0x%x\n", mem_end);
 
+	/*
+	 * deal with the boot section, need to update the
+	 * information of boot section of hypervisor, since
+	 * the text and data memory is in boot section
+	 */
 	section = &mem_sections[0];
 	boot_block_size = (mem_end - code_base) >> MEM_BLOCK_SHIFT;
 	free_blocks -= boot_block_size;
+	section->free_blocks -= boot_block_size;
 	block = section->blocks;
+
 	for (i = 0; i < boot_block_size; i++) {
 		set_bit(i, section->bitmap);
-		section->bm_current = i + 1;
 		init_list(&block->list);
 		block->free_pages = 0;
 		block->vmid = VMID_HOST;
 		block->bm_current = 0;
 		block->phy_base = code_base;
-		bitmap_set(block->pages_bitmap, PAGES_IN_BLOCK, 0);
+
 		block++;
 		code_base += MEM_BLOCK_SIZE;
 	}
+
+	section->bm_current = boot_block_size;
 
 	/*
 	 * put this page to the slab allocater do not
@@ -324,6 +335,15 @@ static int mem_sections_init(void)
 	boot_block_size = mem_end - mem_start;
 	if (boot_block_size > SLAB_MIN_SIZE )
 		add_boot_slab_mem(mem_start, boot_block_size);
+
+	/* add left bootmem to slab allocator */
+	boot_block_size = bootmem_page_base - bootmem_start;
+	if (boot_block_size > SLAB_MIN_SIZE) {
+		add_boot_slab_mem((unsigned long)bootmem_start,
+				boot_block_size);
+		bootmem_size = 0;
+		bootmem_start = NULL;
+	}
 
 	return 0;
 }
@@ -620,20 +640,39 @@ static void add_boot_slab_mem(unsigned long base, size_t size)
 	if ((base + size) & (MEM_BLOCK_SIZE - 1))
 		pr_warn("memory may be a block\n");
 
-	while (size >= SLAB_MIN_SIZE) {
+	pool = &pslab->pool[pslab->pool_nr - 1];
+	while (size >= SLAB_SIZE(SIZE_1M)) {
+		header = (struct slab_header *)base;
+		header->size = SIZE_1M;
+		header->next = NULL;
+		add_slab_to_slab_pool(header, pool);
+		base += SLAB_SIZE(SIZE_1M);
+		size -= SLAB_SIZE(SIZE_1M);
+	}
+
+	while (size >= SLAB_SIZE(512 * SIZE_1K)) {
+		header = (struct slab_header *)base;
+		header->size = SIZE_1K * 512;
+		header->next = NULL;
+		add_slab_to_slab_pool(header, pool);
+		base += SLAB_SIZE(SIZE_1K * 512);
+		size -= SLAB_SIZE(SIZE_1K * 512);
+	}
+
+	while (size >= SLAB_SIZE(SLAB_MIN_SIZE)) {
 		for (i = (pslab->pool_nr - 2); i >= 0; i--) {
 			pool = &pslab->pool[i];
-			if (size < (pool->size + SLAB_HEADER_SIZE))
+			if (size < SLAB_SIZE(pool->size))
 				continue;
 
 			header = (struct slab_header *)base;
 			header->size = pool->size;
 			header->next = NULL;
 			add_slab_to_slab_pool(header, pool);
-			base += pool->size + SLAB_HEADER_SIZE;
-			size -= pool->size + SLAB_HEADER_SIZE;
+			base += SLAB_SIZE(pool->size);
+			size -= SLAB_SIZE(pool->size);
 
-			if (size < SLAB_MIN_SIZE)
+			if (size < SLAB_SIZE(SLAB_MIN_SIZE))
 				break;
 		}
 	}
@@ -671,6 +710,7 @@ get_slab_from_slab_pool(struct slab_pool *pool)
 	header = pool->head;
 	pool->head = header->next;
 	header->magic = SLAB_MAGIC;
+	pool->nr--;
 
 	return header;
 }
@@ -680,6 +720,7 @@ static void inline add_slab_to_slab_pool(struct slab_header *header,
 {
 	header->next = pool->head;
 	pool->head = header;
+	pool->nr++;
 }
 
 static void *get_slab_from_pool(size_t size)

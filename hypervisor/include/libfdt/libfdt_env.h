@@ -52,11 +52,8 @@
  *     EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stddef.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <limits.h>
+#include <minos/string.h>
+#include <minos/types.h>
 
 #ifdef __CHECKER__
 #define FDT_FORCE __attribute__((force))

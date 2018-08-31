@@ -1,5 +1,4 @@
 /*
- * Copyright (C) 2013 ARM Ltd.
  * Copyright (C) 2018 Min Le (lemin9538@gmail.com)
  *
  * This program is free software; you can redistribute it and/or modify
@@ -25,6 +24,7 @@
 
 	.global _start
 	.type _start, "function"
+#ifdef CONFIG_PLATFORM_FVP
 _start:	
 	// SCR_EL3 Secure Configuration Register
 	ldr	x1, =el3_vectors
@@ -77,6 +77,10 @@ _start:
 	cbnz	x19, drop_to_el2
 
 	/* do other init things */
+#else
+_start:
+	b	el2_entry_aarch64	// x0 must be the dtb memory
+#endif
 
 	.global drop_to_el2
 drop_to_el2:

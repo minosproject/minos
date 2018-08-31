@@ -17,7 +17,7 @@ char *strncpy(char *des, char *src, int len);
 int strcmp(const char *src, const char *dst);
 int memcmp(const char *src, const char *dst, size_t size);
 int strncmp(const char *src, const char *dst, int n);
-char *strchr(char *src, char ch);
+char *strchr(const char *src, char ch);
 void memset(void *base, char ch, int size);
 void *memmove(void *dest, const void *src, size_t n);
 size_t strnlen(const char *s, size_t maxlen);

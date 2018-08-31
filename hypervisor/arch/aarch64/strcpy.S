@@ -2,7 +2,6 @@
  * Copyright (C) 2013 ARM Ltd.
  * Copyright (C) 2013 Linaro.
  * Copyright (C) 2014 The Android Open Source Project
- * Copyright (C) Min le (lemin9538@gmail.com)
  *
  * This code is based on glibc cortex strings work originally authored by Linaro
  * and re-licensed under GPLv2 for the Linux kernel. The original code can

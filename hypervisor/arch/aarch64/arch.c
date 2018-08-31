@@ -27,6 +27,8 @@
 
 extern int el2_stage2_init(void);
 extern int el2_stage1_init(void);
+extern int of_init(void *setup_data);
+extern void hvm_dtb_init(struct vm *vm);
 
 static void dump_register(gp_regs *regs)
 {
@@ -141,9 +143,10 @@ void arch_init_vcpu(struct vcpu *vcpu, void *entry)
 	arch_init_gp_regs(regs, entry, vcpu->is_idle);
 }
 
-int arch_early_init(void)
+int arch_early_init(void *setup_data)
 {
 	el2_stage2_init();
+	of_init(setup_data);
 
 	return 0;
 }
@@ -151,6 +154,11 @@ int arch_early_init(void)
 int __arch_init(void)
 {
 	return 0;
+}
+
+void arch_hvm_init(struct vm *vm)
+{
+	hvm_dtb_init(vm);
 }
 
 struct aarch64_system_context {

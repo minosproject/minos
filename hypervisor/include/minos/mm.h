@@ -78,4 +78,7 @@ struct mem_block *alloc_mem_block(unsigned long flags);
 void release_mem_block(struct mem_block *block);
 int has_enough_memory(size_t size);
 
+void *alloc_boot_mem(size_t size);
+void *alloc_boot_pages(int pages);
+
 #endif

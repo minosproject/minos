@@ -49,9 +49,9 @@ static void call_init_func(unsigned long fn_start, unsigned long fn_end)
 	}
 }
 
-void early_init(void)
+void early_init(void *setup_data)
 {
-	arch_early_init();
+	arch_early_init(setup_data);
 
 	call_init_func((unsigned long)&__init_func_0_start,
 			(unsigned long)&__init_func_1_start);
