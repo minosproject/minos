@@ -20,7 +20,7 @@
 #include <asm/psci.h>
 #include <minos/virt.h>
 
-static int fvp_std_smc_handler(gp_regs *c,
+static int std_smc_handler(gp_regs *c,
 		uint32_t id, uint64_t *args)
 {
 	int ret;
@@ -61,4 +61,4 @@ static int fvp_std_smc_handler(gp_regs *c,
 }
 
 DEFINE_SMC_HANDLER("std_smc_desc", SVC_STYPE_STDSMC,
-		SVC_STYPE_STDSMC, fvp_std_smc_handler);
+		SVC_STYPE_STDSMC, std_smc_handler);

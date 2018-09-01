@@ -64,6 +64,7 @@ int register_memory_region(struct memtag *res)
 	memset(region, 0, sizeof(struct memory_region));
 
 	region->phy_base = res->mem_base;
+	region->vir_base = res->mem_base;
 	region->size = res->mem_end - res->mem_base + 1;
 	region->vmid = res->vmid;
 
@@ -80,12 +81,13 @@ int register_memory_region(struct memtag *res)
 		list_add_tail(&mem_list, &region->list);
 	}
 
-	if (region->type == MEM_TYPE_IO)
-		region->vir_base = res->mem_base -
-				CONFIG_PLATFORM_IO_BASE + GVM_IO_MEM_START;
-	else
-		region->vir_base = res->mem_base -
-			CONFIG_PLATFORM_DRAM_BASE + GVM_NORMAL_MEM_START;
+	/* adjust the virtual memory base of gvm */
+	if (region->vmid != 0) {
+		if (region->type == MEM_TYPE_IO)
+			region->vir_base = GVM_IOMEM_BASE(res->mem_base);
+		else
+			region->vir_base = GVM_MEM_BASE(res->mem_base);
+	}
 
 	return 0;
 }
@@ -456,14 +458,18 @@ void vm_mm_struct_init(struct vm *vm)
 	spin_lock_init(&mm->lock);
 
 	/*
+	 * for guest vm
+	 *
 	 * 0x0 - 0x3fffffff for vdev which controlled by
 	 * hypervisor, like gic and timer
 	 *
 	 * 0x40000000 - 0x7fffffff for vdev which controlled
 	 * by vm0, like virtio device, rtc device
 	 */
-	mm->gvm_iomem_base = GVM_IO_MEM_START + SIZE_1G;
-	mm->gvm_iomem_size = GVM_IO_MEM_SIZE - SIZE_1G;
+	if (!vm_is_hvm(vm)) {
+		mm->gvm_iomem_base = GVM_IO_MEM_START + SIZE_1G;
+		mm->gvm_iomem_size = GVM_IO_MEM_SIZE - SIZE_1G;
+	}
 }
 
 int vm_mm_init(struct vm *vm)
@@ -499,12 +505,12 @@ int vmm_init(void)
 {
 	struct memory_region *region;
 
-	/* map all normal memory to host memory space */
+	/* map vm0 normal memory to host memory space */
 	list_for_each_entry(region, &mem_list, list) {
 		if (region->type != MEM_TYPE_NORMAL)
 			continue;
 
-		if (region->vmid == VMID_HOST)
+		if (region->vmid != 0)
 			continue;
 
 		create_host_mapping(region->phy_base, region->phy_base,

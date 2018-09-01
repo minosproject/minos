@@ -92,6 +92,11 @@ static inline int is_32bit_vm(struct vm *vm)
 	return (!vm->bit64);
 }
 
+static inline int vm_is_hvm(struct vm *vm)
+{
+	return (vm->vmid == 0);
+}
+
 static inline int
 create_vm_mmap(int vmid,  unsigned long offset, unsigned long size)
 {
