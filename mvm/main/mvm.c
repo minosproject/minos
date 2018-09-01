@@ -154,20 +154,23 @@ int destroy_vm(struct vm *vm)
 
 	memset(&ee, 0, sizeof(struct epoll_event));
 
-	for (i = 0; i < vm->nr_vcpus; i++) {
-		if ((vm->epfds[i] > 0) && (vm->eventfds[i] > 0)) {
-			ee.events = EPOLLIN;
-			epoll_ctl(vm->epfds[i], EPOLL_CTL_DEL, vm->eventfds[i], &ee);
-		}
+	if (vm->epfds && vm->eventfds) {
+		for (i = 0; i < vm->nr_vcpus; i++) {
+			if ((vm->epfds[i] > 0) && (vm->eventfds[i] > 0)) {
+				ee.events = EPOLLIN;
+				epoll_ctl(vm->epfds[i], EPOLL_CTL_DEL,
+						vm->eventfds[i], &ee);
+			}
 
-		if (vm->eventfds[i] > 0) {
-			close(vm->eventfds[i]);
-			vm->eventfds[i] = -1;
-		}
+			if (vm->eventfds[i] > 0) {
+				close(vm->eventfds[i]);
+				vm->eventfds[i] = -1;
+			}
 
-		if (vm->epfds[i] > 0) {
-			close(vm->epfds[i]);
-			vm->epfds[i] = -1;
+			if (vm->epfds[i] > 0) {
+				close(vm->epfds[i]);
+				vm->epfds[i] = -1;
+			}
 		}
 	}
 
