@@ -27,6 +27,7 @@
 #include <minos/cpumask.h>
 #include <minos/irq.h>
 #include <minos/virq.h>
+#include <asm/of.h>
 
 spinlock_t gicv3_lock;
 static void *gicd_base = (void *)0x2f000000;
@@ -650,14 +651,21 @@ int gicv3_init(void)
 	void *rbase;
 	uint64_t pr;
 	uint32_t value;
+	uint64_t array[16];
 
 	pr_info("*** gicv3 init ***\n");
 
 	spin_lock_init(&gicv3_lock);
 
-	io_remap(0x2f000000, 0x2f000000, 64 * 1024);
-	io_remap(0x2f020000, 0x2f020000, 128 * 1024);
-	io_remap(0x2f100000, 0x2f100000, 1024 * 1024);
+	memset(array, 0, sizeof(array));
+	type = of_get_u64_array("/interrupt-controller",
+				"reg", array, &i);
+	if (type || i < 4)
+		return -ENOENT;
+
+	/* only map gicd and gicr now */
+	pr = array[2] + array[3] - array[0];
+	io_remap(array[0], array[0], pr);
 
 	value = read_sysreg32(ICH_VTR_EL2);
 	gicv3_nr_lr = (value & 0x3f) + 1;
