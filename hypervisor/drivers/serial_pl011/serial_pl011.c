@@ -14,6 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <minos/errno.h>
 #include <minos/io.h>
 #include <drivers/pl011.h>
 #include <minos/mmu.h>
@@ -22,8 +23,13 @@
 static void *base = (void *)0x1c090000;
 extern void flush_log_buf(void);
 
-int uart_init(void)
+int pl011_init(void *addr)
 {
+	if (!addr)
+		return -EINVAL;
+
+	base = addr;
+
 	iowrite32(base + UARTCR, 0x0);
 	iowrite32(base + UARTECR, 0x0);
 	iowrite32(base + UARTLCR_H, 0x0 | PL011_LCR_WORD_LENGTH_8 | \
@@ -42,7 +48,7 @@ int uart_init(void)
 	return 0;
 }
 
-void uart_putc(char c)
+void serial_putc(char c)
 {
 	while (ioread32(base + UARTFR) & PL011_FR_BUSY_FLAG);
 
@@ -52,7 +58,7 @@ void uart_putc(char c)
 	iowrite32(base + UARTDR, c);
 }
 
-char uart_getchar(void)
+char serial_getc(void)
 {
 	while (ioread32(base + UARTFR) & PL011_FR_BUSY_FLAG);
 

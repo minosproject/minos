@@ -7,7 +7,7 @@ OBJ_DUMP 	:= $(CROSS_COMPILE)objdump
 NM		:= $(CROSS_COMPILE)nm
 STRIP		:= $(CROSS_COMPILE)strip
 
-PLATFORM	:= fvp
+PLATFORM	:= espressobin
 TARGET		:= minos
 DEBUG_LEVEL	:= 0
 
@@ -15,15 +15,16 @@ QUIET ?= @
 
 include build/$(PLATFORM).mk
 
-src_dir-y			+= minos arch/$(ARCH) platform/$(PLATFORM)
-src_dir-$(CONFIG_UART_PL011)	+= drivers/pl011
-src_dir-$(CONFIG_LIBFDT)	+= external/libfdt
-src_dir-$(CONFIG_JSON_SJSON)	+= external/sjson
-src_dir-y			+= drivers/virtio
+src_dir-y				+= minos arch/$(ARCH) platform/$(PLATFORM)
+src_dir-$(CONFIG_SERIAL_PL011)		+= drivers/serial_pl011
+src_dir-$(CONFIG_SERIAL_MVEBU_A3700)	+= drivers/serial_mvebu_a3700
+src_dir-$(CONFIG_LIBFDT)		+= external/libfdt
+src_dir-$(CONFIG_JSON_SJSON)		+= external/sjson
+src_dir-y				+= drivers/virtio
 
-inc_dir-y			+= include/minos include/asm include/config config/$(PLATFORM)
-inc_dir-$(CONFIG_LIBFDT)	+= include/libfdt
-inc_dir-$(CONFIG_JSON_SJSON)	+= include/sjson
+inc_dir-y				+= include/minos include/asm include/config config/$(PLATFORM)
+inc_dir-$(CONFIG_LIBFDT)		+= include/libfdt
+inc_dir-$(CONFIG_JSON_SJSON)		+= include/sjson
 
 inc_h-y		= $(shell find $(inc_dir-y) -type f -name "*.h")
 inc_s-y		+= $(shell find $(inc_dir-y) -type f -name "*.S")

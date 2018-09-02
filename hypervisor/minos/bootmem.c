@@ -23,7 +23,7 @@ unsigned long bootmem_size = 0;
 static DEFINE_SPIN_LOCK(bootmem_lock);
 void *bootmem_page_base;
 
-#define BOOTMEM_MIN_SIZE	(128 * 1024)
+#define BOOTMEM_MIN_SIZE	(32 * 1024)
 
 void *alloc_boot_mem(size_t size)
 {

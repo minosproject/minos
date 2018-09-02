@@ -1,4 +1,4 @@
-#include "fvp_config.h"
+#include "espressobin_config.h"
 {
 	"version": "0.0.1",
 	"platform": "armv8-fvp",
@@ -6,7 +6,7 @@
 	"vmtags": [
 	{
 			"vmid": 0,
-			"name": "linux-01",
+			"name": "espressobin",
 			"type": "linux",
 			"nr_vcpu": 1,
 			"entry": "0x80080000",
@@ -18,8 +18,8 @@
 			"bit64": 1
 		}
 	],
-	#include "fvp_irq.json.cc"
-	#include "fvp_mem.json.cc"
+	#include "irq.json.cc"
+	#include "mem.json.cc"
 
 	"others" : {
 		"comments": "minos virtualization config json data"

@@ -186,6 +186,7 @@ static int fdt_setup_cpu(struct vm *vm)
 	/*
 	 * delete unused vcpu for hvm
 	 */
+#ifdef CONFIG_PLATFORM_FVP
 	offset = fdt_path_offset(dtb, "/cpus/cpu-map/cluster0");
 	if (offset < 0) {
 		pr_error("no cpu node found\n");
@@ -201,6 +202,7 @@ static int fdt_setup_cpu(struct vm *vm)
 			fdt_del_node(dtb, node);
 		}
 	}
+#endif
 
 	offset = fdt_path_offset(dtb, "/cpus");
 

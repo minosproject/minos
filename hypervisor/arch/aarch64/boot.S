@@ -77,10 +77,6 @@ _start:
 	cbnz	x19, drop_to_el2
 
 	/* do other init things */
-#else
-_start:
-	b	el2_entry_aarch64	// x0 must be the dtb memory
-#endif
 
 	.global drop_to_el2
 drop_to_el2:
@@ -93,11 +89,31 @@ drop_to_el2:
 		AARCH64_SPSR_A)
 	msr	SPSR_EL3, x1
 	eret
+#else
+_start:
+	dsb	ish
+	ic	ialluis
+	dsb	ish
+	isb
+
+	/* disable the mmu and disable the aligment check */
+	mrs	x1, SCTLR_EL2
+	bic	x1, x1, #SCTLR_ELx_M
+	bic	x1, x1, #SCTLR_ELx_A
+	bic	x1, x1, #SCTLR_ELx_C
+	bic	x1, x1, #SCTLR_ELx_I
+	msr	SCTLR_EL2, x1
+	isb
+
+	mov	x27, x0			// back up dtb address
+
+	bl	get_cpu_id		// cpuid save to x19
+	mov	x19, x0
+#endif
 
 	.global el2_entry_aarch64
 	.type el2_entry_aarch64, "function"
 el2_entry_aarch64:
-	mov	x27, x0			//back up dtb address
 	ldr	x1, =el2_vectors
 	msr	VBAR_EL2, x1
 
@@ -260,7 +276,7 @@ el2_entry_aarch64:
 	bl	memset
 
 	/* init the uart */
-	bl	uart_init
+	bl	serial_init
 	nop
 
 	mov	x0, x27		//restore the dtb address

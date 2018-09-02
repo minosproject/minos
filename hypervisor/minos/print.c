@@ -20,7 +20,7 @@
 #include <minos/print.h>
 #include <minos/spinlock.h>
 #include <config/config.h>
-#include <drivers/pl011.h>
+#include <drivers/serial.h>
 #include <minos/smp.h>
 
 #define LOG_BUFFER_SIZE		(8192)
@@ -107,7 +107,7 @@ int level_print(char *fmt, ...)
 	buf = buffer;
 
 	for(i = 0; i < printed; i++)
-			uart_putc(*buf++);
+		serial_putc(*buf++);
 
 	spin_unlock(&log_buffer.buffer_lock);
 

@@ -3,7 +3,7 @@
 ENTRY(_start)
 SECTIONS
 {
-	.vectors 0xc0000000:
+	.vectors CONFIG_MINOS_START_ADDRESS:
 	{
 		/*
 		 * put all asm code into this section
