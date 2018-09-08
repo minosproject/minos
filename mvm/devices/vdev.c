@@ -76,7 +76,7 @@ alloc_and_init_vdev(struct vm *vm, char *class, char *args)
 
 	plat_ops = get_vdev_ops(class);
 	if (!plat_ops) {
-		printf("* error - can not find such vdev %s\n", class);
+		pr_err("can not find such vdev %s\n", class);
 		return NULL;
 	}
 
@@ -128,48 +128,72 @@ int create_vdev(struct vm *vm, char *class, char *args)
 	return 0;
 }
 
-static void vdev_setup_dtb(struct vm *vm, char *dtb)
+static int dtb_add_platform(struct vdev *vdev, char *dtb, int offset)
 {
-	struct vdev *vdev;
-	int offset, node;
+	return 0;
+}
+
+static int dtb_add_virtio(struct vdev *vdev, char *dtb, int offset)
+{
+	int node;
 	char buf[64];
 	uint32_t args[3];
 	uint32_t addr;
 
+	memset(buf, 0, 64);
+	addr = (uint32_t)vdev->guest_iomem - 0x40000000;
+	sprintf(buf, "%s@%x", vdev->name, addr);
+	node = fdt_add_subnode(dtb, offset, buf);
+	if (node < 0) {
+		pr_err("add %s failed\n", vdev->name);
+		return -EINVAL;
+	}
+
+	fdt_setprop(dtb, node, "compatible", "virtio,mmio", 12);
+
+	/* setup the reg value */
+	args[0] = cpu_to_fdt32(addr);
+	args[1] = cpu_to_fdt32(PAGE_SIZE);
+	fdt_setprop(dtb, node, "reg", (void *)args,
+			2 * sizeof(uint32_t));
+
+	/* setup the interrupt */
+	if (vdev->gvm_irq) {
+		args[0] = cpu_to_fdt32(0x0);
+		args[1] = cpu_to_fdt32(vdev->gvm_irq - 32);
+		args[2] = cpu_to_fdt32(4);
+		fdt_setprop(dtb, node, "interrupts", (void *)args,
+				3 * sizeof(uint32_t));
+	}
+
+	pr_info("add vdev success addr-0x%lx virq-%d\n",
+			vdev->guest_iomem, vdev->gvm_irq);
+	return 0;
+}
+
+static void vdev_setup_dtb(struct vm *vm, char *dtb)
+{
+	struct vdev *vdev;
+	int offset;
+
 	offset = fdt_path_offset(dtb, "/smb/motherboard/vdev");
 	if (offset < 0) {
-		printf("* error - set up vdev failed no vdev node\n");
+		pr_err("set up vdev failed no vdev node\n");
 		return;
 	}
 
 	list_for_each_entry(vdev, &vm->vdev_list, list) {
-		memset(buf, 0, 64);
-		addr = (uint32_t)vdev->guest_iomem - 0x40000000;
-		sprintf(buf, "%s@%x", vdev->name, addr);
-		node = fdt_add_subnode(dtb, offset, buf);
-		if (node < 0) {
-			printf("* error - add %s failed\n", vdev->name);
-			continue;
+		switch (vdev->dev_type) {
+		case VDEV_TYPE_PLATFORM:
+			dtb_add_platform(vdev, dtb, offset);
+			break;
+		case VDEV_TYPE_VIRTIO:
+			dtb_add_virtio(vdev, dtb, offset);
+			break;
+		default:
+			pr_err("unsupported device type now\n");
+			break;
 		}
-
-		fdt_setprop(dtb, node, "compatible", "virtio,mmio", 12);
-
-		/* setup the reg value */
-		args[0] = cpu_to_fdt32(addr);
-		args[1] = cpu_to_fdt32(PAGE_SIZE);
-		fdt_setprop(dtb, node, "reg", (void *)args,
-				2 * sizeof(uint32_t));
-
-		/* setup the interrupt */
-		if (vdev->gvm_irq) {
-			args[0] = cpu_to_fdt32(0x0);
-			args[1] = cpu_to_fdt32(vdev->gvm_irq - 32);
-			args[2] = cpu_to_fdt32(4);
-			fdt_setprop(dtb, node, "interrupts", (void *)args,
-					3 * sizeof(uint32_t));
-		}
-
-		pr_info("add vdev success 0x%x %d\n", addr, vdev->gvm_irq);
 	}
 }
 

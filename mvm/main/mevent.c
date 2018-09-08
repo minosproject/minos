@@ -40,6 +40,7 @@
 #include <sys/epoll.h>
 #include <sys/queue.h>
 #include <pthread.h>
+#include <string.h>
 
 #include "mevent.h"
 
@@ -262,10 +263,13 @@ mevent_delete_close(struct mevent *evp)
 	return mevent_delete_event(evp, 1);
 }
 
-static void
-mevent_set_name(void)
+static void mevent_set_name(int vmid)
 {
-	pthread_setname_np(mevent_tid, "mevent");
+	char name[64];
+
+	memset(name, 0, 64);
+	sprintf(name, "mvm-%d", vmid);
+	pthread_setname_np(mevent_tid, name);
 }
 
 int
@@ -287,8 +291,7 @@ mevent_deinit(void)
 	close(epoll_fd);
 }
 
-void
-mevent_dispatch(void)
+void mevent_dispatch(int vmid)
 {
 	struct epoll_event eventlist[MEVENT_MAX];
 
@@ -296,7 +299,7 @@ mevent_dispatch(void)
 	int ret;
 
 	mevent_tid = pthread_self();
-	mevent_set_name();
+	mevent_set_name(vmid);
 
 	/*
 	 * Open the pipe that will be used for other threads to force

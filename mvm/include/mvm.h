@@ -43,25 +43,13 @@ extern int verbose;
 #define pr_info(...)	printf("[INFO ] " __VA_ARGS__)
 #define pr_warn(...)	printf("[WARN ] " __VA_ARGS__)
 
-struct vm_info {
-	char name[32];
-	char os_type[32];
-	int32_t nr_vcpus;
-	int32_t bit64;
-	uint64_t mem_size;
-	uint64_t mem_start;
-	uint64_t entry;
-	uint64_t setup_data;
-	uint64_t mmap_base;
-};
-
 struct vm;
 
 struct vm_os {
 	char *name;
 	int (*early_init)(struct vm *vm);
 	int (*load_image)(struct vm *vm);
-	int (*setup_vm_env)(struct vm *vm);
+	int (*setup_vm_env)(struct vm *vm, char *cmdline);
 };
 
 #define OS_TYPE_LINUX		(1 << 0)
@@ -94,6 +82,7 @@ struct vm {
 	void *vmcs;
 	int *eventfds;
 	int *epfds;
+	int *irqs;
 
 	struct list_head vdev_list;
 };

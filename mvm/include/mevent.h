@@ -38,6 +38,7 @@ enum ev_type {
 
 char *vmname;
 struct mevent;
+struct vm;
 
 struct mevent *mevent_add(int fd, enum ev_type type,
 			  void (*func)(int, enum ev_type, void *),
@@ -48,7 +49,7 @@ int	mevent_delete(struct mevent *evp);
 int	mevent_delete_close(struct mevent *evp);
 int	mevent_notify(void);
 
-void	mevent_dispatch(void);
+void	mevent_dispatch(int vmid);
 int	mevent_init(void);
 void	mevent_deinit(void);
 

@@ -54,7 +54,7 @@
 
 #include <mvm.h>
 
-static int os_setup_env(struct vm *vm)
+static int os_setup_env(struct vm *vm, char *cmdline)
 {
 	return 0;
 }

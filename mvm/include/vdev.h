@@ -15,6 +15,9 @@ struct vdev_ops {
 			unsigned long, unsigned long *);
 };
 
+#define VDEV_TYPE_PLATFORM	(0x0)
+#define VDEV_TYPE_VIRTIO	(0x1)
+
 struct vdev {
 	struct vm *vm;
 	void *iomem;
@@ -24,6 +27,7 @@ struct vdev {
 	int guest_visable;
 	struct vdev_ops *ops;
 	void *pdata;
+	int dev_type;
 	char name[PDEV_NAME_SIZE + 1];
 	struct list_head list;
 };

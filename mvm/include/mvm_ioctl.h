@@ -13,5 +13,6 @@
 #define IOCTL_CREATE_VIRTIO_DEVICE	(0xf009)
 #define IOCTL_CREATE_VMCS		(0xf00a)
 #define IOCTL_CREATE_VMCS_IRQ		(0xf00b)
+#define IOCTL_UNREGISTER_VCPU		(0xf00c)
 
 #endif

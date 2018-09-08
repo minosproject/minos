@@ -337,6 +337,7 @@ static int __virtio_vdev_init(struct vdev *vdev,
 {
 	void *base;
 
+	vdev->dev_type = VDEV_TYPE_VIRTIO;
 	vdev->iomem_physic = iomem;
 	base = vdev_map_iomem(iomem, 4096);
 	if (base == (void *)-1)

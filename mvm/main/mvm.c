@@ -55,14 +55,47 @@
 #include <getopt.h>
 #include <pthread.h>
 #include <sys/eventfd.h>
+#include <sys/prctl.h>
 
 #include <mvm.h>
 #include <vdev.h>
 #include <mevent.h>
 
+struct vm_info {
+	char name[32];
+	char os_type[32];
+	int32_t nr_vcpus;
+	int32_t bit64;
+	uint64_t mem_size;
+	uint64_t mem_start;
+	uint64_t entry;
+	uint64_t setup_data;
+	uint64_t mmap_base;
+};
+
+#define VM_MAX_DEVICES	(10)
+
+struct device_info {
+	int nr_device;
+	char *device_args[VM_MAX_DEVICES];
+};
+
+struct vm_config {
+	unsigned long flags;
+	struct vm_info vm_info;
+	struct device_info device_info;
+	char bootimage_path[256];
+	char rootfs_path[256];
+	char cmdline[256];
+};
+
 struct vm *mvm_vm = NULL;
+static struct vm_config *global_config = NULL;
 
 int verbose;
+
+static void free_vm_config(struct vm_config *config);
+extern int pthread_setname_np(pthread_t thread, const char *name);
 
 void *map_vm_memory(struct vm *vm)
 {
@@ -78,8 +111,8 @@ void *map_vm_memory(struct vm *vm)
 		return NULL;
 
 	if (ioctl(vm->vm_fd, IOCTL_VM_MMAP, args)) {
-		printf("* error - mmap memory failed 0x%lx 0x%lx\n",
-				args[0], vm->mem_size);
+		pr_err("mmap memory failed 0x%lx 0x%lx\n", args[0],
+				vm->mem_size);
 		munmap(addr, vm->mem_size);
 		addr = 0;
 	}
@@ -108,15 +141,15 @@ static int create_new_vm(struct vm *vm)
 		return -EIO;
 	}
 
-	pr_debug("create new vm *\n");
-	pr_debug("        -name       : %s\n", info.name);
-	pr_debug("        -os_type    : %s\n", info.os_type);
-	pr_debug("        -nr_vcpus   : %d\n", info.nr_vcpus);
-	pr_debug("        -bit64      : %d\n", info.bit64);
-	pr_debug("        -mem_size   : 0x%lx\n", info.mem_size);
-	pr_debug("        -mem_start  : 0x%lx\n", info.mem_start);
-	pr_debug("        -entry      : 0x%lx\n", info.entry);
-	pr_debug("        -setup_data : 0x%lx\n", info.setup_data);
+	pr_info("create new vm *\n");
+	pr_info("        -name       : %s\n", info.name);
+	pr_info("        -os_type    : %s\n", info.os_type);
+	pr_info("        -nr_vcpus   : %d\n", info.nr_vcpus);
+	pr_info("        -bit64      : %d\n", info.bit64);
+	pr_info("        -mem_size   : 0x%lx\n", info.mem_size);
+	pr_info("        -mem_start  : 0x%lx\n", info.mem_start);
+	pr_info("        -entry      : 0x%lx\n", info.entry);
+	pr_info("        -setup_data : 0x%lx\n", info.setup_data);
 
 	vmid = ioctl(fd, IOCTL_CREATE_VM, &info);
 	if (vmid <= 0) {
@@ -174,6 +207,16 @@ int destroy_vm(struct vm *vm)
 		}
 	}
 
+	if (vm->irqs) {
+		for (i = 0; i < vm->nr_vcpus; i++) {
+			if (vm->irqs[i] <= 0)
+				continue;
+
+			ioctl(vm->vm_fd, IOCTL_UNREGISTER_VCPU,
+					(unsigned long)vm->irqs[i]);
+		}
+	}
+
 	mevent_deinit();
 
 	if (vm->mmap) {
@@ -197,7 +240,29 @@ int destroy_vm(struct vm *vm)
 	free(vm);
 	mvm_vm = NULL;
 
+	free_vm_config(global_config);
+	global_config = NULL;
+
 	return 0;
+}
+
+static void signal_handler(int signum)
+{
+	int vmid = 0xfff;
+
+	switch (signum) {
+	case SIGALRM:
+	case SIGINT:
+	case SIGTERM:
+		if (mvm_vm)
+			vmid = mvm_vm->vmid;
+
+		pr_info("received signal %i vm-%d\n", signum, vmid);
+		destroy_vm(mvm_vm);
+		exit(0);
+	default:
+		break;
+	}
 }
 
 void print_usage(void)
@@ -213,6 +278,8 @@ void print_usage(void)
 	fprintf(stderr, "    -r                         (do not load ramdisk image)\n");
 	fprintf(stderr, "    -v                         (verbose print debug information)\n");
 	fprintf(stderr, "    -d                         (run as a daemon process)\n");
+	fprintf(stderr, "    -D                         (device argument)\n");
+	fprintf(stderr, "    -C                         (set the cmdline for the os)\n");
 	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);
 }
@@ -223,7 +290,7 @@ void *hvm_map_iomem(void *base, size_t size)
 	int fd = open("/dev/mvm/mvm0", O_RDWR);
 
 	if (fd < 0) {
-		printf("* error - open /dev/mvm/mvm0 failed\n");
+		pr_err("open /dev/mvm/mvm0 failed\n");
 		return (void *)-1;
 	}
 
@@ -257,15 +324,6 @@ static int create_and_init_vm(struct vm *vm)
 {
 	int ret = 0;
 	char path[32];
-
-	if (vm->entry == 0)
-		vm->entry = VM_MEM_START;
-	if (vm->mem_start == 0)
-		vm->mem_start = VM_MEM_START;
-	if (vm->mem_size == 0)
-		vm->mem_size = VM_MIN_MEM_SIZE;
-	if (vm->nr_vcpus == 0)
-		vm->nr_vcpus = 1;
 
 	vm->vmid = create_new_vm(vm);
 	if (vm->vmid <= 0)
@@ -309,7 +367,6 @@ static struct vm_os *get_vm_os(char *os_type)
 
 	for (; os_start < os_end; os_start++) {
 		os = *os_start;
-		printf("%s %s\n", os_type, os->name);
 		if (strcmp(os_type, os->name) == 0)
 			return os;
 
@@ -320,11 +377,34 @@ static struct vm_os *get_vm_os(char *os_type)
 	return default_os;
 }
 
-static int vm_rest_init(struct vm *vm)
+static int vm_rest_init(struct vm *vm, struct vm_config *config)
 {
-	char buf[256];
-	strcpy(buf, "@pty:,");
-	create_vdev(vm, "virtio_console", buf);
+	int i;
+	char *tmp, *pos;
+	char *type = NULL, *arg = NULL;
+	struct device_info *info = &config->device_info;
+
+	for (i = 0; i < info->nr_device; i++) {
+		tmp = info->device_args[i];
+		if (!tmp || (strlen(tmp) == 0)) {
+			pr_warn("invaild device argument index%d\n", i);
+			continue;
+		}
+
+		pos = strchr(tmp, ',');
+		if (pos == NULL) {
+			pr_err("invaild device argumet %s", tmp);
+			continue;
+		}
+
+		type = tmp;
+		arg = pos + 1;
+		*pos = '\0';
+
+		if (create_vdev(vm, type, arg))
+			pr_err("create %s-%s failed\n", type, arg);
+	}
+
 	return 0;
 }
 
@@ -392,6 +472,11 @@ void *vm_vcpu_thread(void *data)
 	struct vmcs *vmcs;
 	unsigned long i = (unsigned long)data;
 	eventfd_t value;
+	char buf[32];
+
+	memset(buf, 0, 32);
+	sprintf(buf, "vm%d-vcpu-event", vm->vmid);
+	prctl(PR_SET_NAME, buf);
 
 	if (i >= vm->nr_vcpus)
 		return NULL;
@@ -439,13 +524,14 @@ static int mvm_main_loop(void)
 	 * create the eventfd and the epoll_fds for
 	 * this vm
 	 */
-	base = (int *)malloc(sizeof(int) * vm->nr_vcpus * 2);
+	base = (int *)malloc(sizeof(int) * vm->nr_vcpus * 3);
 	if (!base)
 		return -ENOMEM;
 
-	memset(base, -1, sizeof(int) * vm->nr_vcpus * 2);
+	memset(base, -1, sizeof(int) * vm->nr_vcpus * 3);
 	vm->eventfds = base;
 	vm->epfds = base + vm->nr_vcpus;
+	vm->irqs = base + vm->nr_vcpus * 2;
 
 	for (i = 0; i < vm->nr_vcpus; i++) {
 		irq = ioctl(vm->vm_fd, IOCTL_CREATE_VMCS_IRQ, (unsigned long)i);
@@ -463,6 +549,7 @@ static int mvm_main_loop(void)
 		/*
 		 * register the irq and eventfd to kernel
 		 */
+		vm->irqs[i] = irq;
 		arg = ((unsigned long)vm->eventfds[i] << 32) | irq;
 		ret = ioctl(vm->vm_fd, IOCTL_REGISTER_VCPU, &arg);
 		if (ret)
@@ -481,50 +568,64 @@ static int mvm_main_loop(void)
 	if (ret)
 		return ret;
 
-	mevent_dispatch();
+	mevent_dispatch(vm->vmid);
 
 	return -EAGAIN;
 }
 
-static int mvm_main(struct vm *vm, char *image_path, unsigned long flags)
+static int mvm_main(struct vm_config *config)
 {
 	int image_fd, ret;
+	struct vm *vm;
 	struct vm_os *os;
+	struct vm_info *vm_info = &config->vm_info;
 
-	if (vm->name[0] == 0)
-		strcpy(vm->name, "unknown");
-	if (vm->os_type[0] == 0)
-		strcpy(vm->os_type, "unknown");
+	signal(SIGINT, signal_handler);
+	signal(SIGTERM, signal_handler);
 
-	os = get_vm_os(vm->os_type);
+	mvm_vm = vm = (struct vm *)malloc(sizeof(struct vm));
+	if (!vm)
+		return -ENOMEM;
+
+	os = get_vm_os(vm_info->os_type);
 	if (!os)
 		return -EINVAL;
 
 	/* read the image to get the entry and other args */
-	image_fd = open(image_path, O_RDWR | O_NONBLOCK);
+	image_fd = open(config->bootimage_path, O_RDWR | O_NONBLOCK);
 	if (image_fd < 0) {
 		free(vm);
-		perror(image_path);
+		perror(config->bootimage_path);
 		return -ENOENT;
 	}
 
+	/* udpate the vm from vm_info */
 	vm->os = os;
+	vm->bit64 = 1;
 	vm->image_fd = image_fd;
-	vm->flags = flags;
+	vm->flags = config->flags;
+	vm->vmid = 0;
+	vm->vm_fd = -1;
+	vm->entry = vm_info->entry;
+	vm->mem_start = vm_info->mem_start;
+	vm->mem_size = vm_info->mem_size;
+	vm->nr_vcpus = vm_info->nr_vcpus;
+	strcpy(vm->name, vm_info->name);
+	strcpy(vm->os_type, vm_info->os_type);
 	init_list(&vm->vdev_list);
-
-	/* free the unused memory */
-	free(image_path);
 
 	ret = os->early_init(vm);
 	if (ret) {
-		printf("* error - os early init faild %d\n", ret);
+		pr_err("os early init faild %d\n", ret);
 		goto release_vm;
 	}
 
-	/* ensure the below field is not modified */
-	vm->vmid = 0;
-	vm->vm_fd = -1;
+	if (vm->entry == 0)
+		vm->entry = VM_MEM_START;
+	if (vm->mem_start == 0)
+		vm->mem_start = VM_MEM_START;
+	if (vm->mem_size == 0)
+		vm->mem_size = VM_MIN_MEM_SIZE;
 
 	ret = create_and_init_vm(vm);
 	if (ret)
@@ -535,11 +636,11 @@ static int mvm_main(struct vm *vm, char *image_path, unsigned long flags)
 	if (ret)
 		goto release_vm;
 
-	ret = vm_rest_init(vm);
+	ret = vm_rest_init(vm, config);
 	if (ret)
 		goto release_vm;
 
-	ret = mvm_vm->os->setup_vm_env(vm);
+	ret = mvm_vm->os->setup_vm_env(vm, config->cmdline);
 	if (ret)
 		return ret;
 
@@ -594,84 +695,125 @@ static int parse_vm_membase(char *buf, unsigned long *value)
 	return -EINVAL;
 }
 
-static void signal_handler(int signum)
+static int add_device_info(struct device_info *dinfo, char *name)
 {
-	int vmid = 0xfff;
+	char *arg = NULL;
 
-	switch (signum) {
-	case SIGALRM:
-	case SIGINT:
-	case SIGTERM:
-		if (mvm_vm)
-			vmid = mvm_vm->vmid;
-
-		printf("* received signal %i vm-%d\n", signum, vmid);
-		destroy_vm(mvm_vm);
-		exit(0);
-	default:
-		break;
+	if (dinfo->nr_device == VM_MAX_DEVICES) {
+		pr_err("support max %d vdev\n", VM_MAX_DEVICES);
+		return -EINVAL;
 	}
+
+	arg = calloc(1, strlen(name) + 1);
+	if (!arg)
+		return -ENOMEM;
+
+	strcpy(arg, name);
+	dinfo->device_args[dinfo->nr_device] = arg;
+	dinfo->nr_device++;
+
+	return 0;
+}
+
+static int check_vm_config(struct vm_config *config)
+{
+	if (strlen(config->bootimage_path) == 0) {
+		pr_err("please point the image for this VM\n");
+		return -EINVAL;
+	}
+
+	if (strlen(config->rootfs_path) == 0) {
+		pr_info("no rootfs is point using ramdisk if exist\n");
+		config->flags &= ~(MVM_FLAGS_NO_RAMDISK);
+	}
+
+	if (config->vm_info.nr_vcpus > VM_MAX_VCPUS) {
+		pr_warn("support max %d vcpus\n", VM_MAX_VCPUS);
+		config->vm_info.nr_vcpus = VM_MAX_VCPUS;
+	}
+
+	if (config->vm_info.name[0] == 0)
+		strcpy(config->vm_info.name, "unknown");
+	if (config->vm_info.os_type[0] == 0)
+		strcpy(config->vm_info.os_type, "unknown");
+
+	return 0;
+}
+
+static void free_vm_config(struct vm_config *config)
+{
+	int i;
+
+	if (!config)
+		return;
+
+	for (i = 0; i < config->device_info.nr_device; i++) {
+		if (!config->device_info.device_args[i])
+			continue;
+		free(config->device_info.device_args[i]);
+	}
+
+	free(config);
 }
 
 int main(int argc, char **argv)
 {
 	int ret, opt, idx;
-	char *image_path = NULL;
-	char *optstr = "c:m:i:s:n:t:b:rv?hd";
-	unsigned long flags = 0;
+	char *optstr = "c:C:m:i:s:n:D:t:b:rv?hd";
 	int run_as_daemon = 0;
+	struct vm_info *vm_info;
+	struct device_info *device_info;
 
-	mvm_vm = (struct vm *)malloc(sizeof(struct vm));
-	if (!mvm_vm)
+	global_config = calloc(1, sizeof(struct vm_config));
+	if (!global_config)
 		return -ENOMEM;
 
-	/*
-	 * default is 64 bit, 1 vcpus and 32M memory
-	 */
-	memset(mvm_vm, 0, sizeof(struct vm));
-	mvm_vm->bit64 = 1;
+	vm_info = &global_config->vm_info;
+	device_info = &global_config->device_info;
 
 	while ((opt = getopt_long(argc, argv, optstr, options, &idx)) != -1) {
 		switch(opt) {
 		case 'c':
-			mvm_vm->nr_vcpus = atoi(optarg);
+			vm_info->nr_vcpus = atoi(optarg);
 			break;
 		case 'm':
-			ret = parse_vm_memsize(optarg, &mvm_vm->mem_size);
+			ret = parse_vm_memsize(optarg, &vm_info->mem_size);
 			if (ret)
 				print_usage();
 			break;
 		case 'i':
-			image_path = malloc(256);
-			if (!image_path) {
-				free(mvm_vm);
-				return -ENOMEM;
+			if (strlen(optarg) > 255) {
+				pr_err("invaild boot_image path %s\n", optarg);
+				ret = -EINVAL;
+				goto exit;
 			}
 
-			strcpy(image_path, optarg);
+			strcpy(global_config->bootimage_path, optarg);
 			break;
 		case 's':
-			ret = parse_vm_membase(optarg, &mvm_vm->mem_start);
+			ret = parse_vm_membase(optarg, &vm_info->mem_start);
 			if (ret) {
 				print_usage();
-				free(mvm_vm);
-				return -EINVAL;
+				ret = -EINVAL;
+				goto exit;
 			}
 			break;
 		case 'n':
-			strncpy(mvm_vm->name, optarg, 31);
+			strncpy(vm_info->name, optarg, 31);
 			break;
 		case 't':
-			strncpy(mvm_vm->os_type, optarg, 31);
+			strncpy(vm_info->os_type, optarg, 31);
 			break;
 		case 'b':
 			ret = atoi(optarg);
-			if ((ret != 32) && (ret != 64))
+			if ((ret != 32) && (ret != 64)) {
+				free(global_config);
 				print_usage();
-			mvm_vm->bit64 = ret == 64 ? 1 : 0;
+			}
+			vm_info->bit64 = ret == 64 ? 1 : 0;
 			break;
 		case 'r':
-			flags |= MVM_FLAGS_NO_RAMDISK;
+			global_config->flags |= MVM_FLAGS_NO_RAMDISK;
 			break;
 		case 'v':
 			verbose = 1;
@@ -679,34 +821,42 @@ int main(int argc, char **argv)
 		case 'd':
 			run_as_daemon = 1;
 			break;
+		case 'D':
+			add_device_info(device_info, optarg);
+			break;
+		case 'C':
+			if (strlen(optarg) > 255) {
+				pr_err("cmdline is too long\n");
+				ret = -EINVAL;
+				goto exit;
+			}
+			strcpy(global_config->cmdline, optarg);
+			break;
 		case 'h':
+			free(global_config);
 			print_usage();
-			free(mvm_vm);
 			return 0;
 		default:
 			break;
 		}
 	}
 
-	if (!image_path) {
-		printf("* error - please point the image for this VM\n");
-		return -1;
-	}
-
-	if (mvm_vm->nr_vcpus > VM_MAX_VCPUS) {
-		printf("* warning - support max %d vcpus\n", VM_MAX_VCPUS);
-		mvm_vm->nr_vcpus = VM_MAX_VCPUS;
-	}
+	ret = check_vm_config(global_config);
+	if (ret)
+		goto exit;
 
 	if (run_as_daemon) {
 		if (daemon(1, 1)) {
-			printf("failed to run as daemon\n");
-			exit(EXIT_FAILURE);
+			pr_err("failed to run as daemon\n");
+			ret = -EFAULT;
+			goto exit;
 		}
 	}
 
-	signal(SIGINT, signal_handler);
-	signal(SIGTERM, signal_handler);
+	ret = mvm_main(global_config);
 
-	return mvm_main(mvm_vm, image_path, flags);
+exit:
+	free_vm_config(global_config);
+	global_config = NULL;
+	exit(ret);
 }

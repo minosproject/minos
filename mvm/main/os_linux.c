@@ -53,7 +53,7 @@ static int fdt_setup_commandline(void *dtb, char *cmdline)
 {
 	int nodeoffset;
 
-	pr_debug("add command - %s\n", cmdline);
+	pr_info("add cmdline - %s\n", cmdline);
 
 	if (!cmdline || (strlen(cmdline) == 0))
 		return -EINVAL;
@@ -76,8 +76,6 @@ static int fdt_setup_cpu(void *dtb, int vcpus)
 	int offset, node, i;
 	char name[16];
 
-	pr_debug("setup vcpu\n");
-
 	/*
 	 * delete unused cpu node, currently only support
 	 * max 4 vcpus in one cluster, so just assume there
@@ -85,7 +83,7 @@ static int fdt_setup_cpu(void *dtb, int vcpus)
 	 */
 	offset = fdt_path_offset(dtb, "/cpus/cpu-map/cluster0");
 	if (offset < 0) {
-		printf("* error - no cpu node found\n");
+		pr_err("no cpu node found in dtb\n");
 		return offset;
 	}
 
@@ -94,7 +92,7 @@ static int fdt_setup_cpu(void *dtb, int vcpus)
 		sprintf(name, "core%d", i);
 		node = fdt_subnode_offset(dtb, offset, name);
 		if (node >= 0) {
-			pr_debug("        - delete %s\n", name);
+			pr_info("        - delete %s\n", name);
 			fdt_del_node(dtb, node);
 		}
 	}
@@ -106,7 +104,7 @@ static int fdt_setup_cpu(void *dtb, int vcpus)
 		sprintf(name, "cpu@%d", i);
 		node = fdt_subnode_offset(dtb, offset, name);
 		if (node >= 0) {
-			pr_debug("        - delete %s\n", name);
+			pr_info("        - delete %s\n", name);
 			fdt_del_node(dtb, node);
 		}
 	}
@@ -155,13 +153,13 @@ static int fdt_setup_memory(void *dtb, uint64_t mstart,
 		args[2] = cpu_to_fdt32(msize >> 32);
 		args[3] = cpu_to_fdt32(msize);
 		size_cell = sizeof(uint32_t) * 4;
-		pr_debug("setup memory 0x%x 0x%x 0x%x 0x%x\n",
+		pr_info("setup memory 0x%x 0x%x 0x%x 0x%x\n",
 				args[0], args[1], args[2], args[3]);
 	} else {
 		args[0] = cpu_to_fdt32(mstart);
 		args[1] = cpu_to_fdt32(msize);
 		size_cell = sizeof(uint32_t) * 2;
-		pr_debug("setup memory 0x%x 0x%x\n", args[0], args[1]);
+		pr_info("setup memory 0x%x 0x%x\n", args[0], args[1]);
 	}
 
 	return fdt_setprop(dtb, offset, "reg",
@@ -180,19 +178,20 @@ static int fdt_setup_ramdisk(void *dtb, uint32_t start, uint32_t size)
 			return offset;
 	}
 
-	pr_debug("set ramdisk : 0x%x 0x%x\n", start, size);
+	pr_info("set ramdisk : 0x%x 0x%x\n", start, size);
 	fdt_setprop_cell(dtb, offset, "linux,initrd-start", start);
 	fdt_setprop_cell(dtb, offset, "linux,initrd-end", start + size);
 
 	return 0;
 }
 
-static int linux_setup_env(struct vm *vm)
+static int linux_setup_env(struct vm *vm, char *cmdline)
 {
 	int ret = 0;
 	void *vbase;
 	uint32_t pages, seek, offset, load_size;
 	boot_img_hdr *hdr = (boot_img_hdr *)vm->os_data;
+	char *arg;
 
 	if (hdr->second_size == 0)
 		return -EINVAL;
@@ -214,20 +213,20 @@ static int linux_setup_env(struct vm *vm)
 
 	ret = read(vm->image_fd, vbase, load_size);
 	if (ret <= 0) {
-		printf("* error - read dtb image failed\n");
+		pr_err("read dtb image failed\n");
 		ret = -EIO;
 		goto free_mem;
 	}
 
 	if (fdt_check_header(vbase)) {
-		printf("* error - invalid DTB please check the bootimage\n");
+		pr_err("invalid DTB please check the bootimage\n");
 		ret = -EINVAL;
 		goto free_mem;
 	}
 
 	fdt_open_into(vbase, vbase, 0x200000);
 	if (fdt_check_header(vbase)) {
-		printf("* error - invalid DTB after open into\n");
+		pr_err("invalid DTB after open into\n");
 		ret = -EINVAL;
 		goto free_mem;
 	}
@@ -237,7 +236,12 @@ static int linux_setup_env(struct vm *vm)
 	 * 2: set up nr vcpu
 	 * 3: setup mem attr
 	 */
-	fdt_setup_commandline(vbase, (char *)hdr->cmdline);
+	if (cmdline && (strlen(cmdline) > 0))
+		arg = cmdline;
+	else
+		arg = (char *)hdr->cmdline;
+
+	fdt_setup_commandline(vbase, arg);
 	fdt_setup_cpu(vbase, vm->nr_vcpus);
 	fdt_setup_memory(vbase, vm->mem_start, vm->mem_size, vm->bit64);
 
@@ -329,7 +333,7 @@ static int linux_early_init(struct vm *vm)
 
 	ret = read_bootimage_header(vm->image_fd, hdr);
 	if (ret) {
-		printf("* error - image is not a vaild bootimage\n");
+		pr_err("image is not a vaild bootimage\n");
 		return ret;
 	}
 

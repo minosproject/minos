@@ -607,9 +607,9 @@ virtio_console_config_backend(struct virtio_console_backend *be)
 		tcsetattr(slave_fd, TCSAFLUSH, &tio);
 		be->pts_fd = slave_fd;
 
-		pr_warn("***********************************************\n");
-		pr_warn("virt-console backend redirected to %s\n", pts_name);
-		pr_warn("***********************************************\n");
+		pr_info("***********************************************\n");
+		pr_info("virt-console backend redirected to %s\n", pts_name);
+		pr_info("***********************************************\n");
 
 		flags = fcntl(fd, F_GETFL);
 		fcntl(fd, F_SETFL, flags | O_NONBLOCK);
@@ -781,10 +781,10 @@ static int
 virtio_console_init(struct vdev *vdev, char *opts)
 {
 	struct virtio_console *console;
+	char *opt = opts;
 	char *backend = NULL;
 	char *portname = NULL;
 	char *portpath = NULL;
-	char *opt;
 	pthread_mutexattr_t attr;
 	enum virtio_console_be_type be_type;
 	bool is_console = false;
@@ -848,44 +848,43 @@ virtio_console_init(struct vdev *vdev, char *opts)
 	/* virtio-console,[@]stdio|tty|pty|file:portname[=portpath]
 	 * [,[@]stdio|tty|pty|file:portname[=portpath]]
 	 */
-	while ((opt = strsep(&opts, ",")) != NULL) {
-		backend = strsep(&opt, ":");
+	backend = strsep(&opt, ":");
+	if (backend == NULL) {
+		pr_warn("vtcon: no backend is specified!\n");
+		return -1;
+	}
 
-		if (backend == NULL) {
-			pr_warn("vtcon: no backend is specified!\n");
+	if (backend[0] == '@') {
+		is_console = true;
+		backend++;
+	} else
+		is_console = false;
+
+	be_type = virtio_console_get_be_type(backend);
+	if (be_type == VIRTIO_CONSOLE_BE_INVALID) {
+		pr_warn("vtcon: invalid backend %s!\n", backend);
+		return -1;
+	}
+
+	if (opt != NULL) {
+		portname = strsep(&opt, "=");
+		portpath = opt;
+		if (portname == NULL)
+			return 0;
+
+		if (portpath == NULL
+			&& be_type != VIRTIO_CONSOLE_BE_STDIO
+			&& be_type != VIRTIO_CONSOLE_BE_PTY) {
+			pr_warn("vtcon: portpath missing for %s\n",
+					portname);
 			return -1;
 		}
 
-		if (backend[0] == '@') {
-			is_console = true;
-			backend++;
-		} else
-			is_console = false;
-
-		be_type = virtio_console_get_be_type(backend);
-		if (be_type == VIRTIO_CONSOLE_BE_INVALID) {
-			pr_warn("vtcon: invalid backend %s!\n",
-				backend);
-			return 0;
-		}
-
-		if (opt != NULL) {
-			portname = strsep(&opt, "=");
-			portpath = opt;
-			if (portpath == NULL
-				&& be_type != VIRTIO_CONSOLE_BE_STDIO
-				&& be_type != VIRTIO_CONSOLE_BE_PTY) {
-				pr_warn("vtcon: portpath missing for %s\n",
+		if (virtio_console_add_backend(console, portname,
+			portpath, be_type, is_console) < 0) {
+			pr_warn("vtcon: add port failed %s\n",
 					portname);
-				return -1;
-			}
-
-			if (virtio_console_add_backend(console, portname,
-				portpath, be_type, is_console) < 0) {
-				pr_warn("vtcon: add port failed %s\n",
-					portname);
-				return -1;
-			}
+			return -1;
 		}
 	}
 

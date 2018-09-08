@@ -55,6 +55,7 @@ static void dump_bootimg_hdr(boot_img_hdr *hdr)
 	memset(buf, 0, 1024);
 	strncpy(buf, (char *)hdr->magic, BOOT_MAGIC_SIZE);
 
+	pr_info("boot image infomation :\n");
 	pr_info("magic        - %s\n", buf);
 	pr_info("kernel_size  - 0x%x\n", hdr->kernel_size);
 	pr_info("kernel_addr  - 0x%x\n", hdr->kernel_addr);
