@@ -36,12 +36,23 @@ DEFINE_PER_CPU(atomic_t, preempt);
 
 void get_vcpu_affinity(uint8_t *aff, int nr)
 {
-	int i, base = NR_CPUS - 1;
+	int i;
+	static int base = 1 & (NR_CPUS - 1);
 
-	/* TBD */
-	for (i = nr; i > 0; i--) {
-		aff[nr - 1] = base;
-		base--;
+	if (nr == NR_CPUS) {
+		for (i = 0; i < nr; i++) {
+			aff[i] = base;
+			base++;
+			base = base & (NR_CPUS - 1);
+		}
+	} else {
+		for (i = 0; i < nr; i++) {
+			if (base == 0)
+				base++;
+			aff[i] = base;
+			base++;
+			base = base & (NR_CPUS - 1);
+		}
 	}
 }
 

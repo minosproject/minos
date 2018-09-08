@@ -297,6 +297,8 @@ int vm_vcpus_init(struct vm *vm)
 
 	vm_for_each_vcpu(vm, vcpu) {
 		arch_init_vcpu(vcpu, (void *)vm->entry_point);
+		pr_info("vm-%d vcpu-%d affnity to pcpu-%d\n",
+				vm->vmid, vcpu->vcpu_id, vcpu->affinity);
 		pcpu_add_vcpu(vcpu->affinity, vcpu);
 		vcpu_vmodules_init(vcpu);
 		vm->os->ops->vcpu_init(vcpu);

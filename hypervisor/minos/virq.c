@@ -203,12 +203,6 @@ int __send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq, int hw)
 	if (!desc || !desc->enable)
 		return -EINVAL;
 
-	if (desc->hw != hw) {
-		pr_error("virq %d is %s irq\n", virq, desc->hw ?
-				"hardware" : "virtual");
-		return -EINVAL;
-	}
-
 	local_irq_save(flags);
 	ret = __send_virq(vcpu, desc->vno, desc->hno,
 			desc->hw, desc->pr);
