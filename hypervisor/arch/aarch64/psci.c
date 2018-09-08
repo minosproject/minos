@@ -14,35 +14,23 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <asm/aarch64_common.h>
-#include <asm/asm_marco.S>
+#include <minos/minos.h>
 #include <config/config.h>
+#include <asm/psci.h>
+#include <minos/arch.h>
 
-	.global smp_processor_id
-	.global arch_get_fp
-	.global arch_get_lr
-	.global smc_call
+static inline unsigned long psci_fn(uint32_t id, unsigned long a1,
+		unsigned long a2, unsigned long a3)
+{
+	return smc_call(id, a1, a2, a3, 0, 0, 0);
+}
 
-func smp_processor_id
-	mrs 	x0, MPIDR_EL1
-	ubfx    x1, x0, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
-	ubfx    x2, x0, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
-	lsl	x2, x2, #CONFIG_AFF1_SHIFT
-	add	x0, x2, x1
-	ret
-endfunc smp_processor_id
+unsigned long psci_cpu_on(unsigned long cpu, unsigned long entry)
+{
+	return psci_fn(PSCI_0_2_FN_CPU_ON, cpu, entry, 0);
+}
 
-func arch_get_fp
-	mov	x0, x29
-	ret
-endfunc arch_get_fp
-
-func arch_get_lr
-	mov	x0, x30
-	ret
-endfunc arch_get_lr
-
-func smc_call
-	smc	#0
-	ret
-endfunc smc_call
+unsigned long psci_cpu_off(unsigned long cpu)
+{
+	return psci_fn(PSCI_0_2_FN_CPU_OFF, cpu, 0, 0);
+}

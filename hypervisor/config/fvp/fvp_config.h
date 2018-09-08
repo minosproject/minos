@@ -24,7 +24,21 @@
 
 #define CONFIG_VCPU_MAX_ACTIVE_IRQS	(16)
 
-#define CONFIG_MINOS_RESCHED_IRQ	(13)
+/*
+ * The below interrupt in arm fvp is used to g0 or
+ * G1S irqs handled in EL3
+ *
+ * #define ARM_IRQ_SEC_PHY_TIMER	29
+ * #define ARM_IRQ_SEC_SGI_0		8
+ * #define ARM_IRQ_SEC_SGI_1		9
+ * #define ARM_IRQ_SEC_SGI_2		10
+ * #define ARM_IRQ_SEC_SGI_3		11
+ * #define ARM_IRQ_SEC_SGI_4		12
+ * #define ARM_IRQ_SEC_SGI_5		13
+ * #define ARM_IRQ_SEC_SGI_6		14
+ * #define ARM_IRQ_SEC_SGI_7		15
+ */
+#define CONFIG_MINOS_RESCHED_IRQ	(7)
 
 #define CONFIG_MAX_SLAB_BLOCKS		(10)
 
@@ -35,6 +49,8 @@
 #define CONFIG_PLATFORM_IO_BASE		(0x0UL)
 #define CONFIG_PLATFORM_DRAM_BASE	(0x80000000)
 
-#define CONFIG_BOOTMEM_SIZE		(128 * 1024)
+#define CONFIG_BOOTMEM_SIZE		(64 * 1024)
+
+#define CONFIG_AFF1_SHIFT		(2)
 
 #endif

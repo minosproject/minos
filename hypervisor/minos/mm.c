@@ -85,6 +85,8 @@ struct mem_section mem_sections[MAX_MEM_SECTIONS];
 static struct slab slab;
 static struct slab *pslab = &slab;
 static struct page_pool __page_pool;
+static struct page_pool __io_pool;
+static struct page_pool *io_pool = &__io_pool;
 static struct page_pool *page_pool = &__page_pool;
 static size_t free_blocks;
 
@@ -612,6 +614,11 @@ void *__get_free_pages(int pages, int align)
 	return NULL;
 }
 
+void *__get_io_pages(int pages, int align)
+{
+
+}
+
 static size_t inline get_slab_alloc_size(size_t size)
 {
 	return BALIGN(size, SLAB_MIN_DATA_SIZE);
@@ -637,7 +644,7 @@ static void add_boot_slab_mem(unsigned long base, size_t size)
 	 * time and on the cpu 0, so do not need to
 	 * aquire the spin lock.
 	 */
-	if ((base + size) & (MEM_BLOCK_SIZE - 1))
+	if (!(base & (MEM_BLOCK_SIZE - 1)))
 		pr_warn("memory may be a block\n");
 
 	pool = &pslab->pool[pslab->pool_nr - 1];

@@ -145,7 +145,7 @@ void boot_main(void *setup_data)
 
 	percpus_init();
 
-	if (get_cpu_id() != 0)
+	if (smp_processor_id() != 0)
 		panic("cpu is not cpu0");
 
 	arch_init();
@@ -176,7 +176,6 @@ void boot_main(void *setup_data)
 
 	smp_cpus_up();
 
-	sched_tick_enable(MILLISECS(5));
 	local_irq_enable();
 
 	cpu_idle();
@@ -185,7 +184,7 @@ void boot_main(void *setup_data)
 
 void boot_secondary(void)
 {
-	uint32_t cpuid = get_cpu_id();
+	uint32_t cpuid = smp_processor_id();
 
 	pr_info("cpu-%d is up\n", cpuid);
 
@@ -205,7 +204,6 @@ void boot_secondary(void)
 
 	create_idle_vcpu();
 
-	sched_tick_enable(MILLISECS(5));
 	local_irq_enable();
 
 	cpu_idle();

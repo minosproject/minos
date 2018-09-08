@@ -296,7 +296,7 @@ int vm_mmap(struct vm *vm, unsigned long offset, unsigned long size)
 	 * map the memory as a IO memory in guest to
 	 * avoid the cache issue
 	 */
-	attr = page_table_description(VM_IO | VM_DES_BLOCK);
+	attr = page_table_description(VM_DES_BLOCK);
 
 	while (left > 0) {
 		vm_pmd = (unsigned long *)get_mapping_pmd(mm->pgd_base, vir, 0);

@@ -24,72 +24,6 @@
 
 	.global _start
 	.type _start, "function"
-#ifdef CONFIG_PLATFORM_FVP
-_start:	
-	// SCR_EL3 Secure Configuration Register
-	ldr	x1, =el3_vectors
-	msr	VBAR_EL3, x1
-
-	msr	SCR_EL3, xzr
-	isb
-
-	//ICC_SRE_EL3 Interrupt Controller System Register Enable register 
-	mov	x0, #15
-	msr	ICC_SRE_EL3, x0
-	isb
-
-	mov	x3, #(SCR_EL3_RW | \
-			SCR_EL3_SMD | \
-			SCR_EL3_NS | \
-			SCR_EL3_HCE)
-	msr	SCR_EL3, x3
-	isb
-
-	mov	x0, #15
-	msr	ICC_SRE_EL2, x0
-	isb
-	msr	ICC_SRE_EL1, X0
-
-	/*
-	 * init the vmpidr
-	 */
-	mrs	x0, MPIDR_EL1
-	msr	VMPIDR_EL2, x0
-	mrs	x0, MIDR_EL1
-	msr	VPIDR_EL2, x0
-
-	/* get the cpu id to x19 */
-	mrs	x19, MPIDR_EL1
-	ubfx	x19, x19, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
-
-	msr	CPTR_EL3, xzr
-
-	mov	x0, #0
-	msr	SCTLR_EL3, x0
-
-	ldr	x0, =__el3_stack_end
-	sub	x0, x0, x19, lsl #12
-	mov	sp, x0
-
-	/* do the gic setting for el3 */
-	bl	gic_init_el3
-
-	cbnz	x19, drop_to_el2
-
-	/* do other init things */
-
-	.global drop_to_el2
-drop_to_el2:
-	mov	x0, #0x83e00000		// x0 is the dtb memory
-	adr	x1, el2_entry_aarch64
-	msr	ELR_EL3, X1
-	mov	x1, #(AARCH64_SPSR_EL2h | \
-		AARCH64_SPSR_F  | \
-		AARCH64_SPSR_I  | \
-		AARCH64_SPSR_A)
-	msr	SPSR_EL3, x1
-	eret
-#else
 _start:
 	dsb	ish
 	ic	ialluis
@@ -107,9 +41,8 @@ _start:
 
 	mov	x27, x0			// back up dtb address
 
-	bl	get_cpu_id		// cpuid save to x19
+	bl	smp_processor_id		// cpuid save to x19
 	mov	x19, x0
-#endif
 
 	.global el2_entry_aarch64
 	.type el2_entry_aarch64, "function"
@@ -119,6 +52,10 @@ el2_entry_aarch64:
 
 	mov	x0, #15	// el1 access ICC_SRE_EL1 will trap to EL2
 	msr	ICC_SRE_EL2, x0
+	isb
+
+	msr	ICC_SRE_EL1, x0
+	isb
 
 	msr	VTTBR_EL2, xzr
 	isb
@@ -284,24 +221,6 @@ el2_entry_aarch64:
 	nop
 
 secondary_start_up:
-	dsb	sy
-	isb
-
-	bl	get_cpu_id
-	ldr	x1, =__smp_hoding_pen
-	add	x1, x1, x0, lsl #3
-	mrs	x2, MPIDR_EL1
-	ldr	x4, =0x000000ff00ffffff
-	and	x2, x2, x4
-
-wait_loop:
-	ldr	x3, [x1]
-	sub	x3, x3, x2
-	cbnz	x3, wait_loop
-
-	dsb	sy
-	isb
-
 	/* enable the dcache and the icache */
 	mrs	x1, SCTLR_EL2
 	orr	x1, x1, #SCTLR_ELx_C
@@ -309,6 +228,19 @@ wait_loop:
 	bic	x1, x1, #SCTLR_ELx_A
 	orr	x1, x1, #SCTLR_ELx_M
 	msr	SCTLR_EL2, x1
+	dsb	ish
+	ic	ialluis
+	dsb	ish
+	isb
+
+	ldr	x1, =__smp_affinity_id
+	add	x1, x1, x19, lsl #3
+	mrs	x2, MPIDR_EL1
+	ldr	x4, =0x000000ff00ffffff
+	and	x2, x2, x4
+	str	x2, [x1]
+
+	dsb	sy
 	isb
 
 	/* here wait for boot cpu finish tht init work */

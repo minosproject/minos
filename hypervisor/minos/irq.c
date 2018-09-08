@@ -61,7 +61,7 @@ void send_sgi(uint32_t sgi, int cpu)
 
 static int do_handle_host_irq(struct irq_desc *irq_desc)
 {
-	uint32_t cpuid = get_cpu_id();
+	uint32_t cpuid = smp_processor_id();
 	int ret;
 
 	if (cpuid != irq_desc->affinity) {

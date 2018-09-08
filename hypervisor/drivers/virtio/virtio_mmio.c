@@ -209,7 +209,7 @@ void *create_virtio_device(struct vm *vm)
 	 */
 	if (create_guest_mapping(vm, vdev->gvm_paddr,
 				(unsigned long)vdev->iomem,
-				PAGE_SIZE, VM_IO | VM_RO))
+				PAGE_SIZE, VM_RO))
 		goto out;
 
 	virtio_device_init(vm, virtio_dev);

@@ -24,10 +24,10 @@ SECTIONS
 
 	. = ALIGN(8);
 
-	.smp_holding_pen : {
-		__smp_hoding_pen = .;
+	.smp_affinity_id : {
+		__smp_affinity_id = .;
 		. = . + (CONFIG_NR_CPUS * 8);
-		__smp_hoding_pen_end = .;
+		__smp_affinity_id_end = .;
 	}
 
 	. = ALIGN(8);

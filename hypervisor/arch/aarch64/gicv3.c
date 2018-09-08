@@ -30,9 +30,7 @@
 #include <asm/of.h>
 
 spinlock_t gicv3_lock;
-static void *gicd_base = (void *)0x2f000000;
-static void * __gicr_rd_base = (void *)0x2f100000;
-static int gicv3_vmodule_id = 0xffff;
+static void *gicd_base = 0;
 
 static int gicv3_nr_lr = 0;
 static int gicv3_nr_pr = 0;
@@ -323,7 +321,7 @@ static void gicv3_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *cpu)
 		isb();
 		break;
 	case SGI_TO_SELF:
-		cpumask_set_cpu(get_cpu_id(), &cpus_mask);
+		cpumask_set_cpu(smp_processor_id(), &cpus_mask);
 		gicv3_send_sgi_list(sgi, &cpus_mask);
 		break;
 	case SGI_TO_LIST:
@@ -604,45 +602,6 @@ static void gicv3_state_init(struct vcpu *vcpu, void *context)
 	c->ich_hcr_el2 = GICH_HCR_EN;
 }
 
-void gic_init_el3(void)
-{
-	int i;
-	void *gicr_rd_base;
-	void *gicr_sgi_base;
-	int cpuid = get_cpu_id();
-	uint32_t val, nr_lines = 0;
-
-	gicr_rd_base = __gicr_rd_base + (128 * 1024) * cpuid;
-	gicr_sgi_base = gicr_rd_base + (64 * 1024);
-
-	if (cpuid == 0) {
-		val = ioread32(gicd_base + GICD_TYPER);
-		nr_lines = 32 * ((val & 0x1f));
-		iowrite32(gicd_base + GICD_CTLR, (1 << 4) | (1 << 5));
-		gicv3_gicd_wait_for_rwp();
-	} else {
-		val = (1 << 4) | (1 << 5);
-		while ((ioread32(gicd_base + GICD_CTLR) & (val)) != val);
-	}
-
-	/* wake up GIC-R */
-	val = ioread32(gicr_rd_base + GICR_WAKER);
-	val &= ~(GICR_WAKER_PROCESSOR_SLEEP);
-	iowrite32(gicr_rd_base + GICR_WAKER, val);
-
-	while ((ioread32(gicr_rd_base + GICR_WAKER)
-			& GICR_WAKER_CHILDREN_ASLEEP) != 0);
-
-	if (cpuid == 0) {
-		/* configure SPIs as non-secure GROUP-1 */
-		for (i = GICV3_NR_LOCAL_IRQS; i < nr_lines; i += 32)
-			iowrite32(gicd_base + GICD_IGROUPR + (i / 32) *4, 0xffffffff);
-	}
-
-	/* configure SGI and PPI as non-secure Group-1 */
-	iowrite32(gicr_sgi_base + GICR_IGROUPR0, 0xffffffff);
-}
-
 int gicv3_init(void)
 {
 	int i;
@@ -652,6 +611,7 @@ int gicv3_init(void)
 	uint64_t pr;
 	uint32_t value;
 	uint64_t array[16];
+	void * __gicr_rd_base = 0;
 
 	pr_info("*** gicv3 init ***\n");
 
@@ -661,11 +621,14 @@ int gicv3_init(void)
 	type = of_get_u64_array("/interrupt-controller",
 				"reg", array, &i);
 	if (type || i < 4)
-		return -ENOENT;
+		panic("can not find gicv3 interrupt controller\n");
 
 	/* only map gicd and gicr now */
 	pr = array[2] + array[3] - array[0];
 	io_remap(array[0], array[0], pr);
+
+	gicd_base = (void *)array[0];
+	__gicr_rd_base = (void *)array[2];
 
 	value = read_sysreg32(ICH_VTR_EL2);
 	gicv3_nr_lr = (value & 0x3f) + 1;
@@ -733,13 +696,9 @@ int gicv3_init(void)
 
 int gicv3_secondary_init(void)
 {
-	spin_lock(&gicv3_lock);
-
 	gicv3_gicr_init();
 	gicv3_gicc_init();
 	gicv3_hyp_init();
-
-	spin_unlock(&gicv3_lock);
 
 	return 0;
 }
@@ -768,8 +727,6 @@ static int gicv3_vmodule_init(struct vmodule *vmodule)
 	vmodule->state_init = gicv3_state_init;
 	vmodule->state_save = gicv3_state_save;
 	vmodule->state_restore = gicv3_state_restore;
-
-	gicv3_vmodule_id = vmodule->id;
 
 	return 0;
 }

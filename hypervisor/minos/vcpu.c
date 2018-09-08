@@ -57,7 +57,7 @@ out:
 
 void vcpu_online(struct vcpu *vcpu)
 {
-	int cpuid = get_cpu_id();
+	int cpuid = smp_processor_id();
 
 	if (vcpu->affinity != cpuid) {
 		vcpu->resched = 1;
@@ -397,7 +397,7 @@ struct vcpu *create_idle_vcpu(void)
 	pcpu_add_vcpu(cpu, idle);
 	set_vcpu_ready(idle);
 	idle->state = VCPU_STAT_RUNNING;
-	idle->affinity = get_cpu_id();
+	idle->affinity = smp_processor_id();
 
 	strncpy(idle->name, "idle", 4);
 

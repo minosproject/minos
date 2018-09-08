@@ -3,6 +3,7 @@
 
 #include <minos/types.h>
 #include <asm/aarch64_helper.h>
+#include <config/config.h>
 
 struct vcpu;
 struct vm;
@@ -104,6 +105,12 @@ static inline void arch_restore_irqflags(unsigned long flags)
 
 #define read_sysreg(name)     read_sysreg64(name)
 #define write_sysreg(v, name) write_sysreg64(v, name)
+
+static inline int affinity_to_logic_cpu(uint32_t aff3, uint32_t aff2,
+		uint32_t aff1, uint32_t aff0)
+{
+	return (aff1 << CONFIG_AFF1_SHIFT) + aff0;
+}
 
 static inline void flush_all_tlb_host(void)
 {
@@ -213,6 +220,18 @@ static inline void cpu_relax(void)
 {
 	asm volatile("yield" ::: "memory");
 }
+
+extern unsigned long smc_call(uint32_t id, unsigned long a1,
+		unsigned long a2, unsigned long a3, unsigned long a4,
+		unsigned long a5, unsigned long a6);
+
+void dcsw_op_louis(uint32_t op_type);
+void dcsw_op_all(uint32_t op_type);
+void flush_dcache_range(unsigned long addr, size_t size);
+void clean_dcache_range(unsigned long addr, size_t size);
+void inv_dcache_range(unsigned long addr, size_t size);
+void flush_cache_all(void);
+void flush_dcache_all(void);
 
 int arch_taken_from_guest(gp_regs *regs);
 void arch_switch_vcpu_sw(void);

@@ -421,7 +421,7 @@ DEFINE_SERROR_DESC(EC_BRK_INS, EC_TYPE_AARCH64,
 
 void SError_from_lower_EL_handler(gp_regs *data)
 {
-	int cpuid = get_cpu_id();
+	int cpuid = smp_processor_id();
 	uint32_t esr_value;
 	int ec_type;
 	struct serror_desc *ec;
