@@ -64,7 +64,7 @@ int guest_vdev_init(struct vm *vm, struct vdev *vdev, uint32_t size)
 	memset(vdev, 0, sizeof(struct vdev));
 
 	if (size > 0) {
-		vdev->iomem = get_free_pages(PAGE_NR(size));
+		vdev->iomem = get_io_pages(PAGE_NR(size));
 		if (!vdev->iomem) {
 			free(vdev);
 			return -ENOMEM;

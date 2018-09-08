@@ -97,7 +97,7 @@ unsigned long vm_create_vmcs(struct vm *vm)
 		return 0;
 
 	size = VMCS_SIZE(vm->vcpu_nr);
-	base = (unsigned long)get_free_pages(PAGE_NR(size));
+	base = (unsigned long)get_io_pages(PAGE_NR(size));
 	if (!base)
 		return 0;
 

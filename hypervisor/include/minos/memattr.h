@@ -44,11 +44,13 @@
 #define GFB_PAGE		(1 << 1)
 #define GPF_PAGE_META		(1 << 2)
 #define GFB_VM			(1 << 3)
+#define GFB_IO			(1 << 4)
 
 #define GFB_SLAB_BIT		(0)
 #define GFB_PAGE_BIT		(1)
 #define GFB_PAGE_META_BIT	(2)
 #define GFB_VM_BIT		(3)
+#define GFB_IO_BIT		(4)
 
 #define GFB_MASK		(0xffff)
 

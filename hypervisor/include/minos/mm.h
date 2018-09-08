@@ -51,6 +51,7 @@ void *__get_free_pages(int pages, int align);
 struct page *__alloc_pages(int pages, int align);
 void release_pages(struct page *page);
 struct page *addr_to_page(void *addr);
+void *__get_io_pages(int pages, int align);
 
 #define page_to_addr(page)	(void *)(page->phy_base & __PAGE_MASK)
 
@@ -72,6 +73,16 @@ static inline struct page *alloc_pages(int pages)
 static inline struct page *alloc_page(void)
 {
 	return __alloc_pages(1, 1);
+}
+
+static inline void *get_io_page(void)
+{
+	return __get_io_pages(1, 1);
+}
+
+static inline void *get_io_pages(int pages)
+{
+	return __get_io_pages(pages, 1);
 }
 
 struct mem_block *alloc_mem_block(unsigned long flags);

@@ -292,11 +292,7 @@ int vm_mmap(struct vm *vm, unsigned long offset, unsigned long size)
 	if (!vm0_pmd)
 		return -ENOMEM;
 
-	/*
-	 * map the memory as a IO memory in guest to
-	 * avoid the cache issue
-	 */
-	attr = page_table_description(VM_DES_BLOCK);
+	attr = page_table_description(VM_DES_BLOCK | VM_NORMAL);
 
 	while (left > 0) {
 		vm_pmd = (unsigned long *)get_mapping_pmd(mm->pgd_base, vir, 0);

@@ -262,6 +262,7 @@ int create_mem_mapping(struct mm_struct *mm, unsigned long addr,
 	if (ret)
 		pr_error("map fail 0x%x->0x%x size:%x\n", addr, phy, size);
 
+	/* need to flush the addr + size's mem's cache ? */
 	if (flags & VM_HOST)
 		flush_all_tlb_host();
 	else

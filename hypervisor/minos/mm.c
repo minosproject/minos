@@ -362,7 +362,7 @@ static void map_memory_sections(void)
 	for (i = 1; i < nr_sections; i++) {
 		section = &mem_sections[i];
 		create_host_mapping(section->phy_base, section->phy_base,
-				section->size, MEM_TYPE_NORMAL);
+				section->size, VM_NORMAL);
 	}
 }
 
@@ -455,6 +455,7 @@ __alloc_mem_block(struct mem_section *section, unsigned long f)
 struct mem_block *alloc_mem_block(unsigned long flags)
 {
 	int i;
+	unsigned long f = 0;
 	struct mem_block *block = NULL;
 	struct mem_section *section;
 
@@ -465,15 +466,30 @@ struct mem_block *alloc_mem_block(unsigned long flags)
 			break;
 	}
 
+	/*
+	 * if the block is not for guest vm mapped it to host
+	 * memory space
+	 */
+	if (!(flags & GFB_VM)) {
+		f |= VM_RW;
+		if (flags | GFB_IO)
+			f |= VM_IO;
+		else
+			f |= VM_NORMAL;
+
+		create_host_mapping(block->phy_base, block->phy_base,
+				MEM_BLOCK_SIZE, f);
+	}
+
 	return block;
 }
 
-static unsigned long *get_page_meta(void)
+static unsigned long *get_page_meta(struct page_pool *pool)
 {
 	int bit;
 	struct mem_block *block = NULL, *n = NULL;
 
-	list_for_each_entry_safe(block, n, &page_pool->meta_list, list) {
+	list_for_each_entry_safe(block, n, &pool->meta_list, list) {
 		bit = find_next_zero_bit_loop(block->pages_bitmap,
 				PAGE_METAS_IN_BLOCK, block->bm_current);
 		if (bit >= PAGE_METAS_IN_BLOCK) {
@@ -504,8 +520,8 @@ static unsigned long *get_page_meta(void)
 	memset(block->pages_bitmap, 0, PAGE_METAS_BITMAP_SIZE);
 	set_bit(0, block->pages_bitmap);
 	block->bm_current = 1;
-	list_add(&page_pool->meta_list, &block->list);
-	page_pool->meta_blocks++;
+	list_add(&pool->meta_list, &block->list);
+	pool->meta_blocks++;
 
 	return (unsigned long *)block->phy_base;
 }
@@ -559,7 +575,8 @@ static struct page *alloc_pages_from_block(struct mem_block *block,
 	return page;
 }
 
-struct page *__alloc_pages(int count, int align)
+static struct page *__alloc_pages_internal(struct page_pool *pool,
+		int count, int align, unsigned long flags)
 {
 	struct mem_block *block = NULL, *n = NULL;
 	unsigned long *page_meta = NULL;
@@ -568,9 +585,9 @@ struct page *__alloc_pages(int count, int align)
 	if (count <= 0)
 		return NULL;
 
-	spin_lock(&page_pool->lock);
+	spin_lock(&pool->lock);
 
-	list_for_each_entry_safe(block, n, &page_pool->block_list, list) {
+	list_for_each_entry_safe(block, n, &pool->block_list, list) {
 		page = alloc_pages_from_block(block, count, align);
 		if (page) {
 			if (block->free_pages == 0)
@@ -585,29 +602,36 @@ struct page *__alloc_pages(int count, int align)
 	if (page)
 		goto out;
 
-	block = alloc_mem_block(GFB_PAGE);
+	block = alloc_mem_block(flags);
 	if (!block)
 		goto out;
 
-	page_meta = get_page_meta();
+	page_meta = get_page_meta(pool);
 	if (!page_meta)
 		goto out;
 
 	memset(page_meta, 0, PAGE_META_SIZE);
 	block->pages_bitmap = page_meta;
-	list_add(&page_pool->block_list, &block->list);
+	list_add(&pool->block_list, &block->list);
 
 	page = alloc_pages_from_block(block, count, align);
 
 out:
-	spin_unlock(&page_pool->lock);
+	spin_unlock(&pool->lock);
 	return page;
+}
+
+struct page *__alloc_pages(int pages, int align)
+{
+	return __alloc_pages_internal(page_pool, pages,
+			align, GFB_PAGE_BIT);
 }
 
 void *__get_free_pages(int pages, int align)
 {
-	struct page *page = __alloc_pages(pages, align);
+	struct page *page = NULL;
 
+	page = __alloc_pages(pages, align);
 	if (page)
 		return (void *)(page->phy_base & __PAGE_MASK);
 
@@ -616,7 +640,14 @@ void *__get_free_pages(int pages, int align)
 
 void *__get_io_pages(int pages, int align)
 {
+	struct page *page = NULL;
 
+	page = __alloc_pages_internal(io_pool, pages,
+			align, GFB_PAGE_BIT | GFB_IO);
+	if (page)
+		return (void *)(page->phy_base & __PAGE_MASK);
+
+	return NULL;
 }
 
 static size_t inline get_slab_alloc_size(size_t size)
@@ -926,6 +957,7 @@ void free_pages(void *addr)
 	unsigned long start;
 	struct page *meta;
 	int i, count;
+	struct page_pool *pool;
 
 	block = addr_to_mem_block((unsigned long)addr);
 	start = offset_in_block_bitmap((unsigned long)addr, block);
@@ -935,7 +967,12 @@ void free_pages(void *addr)
 		return;
 	}
 
-	spin_lock(&page_pool->lock);
+	if (block->flags & GFB_IO)
+		pool = page_pool;
+	else
+		pool = io_pool;
+
+	spin_lock(&pool->lock);
 
 	meta = (struct page *)block_meta_base(block);
 	count = meta->phy_base & 0xfff;
@@ -947,7 +984,7 @@ void free_pages(void *addr)
 	 * pages free is not 0
 	 */
 	if (i == 0)
-		list_add_tail(&page_pool->block_list, &block->list);
+		list_add_tail(&pool->block_list, &block->list);
 
 	bitmap_clear(block->pages_bitmap, start, count);
 	for (i = start; i < count; i++) {
@@ -1004,6 +1041,11 @@ static void page_pool_init(void)
 	spin_lock_init(&page_pool->lock);
 	init_list(&page_pool->meta_list);
 	init_list(&page_pool->block_list);
+
+	memset(io_pool, 0, sizeof(struct page_pool));
+	spin_lock_init(&io_pool->lock);
+	init_list(&io_pool->meta_list);
+	init_list(&io_pool->block_list);
 }
 
 int has_enough_memory(size_t size)
@@ -1030,7 +1072,7 @@ int mm_init(void)
 	page_pool_init();
 	parse_system_regions();
 	mem_sections_init();
-	map_memory_sections();
+	//map_memory_sections();
 
 	return 0;
 }
