@@ -49,7 +49,7 @@ int	mevent_delete(struct mevent *evp);
 int	mevent_delete_close(struct mevent *evp);
 int	mevent_notify(void);
 
-void	mevent_dispatch(int vmid);
+void *mevent_dispatch(void *);
 int	mevent_init(void);
 void	mevent_deinit(void);
 

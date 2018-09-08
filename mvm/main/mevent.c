@@ -268,7 +268,7 @@ static void mevent_set_name(int vmid)
 	char name[64];
 
 	memset(name, 0, 64);
-	sprintf(name, "mvm-%d", vmid);
+	sprintf(name, "vm-%d-mevent", vmid);
 	pthread_setname_np(mevent_tid, name);
 }
 
@@ -291,13 +291,14 @@ mevent_deinit(void)
 	close(epoll_fd);
 }
 
-void mevent_dispatch(int vmid)
+void *mevent_dispatch(void *data)
 {
 	struct epoll_event eventlist[MEVENT_MAX];
-
 	struct mevent *pipev;
 	int ret;
+	int vmid;
 
+	vmid = (int)(unsigned long)data;
 	mevent_tid = pthread_self();
 	mevent_set_name(vmid);
 

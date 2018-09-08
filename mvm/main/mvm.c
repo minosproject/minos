@@ -563,12 +563,21 @@ static int mvm_main_loop(void)
 		}
 	}
 
+	ret = pthread_create(&vcpu_thread, NULL, mevent_dispatch,
+			(void *)(unsigned long)(vm->vmid));
+	if (ret) {
+		pr_err("create mevent thread failed\n");
+		return ret;
+	}
+
 	/* now start the vm */
 	ret = ioctl(vm->vm_fd, IOCTL_POWER_UP_VM, NULL);
 	if (ret)
 		return ret;
 
-	mevent_dispatch(vm->vmid);
+	for (;;) {
+		/* here wait for the trap type for VM */
+	}
 
 	return -EAGAIN;
 }
