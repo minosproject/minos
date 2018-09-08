@@ -28,10 +28,8 @@ struct irqtag {
 struct memtag {
 	unsigned long mem_base;
 	unsigned long mem_end;
-	int host;
-	int sectype;
-	int enable;
-	int type;
+	uint16_t enable;
+	uint16_t type;
 	uint32_t vmid;
 	char *name;
 };

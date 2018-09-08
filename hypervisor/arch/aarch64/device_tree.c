@@ -158,6 +158,9 @@ static int fdt_setup_minos(struct vm *vm)
 	fdt_setprop(dtb, node, "compatible", "minos,hypervisor", 17);
 
 	for (i = 0; i < virq_nr; i++) {
+		if (test_bit(i, vm->virq_map))
+			continue;
+
 		*array++ = cpu_to_fdt32(0);
 		*array++ = cpu_to_fdt32(i);
 		*array++ = cpu_to_fdt32(4);
@@ -168,7 +171,7 @@ static int fdt_setup_minos(struct vm *vm)
 	if (i)
 		pr_error("fdt set interrupt for minos failed\n");
 
-	free(array);
+	free(tmp);
 
 	return i;
 }

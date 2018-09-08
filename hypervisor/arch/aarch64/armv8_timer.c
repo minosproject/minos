@@ -25,6 +25,23 @@
 #include <minos/vmodule.h>
 #include <minos/irq.h>
 #include <minos/virq.h>
+#include <asm/of.h>
+
+enum timer_type {
+	SEC_PHY_TIMER,
+	NONSEC_PHY_TIMER,
+	VIRT_TIMER,
+	HYP_TIMER,
+	TIMER_MAX,
+};
+
+struct armv8_timer_info {
+	uint32_t type;
+	uint32_t irq;
+	uint32_t flags;
+};
+
+static struct armv8_timer_info timer_info[TIMER_MAX];
 
 uint32_t cpu_khz = 0;
 uint64_t boot_tick = 0;
@@ -129,6 +146,9 @@ static int virtual_timer_irq_handler(uint32_t irq, void *data)
 
 static int timers_init(void)
 {
+	int len = 0, ret;
+	struct armv8_timer_info *info;
+
 	write_sysreg64(0, CNTVOFF_EL2);
 
 	/* el1/el0 can read CNTPCT_EL0 */
@@ -139,15 +159,42 @@ static int timers_init(void)
 	write_sysreg32(0, CNTHP_CTL_EL2);
 	isb();
 
+	memset((void *)timer_info, 0, sizeof(timer_info));
+	ret = of_get_u32_array("/timer", "interrupts",
+			(uint32_t *)timer_info, &len);
+	if (ret || (len == 0))
+		panic("no arm gen timer found in dtb\n");
+
+	for (len = 0; len < TIMER_MAX; len++) {
+		info = &timer_info[len];
+		if ((info->type != 1) || (info->irq == 0)) {
+			pr_warn("timer int not a ppi %d\n", info->irq);
+			continue;
+		}
+
+		info->irq += 16;
+	}
+
 	/* used for sched ticks */
-	request_irq(HYP_TIMER_INT, sched_timer_handler,
-			0, "hyp timer int", NULL);
+	info = &timer_info[HYP_TIMER];
+	if (info->irq) {
+		request_irq(info->irq, sched_timer_handler,
+			info->type & 0xff, "hyp timer int", NULL);
+	}
 
-	request_irq(PHYS_TIMER_NONSEC_INT, timer_interrupt_handler,
-			0, "nonsec timer int", NULL);
+	info = &timer_info[NONSEC_PHY_TIMER];
+	if (info->irq) {
+		request_irq(info->irq, timer_interrupt_handler,
+			info->type & 0xff, "nonsec timer int", NULL);
+	}
 
-	return request_irq(VIRT_TIMER_INT, virtual_timer_irq_handler,
-			IRQ_FLAGS_VCPU, "local irq", NULL);
+	info = &timer_info[VIRT_TIMER];
+	if (info->irq) {
+		request_irq(info->irq, virtual_timer_irq_handler,
+			IRQ_FLAGS_VCPU | (info->type & 0xff),
+			"virt timer irq", NULL);
+	}
+
 	return 0;
 }
 

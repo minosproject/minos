@@ -350,22 +350,6 @@ static int mem_sections_init(void)
 	return 0;
 }
 
-static void map_memory_sections(void)
-{
-	int i;
-	struct mem_section *section;
-
-	if (nr_sections == 1)
-		return;
-
-	/* boot section do not to be mapped again */
-	for (i = 1; i < nr_sections; i++) {
-		section = &mem_sections[i];
-		create_host_mapping(section->phy_base, section->phy_base,
-				section->size, VM_NORMAL);
-	}
-}
-
 static struct mem_section *addr_to_mem_section(unsigned long addr)
 {
 	int i;
@@ -470,12 +454,16 @@ struct mem_block *alloc_mem_block(unsigned long flags)
 	 * if the block is not for guest vm mapped it to host
 	 * memory space
 	 */
-	if (!(flags & GFB_VM)) {
+	if (block && (!(flags & GFB_VM))) {
 		f |= VM_RW;
 		if (flags | GFB_IO)
 			f |= VM_IO;
 		else
 			f |= VM_NORMAL;
+
+		/* section and normal memory skip mapping */
+		if ((section->id == 0) && (f & VM_NORMAL))
+			return block;
 
 		create_host_mapping(block->phy_base, block->phy_base,
 				MEM_BLOCK_SIZE, f);

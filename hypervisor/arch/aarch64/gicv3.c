@@ -101,9 +101,9 @@ static int gicv3_set_irq_type(uint32_t irq, uint32_t type)
 
 	cfg = ioread32(base);
 	edgebit = 2u << (2 * (irq % 16));
-	if (type & IRQ_FLAG_TYPE_LEVEL_BOTH)
+	if (type & IRQ_FLAGS_LEVEL_BOTH)
 		cfg &= ~edgebit;
-	else if (type & IRQ_FLAG_TYPE_EDGE_BOTH)
+	else if (type & IRQ_FLAGS_EDGE_BOTH)
 		cfg |= edgebit;
 
 	iowrite32(base, cfg);

@@ -1,4 +1,11 @@
 /* "hw": 1-host 0-guest */
+#define IRQ_TYPE_NONE		0
+#define IRQ_TYPE_EDGE_RISING	1
+#define IRQ_TYPE_EDGE_FALLING	2
+#define IRQ_TYPE_EDGE_BOTH	(IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING)
+#define IRQ_TYPE_LEVEL_HIGH	4
+#define IRQ_TYPE_LEVEL_LOW	8
+
 "irqtags": [
 	{
 		"vno": 27,
@@ -12,230 +19,237 @@
 		"vno": 32,
 		"vmid": 0,
 		"vcpu_id": 0,
-		"name": "watchdog"
+		"name": "spi 0"
+	},
+	{
+		"hno": 33,
+		"vno": 33,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "i2c 0"
 	},
 	{
 		"hno": 34,
 		"vno": 34,
-		"vmid": 1,
-		"vcpu_id": 0,
-		"name": "sp804-timer0"
-	},
-	{
-		"hno": 35,
-		"vno": 35,
 		"vmid": 0,
 		"vcpu_id": 0,
-		"name": "sp804-timer1"
-	},
-	{
-		"hno": 36,
-		"vno": 36,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "pl031-rtc"
-	},
-	{
-		"hno": 37,
-		"vno": 37,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "pl011-uart0"
-	},
-	{
-		"hno": 38,
-		"vno": 38,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "pl011-uart1"
-	},
-	{
-		"hno": 39,
-		"vno": 39,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "uart2"
-	},
-	{
-		"hno": 40,
-		"vno": 40,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "uart3"
-	},
-	{
-		"hno": 41,
-		"vno": 41,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "mci pl180 mciintr0"
-	},
-	{
-		"hno": 42,
-		"vno": 42,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "mci pl180 mciintr1"
+		"name": "i2c 1"
 	},
 	{
 		"hno": 43,
 		"vno": 43,
 		"vmid": 0,
 		"vcpu_id": 0,
-		"name": "aaci pl041"
+		"name": "uart 0"
 	},
 	{
-		"hno": 44,
-		"vno": 44,
+		"hno": 160,
+		"vno": 160,
 		"vmid": 0,
 		"vcpu_id": 0,
-		"name": "keyboar pl050"
-	},
-	{
-		"hno": 45,
-		"vno": 45,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "mouse pl050"
-	},
-	{
-		"hno": 46,
-		"vno": 46,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "color lcd pl111"
-	},
-	{
-		"hno": 47,
-		"vno": 47,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "ethernet smsc 91c111"
-	},
-	{
-		"hno": 56,
-		"vno": 56,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "trusted watch dog sp085"
-	},
-	{
-		"hno": 57,
-		"vno": 57,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "ap_refclk generic timer cntpsirq"
-	},
-	{
-		"hno": 58,
-		"vno": 58,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "ap_refclk, generic timer cntpsirq1"
-	},
-	{
-		"hno": 59,
-		"vno": 59,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "el2 generic watchdog ws0"
-	},
-	{
-		"hno": 60,
-		"vno": 60,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "el2 generic watchdog wsi"
-	},
-	{
-		"hno": 73,
-		"vno": 73,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "vfs2"
+		"name": "cpufreq"
 	},
 	{
 		"hno": 74,
 		"vno": 74,
 		"vmid": 0,
 		"vcpu_id": 0,
-		"name": "virtio block device"
+		"name": "eth0"
+	},
+	{
+		"hno": 77,
+		"vno": 77,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "eth1"
+	},
+	{
+		"hno": 83,
+		"vno": 83,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "gpio"
+	},
+	{
+		"hno": 84,
+		"vno": 84,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "gpio"
+	},
+	{
+		"hno": 85,
+		"vno": 85,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "gpio"
+	},
+	{
+		"hno": 86,
+		"vno": 86,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "gpio"
+	},
+	{
+		"hno": 87,
+		"vno": 87,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "gpio"
+	},
+	{
+		"hno": 88,
+		"vno": 88,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "gpio"
+	},
+	{
+		"hno": 89,
+		"vno": 89,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "gpio"
+	},
+	{
+		"hno": 90,
+		"vno": 90,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "gpio"
+	},
+	{
+		"hno": 184,
+		"vno": 184,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "gpio"
+	},
+	{
+		"hno": 185,
+		"vno": 185,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "gpio"
+	},
+	{
+		"hno": 186,
+		"vno": 186,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "gpio"
+	},
+	{
+		"hno": 187,
+		"vno": 187,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "gpio"
+	},
+	{
+		"hno": 188,
+		"vno": 188,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "gpio sb"
+	},
+	{
+		"hno": 189,
+		"vno": 189,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "gpio sb"
+	},
+	{
+		"hno": 190,
+		"vno": 190,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "gpio sb"
+	},
+	{
+		"hno": 191,
+		"vno": 191,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "gpio sb"
+	},
+	{
+		"hno": 192,
+		"vno": 192,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "0"
+	},
+	{
+		"hno": 47,
+		"vno": 47,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "u3d"
+	},
+	{
+		"hno": 35,
+		"vno": 35,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "usb3"
+	},
+	{
+		"hno": 48,
+		"vno": 48,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "otg phy"
+	},
+	{
+		"hno": 49,
+		"vno": 49,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "usb"
+	},
+	{
+		"hno": 79,
+		"vno": 79,
+		"vmid": 0,
+		"vcpu_id": 0,
+		"name": "xor10"
 	},
 	{
 		"hno": 80,
 		"vno": 80,
 		"vmid": 0,
 		"vcpu_id": 0,
-		"name": "tzc-400 interrupt"
+		"name": "xor11"
 	},
 	{
-		"hno": 92,
-		"vno": 92,
+		"hno": 57,
+		"vno": 57,
 		"vmid": 0,
 		"vcpu_id": 0,
-		"name": "cluster0.cpu0 pmuirq"
+		"name": "sdhci1"
 	},
 	{
-		"hno": 93,
-		"vno": 93,
+		"hno": 58,
+		"vno": 58,
 		"vmid": 0,
 		"vcpu_id": 0,
-		"name": "cluster0.cpu1 pmuirq"
+		"name": "sdhci0"
 	},
 	{
-		"hno": 94,
-		"vno": 94,
+		"hno": 59,
+		"vno": 59,
 		"vmid": 0,
 		"vcpu_id": 0,
-		"name": "cluster0.cpu2 pmuirq"
+		"name": "sata"
 	},
 	{
-		"hno": 95,
-		"vno": 95,
+		"hno": 61,
+		"vno": 61,
 		"vmid": 0,
 		"vcpu_id": 0,
-		"name": "cluster0.cpu3 pmuirq"
-	},
-	{
-		"hno": 96,
-		"vno": 96,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "cluster1.cpu0 pmuirq"
-	},
-	{
-		"hno": 97,
-		"vno": 97,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "cluster1.cpu1 pmuirq"
-	},
-	{
-		"hno": 98,
-		"vno": 98,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "cluster1.cpu2 pmuirq"
-	},
-	{
-		"hno": 99,
-		"vno": 99,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "cluster1.cpu3 pmuirq"
-	},
-	{
-		"hno": 117,
-		"vno": 117,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "hd lcd"
-	},
-	{
-		"hno": 139,
-		"vno": 139,
-		"vmid": 0,
-		"vcpu_id": 0,
-		"name": "trusted random number generator"
+		"name": "pcie0"
 	}
 ],

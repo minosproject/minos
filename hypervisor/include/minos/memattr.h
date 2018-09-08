@@ -4,9 +4,9 @@
 #define GVM_PGD_PAGE_NR		(__GVM_PGD_PAGE_NR)
 #define GVM_PGD_PAGE_ALIGN	(__GVM_PGD_PAGE_ALIGN)
 
-#define MEM_TYPE_SHARED		(0x0)
-#define MEM_TYPE_IO		(0x1)
-#define MEM_TYPE_NORMAL		(0x2)
+#define MEM_TYPE_SHARED		0
+#define MEM_TYPE_IO		1
+#define MEM_TYPE_NORMAL		2
 
 #define VM_NONE			(0x00000000)
 #define VM_IO			(0x00000001)

@@ -48,6 +48,8 @@ struct virq_desc {
 	uint8_t enable;
 	uint8_t pr;
 	uint8_t vcpu_id;
+	uint8_t type;
+	uint8_t res;
 	uint16_t vmid;
 	uint16_t vno;
 	uint16_t hno;
@@ -83,6 +85,8 @@ void send_vsgi(struct vcpu *sender,
 		uint32_t sgi, cpumask_t *cpumask);
 void clear_pending_virq(struct vcpu *vcpu, uint32_t irq);
 int virq_set_priority(struct vcpu *vcpu, uint32_t virq, int pr);
+int virq_set_type(struct vcpu *vcpu, uint32_t virq, int value);
+uint32_t virq_get_type(struct vcpu *vcpu, uint32_t virq);
 
 int send_hirq_to_vcpu(struct vcpu *vcpu, uint32_t virq);
 int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq);

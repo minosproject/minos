@@ -399,8 +399,25 @@ void irq_set_affinity(uint32_t irq, int cpu)
 
 void irq_set_type(uint32_t irq, int type)
 {
+	struct irq_desc *irq_desc;
+
+	irq_desc = get_irq_desc(irq);
+	if (!irq_desc)
+		return;
+
+	spin_lock(&irq_desc->lock);
+
+	if (type == (irq_desc->flags & IRQ_FLAGS_TYPE_MASK))
+		goto out;
+
 	if (irq_chip->irq_set_type)
 		irq_chip->irq_set_type(irq, type);
+
+	irq_desc->flags &= IRQ_FLAGS_TYPE_MASK;
+	irq_desc->flags |= type;
+
+out:
+	spin_unlock(&irq_desc->lock);
 }
 
 static int do_bad_int(uint32_t irq)
@@ -473,6 +490,9 @@ int request_irq(uint32_t irq, irq_handle_t handler,
 		strncpy(irq_desc->name, name, len);
 	}
 	spin_unlock_irqrestore(&irq_desc->lock, flag);
+
+	if (flags & IRQ_FLAGS_TYPE_MASK)
+		irq_set_type(irq, flags & IRQ_FLAGS_TYPE_MASK);
 
 	irq_unmask(irq);
 

@@ -130,6 +130,44 @@ static int guest_irq_handler(uint32_t irq, void *data)
 	return __send_virq(vcpu, desc->vno, irq, 1, desc->pr);
 }
 
+uint32_t virq_get_type(struct vcpu *vcpu, uint32_t virq)
+{
+	struct virq_desc *desc;
+
+	desc = get_virq_desc(vcpu, virq);
+	if (!desc)
+		return -ENOENT;
+
+	return desc->type;
+}
+
+int virq_set_type(struct vcpu *vcpu, uint32_t virq, int value)
+{
+	struct virq_desc *desc;
+
+	desc = get_virq_desc(vcpu, virq);
+	if (!desc)
+		return -ENOENT;
+
+	/*
+	 * 0 - IRQ_TYPE_LEVEL_HIGH
+	 * 1 - IRQ_TYPE_EDGE_RISING
+	 */
+	if (desc->type != value) {
+		desc->type = value;
+		if (desc->hw) {
+			if (value)
+				value = IRQ_FLAGS_EDGE_RISING;
+			else
+				value = IRQ_FLAGS_LEVEL_HIGH;
+
+			irq_set_type(desc->hno, value);
+		}
+	}
+
+	return 0;
+}
+
 int virq_set_priority(struct vcpu *vcpu, uint32_t virq, int pr)
 {
 	struct virq_desc *desc;

@@ -105,11 +105,46 @@ static int address_to_gicr(struct vgic_gicr *gicr,
 	return GIC_TYPE_INVAILD;
 }
 
+static uint32_t vgic_get_virq_type(struct vcpu *vcpu, uint32_t offset)
+{
+	int i;
+	int irq;
+	uint32_t value = 0, tmp;
+
+	offset = (offset - GICD_ICFGR) / 4;
+	irq = 16 * offset;
+
+	for (i = 0; i < 16; i++, irq++) {
+		tmp = virq_get_type(vcpu, irq);
+		value = value | (tmp << i * 2);
+	}
+
+	return value;
+}
+
+static void vgic_set_virq_type(struct vcpu *vcpu,
+		uint32_t offset, uint32_t value)
+{
+	int i;
+	int irq;
+
+	offset = (offset - GICD_ICFGR) / 4;
+	irq = 16 * offset;
+
+	for (i = 0; i < 16; i++, irq++) {
+		virq_set_type(vcpu, irq, value & 0x3);
+		value = value >> 2;
+	}
+}
+
+
 static int vgic_gicd_mmio_read(struct vcpu *vcpu,
 			struct vgic_gicd *gicd,
 			unsigned long offset,
-			unsigned long *value)
+			unsigned long *v)
 {
+	uint32_t *value = (uint32_t *)v;
+
 	switch (offset) {
 		case GICD_CTLR:
 			*value = gicd->gicd_ctlr & ~(1 << 31);
@@ -128,6 +163,9 @@ static int vgic_gicd_mmio_read(struct vcpu *vcpu,
 			break;
 		case GICD_PIDR2:
 			*value = gicd->gicd_pidr2;
+			break;
+		case GICD_ICFGR...GICD_ICFGR_END:
+			*value = vgic_get_virq_type(vcpu, offset);
 			break;
 		default:
 			*value = 0;
@@ -181,6 +219,7 @@ static int vgic_gicd_mmio_write(struct vcpu *vcpu,
 		virq_set_priority(vcpu, y + 4, bit);
 		break;
 	case GICD_ICFGR...GICD_ICFGR_END:
+		vgic_set_virq_type(vcpu, offset, *value);
 		break;
 
 	default:

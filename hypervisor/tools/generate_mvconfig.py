@@ -76,8 +76,6 @@ patten = [
         'members' : [
             {'name': 'mem_base', 'type': 'HEX_STRING', 'data': None},
             {'name': 'mem_end', 'type': 'HEX_STRING', 'data': None},
-            {'name': 'host', 'type': 'NUM', 'data': None},
-            {'name': 'sectype', 'type': 'FUNCTION', 'data': parse_mem_sectype},
             {'name': 'enable', 'type': 'NUM', 'data': None},
             {'name': 'type', 'type': 'NUM', 'data': None},
             {'name': 'vmid', 'type': 'NUM', 'data': None},
