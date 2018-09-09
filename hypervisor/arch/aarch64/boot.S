@@ -25,32 +25,35 @@
 	.global _start
 	.type _start, "function"
 _start:
-	dsb	ish
-	ic	ialluis
-	dsb	ish
-	isb
+	msr	daifset, #2
+	b	do_start
+	.quad   CONFIG_MINOS_START_ADDRESS	     /* Image load offset from start of RAM */
+        .quad   __code_end - _start		     /* reserved */
+        .quad   0				     /* reserved */
+        .quad   0				     /* reserved */
+        .quad   0				     /* reserved */
+        .quad   0				     /* reserved */
+        .byte   0x41				     /* Magic number, "ARM\x64" */
+        .byte   0x52
+        .byte   0x4d
+        .byte   0x64
+        .long   0x0
 
-	/* disable the mmu and disable the aligment check */
-	mrs	x1, SCTLR_EL2
-	bic	x1, x1, #SCTLR_ELx_M
-	bic	x1, x1, #SCTLR_ELx_A
-	bic	x1, x1, #SCTLR_ELx_C
-	bic	x1, x1, #SCTLR_ELx_I
-	msr	SCTLR_EL2, x1
-	isb
+do_start:
+	mov	x0, x27				// save the dtb blob to x27
 
-	mov	x27, x0			// back up dtb address
+	mrs	x0, midr_el1
+	mrs	x1, mpidr_el1
+	msr	vpidr_el2, x0
+	msr	vmpidr_el2, x1
 
 	bl	smp_processor_id		// cpuid save to x19
 	mov	x19, x0
 
-	.global el2_entry_aarch64
-	.type el2_entry_aarch64, "function"
-el2_entry_aarch64:
 	ldr	x1, =el2_vectors
 	msr	VBAR_EL2, x1
 
-	mov	x0, #15	// el1 access ICC_SRE_EL1 will trap to EL2
+	mov	x0, #15
 	msr	ICC_SRE_EL2, x0
 	isb
 
@@ -69,8 +72,10 @@ el2_entry_aarch64:
 
 	/* invalid the dcache and flush the tlb */
 	bl	inv_unified_dcache
-	tlbi	alle1
 	isb
+
+	ldr	x1, =0x30c51878
+	msr	SCTLR_EL2, x1
 
 	/* setup the el2 page table */
 	ldr	x1, = __el2_ttb0_pgd
@@ -80,15 +85,13 @@ el2_entry_aarch64:
 	movk	x1, #4, lsl #16
 	msr	MAIR_EL2, x1
 
-	/*
-	 * get the physical address range
-	 */
+	/* get the physical address range */
 	mrs	x0, ID_AA64MMFR0_EL1
 	and	x0, x0, #0xf
 	mov	x2, x0, lsl #16
 
 	/* config the TCR_EL2 */
-	mrs	x1, TCR_EL2
+	mov	x1, #0x80800000
 	ldr	x3, =0xfff8ffff
 	and	x1, x1, x3
 	orr	x1, x1, x2
@@ -98,6 +101,7 @@ el2_entry_aarch64:
 	orr	x1, x1, #(3 << 12)	// Inner shareable
 	orr	x1, x1, #(1 << 23)
 	msr	TCR_EL2, x1
+	isb
 
 	mov	x1, #0x1c9
 	msr	spsr_el2, x1
@@ -155,7 +159,7 @@ el2_entry_aarch64:
 	mov	x5, #(TT_S1_ATTR_BLOCK | \
 		(1 << TT_S1_ATTR_MATTR_LSB) | \
 		TT_S1_ATTR_NS | \
-		TT_S1_ATTR_AP_RW_PL1 | \
+		TT_S1_ATTR_AP_RW_ANY | \
 		TT_S1_ATTR_SH_INNER | \
 		TT_S1_ATTR_AF | \
 		TT_S1_ATTR_nG)
@@ -181,7 +185,7 @@ el2_entry_aarch64:
 	mov	x5, #(TT_S1_ATTR_BLOCK | \
 		(2 << TT_S1_ATTR_MATTR_LSB) | \
 		TT_S1_ATTR_NS | \
-		TT_S1_ATTR_AP_RW_PL1 | \
+		TT_S1_ATTR_AP_RW_ANY | \
 		TT_S1_ATTR_AF | \
 		TT_S1_ATTR_nG)
 	bl	build_l2_table
@@ -204,6 +208,7 @@ el2_entry_aarch64:
 	orr	x1, x1, #SCTLR_ELx_C
 	orr	x1, x1, #SCTLR_ELx_I
 	msr	SCTLR_EL2, x1
+	dsb	sy
 	isb
 
 	ldr	x0, =__bss_start
@@ -221,6 +226,11 @@ el2_entry_aarch64:
 	nop
 
 secondary_start_up:
+	ldr	x1, =0x30c51878
+	msr	SCTLR_EL2, x1
+	dsb	sy
+	isb
+
 	/* enable the dcache and the icache */
 	mrs	x1, SCTLR_EL2
 	orr	x1, x1, #SCTLR_ELx_C
@@ -306,3 +316,20 @@ loop:
 exit_loop:
 	ret
 
+	.global puts
+puts:
+	ldr	x2, =0xd001200c
+	ldr	x3, =0xd0012004
+	mov	x4, #0
+ploop:
+	ldrh	w4, [x2]
+	and	x4, x4, #0x800
+	cbnz	x4, ploop
+
+	ldrb	w1, [x0], #1           /* Load next char */
+	cbz	w1, 1f                 /* Exit on nul */
+	strh	w1, [x3]
+	dsb	sy
+	b	ploop
+1:
+	ret

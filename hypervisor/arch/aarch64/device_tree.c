@@ -19,6 +19,7 @@
 #include <minos/vmm.h>
 #include <libfdt/libfdt.h>
 #include <minos/vm.h>
+#include <minos/virt.h>
 
 #define MAX_DTB_SIZE	(MEM_BLOCK_SIZE)
 
@@ -108,7 +109,12 @@ int of_get_u64_array(char *path, char *attr, uint64_t *array, int *len)
 
 int of_init(void *setup_data)
 {
-	unsigned long base = (unsigned long)setup_data;
+	unsigned long base;
+
+	setup_data = (void *)mv_config->vmtags[0].setup_data;
+	base = (unsigned long)setup_data;
+
+	pr_info("dtb address is 0x%x\n", (unsigned long)base);
 
 	if (!setup_data || (base & (MEM_BLOCK_SIZE - 1))) {
 		pr_fatal("invalid dtb address\n");
@@ -307,7 +313,7 @@ void hvm_dtb_init(struct vm *vm)
 	}
 
 	/* update the dtb address for the hvm */
-	vm->setup_data = (unsigned long)dtb;
+	//vm->setup_data = (unsigned long)dtb;
 
 	fdt_setup_minos(vm);
 	fdt_setup_cmdline(vm);

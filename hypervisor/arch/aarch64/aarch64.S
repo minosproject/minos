@@ -21,6 +21,7 @@
 	.global smp_processor_id
 	.global arch_get_fp
 	.global arch_get_lr
+	.global arch_get_sp
 	.global smc_call
 
 func smp_processor_id
@@ -41,6 +42,11 @@ func arch_get_lr
 	mov	x0, x30
 	ret
 endfunc arch_get_lr
+
+func arch_get_sp
+	mov	x0, sp
+	ret
+endfunc arch_get_sp
 
 func smc_call
 	smc	#0

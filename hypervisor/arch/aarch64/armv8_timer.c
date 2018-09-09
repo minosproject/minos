@@ -76,6 +76,7 @@ unsigned long get_sys_time()
 
 static int timers_arch_init(void)
 {
+#ifdef CONFIG_PLATFORM_FVP
 	io_remap(0x2a430000, 0x2a430000, 64 * 1024);
 
 	if (!cpu_khz)
@@ -87,7 +88,7 @@ static int timers_arch_init(void)
 
 	/* enable the counter */
 	iowrite32(refclk_cnt_base + CNTCR, 1);
-
+#endif
 	return 0;
 }
 

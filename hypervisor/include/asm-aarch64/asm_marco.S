@@ -17,3 +17,12 @@
 	.size \_name, . - \_name
 	.endm
 #endif
+
+.macro PRINT
+	adr	x0, 98f
+	bl	puts
+	b	99f
+98:     .asciz "-------1\r\n"
+	.align 2
+99:
+.endm

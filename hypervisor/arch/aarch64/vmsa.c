@@ -115,11 +115,10 @@ int el2_stage2_init(void)
 
 	value = read_id_aa64mmfr0_el1();
 	memcpy(&aa64mmfr0, &value, sizeof(uint64_t));
-	pr_debug("aa64mmfr0: pa_range:0x%x"
-		 " t_gran_16k:0x%x t_gran_64k"
-		 ":0x%x t_gran_4k:0x%x\n",
-		 aa64mmfr0.pa_range, aa64mmfr0.t_gran_16k,
-		aa64mmfr0.t_gran_64k, aa64mmfr0.t_gran_4k);
+	pr_info("aa64mmfr0: pa_range:0x%x t_gran_16k:0x%x t_gran_64k"
+		 ":0x%x t_gran_4k:0x%x\n", aa64mmfr0.pa_range,
+		 aa64mmfr0.t_gran_16k, aa64mmfr0.t_gran_64k,
+		 aa64mmfr0.t_gran_4k);
 
 	value = read_sysreg(CTR_EL0);
 	dcache = 4 << ((value & 0xf0000) >> 16);

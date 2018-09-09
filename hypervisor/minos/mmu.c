@@ -183,8 +183,6 @@ static int create_table_entry(struct mm_struct *mm,
 			memset((void *)value, 0, SIZE_4K);
 			*(tbase + offset) = attr | (value &
 					DESC_MASK(config->des_offset));
-			flush_dcache_range((unsigned long)(tbase + offset),
-						sizeof(unsigned long));
 		} else {
 			/* get the base address of the entry */
 			value = value & 0x0000ffffffffffff;
@@ -225,7 +223,6 @@ static int create_table_entry(struct mm_struct *mm,
 			return ret;
 		}
 
-		flush_dcache_range(value, SIZE_4K);
 		info->vir_base += map_size;
 		size -= map_size;
 		info->phy_base += map_size;
@@ -264,7 +261,7 @@ int create_mem_mapping(struct mm_struct *mm, unsigned long addr,
 
 	/* need to flush the addr + size's mem's cache ? */
 	if (flags & VM_HOST)
-		flush_all_tlb_host();
+		flush_tlb_va_host(addr, size);
 	else
 		flush_local_tlb_guest();
 
@@ -308,8 +305,6 @@ static int __destroy_mem_mapping(struct mapping_struct *info)
 				*(table + offset) = 0;
 				size -= attr->map_size;
 				vir += attr->map_size;
-				flush_dcache_range((unsigned long)(table + offset),
-						sizeof(unsigned long));
 				break;
 			}
 		} while (1);
@@ -334,8 +329,9 @@ int destroy_mem_mapping(struct mm_struct *mm, unsigned long vir,
 	__destroy_mem_mapping(&map_info);
 	spin_unlock(&mm->lock);
 
-	if (flags & VM_HOST)
-		flush_all_tlb_host();
+	if (flags & VM_HOST) {
+		flush_tlb_va_host(vir, size);
+	}
 	else
 		flush_local_tlb_guest();
 
@@ -445,9 +441,6 @@ int create_early_pmd_mapping(unsigned long vir, unsigned long phy)
 			return -ENOMEM;
 
 		memset(pudp, 0, PAGE_SIZE);
-		flush_dcache_range((unsigned long)pgd_offset(pgdp, vir),
-				sizeof(pgd_t));
-
 		set_pgd_at(pgd_offset(pgdp, vir), (unsigned long)pudp |
 				VM_DESC_HOST_TABLE);
 	}
@@ -459,15 +452,14 @@ int create_early_pmd_mapping(unsigned long vir, unsigned long phy)
 			return -ENOMEM;
 
 		memset(pmdp, 0, PAGE_SIZE);
-		flush_dcache_range((unsigned long)pud_offset(pudp, vir),
-				sizeof(pud_t));
-
 		set_pud_at(pud_offset(pudp, vir), (unsigned long)pmdp |
 				VM_DESC_HOST_TABLE);
+
 	}
 
-	flush_dcache_range((unsigned long)pmdp, sizeof(pmd_t));
 	set_pmd_at(pmd_offset(pmdp, phy), (phy & PMD_MASK) |
 			VM_DESC_HOST_BLOCK);
+	flush_tlb_va_host(vir, SIZE_2M);
+
 	return 0;
 }

@@ -135,6 +135,7 @@ void boot_main(void *setup_data)
 	 * free mem or free pages
 	 */
 	bootmem_init();
+	pr_info("sp is 0x%x\n", arch_get_fp());
 
 	early_init(setup_data);
 	early_init_percpu();

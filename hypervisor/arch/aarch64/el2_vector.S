@@ -17,6 +17,7 @@
 
 #include <asm/aarch64_common.h>
 #include <config/config.h>
+#include <asm/asm_marco.S>
 
 	.global el2_vectors
 
@@ -46,7 +47,7 @@ cxfiq2:
 	b cxfiq2
 	.balign 0x80
 cxserr2:
-	b cxserr2
+	bl bad_error
 	.balign 0x80	//Lower EL using AArch64
 l64sync2:
 	b __serror_handler

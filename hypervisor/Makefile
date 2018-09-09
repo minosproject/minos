@@ -7,7 +7,8 @@ OBJ_DUMP 	:= $(CROSS_COMPILE)objdump
 NM		:= $(CROSS_COMPILE)nm
 STRIP		:= $(CROSS_COMPILE)strip
 
-PLATFORM	:= fvp
+#PLATFORM	:= fvp
+PLATFORM	:= espressobin
 TARGET		:= minos
 DEBUG_LEVEL	:= 0
 

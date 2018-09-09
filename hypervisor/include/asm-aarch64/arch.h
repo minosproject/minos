@@ -171,6 +171,23 @@ static inline void flush_all_tlbis_guest(void)
 	);
 }
 
+static inline void flush_tlb_va_host(unsigned long va,
+		unsigned long size)
+{
+	unsigned long end = va + size;
+
+	dsb();
+
+	while (va < end) {
+		asm volatile("tlbi vae2is, %0;" : : "r"
+				(va >> PAGE_SHIFT) : "memory");
+		va += PAGE_SIZE;
+	}
+
+	dsb();
+	isb();
+}
+
 static inline unsigned long va_to_pa(unsigned long va)
 {
 	uint64_t pa, tmp = read_sysreg64(PAR_EL1);

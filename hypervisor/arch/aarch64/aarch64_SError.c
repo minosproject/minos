@@ -33,6 +33,11 @@ extern unsigned char __serror_desc_end;
 
 static struct serror_desc *serror_descs[MAX_SERROR_TYPE] __align_cache_line;
 
+void bad_error(void)
+{
+	panic("------ bad error\n");
+}
+
 static int unknown_handler(gp_regs *reg, uint32_t esr_value)
 {
 	return 0;
@@ -456,6 +461,7 @@ void SError_from_current_EL_handler(gp_regs *data)
 	esr_value = read_esr_el2();
 	ec_type = (esr_value & 0xfc000000) >> 26;
 	ec = serror_descs[ec_type];
+	pr_error("SError_from_current_EL_handler : 0x%x\n", ec_type);
 	if (ec != NULL)
 		ec->handler(data, esr_value);
 

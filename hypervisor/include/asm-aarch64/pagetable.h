@@ -100,7 +100,7 @@ static inline unsigned long arch_host_tt_description(unsigned long flags)
 	rw = flags & VM_RW_MASK;
 
 	if (d_type == VM_DES_TABLE)
-		return (uint64_t)TT_S1_ATTR_TABLE;
+		return 0xf7f;
 
 	if (d_type == VM_DES_BLOCK) {
 		if (m_type == VM_NORMAL) {
@@ -110,13 +110,16 @@ static inline unsigned long arch_host_tt_description(unsigned long flags)
 			       TT_S1_ATTR_SH_INNER | \
 			       TT_S1_ATTR_AF | \
 			       TT_S1_ATTR_nG;
+			attr = 0xf7d;
 		} else {
 			attr = TT_S1_ATTR_BLOCK | \
 			       (2 << TT_S1_ATTR_MATTR_LSB) | \
 			       TT_S1_ATTR_NS | \
+			       TT_S1_ATTR_AP_RW_PL1 | \
 			       TT_S1_ATTR_AF | \
 			       TT_S1_ATTR_XN | \
 			       TT_S1_ATTR_nG;
+			attr = 0xe71;
 		}
 	}
 
@@ -132,6 +135,7 @@ static inline unsigned long arch_host_tt_description(unsigned long flags)
 			attr = TT_S1_ATTR_PAGE | \
 			       (2 << TT_S1_ATTR_MATTR_LSB) | \
 			       TT_S1_ATTR_NS | \
+			       TT_S1_ATTR_AP_RW_PL1 | \
 			       TT_S1_ATTR_AF | \
 			       TT_S1_ATTR_XN | \
 			       TT_S1_ATTR_nG;

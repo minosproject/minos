@@ -20,6 +20,14 @@
 #define AARCH64_SPSR_Z		(1 << 30)
 #define AARCH64_SPSR_N		(1 << 31)
 
+#define MODE_EL3		(0x3UL)
+#define MODE_EL2		(0x2UL)
+#define MODE_EL1		(0x1UL)
+#define MODE_EL0		(0x0UL)
+#define MODE_EL_SHIFT		(0x2UL)
+#define MODE_EL_MASK		(0x3UL)
+#define GET_EL(mode)		(((mode) >> MODE_EL_SHIFT) & MODE_EL_MASK)
+
 #define MPIDR_EL1_AFF3_LSB	32
 #define MPIDR_EL1_U		(1 << 30)
 #define MPIDR_EL1_MT		(1 << 24)
@@ -53,6 +61,10 @@
 #define SCTLR_ELx_C		(1 << 2)
 #define SCTLR_ELx_A		(1 << 1)
 #define SCTLR_ELx_M		(1 << 0)
+
+#define SCTLR_ELx_C_BIT		(2)
+#define SCTLR_ELx_A_BIT		(1)
+#define SCTLR_ELx_M_BIT		(0)
 
 #define CPACR_EL1_TTA		(1 << 28)
 #define CPACR_EL1_FPEN		(3 << 20)

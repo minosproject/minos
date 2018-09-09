@@ -145,6 +145,11 @@ void arch_init_vcpu(struct vcpu *vcpu, void *entry)
 
 int arch_early_init(void *setup_data)
 {
+	pr_info("current EL is 0x%x\n", GET_EL(read_CurrentEl()));
+
+	if (!IS_IN_EL2())
+		panic("minos must run at EL2 mode\n");
+
 	el2_stage2_init();
 	of_init(setup_data);
 
