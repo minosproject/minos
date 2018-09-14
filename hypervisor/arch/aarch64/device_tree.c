@@ -215,7 +215,7 @@ static int fdt_setup_minos(struct vm *vm)
 	int node, i;
 	uint32_t *array = NULL, *tmp;
 	size_t size;
-	int virq_nr = vm->virq_nr - 32;
+	int vspi_nr = vm->vspi_nr;
 
 	node = fdt_path_offset(dtb, "/minos");
 	if (node < 0) {
@@ -224,7 +224,7 @@ static int fdt_setup_minos(struct vm *vm)
 			return node;
 	}
 
-	size = virq_nr * sizeof(uint32_t) * 3;
+	size = vspi_nr * sizeof(uint32_t) * 3;
 	size = PAGE_BALIGN(size);
 	tmp = array = (uint32_t *)get_free_pages(PAGE_NR(size));
 	size = 0;
@@ -235,10 +235,7 @@ static int fdt_setup_minos(struct vm *vm)
 
 	fdt_setprop(dtb, node, "compatible", "minos,hypervisor", 17);
 
-	for (i = 0; i < virq_nr; i++) {
-		if (test_bit(i, vm->virq_map))
-			continue;
-
+	for (i = 0; i < vspi_nr; i++) {
 		*array++ = cpu_to_fdt32(0);
 		*array++ = cpu_to_fdt32(i);
 		*array++ = cpu_to_fdt32(4);

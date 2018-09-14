@@ -22,15 +22,16 @@ struct irqtag;
 #define VM_PPI_VIRQ_NR		(16)
 #define VM_LOCAL_VIRQ_NR	(VM_SGI_VIRQ_NR + VM_PPI_VIRQ_NR)
 
-#define HVM_SPI_VIRQ_NR		(512)
+#define HVM_SPI_VIRQ_NR		(384)
 #define HVM_SPI_VIRQ_BASE	(VM_LOCAL_VIRQ_NR)
 
 #define GVM_SPI_VIRQ_NR		(128)
 #define GVM_SPI_VIRQ_BASE	(VM_LOCAL_VIRQ_NR)
 
-#define VM_VIRQ_NR(nr)		(nr & 0x7fffffff)
 #define VIRQ_SPI_OFFSET(virq)	((virq) - VM_LOCAL_VIRQ_NR)
 #define VIRQ_SPI_NR(count)	((count) > VM_LOCAL_VIRQ_NR ? VIRQ_SPI_OFFSET((count)) : 0)
+
+#define VM_VIRQ_NR(nr)		((nr) + VM_LOCAL_VIRQ_NR)
 
 #define MAX_HVM_VIRQ		(HVM_SPI_VIRQ_NR + VM_LOCAL_VIRQ_NR)
 #define MAX_GVM_VIRQ		(GVM_SPI_VIRQ_NR + VM_LOCAL_VIRQ_NR)

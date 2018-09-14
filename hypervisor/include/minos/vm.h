@@ -54,10 +54,10 @@ struct vm {
 
 	struct list_head vdev_list;
 
-	uint32_t virq_nr;
+	uint32_t vspi_nr;
 	int virq_same_page;
-	struct virq_desc *virq_desc;
-	unsigned long *virq_map;
+	struct virq_desc *vspi_desc;
+	unsigned long *vspi_map;
 
 	void *vmcs;
 	void *hvm_vmcs;

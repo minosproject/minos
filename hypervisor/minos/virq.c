@@ -30,10 +30,10 @@ get_virq_desc(struct vcpu *vcpu, uint32_t virq)
 	if (virq < VM_LOCAL_VIRQ_NR)
 		return &vcpu->virq_struct->local_desc[virq];
 
-	if (virq >= vm->virq_nr)
+	if (virq >= VM_VIRQ_NR(vm->vspi_nr))
 		return NULL;
 
-	return &vm->virq_desc[VIRQ_SPI_OFFSET(virq)];
+	return &vm->vspi_desc[VIRQ_SPI_OFFSET(virq)];
 }
 
 static int __send_virq(struct vcpu *vcpu,
@@ -488,10 +488,10 @@ static void vm_config_virq(struct vm *vm)
 		if (vm->vmid != irqtag->vmid)
 			continue;
 
-		if (irqtag->vno >= vm->virq_nr)
+		if (irqtag->vno >= vm->vspi_nr)
 			continue;
 
-		desc = &vm->virq_desc[VIRQ_SPI_OFFSET(irqtag->vno)];
+		desc = &vm->vspi_desc[VIRQ_SPI_OFFSET(irqtag->vno)];
 		desc->hw = 1;
 		desc->enable = 0;
 		desc->vno = irqtag->vno;
@@ -499,7 +499,7 @@ static void vm_config_virq(struct vm *vm)
 		desc->vcpu_id = irqtag->vcpu_id;
 		desc->pr = 0xa0;
 		desc->vmid = vm->vmid;
-		set_bit(VIRQ_SPI_OFFSET(desc->vno), vm->virq_map);
+		set_bit(VIRQ_SPI_OFFSET(desc->vno), vm->vspi_map);
 
 		c = get_vcpu_by_id(desc->vmid, desc->vcpu_id);
 		if (!c)
@@ -515,22 +515,22 @@ static void vm_config_virq(struct vm *vm)
 int alloc_vm_virq(struct vm *vm)
 {
 	int virq;
-	int count = vm->virq_nr;
+	int count = vm->vspi_nr;
 	struct virq_desc *desc;
 
 	if (vm->vmid == 0)
 		spin_lock(&hvm_irq_lock);
 
-	virq = find_next_zero_bit_loop(vm->virq_map, count, 0);
+	virq = find_next_zero_bit_loop(vm->vspi_map, count, 0);
 	if (virq >= count)
 		virq = -1;
 
 	if (virq >= 0) {
-		desc = &vm->virq_desc[virq];
+		desc = &vm->vspi_desc[virq];
 		desc->vno = virq + VM_LOCAL_VIRQ_NR;
 		desc->hw = 0;
 		desc->vmid = vm->vmid;
-		set_bit(virq, vm->virq_map);
+		set_bit(virq, vm->vspi_map);
 	}
 
 	if (vm->vmid == 0)
@@ -544,7 +544,7 @@ void release_vm_virq(struct vm *vm, int virq)
 	if (vm->vmid == 0)
 		spin_lock(&hvm_irq_lock);
 
-	clear_bit(VIRQ_SPI_OFFSET(virq), vm->virq_map);
+	clear_bit(VIRQ_SPI_OFFSET(virq), vm->vspi_map);
 
 	if (vm->vmid == 0)
 		spin_unlock(&hvm_irq_lock);
@@ -552,40 +552,40 @@ void release_vm_virq(struct vm *vm, int virq)
 
 static int virq_create_vm(void *item, void *args)
 {
-	uint32_t virq_nr;
+	uint32_t vspi_nr;
 	uint32_t size, tmp, map_size;
 	struct vm *vm = (struct vm *)item;
 
 	if (vm->vmid == 0)
-		virq_nr = MAX_HVM_VIRQ;
+		vspi_nr = HVM_SPI_VIRQ_NR;
 	else
-		virq_nr = MAX_GVM_VIRQ;
+		vspi_nr = GVM_SPI_VIRQ_NR;
 
-	tmp = sizeof(struct virq_desc) * virq_nr;
+	tmp = sizeof(struct virq_desc) * vspi_nr;
 	tmp = BALIGN(tmp, sizeof(unsigned long));
 	size = PAGE_BALIGN(tmp);
 	vm->virq_same_page = 0;
-	vm->virq_desc = get_free_pages(PAGE_NR(size));
-	if (!vm->virq_desc)
+	vm->vspi_desc = get_free_pages(PAGE_NR(size));
+	if (!vm->vspi_desc)
 		return -ENOMEM;
 
-	map_size = BITS_TO_LONGS(virq_nr) * sizeof(unsigned long);
+	map_size = BITS_TO_LONGS(vspi_nr) * sizeof(unsigned long);
 
 	if ((size - tmp) >= map_size) {
-		vm->virq_map = (unsigned long *)
-			((unsigned long)vm->virq_desc + tmp);
+		vm->vspi_map = (unsigned long *)
+			((unsigned long)vm->vspi_desc + tmp);
 		vm->virq_same_page = 1;
 	} else {
-		vm->virq_map = malloc(BITS_TO_LONGS(virq_nr) *
+		vm->vspi_map = malloc(BITS_TO_LONGS(vspi_nr) *
 				sizeof(unsigned long));
-		if (!vm->virq_map)
+		if (!vm->vspi_map)
 			return -ENOMEM;
 	}
 
-	memset(vm->virq_desc, 0, tmp);
-	memset(vm->virq_map, 0, BITS_TO_LONGS(virq_nr) *
+	memset(vm->vspi_desc, 0, tmp);
+	memset(vm->vspi_map, 0, BITS_TO_LONGS(vspi_nr) *
 			sizeof(unsigned long));
-	vm->virq_nr = virq_nr;
+	vm->vspi_nr = vspi_nr;
 
 	vm_config_virq(vm);
 
@@ -598,9 +598,9 @@ static int virq_destroy_vm(void *item, void *data)
 	struct virq_desc *desc;
 	struct vm *vm = (struct vm *)item;
 
-	if (vm->virq_desc) {
-		for (i = 0; i < VIRQ_SPI_NR(vm->virq_nr); i++) {
-			desc = &vm->virq_desc[i];
+	if (vm->vspi_desc) {
+		for (i = 0; i < VIRQ_SPI_NR(vm->vspi_nr); i++) {
+			desc = &vm->vspi_desc[i];
 
 			/* should check whether the hirq is pending or not */
 			if (desc->enable && desc->hw &&
@@ -608,11 +608,11 @@ static int virq_destroy_vm(void *item, void *data)
 				irq_mask(desc->hno);
 		}
 
-		free(vm->virq_desc);
+		free(vm->vspi_desc);
 	}
 
 	if (!vm->virq_same_page)
-		free(vm->virq_map);
+		free(vm->vspi_map);
 
 	return 0;
 }

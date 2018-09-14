@@ -447,7 +447,7 @@ static void vgic_gicd_init(struct vm *vm, struct vgic_gicd *gicd,
 
 	typer |= vm->vcpu_nr << 5;
 	typer |= 9 << 19;
-	nr_spi = ((vm->virq_nr - VM_LOCAL_VIRQ_NR) >> 5) - 1;
+	nr_spi = (vm->vspi_nr >> 5) - 1;
 	typer |= nr_spi;
 	gicd->gicd_typer = typer;
 }
