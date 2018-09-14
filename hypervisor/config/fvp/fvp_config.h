@@ -11,10 +11,9 @@
 #define CONFIG_MINOS_RAM_SIZE		(64 * 1024 *1024)
 
 #define CONFIG_MAX_CPU_NR		(8)
-#define CONFIG_NR_CPUS			(6)
-#define CONFIG_NR_CPUS_CLUSTER0		(2)
-#define CONFIG_NR_CPUS_CLUST1		(4)
-#define CONFIG_VM_MAX_VCPU		(CONFIG_NR_CPUS)
+#define CONFIG_NR_CPUS			(4)
+#define CONFIG_NR_CPUS_CLUSTER0		(4)
+#define CONFIG_NR_CPUS_CLUSTER1		(0)
 #define CONFIG_MAX_VM			(64)
 
 #define CONFIG_IRQ_CHIP_NAME		"gicv3"
@@ -23,8 +22,6 @@
 #define CONFIG_LOG_LEVEL		3
 
 #define CONFIG_SCHED_INTERVAL		(20)
-
-#define CONFIG_VCPU_MAX_ACTIVE_IRQS	(16)
 
 /*
  * The below interrupt in arm fvp is used to g0 or

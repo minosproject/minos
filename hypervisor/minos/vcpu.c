@@ -156,7 +156,7 @@ static struct vm *__create_vm(struct vmtag *vme)
 	if (!vm)
 		return NULL;
 
-	vme->nr_vcpu = MIN(vme->nr_vcpu, CONFIG_VM_MAX_VCPU);
+	vme->nr_vcpu = MIN(vme->nr_vcpu, VM_MAX_VCPU);
 
 	memset((char *)vm, 0, sizeof(struct vm));
 	vm->vcpus = (struct vcpu **)malloc(sizeof(struct vcpu *)
@@ -177,7 +177,7 @@ static struct vm *__create_vm(struct vmtag *vme)
 	vm->setup_data = vme->setup_data;
 	init_list(&vm->vdev_list);
 	memcpy(vm->vcpu_affinity, vme->vcpu_affinity,
-			sizeof(uint8_t) * CONFIG_VM_MAX_VCPU);
+			sizeof(uint8_t) * VM_MAX_VCPU);
 
 	vms[vme->vmid] = vm;
 	total_vms++;

@@ -12,7 +12,7 @@
 #include <minos/vmcs.h>
 #include <minos/spinlock.h>
 
-#define VCPU_VCPU_DEFAULT_STACK_SIZE	(SIZE_4K * 2)
+#define VCPU_DEFAULT_STACK_SIZE	(SIZE_4K * 2)
 
 #define VCPU_MAX_LOCAL_IRQS		(32)
 #define CONFIG_VCPU_MAX_ACTIVE_IRQS	(16)

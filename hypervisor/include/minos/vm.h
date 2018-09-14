@@ -11,6 +11,8 @@
 #include <minos/vmm.h>
 #include <minos/errno.h>
 
+#define VM_MAX_VCPU	CONFIG_NR_CPUS
+
 #define MINOS_VM_NAME_SIZE	32
 #define OS_TYPE_SIZE		32
 
@@ -39,7 +41,7 @@ struct vm {
 	int vmid;
 	uint32_t vcpu_nr;
 	int8_t bit64;
-	uint8_t vcpu_affinity[CONFIG_VM_MAX_VCPU];
+	uint8_t vcpu_affinity[VM_MAX_VCPU];
 	unsigned long entry_point;
 	unsigned long setup_data;
 	char name[MINOS_VM_NAME_SIZE];

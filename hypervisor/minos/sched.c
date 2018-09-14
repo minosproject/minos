@@ -25,7 +25,7 @@
 #include <minos/virt.h>
 #include <minos/virq.h>
 
-static struct pcpu pcpus[CONFIG_NR_CPUS];
+static struct pcpu pcpus[NR_CPUS];
 
 DEFINE_PER_CPU(struct pcpu *, pcpu);
 DEFINE_PER_CPU(struct vcpu *, percpu_current_vcpu);
@@ -43,15 +43,18 @@ void get_vcpu_affinity(uint8_t *aff, int nr)
 		for (i = 0; i < nr; i++) {
 			aff[i] = base;
 			base++;
-			base = base & (NR_CPUS - 1);
+			if (base >= NR_CPUS)
+				base = 0;
 		}
 	} else {
 		for (i = 0; i < nr; i++) {
 			if (base == 0)
 				base++;
+
 			aff[i] = base;
 			base++;
-			base = base & (NR_CPUS - 1);
+			if (base >= NR_CPUS)
+				base = 1;
 		}
 	}
 }
@@ -152,7 +155,7 @@ void pcpus_init(void)
 	int i;
 	struct pcpu *pcpu;
 
-	for (i = 0; i < CONFIG_NR_CPUS; i++) {
+	for (i = 0; i < NR_CPUS; i++) {
 		pcpu = &pcpus[i];
 		pcpu->state = PCPU_STATE_RUNNING;
 		init_list(&pcpu->vcpu_list);

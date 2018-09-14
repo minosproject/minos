@@ -81,20 +81,10 @@ static int fdt_setup_cpu(void *dtb, int vcpus)
 	 * max 4 vcpus in one cluster, so just assume there
 	 * is only one cluster node in the dtb file
 	 */
-	offset = fdt_path_offset(dtb, "/cpus/cpu-map/cluster0");
-	if (offset < 0) {
-		pr_err("no cpu node found in dtb\n");
-		return offset;
-	}
-
-	memset(name, 0, 16);
-	for (i = vcpus; i < VM_MAX_VCPUS; i++) {
-		sprintf(name, "core%d", i);
-		node = fdt_subnode_offset(dtb, offset, name);
-		if (node >= 0) {
-			pr_info("        - delete %s\n", name);
-			fdt_del_node(dtb, node);
-		}
+	offset = fdt_path_offset(dtb, "/cpus/cpu-map");
+	if (offset > 0) {
+		pr_info("delete cpu-map node\n");
+		fdt_del_node(dtb, offset);
 	}
 
 	offset = fdt_path_offset(dtb, "/cpus");

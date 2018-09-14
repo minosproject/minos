@@ -161,9 +161,4 @@ struct gic_lr {
 	uint64_t state : 2;
 };
 
-static inline uint64_t logic_cpu_to_irq_affinity(uint32_t c)
-{
-	return 0ul | (c << 0);
-}
-
 #endif

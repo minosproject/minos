@@ -12,7 +12,8 @@
 
 #define CONFIG_MAX_CPU_NR		(8)
 #define CONFIG_NR_CPUS			(2)
-#define CONFIG_VM_MAX_VCPU		(CONFIG_NR_CPUS)
+#define CONFIG_NR_CPUS_CLUSTER0		(2)
+#define CONFIG_NR_CPUS_CLUSTER1		(0)
 #define CONFIG_MAX_VM			(64)
 
 #define CONFIG_IRQ_CHIP_NAME		"gicv3"
@@ -36,7 +37,5 @@
 #define CONFIG_PLATFORM_DRAM_BASE	(0x00000000UL)
 
 #define CONFIG_BOOTMEM_SIZE		(64 * 1024)
-
-#define CONFIG_AFF1_SHIFT		(2)
 
 #endif

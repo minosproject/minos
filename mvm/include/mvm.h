@@ -107,7 +107,7 @@ extern struct vm *mvm_vm;
 #define MEM_BLOCK_BALIGN(v) \
 	(((v) + MEM_BLOCK_SIZE - 1) & ~(MEM_BLOCK_SIZE - 1))
 
-#define VM_MAX_VCPUS			(4)
+#define VM_MAX_VCPUS			(8)
 
 #define VMCS_SIZE(nr) 	BALIGN(nr * sizeof(struct vmcs), PAGE_SIZE)
 

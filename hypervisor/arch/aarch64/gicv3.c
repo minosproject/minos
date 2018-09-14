@@ -150,7 +150,7 @@ static int gicv3_set_irq_affinity(uint32_t irq, uint32_t pcpu)
 {
 	uint64_t affinity;
 
-	affinity = logic_cpu_to_irq_affinity(pcpu);
+	affinity = cpuid_to_affinity(pcpu);
 	affinity &= ~(1 << 31); //GICD_IROUTER_SPI_MODE_ANY
 
 	spin_lock(&gicv3_lock);
@@ -162,20 +162,34 @@ static int gicv3_set_irq_affinity(uint32_t irq, uint32_t pcpu)
 
 static void gicv3_send_sgi_list(uint32_t sgi, cpumask_t *mask)
 {
-	uint64_t list = 0;
-	uint64_t val;
 	int cpu;
+	uint64_t val;
+	int list_cluster0 = 0;
+	int list_cluster1 = 0;
 
-	for_each_cpu(cpu, mask)
-		list |= (1 << cpu);
+	for_each_cpu(cpu, mask) {
+		if (cpu >= CONFIG_NR_CPUS_CLUSTER0)
+			list_cluster1 |= 1 << (cpu - CONFIG_NR_CPUS_CLUSTER0);
+		else
+			list_cluster0 |= (1 << cpu);
+	}
 
 	/*
-	 * TBD: now only support one cluster
+	 * TBD: now only support two cluster
 	 */
-	val = list | (0ul << 16) | (0ul << 32) |
-		(0ul << 48) | (sgi << 24);
-	write_sysreg64(val, ICC_SGI1R_EL1);
-	isb();
+	if (list_cluster0) {
+		val = list_cluster0 | (0ul << 16) | (0ul << 32) |
+			(0ul << 48) | (sgi << 24);
+		write_sysreg64(val, ICC_SGI1R_EL1);
+		isb();
+	}
+
+	if (list_cluster1) {
+		val = list_cluster1 | (1ul << 16) | (0ul << 32) |
+			(0ul << 48) | (sgi << 24);
+		write_sysreg64(val, ICC_SGI1R_EL1);
+		isb();
+	}
 }
 
 static uint64_t gicv3_read_lr(int lr)
