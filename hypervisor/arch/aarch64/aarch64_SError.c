@@ -35,7 +35,7 @@ static struct serror_desc *serror_descs[MAX_SERROR_TYPE] __align_cache_line;
 
 void bad_error(void)
 {
-	panic("------ bad error\n");
+	panic("Bad error received\n");
 }
 
 static int unknown_handler(gp_regs *reg, uint32_t esr_value)

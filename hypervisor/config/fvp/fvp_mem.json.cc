@@ -148,7 +148,7 @@
 		"mem_end": "0x1c0cffff",
 		"enable": 1,
 		"type": 1,
-		"vmid": 1,
+		"vmid": 0,
 		"name": "uart3, pl011"
 	},
 	{

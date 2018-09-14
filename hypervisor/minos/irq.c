@@ -78,7 +78,7 @@ static int do_handle_host_irq(struct irq_desc *irq_desc)
 
 	ret = irq_desc->handler(irq_desc->hno, irq_desc->pdata);
 	if (ret)
-		pr_error("handle irq:%d fail in minos\n", irq_desc->hno);
+		pr_debug("handle irq:%d fail in minos\n", irq_desc->hno);
 
 out:
 	/*

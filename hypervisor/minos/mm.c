@@ -456,7 +456,7 @@ struct mem_block *alloc_mem_block(unsigned long flags)
 	 */
 	if (block && (!(flags & GFB_VM))) {
 		f |= VM_RW;
-		if (flags | GFB_IO)
+		if (flags & GFB_IO)
 			f |= VM_IO;
 		else
 			f |= VM_NORMAL;
