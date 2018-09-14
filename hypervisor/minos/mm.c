@@ -90,7 +90,7 @@ static struct page_pool *io_pool = &__io_pool;
 static struct page_pool *page_pool = &__page_pool;
 static size_t free_blocks;
 
-static void add_boot_slab_mem(unsigned long base, size_t size);
+static void add_slab_mem(unsigned long base, size_t size);
 static void inline add_slab_to_slab_pool(struct slab_header *header,
 		struct slab_pool *pool);
 
@@ -127,7 +127,7 @@ static struct slab_pool slab_pool[] = {
 	{480, 	NULL, 0},
 	{496, 	NULL, 0},
 	{512, 	NULL, 0},
-	{0, 	NULL, 0}		/* size > 512 will store here */
+	{0, 	NULL, 0}		/* size > 512 will store here used as cache pool*/
 };
 
 static LIST_HEAD(host_list);
@@ -179,7 +179,7 @@ static int add_memory_section(unsigned long mem_base, size_t size)
 
 	size = size - real_size;
 	if (size > SLAB_MIN_SIZE)
-		add_boot_slab_mem(mem_base + real_size, size);
+		add_slab_mem(mem_base + real_size, size);
 
 	return 0;
 }
@@ -336,12 +336,12 @@ static int mem_sections_init(void)
 	 */
 	boot_block_size = mem_end - mem_start;
 	if (boot_block_size > SLAB_MIN_SIZE )
-		add_boot_slab_mem(mem_start, boot_block_size);
+		add_slab_mem(mem_start, boot_block_size);
 
 	/* add left bootmem to slab allocator */
 	boot_block_size = bootmem_page_base - bootmem_start;
 	if (boot_block_size > SLAB_MIN_SIZE) {
-		add_boot_slab_mem((unsigned long)bootmem_start,
+		add_slab_mem((unsigned long)bootmem_start,
 				boot_block_size);
 		bootmem_size = 0;
 		bootmem_start = NULL;
@@ -358,8 +358,10 @@ static struct mem_section *addr_to_mem_section(unsigned long addr)
 	for (i = 0; i < nr_sections; i++) {
 		temp = &mem_sections[i];
 		if ((addr >= temp->phy_base) &&
-			(addr < (temp->phy_base + temp->size)))
+			(addr < (temp->phy_base + temp->size))) {
 			section = temp;
+			break;
+		}
 	}
 
 	return section;
@@ -578,18 +580,24 @@ static struct page *__alloc_pages_internal(struct page_pool *pool,
 	list_for_each_entry_safe(block, n, &pool->block_list, list) {
 		page = alloc_pages_from_block(block, count, align);
 		if (page) {
+			/*
+			 * if the block has no more pages for allocate
+			 * delete it from the pool, then do not search
+			 * for pages in this block, when someone free
+			 * some pages, it will be added to the pool again
+			 */
 			if (block->free_pages == 0)
 				list_del(&block->list);
 			break;
 		}
 	}
 
-	/*
-	 * need new memory block from the section
-	 */
 	if (page)
 		goto out;
 
+	/*
+	 * need new memory block from the section
+	 */
 	block = alloc_mem_block(flags);
 	if (!block)
 		goto out;
@@ -611,8 +619,7 @@ out:
 
 struct page *__alloc_pages(int pages, int align)
 {
-	return __alloc_pages_internal(page_pool, pages,
-			align, GFB_PAGE_BIT);
+	return __alloc_pages_internal(page_pool, pages, align, GFB_PAGE);
 }
 
 void *__get_free_pages(int pages, int align)
@@ -631,7 +638,7 @@ void *__get_io_pages(int pages, int align)
 	struct page *page = NULL;
 
 	page = __alloc_pages_internal(io_pool, pages,
-			align, GFB_PAGE_BIT | GFB_IO);
+			align, GFB_PAGE | GFB_IO);
 	if (page)
 		return (void *)(page->phy_base & __PAGE_MASK);
 
@@ -650,7 +657,7 @@ static inline int slab_pool_id(size_t size)
 	return id >= pslab->pool_nr ? (pslab->pool_nr - 1) : id;
 }
 
-static void add_boot_slab_mem(unsigned long base, size_t size)
+static void add_slab_mem(unsigned long base, size_t size)
 {
 	int i;
 	struct slab_pool *pool;
@@ -666,42 +673,37 @@ static void add_boot_slab_mem(unsigned long base, size_t size)
 	if (!(base & (MEM_BLOCK_SIZE - 1)))
 		pr_warn("memory may be a block\n");
 
-	pool = &pslab->pool[pslab->pool_nr - 1];
-	while (size >= SLAB_SIZE(SIZE_1M)) {
-		header = (struct slab_header *)base;
-		header->size = SIZE_1M;
-		header->next = NULL;
-		add_slab_to_slab_pool(header, pool);
-		base += SLAB_SIZE(SIZE_1M);
-		size -= SLAB_SIZE(SIZE_1M);
-	}
-
-	while (size >= SLAB_SIZE(512 * SIZE_1K)) {
-		header = (struct slab_header *)base;
-		header->size = SIZE_1K * 512;
-		header->next = NULL;
-		add_slab_to_slab_pool(header, pool);
-		base += SLAB_SIZE(SIZE_1K * 512);
-		size -= SLAB_SIZE(SIZE_1K * 512);
-	}
-
-	while (size >= SLAB_SIZE(SLAB_MIN_SIZE)) {
-		for (i = (pslab->pool_nr - 2); i >= 0; i--) {
-			pool = &pslab->pool[i];
-			if (size < SLAB_SIZE(pool->size))
-				continue;
-
-			header = (struct slab_header *)base;
-			header->size = pool->size;
-			header->next = NULL;
-			add_slab_to_slab_pool(header, pool);
-			base += SLAB_SIZE(pool->size);
-			size -= SLAB_SIZE(pool->size);
-
-			if (size < SLAB_SIZE(SLAB_MIN_SIZE))
-				break;
+	if (size <= SLAB_SIZE(512)) {
+		if (size < SLAB_SIZE(SLAB_MIN_DATA_SIZE)) {
+			pr_warn("drop small slab memory 0x%p 0x%x\n", base, size);
+			return;
 		}
+
+		i = size - SLAB_HEADER_SIZE;
+		i &= (SLAB_MIN_DATA_SIZE - 1);
+		if (i < SLAB_MIN_DATA_SIZE)
+			return;
+
+		size = i;
+		i = slab_pool_id(size);
+		pool = &pslab->pool[i];
+		header = (struct slab_header *)base;
+		header->size = size;
+		header->next = NULL;
+		add_slab_to_slab_pool(header, pool);
+		return;
 	}
+
+	/*
+	 * the last pool is used to cache pool, if the
+	 * slab memory region bigger than 512byte, it will
+	 * first used as a cached memory slab
+	 */
+	pool = &pslab->pool[pslab->pool_nr - 1];
+	header = (struct slab_header *)base;
+	header->size = size - SLAB_HEADER_SIZE;
+	header->next = NULL;
+	add_slab_to_slab_pool(header, pool);
 }
 
 static int alloc_new_slab_block(void)
@@ -833,6 +835,69 @@ static void *get_new_slab(size_t size)
 	return get_slab_from_slab_free(size);
 }
 
+static void *get_slab_from_cache(size_t size)
+{
+	struct slab_pool *slab_pool;
+	struct slab_header *prev;
+	struct slab_header *header;
+	struct slab_header *ret = NULL;
+	struct slab_header *new;
+	uint32_t left_size;
+	unsigned long base;
+
+	slab_pool = &pslab->pool[pslab->pool_nr - 1];
+	header = slab_pool->head;
+	prev = slab_pool->head;
+
+	while (header != NULL) {
+		if (header->size < size) {
+			prev = header;
+			header = header->next;
+			continue;
+		}
+
+		/*
+		 * split the chache slab, the memory will split
+		 * from the head of the slab
+		 */
+		base = (unsigned long)header + SLAB_SIZE(size);
+		left_size = header->size - size;
+
+		ret = header;
+
+		/*
+		 * check the left size, if the the left size smaller
+		 * than SLAB_MIN_DATA_SIZE, drop it
+		 */
+		if (left_size <= SLAB_SIZE(80)) {
+			if (prev == header)
+				slab_pool->head = header->next;
+			else
+				prev->next = header->next;
+
+			add_slab_mem(base, left_size);
+		} else {
+			new = (struct slab_header *)base;
+			new->next = header->next;
+			new->size = left_size - SLAB_HEADER_SIZE;
+
+			if (prev == header)
+				slab_pool->head = new;
+			else
+				prev->next = new;
+		}
+
+		ret->size = size;
+		ret->magic = SLAB_MAGIC;
+		break;
+	}
+
+	if (ret)
+		return SLAB_HEADER_TO_ADDR(ret);
+
+	return NULL;
+}
+
 static void *get_big_slab(size_t size)
 {
 	struct slab_pool *slab_pool;
@@ -859,6 +924,7 @@ typedef void *(*slab_alloc_func)(size_t size);
 
 static slab_alloc_func alloc_func[] = {
 	get_slab_from_pool,
+	get_slab_from_cache,
 	get_slab_from_slab_free,
 	get_new_slab,
 	get_big_slab,
@@ -980,7 +1046,7 @@ void free_pages(void *addr)
 		meta++;
 	}
 
-	spin_unlock(&page_pool->lock);
+	spin_unlock(&pool->lock);
 }
 
 void release_pages(struct page *page)
@@ -1004,8 +1070,11 @@ void free(void *addr)
 	}
 
 	header = ADDR_TO_SLAB_HEADER(addr);
-	if (header->magic != SLAB_MAGIC)
+	if (header->magic != SLAB_MAGIC) {
+		pr_warn("memory is not a slab mem 0x%p\n",
+				(unsigned long)addr);
 		return;
+	}
 
 	spin_lock(&pslab->lock);
 	slab_pool = &pslab->pool[slab_pool_id(header->size)];
@@ -1060,7 +1129,6 @@ int mm_init(void)
 	page_pool_init();
 	parse_system_regions();
 	mem_sections_init();
-	//map_memory_sections();
 
 	return 0;
 }
