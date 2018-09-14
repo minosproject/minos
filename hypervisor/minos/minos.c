@@ -128,6 +128,9 @@ void boot_main(void *setup_data)
 
 	pr_info("Starting Minos ...\n");
 
+	if (smp_processor_id() != 0)
+		panic("boot_main : cpu is not cpu0");
+
 	/*
 	 * at the early stage when the memory mangement
 	 * has not been finish init, system can using
@@ -135,7 +138,6 @@ void boot_main(void *setup_data)
 	 * free mem or free pages
 	 */
 	bootmem_init();
-	pr_info("sp is 0x%x\n", arch_get_fp());
 
 	early_init(setup_data);
 	early_init_percpu();
@@ -145,9 +147,6 @@ void boot_main(void *setup_data)
 	hooks_init();
 
 	percpus_init();
-
-	if (smp_processor_id() != 0)
-		panic("cpu is not cpu0");
 
 	arch_init();
 	arch_init_percpu();

@@ -610,24 +610,18 @@ int gicv3_init(void)
 	void *rbase;
 	uint64_t pr;
 	uint32_t value;
-	uint32_t array[16];
+	int len = 16, node;
+	uint64_t array[16];
 	void * __gicr_rd_base = 0;
 
 	pr_info("*** gicv3 init ***\n");
 
 	spin_lock_init(&gicv3_lock);
 
-#if 0
 	memset(array, 0, sizeof(array));
-	type = of_get_u32_array("/soc/internal-regs/interrupt-controller",
-				"reg", array, &i);
-	if (type || i < 4)
+	node = of_get_interrupt_regs(array, &len);
+	if ((node < 0) || (len < 4))
 		panic("can not find gicv3 interrupt controller\n");
-#endif
-	array[0] = 0xd1d00000;
-	array[1] = 0x10000;
-	array[2] = 0xd1d40000;
-	array[3] = 0x40000;
 
 	/* only map gicd and gicr now */
 	pr = array[2] + array[3] - array[0];
@@ -655,7 +649,7 @@ int gicv3_init(void)
 	iowrite32(gicd_base + GICD_CTLR, 0);
 
 	type = ioread32(gicd_base + GICD_TYPER);
-	pr_info("typer reg of gicv3 is 0x%x\n", type);
+	pr_info("gicv3 typer reg of gicv3 is 0x%x\n", type);
 	nr_lines = 32 * ((type & 0x1f));
 
 	/* alloc LOCAL_IRQS for each cpus */

@@ -19,12 +19,15 @@
 #include <asm/gic_reg.h>
 #include <config/config.h>
 
+#define SCTLR_EL2_VALUE		0x30c51878
+
 	.section __start_up, "ax"
 	.balign 4
 
 	.global _start
 	.type _start, "function"
 _start:
+	/* interrupt disabled mmu/dcache/icache off */
 	msr	daifset, #2
 	b	do_start
 	.quad   CONFIG_MINOS_START_ADDRESS	     /* Image load offset from start of RAM */
@@ -66,15 +69,17 @@ do_start:
 	// neither EL3 nor EL2 trap floating point or accesses to CPACR
 	msr	CPTR_EL2, xzr
 
+	/* each idle task will have 16k stack */
 	ldr	x0, =__el2_stack_end
-	sub	x0, x0, x19, lsl #13
+	sub	x0, x0, x19, lsl #14
 	mov	sp, x0
 
 	/* invalid the dcache and flush the tlb */
 	bl	inv_unified_dcache
+	tlbi	alle2
 	isb
 
-	ldr	x1, =0x30c51878
+	ldr	x1, =SCTLR_EL2_VALUE
 	msr	SCTLR_EL2, x1
 
 	/* setup the el2 page table */
@@ -195,6 +200,7 @@ do_start:
 	mrs	x1, SCTLR_EL2
 	orr	x1, x1, #SCTLR_ELx_M
 	bic	x1, x1, #SCTLR_ELx_A
+	bic	x1, x1, #SCTLR_ELx_SA
 	msr	SCTLR_EL2, x1
 	isb
 
@@ -226,7 +232,7 @@ do_start:
 	nop
 
 secondary_start_up:
-	ldr	x1, =0x30c51878
+	ldr	x1, =SCTLR_EL2_VALUE
 	msr	SCTLR_EL2, x1
 	dsb	sy
 	isb
@@ -236,6 +242,7 @@ secondary_start_up:
 	orr	x1, x1, #SCTLR_ELx_C
 	orr	x1, x1, #SCTLR_ELx_I
 	bic	x1, x1, #SCTLR_ELx_A
+	bic	x1, x1, #SCTLR_ELx_SA
 	orr	x1, x1, #SCTLR_ELx_M
 	msr	SCTLR_EL2, x1
 	dsb	ish
@@ -314,22 +321,4 @@ loop:
 	add	x3, x3, #0x200000
 	b loop
 exit_loop:
-	ret
-
-	.global puts
-puts:
-	ldr	x2, =0xd001200c
-	ldr	x3, =0xd0012004
-	mov	x4, #0
-ploop:
-	ldrh	w4, [x2]
-	and	x4, x4, #0x800
-	cbnz	x4, ploop
-
-	ldrb	w1, [x0], #1           /* Load next char */
-	cbz	w1, 1f                 /* Exit on nul */
-	strh	w1, [x3]
-	dsb	sy
-	b	ploop
-1:
 	ret

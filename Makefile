@@ -1,10 +1,12 @@
 all: hypervisor mvm
 
+PLATFORM	?= espressobin
+
 .PHONY: hypervisor mvm clean distclean
 
 hypervisor:
 	@ echo "build hypervisor"
-	@ cd hypervisor && make
+	@ cd hypervisor && make PLATFORM=$(PLATFORM)
 
 mvm:
 	@ echo "build minos userspace tools"

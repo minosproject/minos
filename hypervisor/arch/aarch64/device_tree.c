@@ -107,11 +107,83 @@ int of_get_u64_array(char *path, char *attr, uint64_t *array, int *len)
 	return 0;
 }
 
+int of_get_node_by_name(int pnode, char *str, int deepth)
+{
+	const char *name;
+	int node = -1, child, len;
+
+	if (deepth >= 10)
+		return -ENOENT;
+
+	fdt_for_each_subnode(node, dtb, pnode) {
+		if (NULL == (name = fdt_get_name(dtb, node, &len)))
+			continue;
+		if (len < 0)
+			continue;
+
+		if (strncmp(name, str, strlen(str)) == 0)
+			return node;
+		else {
+			child = of_get_node_by_name(node, str, deepth + 1);
+			if (child > 0)
+				return child;
+		}
+	}
+
+	return -ENOENT;
+}
+
+int of_get_interrupt_regs(uint64_t *array, int *array_len)
+{
+	const void *data;
+	uint32_t *u32_data;
+	int node = -1, len, size_cell, i;
+
+	node = of_get_node_by_name(0, "interrupt-controller", 0);
+	if (node < 0)
+		return -ENOENT;
+
+	size_cell = fdt_size_cells(dtb, node);
+	if ((size_cell != 1) && (size_cell != 2)) {
+		pr_error("invaild size cell of interrupt node\n");
+		return -EINVAL;
+	}
+
+	data = fdt_getprop(dtb, node, "reg", &len);
+	if (!data || (len <= 0))
+		return -EINVAL;
+
+	u32_data = (uint32_t *)data;
+	len = (len / sizeof(uint32_t));
+	if (*array_len < (len / size_cell))
+		return -EINVAL;
+	else
+		*array_len = len / size_cell;
+
+	if (size_cell == 1) {
+		for (i = 0; i < len; i++)
+			array[i] = fdt32_to_cpu(u32_data[i]);
+	} else {
+		if (len & 1)
+			return -EINVAL;
+
+		for (i = 0; i < len; i += 2) {
+			*array = (uint64_t)(fdt32_to_cpu(u32_data[i])) << 32 |
+				fdt32_to_cpu(u32_data[i + 1]);
+			array++;
+		}
+	}
+
+	return node;
+}
+
 int of_init(void *setup_data)
 {
 	unsigned long base;
 
+#ifdef CONFIG_PLATFORM_FVP
 	setup_data = (void *)mv_config->vmtags[0].setup_data;
+#endif
 	base = (unsigned long)setup_data;
 
 	pr_info("dtb address is 0x%x\n", (unsigned long)base);
@@ -313,7 +385,7 @@ void hvm_dtb_init(struct vm *vm)
 	}
 
 	/* update the dtb address for the hvm */
-	//vm->setup_data = (unsigned long)dtb;
+	vm->setup_data = (unsigned long)dtb;
 
 	fdt_setup_minos(vm);
 	fdt_setup_cmdline(vm);

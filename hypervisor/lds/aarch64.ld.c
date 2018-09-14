@@ -10,7 +10,7 @@ SECTIONS
 		 */
 		__code_start = .;
 		KEEP(*(__start_up))
-		KEEP(*(__el3_vectors __el2_vectors __int_handlers __asm_code))
+		KEEP(*(__el2_vectors __int_handlers __asm_code))
 	}
 
 	.text : 
@@ -195,15 +195,8 @@ SECTIONS
 	.el2_stack : {
 		. = ALIGN(64);
 		__el2_stack = .;
-		. = . + (CONFIG_NR_CPUS * 0x2000);
+		. = . + (CONFIG_NR_CPUS * 0x4000);
 		__el2_stack_end = .;
-	}
-
-	.el3_stack : {
-		. = ALIGN(64);
-		__el3_stack = .;
-		. = . + (CONFIG_NR_CPUS * 0x100);
-		__el3_stack_end = .;
 	}
 
 	.el2_ttb0_pgd : {

@@ -522,10 +522,10 @@ int vgic_create_vm(void *item, void *arg)
 	 * arm FVP
 	 */
 	if (vm->vmid == 0) {
+		i = 16;
 		memset(array, 0, sizeof(array));
-		ret = of_get_u64_array("/interrupt-controller",
-				"reg", array, &i);
-		if (ret || i < 4)
+		ret = of_get_interrupt_regs(array, &i);
+		if ((ret < 0) || (i < 4))
 			return -ENOENT;
 
 		/* count the iomem size of gic */
