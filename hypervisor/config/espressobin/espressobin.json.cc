@@ -15,6 +15,7 @@
 			"vcpu1_affinity": 1,
 			"vcpu2_affinity": 2,
 			"vcpu3_affinity": 3,
+			"cmdline": "",
 			"bit64": 1
 		}
 	],

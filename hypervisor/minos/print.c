@@ -74,7 +74,7 @@ int level_print(char *fmt, ...)
 	int printed, i;
 	char *buf;
 
-	ch = fmt[2];
+	ch = fmt[4];
 	if (is_digit(ch)) {
 		ch = ch - '0';
 		if(ch > CONFIG_LOG_LEVEL)

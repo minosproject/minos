@@ -108,6 +108,6 @@ void vcpu_idle(void);
 int vcpu_suspend(gp_regs *c, uint32_t state, unsigned long entry);
 void vcpu_online(struct vcpu *vcpu);
 void vcpu_offline(struct vcpu *vcpu);
-int vcpu_power_on(struct vcpu *caller, int cpuid,
+int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 		unsigned long entry, unsigned long unsed);
 #endif

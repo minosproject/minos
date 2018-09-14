@@ -73,11 +73,14 @@ void vcpu_offline(struct vcpu *vcpu)
 	set_vcpu_suspend(vcpu);
 }
 
-int vcpu_power_on(struct vcpu *caller, int cpuid,
+int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 		unsigned long entry, unsigned long unsed)
 {
+	int cpuid;
 	struct vcpu *vcpu;
 	struct os *os = caller->vm->os;
+
+	cpuid = affinity_to_vcpuid(affinity);
 
 	/*
 	 * resched the pcpu since it may have in the
@@ -89,8 +92,8 @@ int vcpu_power_on(struct vcpu *caller, int cpuid,
 	 */
 	vcpu = get_vcpu_by_id(caller->vm->vmid, cpuid);
 	if (!vcpu) {
-		pr_error("no such:%d vcpu for this VM %s\n",
-				cpuid, caller->vm->name);
+		pr_error("no such:%d->0x%x vcpu for this VM %s\n",
+				cpuid, affinity, caller->vm->name);
 		return -ENOENT;
 	}
 

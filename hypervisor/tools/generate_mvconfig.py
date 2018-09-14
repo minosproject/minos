@@ -49,6 +49,7 @@ patten = [
             {'name': 'nr_vcpu', 'type': 'NUM', 'data': None},
             {'name': 'entry', 'type': 'HEX_STRING', 'data': None},
             {'name': 'setup_data', 'type': 'HEX_STRING', 'data': None},
+            {'name': 'cmdline', 'type': 'STRING', 'data': None},
             {'name': 'vcpu_affinity', 'type': 'FUNCTION', 'data': parse_vcpu_affinity},
             {'name': 'bit64', 'type': "NUM", 'data': None}
         ]

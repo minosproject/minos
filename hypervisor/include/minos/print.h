@@ -5,12 +5,12 @@ void log_init(void);
 
 int level_print(char *fmt, ...);
 
-#define	pr_debug(...)	level_print("[04 D] : " __VA_ARGS__)
-#define pr_info(...)	level_print("[03 I] : " __VA_ARGS__)
-#define pr_warn(...)	level_print("[02 W] : " __VA_ARGS__)
-#define pr_error(...)	level_print("[01 E] : " __VA_ARGS__)
-#define pr_fatal(...)	level_print("[00 F] : " __VA_ARGS__)
+#define	pr_debug(...)	level_print("[00 4] : " __VA_ARGS__)
+#define pr_info(...)	level_print("[00 3] : " __VA_ARGS__)
+#define pr_warn(...)	level_print("[00 2] : " __VA_ARGS__)
+#define pr_error(...)	level_print("[00 1] : " __VA_ARGS__)
+#define pr_fatal(...)	level_print("[00 0] : " __VA_ARGS__)
 
-#define printf(...)	level_print("[03 I] : " __VA_ARGS__)
+#define printf(...)	level_print("[00 0] : " __VA_ARGS__)
 
 #endif

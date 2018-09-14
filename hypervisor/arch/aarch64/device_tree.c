@@ -253,6 +253,35 @@ static int fdt_setup_minos(struct vm *vm)
 
 static int fdt_setup_cmdline(struct vm *vm)
 {
+	const void *data;
+	int node, len;
+	char *new_cmdline;
+
+	node = fdt_path_offset(dtb, "/chosen");
+	if (node < 0) {
+		node = fdt_add_subnode(dtb, 0, "chosen");
+		if (node < 0) {
+			pr_error("add chosen node failed for vm0\n");
+			return node;
+		}
+	}
+
+	data = fdt_getprop(dtb, node, "bootargs", &len);
+	if ((!data) || (len <= 0))
+		pr_info("default_cmdline:");
+	else
+		pr_info("default_cmdline: %s\n", (char *)data);
+
+	new_cmdline = mv_config->vmtags[0].cmdline;
+	len = strlen(new_cmdline);
+	if (len == 0) {
+		pr_info("no new cmdline using default\n");
+		return 0;
+	} else
+		pr_info("new_cmdline:%s\n", new_cmdline);
+
+	fdt_setprop(dtb, node, "bootargs", new_cmdline, len);
+
 	return 0;
 }
 
@@ -264,32 +293,24 @@ static int fdt_setup_cpu(struct vm *vm)
 	/*
 	 * delete unused vcpu for hvm
 	 */
-#ifdef CONFIG_PLATFORM_FVP
-	offset = fdt_path_offset(dtb, "/cpus/cpu-map/cluster0");
+	offset = of_get_node_by_name(0, "cpus", 0);
 	if (offset < 0) {
-		pr_error("no cpu node found\n");
-		return offset;
+		pr_error("can not find cpus node in dtb\n");
+		return -ENOENT;
+	}
+
+	node = fdt_subnode_offset(dtb, offset, "cpu-map");
+	if (offset > 0) {
+		pr_info("delete cpu-map node\n");
+		fdt_del_node(dtb, node);
 	}
 
 	memset(name, 0, 16);
-	for (i = vm->vcpu_nr; i < CONFIG_VM_MAX_VCPU; i++) {
-		sprintf(name, "core%d", i);
+	for (i = vm->vcpu_nr; i < CONFIG_MAX_CPU_NR; i++) {
+		sprintf(name, "cpu@%x", ((i / 4) << 8) + (i % 4));
 		node = fdt_subnode_offset(dtb, offset, name);
 		if (node >= 0) {
-			pr_debug("        - delete %s\n", name);
-			fdt_del_node(dtb, node);
-		}
-	}
-#endif
-
-	offset = fdt_path_offset(dtb, "/cpus");
-
-	memset(name, 0, 16);
-	for (i = vm->vcpu_nr; i < CONFIG_VM_MAX_VCPU; i++) {
-		sprintf(name, "cpu@%d", i);
-		node = fdt_subnode_offset(dtb, offset, name);
-		if (node >= 0) {
-			pr_debug("        - delete %s\n", name);
+			pr_info("delete vcpu %s for vm0\n", name);
 			fdt_del_node(dtb, node);
 		}
 	}

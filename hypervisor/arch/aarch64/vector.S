@@ -118,7 +118,11 @@ arch_switch_vcpu_sw:
 	ldr	x5, =per_cpu_percpu_current_vcpu
 	ldr	x4, =per_cpu_percpu_next_vcpu
 	mrs	x1, mpidr_el1
-	ubfx	x1, x1, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
+	ubfx	x8, x1, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
+	ubfx	x9, x1, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
+	mov	x10, #CONFIG_NR_CPUS_CLUSTER0
+	mul	x2, x9, x10
+	add	x1, x2, x8
 	ldr	x2, =percpu_offset
 	ldr	x3, [x2]
 	sub	x5, x5, x3
@@ -256,7 +260,11 @@ __irq_handler:
 	ldr	x5, =per_cpu_percpu_current_vcpu
 	ldr	x4, =per_cpu_percpu_next_vcpu
 	mrs	x1, mpidr_el1
-	ubfx	x1, x1, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
+	ubfx	x8, x1, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
+	ubfx	x9, x1, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
+	mov	x10, #CONFIG_NR_CPUS_CLUSTER0
+	mul	x2, x9, x10
+	add	x1, x2, x8
 	ldr	x2, =percpu_offset
 	ldr	x3, [x2]
 	sub	x5, x5, x3

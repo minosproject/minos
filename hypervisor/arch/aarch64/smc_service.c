@@ -34,7 +34,7 @@ static int std_smc_handler(gp_regs *c,
 
 	case PSCI_0_2_FN64_CPU_ON:
 	case PSCI_0_2_FN_CPU_ON:
-		ret = vcpu_power_on(current_vcpu, (int)args[0],
+		ret = vcpu_power_on(current_vcpu, (unsigned long)args[0],
 					(unsigned long)args[1],
 					(unsigned long)args[2]);
 		if (ret)

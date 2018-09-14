@@ -106,10 +106,35 @@ static inline void arch_restore_irqflags(unsigned long flags)
 #define read_sysreg(name)     read_sysreg64(name)
 #define write_sysreg(v, name) write_sysreg64(v, name)
 
+static inline int affinity_to_vcpuid(unsigned long affinity)
+{
+	int aff0, aff1;
+
+#define VM_NR_CPUS_CLUSTER	256
+	aff1 = (affinity >> 8) & 0xff;
+	aff0 = affinity & 0xff;
+
+	return (aff1 * VM_NR_CPUS_CLUSTER) + aff0;
+}
+
 static inline int affinity_to_logic_cpu(uint32_t aff3, uint32_t aff2,
 		uint32_t aff1, uint32_t aff0)
 {
-	return (aff1 << CONFIG_AFF1_SHIFT) + aff0;
+	return (aff1 * CONFIG_NR_CPUS_CLUSTER0) + aff0;
+}
+
+static inline uint64_t cpuid_to_affinity(int cpuid)
+{
+	int aff0, aff1;
+
+	if (cpuid < CONFIG_NR_CPUS_CLUSTER0)
+		return cpuid;
+	else {
+		aff0 = cpuid - CONFIG_NR_CPUS_CLUSTER0;
+		aff1 = 1;
+
+		return (aff1 << 8) + aff0;
+	}
 }
 
 static inline void flush_all_tlb_host(void)

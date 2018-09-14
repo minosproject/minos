@@ -29,19 +29,23 @@ int smp_cpu_up(unsigned long cpu, unsigned long entry)
 void smp_cpus_up(void)
 {
 	int i, ret;
+	uint64_t affinity;
 
 	flush_cache_all();
 
 	for (i = 1; i < CONFIG_NR_CPUS; i++) {
-		ret = smp_cpu_up(i, CONFIG_MINOS_START_ADDRESS);
+		affinity = cpuid_to_affinity(i);
+		ret = smp_cpu_up(affinity, CONFIG_MINOS_START_ADDRESS);
 		if (ret) {
 			pr_fatal("failed to bring up cpu-%d\n", i);
 			continue;
 		}
 
 		pr_info("waiting for cpu-%d up\n", i);
-		while (smp_affinity_id[i] == 0);
-		pr_info("cpu-%d is up with affinity id 0x%p\n",
+		while (smp_affinity_id[i] == 0)
+			cpu_relax();
+
+		pr_debug("cpu-%d is up with affinity id 0x%p\n",
 				i, smp_affinity_id[i]);
 	}
 }
@@ -49,4 +53,5 @@ void smp_cpus_up(void)
 void smp_init(void)
 {
 	smp_affinity_id = (uint64_t *)&__smp_affinity_id;
+	memset(smp_affinity_id, 0, sizeof(uint64_t) * NR_CPUS);
 }
