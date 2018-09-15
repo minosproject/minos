@@ -48,7 +48,7 @@ static void gicv3_gicd_wait_for_rwp(void)
 
 static void gicv3_gicr_wait_for_rwp(void)
 {
-	while (ioread32(gicr_rd_base() + GICR_CTLR) & (1 << 3));
+	while (ioread32(gicr_rd_base() + GICR_CTLR) & (1 << 31));
 }
 
 static void gicv3_mask_irq(uint32_t irq)
@@ -448,6 +448,7 @@ static int gicv3_gicr_init(void)
 	/* disable all PPI and enable all SGI */
 	iowrite32(gicr_sgi_base() + GICR_ICENABLER, 0xffff0000);
 	iowrite32(gicr_sgi_base() + GICR_ISENABLER, 0x0000ffff);
+
 
 	/* configure SGI and PPI as non-secure Group-1 */
 	iowrite32(gicr_sgi_base() + GICR_IGROUPR0, 0xffffffff);

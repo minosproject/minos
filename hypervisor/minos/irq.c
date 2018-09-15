@@ -422,7 +422,7 @@ out:
 
 static int do_bad_int(uint32_t irq)
 {
-	pr_error("Handle bad irq do nothing %d\n", irq);
+	pr_debug("Handle bad irq do nothing %d\n", irq);
 	irq_chip->irq_dir(irq);
 
 	return 0;

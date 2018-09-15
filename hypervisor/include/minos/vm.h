@@ -11,13 +11,13 @@
 #include <minos/vmm.h>
 #include <minos/errno.h>
 
-#define VM_MAX_VCPU	CONFIG_NR_CPUS
+#define VM_MAX_VCPU		CONFIG_NR_CPUS
 
 #define MINOS_VM_NAME_SIZE	32
 #define OS_TYPE_SIZE		32
 
-#define VMID_HOST	(65535)
-#define VMID_INVALID	(-1)
+#define VMID_HOST		(65535)
+#define VMID_INVALID		(-1)
 
 struct vcpu;
 struct os;

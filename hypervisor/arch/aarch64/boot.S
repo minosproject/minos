@@ -43,8 +43,7 @@ _start:
         .long   0x0
 
 do_start:
-	mov	x0, x27				// save the dtb blob to x27
-
+	mov	x27, x0				// save the dtb blob to x27
 	mrs	x0, midr_el1
 	mrs	x1, mpidr_el1
 	msr	vpidr_el2, x0

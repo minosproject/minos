@@ -153,17 +153,28 @@ int of_get_interrupt_regs(uint64_t *array, int *array_len)
 	if (!data || (len <= 0))
 		return -EINVAL;
 
+	/*
+	 * Fix Me: espressobin dts's size_cell of interrupt
+	 * controller is 2, but the reg is using uint32_t
+	 * format, so the length will be wrong
+	 */
 	u32_data = (uint32_t *)data;
 	len = (len / sizeof(uint32_t));
 	if (*array_len < (len / size_cell))
 		return -EINVAL;
-	else
+	else {
+#ifndef CONFIG_PLATFORM_ARMADA
 		*array_len = len / size_cell;
+#else
+		*array_len = len;
+#endif
+	}
 
 	if (size_cell == 1) {
 		for (i = 0; i < len; i++)
 			array[i] = fdt32_to_cpu(u32_data[i]);
 	} else {
+#ifndef CONFIG_PLATFORM_ARMADA
 		if (len & 1)
 			return -EINVAL;
 
@@ -172,6 +183,10 @@ int of_get_interrupt_regs(uint64_t *array, int *array_len)
 				fdt32_to_cpu(u32_data[i + 1]);
 			array++;
 		}
+#else
+		for (i = 0; i < len; i++)
+			array[i] = fdt32_to_cpu(u32_data[i]);
+#endif
 	}
 
 	return node;
@@ -181,11 +196,7 @@ int of_init(void *setup_data)
 {
 	unsigned long base;
 
-#ifdef CONFIG_PLATFORM_FVP
-	setup_data = (void *)mv_config->vmtags[0].setup_data;
-#endif
 	base = (unsigned long)setup_data;
-
 	pr_info("dtb address is 0x%x\n", (unsigned long)base);
 
 	if (!setup_data || (base & (MEM_BLOCK_SIZE - 1))) {

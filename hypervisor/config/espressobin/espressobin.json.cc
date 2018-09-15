@@ -4,12 +4,12 @@
 	"platform": "armv8-fvp",
 
 	"vmtags": [
-	{
+		{
 			"vmid": 0,
 			"name": "espressobin",
 			"type": "linux",
 			"nr_vcpu": 1,
-			"entry": "0x80000",
+			"entry": "0x280000",
 			"setup_data": "0xfe00000",
 			"vcpu0_affinity": 0,
 			"vcpu1_affinity": 1,
