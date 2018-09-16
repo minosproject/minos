@@ -46,7 +46,6 @@ static void virt_timer_expire_function(unsigned long data)
 {
 	struct vtimer *vtimer = (struct vtimer *)data;
 
-	vtimer->cnt_ctl |= CNT_CTL_IMASK;
 	send_virq_to_vcpu(vtimer->vcpu, vtimer->virq);
 }
 
