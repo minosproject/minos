@@ -18,12 +18,17 @@
 
 extern int mvebu_serial_probe(void *addr);
 
-int serial_init(void)
+int platform_serial_init(void)
 {
 	return mvebu_serial_probe((void *)0xd0012000);
 }
 
-int cpu_on(int cpu, unsigned long entry)
+int platform_cpu_on(int cpu, unsigned long entry)
 {
 	return psci_cpu_on(cpu, entry);
+}
+
+int platform_time_init(void)
+{
+	return 0;
 }

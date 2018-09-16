@@ -17,13 +17,14 @@
 #include <minos/minos.h>
 #include <config/config.h>
 #include <minos/percpu.h>
+#include <minos/platform.h>
 
 extern unsigned char __smp_affinity_id;
 uint64_t *smp_affinity_id;
 
 int smp_cpu_up(unsigned long cpu, unsigned long entry)
 {
-	return cpu_on(cpu, entry);
+	return platform_cpu_on(cpu, entry);
 }
 
 void smp_cpus_up(void)
