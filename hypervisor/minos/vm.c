@@ -67,8 +67,8 @@ int create_new_vm(struct vm_info *info)
 	/*
 	 * first check whether there are enough memory for
 	 * this vm and the vm's memory base need to be start
-	 * at 0xc0000000 or higher, if the mem_start is 0,
-	 * then set it to default 0xc0000000
+	 * at 0x80000000 or higher, if the mem_start is 0,
+	 * then set it to default 0x80000000
 	 */
 	size = vm_info->mem_size;
 
@@ -121,3 +121,38 @@ release_vm:
 
 	return -ENOMEM;
 }
+
+#if 0
+void vm_reset(struct vm *vm, void *args)
+{
+	int ret;
+	struct vdev *vdev;
+	struct vcpu *vcpu;
+
+	/*
+	 * if the args is NULL, then this reset is requested by
+	 * iteself, otherwise the reset is called by vm0
+	 */
+	vm_for_each_vcpu(vm, vcpu) {
+		ret = vcpu_power_off(vcpu, 1000);
+		if (ret) {
+			pr_error("vm-%d vcpu-%d power off failed\n",
+					vm->vmid, vcpu->vcpu_id);
+			return ret;
+		}
+
+		/* the vcpu is powered off, then reset it */
+		ret = vcpu_reset(vcpu);
+		if (ret)
+			return ret;
+	}
+
+	/* reset the vdev for this vm */
+	list_for_each_entry(vdev, &vm->vdev_list, list) {
+		if (vdev->reset)
+			vdev->reset(vdev);
+	}
+
+	sched();
+}
+#endif

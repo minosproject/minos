@@ -55,6 +55,13 @@ static int std_smc_handler(gp_regs *c,
 	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
 		SVC_RET1(c, PSCI_0_2_TOS_MP);
 		break;
+
+	case PSCI_0_2_FN_SYSTEM_OFF:
+		break;
+
+	case PSCI_0_2_FN_SYSTEM_RESET:
+		break;
+
 	default:
 		break;
 	}
