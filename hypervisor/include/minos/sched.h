@@ -30,6 +30,8 @@ DECLARE_PER_CPU(int, need_resched);
 
 #define SCHED_REASON_IRQ	(0x0)
 
+#define SCHED_FLAGS_PREEMPT	(1 << 0)
+
 typedef enum _pcpu_state_t {
 	PCPU_STATE_RUNNING	= 0x0,
 	PCPU_STATE_IDLE,
@@ -44,6 +46,9 @@ struct pcpu {
 	struct sched_class *sched_class;
 	void *sched_data;
 
+	int nr_vcpus;
+	int nr_running_vcpus;
+
 	struct list_head vcpu_list;
 };
 
@@ -53,7 +58,7 @@ void pcpus_init(void);
 void sched(void);
 int pcpu_add_vcpu(int cpu, struct vcpu *vcpu);
 void set_vcpu_state(struct vcpu *vcpu, int state);
-void sched_vcpu(struct vcpu *vcpu);
+void kick_vcpu(struct vcpu *vcpu);
 int sched_init(void);
 int local_sched_init(void);
 void sched_new(void);

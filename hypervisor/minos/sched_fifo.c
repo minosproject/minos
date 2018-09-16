@@ -44,17 +44,12 @@ static void fifo_set_vcpu_state(struct pcpu *pcpu,
 
 	if (state == VCPU_STAT_READY) {
 		list_del(&td->fifo_list);
-		if (vcpu->resched)
-			list_add(&pd->ready_list, &td->fifo_list);
-		else
-			list_add_tail(&pd->ready_list, &td->fifo_list);
-
-		/* if the need_resched flag is set clear it */
-		vcpu->resched = 0;
+		list_add(&pd->ready_list, &td->fifo_list);
 	} else if ((state == VCPU_STAT_SUSPEND) ||
 		state == VCPU_STAT_IDLE) {
 		list_del(&td->fifo_list);
 		list_add_tail(&pd->sleep_list, &td->fifo_list);
+		pr_info("vm-%d-%d suspend\n", vcpu->vcpu_id, vcpu->vm->vmid);
 	}
 
 	vcpu->state = state;
@@ -116,6 +111,17 @@ static int fifo_init_pcpu_data(struct pcpu *pcpu)
 	return 0;
 }
 
+static void fifo_deinit_pcpu_data(struct pcpu *pcpu)
+{
+	struct fifo_pcpu_data *d;
+
+	d = pcpu->sched_data;
+	if (d)
+		free(d);
+
+	pcpu->sched_data = NULL;
+}
+
 static int fifo_init_vcpu_data(struct pcpu *pcpu, struct vcpu *vcpu)
 {
 	struct fifo_vcpu_data *data;
@@ -130,6 +136,18 @@ static int fifo_init_vcpu_data(struct pcpu *pcpu, struct vcpu *vcpu)
 	data->vcpu = vcpu;
 
 	return 0;
+}
+
+static void fifo_deinit_vcpu_data(struct pcpu *pcpu, struct vcpu *vcpu)
+{
+	struct fifo_vcpu_data *data;
+
+	data = vcpu->sched_data;
+	if (!data)
+		return;
+
+	vcpu->sched_data = NULL;
+	free(data);
 }
 
 static void fifo_sched(struct pcpu *pcpu,
@@ -177,20 +195,23 @@ static unsigned long fifo_tick_handler(struct pcpu *pcpu)
 {
 	next_vcpu = fifo_pick_vcpu(pcpu);
 
-	return MILLISECS(5);
+	return MILLISECS(50);
 }
 
 static struct sched_class sched_fifo = {
-	.name		= "fifo",
-	.sched_interval = MILLISECS(5),
-	.set_vcpu_state = fifo_set_vcpu_state,
-	.pick_vcpu	= fifo_pick_vcpu,
-	.add_vcpu	= fifo_add_vcpu,
-	.init_pcpu_data = fifo_init_pcpu_data,
-	.init_vcpu_data = fifo_init_vcpu_data,
-	.sched		= fifo_sched,
-	.sched_vcpu	= fifo_sched_vcpu,
-	.tick_handler	= fifo_tick_handler,
+	.name			= "fifo",
+	.flags			= 0,
+	.sched_interval		= MILLISECS(100),
+	.set_vcpu_state		= fifo_set_vcpu_state,
+	.pick_vcpu		= fifo_pick_vcpu,
+	.add_vcpu		= fifo_add_vcpu,
+	.init_pcpu_data		= fifo_init_pcpu_data,
+	.deinit_pcpu_data	= fifo_deinit_pcpu_data,
+	.init_vcpu_data		= fifo_init_vcpu_data,
+	.deinit_vcpu_data	= fifo_deinit_vcpu_data,
+	.sched			= fifo_sched,
+	.sched_vcpu		= fifo_sched_vcpu,
+	.tick_handler		= fifo_tick_handler,
 };
 
 static int sched_fifo_init(void)

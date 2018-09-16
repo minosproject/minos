@@ -18,9 +18,6 @@
 #include <asm/arch.h>
 #include <minos/sched.h>
 
-extern void sched_tick_enable(unsigned long exp);
-extern void sched_tick_disable(void);
-
 void cpu_idle()
 {
 	struct pcpu *pcpu = get_cpu_var(pcpu);
@@ -28,10 +25,8 @@ void cpu_idle()
 	/* enable the sched_tick */
 
 	while (1) {
-		sched_tick_enable(MILLISECS(5));
 		sched();
 		pcpu->state = PCPU_STATE_IDLE;
-		sched_tick_disable();
 		wfi();
 		pcpu->state = PCPU_STATE_RUNNING;
 	}

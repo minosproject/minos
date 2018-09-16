@@ -25,6 +25,9 @@
 #include <minos/virt.h>
 #include <minos/virq.h>
 
+extern void sched_tick_disable(void);
+extern void sched_tick_enable(unsigned long exp);
+
 static struct pcpu pcpus[NR_CPUS];
 
 DEFINE_PER_CPU(struct pcpu *, pcpu);
@@ -85,38 +88,25 @@ void switch_to_vcpu(struct vcpu *current, struct vcpu *next)
 		enter_to_guest(next, NULL);
 }
 
-void sched_vcpu(struct vcpu *vcpu)
+void kick_vcpu(struct vcpu *vcpu)
 {
 	struct vcpu *current = current_vcpu;
-	//struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	/* Fix me TBD */
-
-	if (vcpu == current)
+	/*
+	 * if the vcpu is in suspend or idle state
+	 * when recevie new interrput or other things
+	 * which cause vcpu is waked up, need to set
+	 * the vcpu's to ready again
+	 */
+	if ((vcpu == current) || vcpu->is_idle)
 		return;
 
-	if (vcpu_has_hwirq_pending(current)) {
-		if ((vcpu->state == VCPU_STAT_SUSPEND) ||
-			(vcpu->state == VCPU_STAT_IDLE))
-			;
-		else
-			return;
-	}
-
-	if ((vcpu->is_idle) || (vcpu->state == VCPU_STAT_RUNNING))
-		return;
-
-	if (vcpu->affinity != current->affinity) {
-		vcpu->resched = 1;
-		pcpu_resched(vcpu->affinity);
-		return;
-	}
-
-	if (0) {
-		if (in_interrupt)
-			need_resched = 1;
-		else
-			sched();
+	if (vcpu->state == VCPU_STAT_SUSPEND) {
+		if (vcpu->affinity != current->affinity) {
+			vcpu->resched = 1;
+			pcpu_resched(vcpu->affinity);
+		} else
+			set_vcpu_state(vcpu, VCPU_STAT_READY);
 	}
 }
 
@@ -157,24 +147,65 @@ void pcpus_init(void)
 
 	for (i = 0; i < NR_CPUS; i++) {
 		pcpu = &pcpus[i];
-		pcpu->state = PCPU_STATE_RUNNING;
+		memset(pcpu, 0, sizeof(struct pcpu));
+		pcpu->state = PCPU_STATE_OFFLINE;
 		init_list(&pcpu->vcpu_list);
 		pcpu->pcpu_id = i;
 		get_per_cpu(pcpu, i) = pcpu;
+		spin_lock_init(&pcpu->lock);
 	}
 }
 
 void set_vcpu_state(struct vcpu *vcpu, int state)
 {
+	int a, b;
+	unsigned long flags;
+	int old_state = vcpu->state;
 	struct pcpu *pcpu = get_per_cpu(pcpu, vcpu->affinity);
 
-	/* set the vcpu ready to run */
-	pcpu->sched_class->set_vcpu_state(pcpu, vcpu, state);
-}
+	if ((old_state == state) || (vcpu->is_idle))
+		return;
 
+	/*
+	 * set the vcpu to the new state, and update the pcpu
+	 * information about the running vcpus, now only support
+	 * ready, suspend and idle state
+	 */
+	pcpu->sched_class->set_vcpu_state(pcpu, vcpu, state);
+
+	local_irq_save(flags);
+
+	state = vcpu->state;
+	a = (old_state == VCPU_STAT_READY) ||
+		(old_state == VCPU_STAT_RUNNING);
+	b = (state == VCPU_STAT_SUSPEND) || (state == VCPU_STAT_IDLE);
+
+	/*
+	 * if the vcpu's state from ready/running to suspended
+	 * or idle decreae the pcpu's running vcpus
+	 */
+	if (a && b) {
+		pcpu->nr_running_vcpus--;
+		if (pcpu->nr_running_vcpus == 1) {
+			pr_info("disable sched_timer\n");
+			sched_tick_disable();
+		}
+	}
+
+	if ((!a) && (!b)) {
+		pcpu->nr_running_vcpus++;
+		if (pcpu->nr_running_vcpus == 2) {
+			pr_info("enable sched_timer\n");
+			sched_tick_enable(pcpu->sched_class->sched_interval);
+		}
+	}
+
+	local_irq_restore(flags);
+}
 
 int pcpu_add_vcpu(int cpu, struct vcpu *vcpu)
 {
+	int ret;
 	struct pcpu *pcpu;
 
 	if (cpu >= NR_CPUS) {
@@ -186,31 +217,59 @@ int pcpu_add_vcpu(int cpu, struct vcpu *vcpu)
 
 	/* init the vcpu's sched private data */
 	pcpu->sched_class->init_vcpu_data(pcpu, vcpu);
-	list_add_tail(&pcpu->vcpu_list, &vcpu->list);
 
-	return pcpu->sched_class->add_vcpu(pcpu, vcpu);
+	ret = pcpu->sched_class->add_vcpu(pcpu, vcpu);
+	if (ret) {
+		pr_error("add vcpu to pcpu failed\n");
+		spin_lock(&pcpu->lock);
+		list_del(&vcpu->list);
+		spin_unlock(&pcpu->lock);
+
+		pcpu->sched_class->deinit_vcpu_data(pcpu, vcpu);
+		return ret;
+	}
+
+	spin_lock(&pcpu->lock);
+	list_add_tail(&pcpu->vcpu_list, &vcpu->list);
+	pcpu->nr_vcpus++;
+	spin_unlock(&pcpu->lock);
+
+	return 0;
 }
 
 static int resched_handler(uint32_t irq, void *data)
 {
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 	struct vcpu *vcpu;
+	int state;
 
 	list_for_each_entry(vcpu, &pcpu->vcpu_list, list) {
-		if (vcpu->resched)
-			set_vcpu_state(vcpu, VCPU_STAT_READY);
+		if (vcpu->resched) {
+			state = vcpu->state;
+			if ((state != VCPU_STAT_READY) && (state != VCPU_STAT_RUNNING))
+				set_vcpu_state(vcpu, VCPU_STAT_READY);
+
+			/* ensure to clear the resched flag */
+			vcpu->resched = 0;
+		}
 	}
 
-	need_resched = 1;
+	if (pcpu->sched_class->flags & SCHED_FLAGS_PREEMPT)
+		need_resched = 1;
 
 	return 0;
 }
 
 unsigned long sched_tick_handler(unsigned long data)
 {
+	unsigned long ticks;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	return pcpu->sched_class->tick_handler(pcpu);
+	ticks = pcpu->sched_class->tick_handler(pcpu);
+	if (pcpu->nr_running_vcpus <= 1)
+		return 0;
+
+	return ticks;
 }
 
 int sched_init(void)
@@ -230,6 +289,10 @@ int sched_init(void)
 
 int local_sched_init(void)
 {
+	struct pcpu *pcpu = get_cpu_var(pcpu);
+
+	pcpu->state = PCPU_STATE_RUNNING;
+
 	return request_irq(CONFIG_MINOS_RESCHED_IRQ, resched_handler,
 			0, "resched handler", NULL);
 }

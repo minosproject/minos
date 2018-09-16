@@ -400,7 +400,6 @@ struct vcpu *create_idle_vcpu(void)
 	idle->is_idle = 1;
 
 	pcpu_add_vcpu(cpu, idle);
-	set_vcpu_ready(idle);
 	idle->state = VCPU_STAT_RUNNING;
 	idle->affinity = smp_processor_id();
 

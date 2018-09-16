@@ -6,12 +6,15 @@ struct pcpu;
 
 struct sched_class {
 	char *name;
+	unsigned long flags;
 	unsigned long sched_interval;
 	struct vcpu *(*pick_vcpu)(struct pcpu *);
 	void (*set_vcpu_state)(struct pcpu *, struct vcpu *, int);
 	int (*add_vcpu)(struct pcpu *, struct vcpu *);
 	int (*init_pcpu_data)(struct pcpu *);
+	void (*deinit_pcpu_data)(struct pcpu *);
 	int (*init_vcpu_data)(struct pcpu *, struct vcpu *k);
+	void (*deinit_vcpu_data)(struct pcpu *, struct vcpu *k);
 	void (*sched)(struct pcpu *, struct vcpu *, struct vcpu *);
 	int (*sched_vcpu)(struct pcpu *, struct vcpu *);
 	unsigned long (*tick_handler)(struct pcpu *);
