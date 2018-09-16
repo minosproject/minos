@@ -4,13 +4,23 @@
 
 #define VMID_HOST		65535
 
-"memtags": [{
+"memtags": [
+	{
 		"mem_base": "0xd0000000",
-		"mem_end": "0xd1ffffff",
+		"mem_end": "0xd1bfffff",
 		"enable": 1,
 		"type": MEM_IO,
 		"vmid": 0,
 		"name": "32M internal register"
+		/* d1d00000 is for gic */
+	},
+	{
+		"mem_base": "0xe8000000",
+		"mem_end": "0xe8ffffff",
+		"enable": 1,
+		"type": MEM_IO,
+		"vmid": 0,
+		"name": "pcie region"
 	},
 	{
 		"mem_base": "0x00200000",

@@ -41,6 +41,9 @@ DEFINE_PER_CPU(void *, gicr_sgi_base);
 #define gicr_rd_base()	get_cpu_var(gicr_rd_base)
 #define gicr_sgi_base()	get_cpu_var(gicr_sgi_base)
 
+extern void vgic_set_hvm_address(void *gicd, void *gicr,
+		void *lpi, uint32_t size);
+
 static void gicv3_gicd_wait_for_rwp(void)
 {
 	while (ioread32(gicd_base + GICD_CTLR) & (1 << 31));
@@ -92,6 +95,10 @@ static int gicv3_set_irq_type(uint32_t irq, uint32_t type)
 	void *base;
 	uint32_t cfg, edgebit;
 
+	/* sgi are always edge-triggered */
+	if (irq < GICV3_NR_SGI)
+		return 0;
+
 	spin_lock(&gicv3_lock);
 
 	if (irq >= GICV3_NR_LOCAL_IRQS)
@@ -107,6 +114,7 @@ static int gicv3_set_irq_type(uint32_t irq, uint32_t type)
 		cfg |= edgebit;
 
 	iowrite32(base, cfg);
+	isb();
 
 	spin_unlock(&gicv3_lock);
 
@@ -638,12 +646,18 @@ int gicv3_init(void)
 	if ((node < 0) || (len < 4))
 		panic("can not find gicv3 interrupt controller\n");
 
+	for (i = 0; i < len; i += 2)
+		array[i] += CONFIG_PLATFORM_IO_BASE;
+
 	/* only map gicd and gicr now */
 	pr = array[2] + array[3] - array[0];
 	io_remap((unsigned long)array[0], (unsigned long)array[0], pr);
 
 	gicd_base = (void *)(unsigned long)array[0];
 	__gicr_rd_base = (void *)(unsigned long)array[2];
+
+	pr_info("gicv3 gicd@0x%x gicr@0x%x\n", (unsigned long)gicd_base,
+			(unsigned long)__gicr_rd_base);
 
 	value = read_sysreg32(ICH_VTR_EL2);
 	gicv3_nr_lr = (value & 0x3f) + 1;

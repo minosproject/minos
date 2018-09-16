@@ -413,7 +413,7 @@ void irq_set_type(uint32_t irq, int type)
 	if (irq_chip->irq_set_type)
 		irq_chip->irq_set_type(irq, type);
 
-	irq_desc->flags &= IRQ_FLAGS_TYPE_MASK;
+	irq_desc->flags &= ~IRQ_FLAGS_TYPE_MASK;
 	irq_desc->flags |= type;
 
 out:
@@ -467,7 +467,7 @@ error:
 int request_irq(uint32_t irq, irq_handle_t handler,
 		unsigned long flags, char *name, void *data)
 {
-	int len;
+	int len, type;
 	struct irq_desc *irq_desc;
 	unsigned long flag;
 
@@ -477,6 +477,9 @@ int request_irq(uint32_t irq, irq_handle_t handler,
 	irq_desc = get_irq_desc(irq);
 	if (!irq_desc)
 		return -ENOENT;
+
+	type = flags & IRQ_FLAGS_TYPE_MASK;
+	flags &= ~IRQ_FLAGS_TYPE_MASK;
 
 	spin_lock_irqsave(&irq_desc->lock, flag);
 	irq_desc->handler = handler;
@@ -491,8 +494,8 @@ int request_irq(uint32_t irq, irq_handle_t handler,
 	}
 	spin_unlock_irqrestore(&irq_desc->lock, flag);
 
-	if (flags & IRQ_FLAGS_TYPE_MASK)
-		irq_set_type(irq, flags & IRQ_FLAGS_TYPE_MASK);
+	if (type)
+		irq_set_type(irq, type);
 
 	irq_unmask(irq);
 

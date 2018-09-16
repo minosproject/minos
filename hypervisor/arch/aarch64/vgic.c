@@ -245,7 +245,7 @@ static int vgic_gicr_rd_mmio(struct vcpu *vcpu, struct vgic_gicr *gicr,
 	if (read) {
 		switch (offset) {
 		case GICR_PIDR2:
-			*value = 0x3 << 4;	// gicv3
+			*value = gicr->gicr_pidr2;
 			break;
 		case GICR_TYPER:
 			*value = gicr->gicr_typer;
@@ -457,7 +457,6 @@ static void vgic_gicr_init(struct vcpu *vcpu,
 		struct vgic_gicr *gicr, unsigned long base)
 {
 	gicr->vcpu_id = get_vcpu_id(vcpu);
-
 	/*
 	 * now for gicv3 TBD
 	 */
@@ -504,7 +503,7 @@ static void vgic_deinit(struct vdev *vdev)
 
 int vgic_create_vm(void *item, void *arg)
 {
-	int i, ret = 0;
+	int i, j, ret = 0;
 	struct vgic_gicr *gicr;
 	struct vm *vm = (struct vm *)item;
 	struct vgic_dev *vgic_dev;
@@ -527,6 +526,9 @@ int vgic_create_vm(void *item, void *arg)
 		ret = of_get_interrupt_regs(array, &i);
 		if ((ret < 0) || (i < 4))
 			return -ENOENT;
+
+		for (j = 0; j < i; j += 2)
+			array[j] += CONFIG_PLATFORM_IO_BASE;
 
 		/* count the iomem size of gic */
 		size = array[2] + array[3] - array[0];

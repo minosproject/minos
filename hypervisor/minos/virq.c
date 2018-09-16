@@ -102,7 +102,7 @@ out:
 
 	spin_unlock(&virq_struct->lock);
 
-	//sched_vcpu(vcpu);
+	kick_vcpu(vcpu);
 
 	return 0;
 }
