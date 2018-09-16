@@ -8,7 +8,7 @@ NM		:= $(CROSS_COMPILE)nm
 STRIP		:= $(CROSS_COMPILE)strip
 
 #PLATFORM	:= fvp
-PLATFORM	:= espressobin
+PLATFORM	?= espressobin
 TARGET		:= minos
 DEBUG_LEVEL	:= 0
 

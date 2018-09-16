@@ -56,11 +56,8 @@ int of_get_u32_array(char *path, char *attr, uint32_t *array, int *len)
 	int length, i;
 
 	data = of_getprop(path, attr, &length);
-	if (!data) {
-		pr_error("can not get %s in %s error-%d\n",
-				attr, path, length);
+	if (!data)
 		return -EINVAL;
-	}
 
 	if (length & (sizeof(uint32_t) - 1)) {
 		pr_error("node is not a u64 array %d\n", length);
@@ -311,7 +308,7 @@ static int fdt_setup_cpu(struct vm *vm)
 	}
 
 	node = fdt_subnode_offset(dtb, offset, "cpu-map");
-	if (offset > 0) {
+	if (node > 0) {
 		pr_info("delete cpu-map node\n");
 		fdt_del_node(dtb, node);
 	}
@@ -361,6 +358,8 @@ static int fdt_setup_memory(struct vm *vm)
 	list_for_each_entry(region, &mem_list, list) {
 		if ((region->type == MEM_TYPE_NORMAL) &&
 				(region->vmid == 0)) {
+			pr_info("add memory region to vm0 0x%p 0x%p\n",
+					region->phy_base, region->size);
 			mstart = region->phy_base;
 			msize = region->size;
 			*args++ = cpu_to_fdt32(mstart >> 32);
@@ -423,4 +422,5 @@ void hvm_dtb_init(struct vm *vm)
 	fdt_setup_timer(vm);
 
 	fdt_pack(dtb);
+	flush_dcache_range((unsigned long)dtb, MAX_DTB_SIZE);
 }

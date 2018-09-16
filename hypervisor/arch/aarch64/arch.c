@@ -82,7 +82,7 @@ void arch_dump_stack(gp_regs *regs, unsigned long *stack)
 		stack_base = (unsigned long)vcpu->stack_origin;
 	} else {
 		stack_base = (unsigned long)&__el2_stack_end -
-			(smp_processor_id() * 0x2000);
+			(smp_processor_id() * 0x4000);
 	}
 
 	dump_register(regs);
@@ -220,7 +220,7 @@ static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
 		     HCR_EL2_TIDCP | HCR_EL2_IMO | HCR_EL2_FMO | \
 		     HCR_EL2_BSU_IS | HCR_EL2_FB | HCR_EL2_PTW | \
 		     HCR_EL2_TSC | HCR_EL2_TACR | HCR_EL2_AMO | \
-		     HCR_EL2_RW | HCR_EL2_VM;
+		     HCR_EL2_RW | HCR_EL2_VM | HCR_EL2_AMO;
 
 	context->vmpidr = get_vcpu_id(vcpu);
 }
