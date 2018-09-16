@@ -113,6 +113,8 @@ int host_vdev_init(struct vm *vm, struct vdev *vdev,
 	if (!vdev)
 		return -EINVAL;
 
+	pr_info("vdev init with addr@0x%p size@0x%x\n", base, size);
+
 	memset(vdev, 0, sizeof(struct vdev));
 	vdev->gvm_paddr = base;
 	vdev->mem_size = size;
