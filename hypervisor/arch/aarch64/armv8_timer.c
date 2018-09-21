@@ -174,6 +174,12 @@ static int sched_timer_handler(uint32_t irq, void *data)
 
 static int virtual_timer_irq_handler(uint32_t irq, void *data)
 {
+	/* if the current vcpu is idle, disable the vtimer */
+	if (current_vcpu->is_idle) {
+		write_sysreg32(0, CNTV_CTL_EL0);
+		return -ENOENT;
+	}
+
 	return send_virq_to_vcpu(current_vcpu, irq);
 }
 

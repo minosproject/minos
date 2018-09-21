@@ -19,8 +19,8 @@
 #define VMID_HOST		(65535)
 #define VMID_INVALID		(-1)
 
-#define VM_FLAGS_NATIVE		(1 << 0)
-#define VM_FLAGS_64BIT		(1 << 1)
+#define VM_FLAGS_64BIT		(1 << 0)
+#define VM_FLAGS_NATIVE		(1 << 1)
 
 #define VM_STAT_ONLINE		(1)
 #define VM_STAT_SUSPEND		(3)
@@ -47,8 +47,8 @@ struct vm_info {
 struct vm {
 	int vmid;
 	uint32_t vcpu_nr;
-	int8_t bit64;
 	int state;
+	unsigned long flags;
 	uint8_t vcpu_affinity[VM_MAX_VCPU];
 	unsigned long entry_point;
 	unsigned long setup_data;
@@ -98,15 +98,19 @@ static inline struct vm *get_vm_by_id(uint32_t vmid)
 	return vms[vmid];
 }
 
-
-static inline int is_32bit_vm(struct vm *vm)
+static inline int vm_is_32bit(struct vm *vm)
 {
-	return (!vm->bit64);
+	return !(vm->flags & VM_FLAGS_64BIT);
 }
 
 static inline int vm_is_hvm(struct vm *vm)
 {
 	return (vm->vmid == 0);
+}
+
+static inline int vm_is_native(struct vm *vm)
+{
+	return !!(vm->flags & VM_FLAGS_NATIVE);
 }
 
 static inline int

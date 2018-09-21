@@ -33,7 +33,7 @@ static void vfp_state_save(struct vcpu *vcpu, void *context)
 {
 	struct vfp_context *c = (struct vfp_context *)context;
 
-	if (!vcpu->vm->bit64)
+	if (vm_is_32bit(vcpu->vm))
 		c->fpexc32_el2 = read_sysreg32(FPEXC32_EL2);
 
 	c->fpsr = read_sysreg32(FPSR);
@@ -62,7 +62,7 @@ static void vfp_state_restore(struct vcpu *vcpu, void *context)
 {
 	struct vfp_context *c = (struct vfp_context *)context;
 
-	if (!vcpu->vm->bit64)
+	if (vm_is_32bit(vcpu->vm))
 		write_sysreg(c->fpexc32_el2, FPEXC32_EL2);
 
 	write_sysreg(c->fpsr, FPSR);

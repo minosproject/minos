@@ -167,12 +167,13 @@ static struct vm *__create_vm(struct vmtag *vme)
 	strncpy(vm->os_type, vme->type,
 		MIN(strlen(vme->type), OS_TYPE_SIZE - 1));
 	vm->vcpu_nr = vme->nr_vcpu;
-	vm->bit64 = vme->bit64;
 	vm->entry_point = vme->entry;
 	vm->setup_data = vme->setup_data;
 	init_list(&vm->vdev_list);
 	memcpy(vm->vcpu_affinity, vme->vcpu_affinity,
 			sizeof(uint8_t) * VM_MAX_VCPU);
+	if (vme->bit64)
+		vm->flags |= VM_FLAGS_64BIT;
 
 	vms[vme->vmid] = vm;
 	total_vms++;
@@ -300,6 +301,11 @@ int vm_vcpus_init(struct vm *vm)
 		pcpu_add_vcpu(vcpu->affinity, vcpu);
 		vcpu_vmodules_init(vcpu);
 		vm->os->ops->vcpu_init(vcpu);
+
+		if (!vm_is_native(vm)) {
+			vcpu->vmcs->host_index = 0;
+			vcpu->vmcs->guest_index = 0;
+		}
 	}
 
 	return 0;
@@ -432,6 +438,13 @@ void vcpu_power_off_call(void *data)
 	}
 
 	set_vcpu_state(vcpu, VCPU_STAT_IDLE);
+
+	/*
+	 * if the vcpu is the current running vcpu
+	 * need to resched another vcpu
+	 */
+	if (vcpu == current_vcpu)
+		need_resched = 1;
 }
 
 int vcpu_power_off(struct vcpu *vcpu, int timeout)
@@ -446,9 +459,9 @@ int vcpu_power_off(struct vcpu *vcpu, int timeout)
 				vcpu->name);
 		return smp_function_call(vcpu->affinity,
 				vcpu_power_off_call, (void *)vcpu, 1);
-	}
+	} else
+		set_vcpu_state(vcpu, VCPU_STAT_IDLE);
 
-	set_vcpu_state(vcpu, VCPU_STAT_IDLE);
 	return 0;
 }
 
@@ -521,6 +534,7 @@ int create_static_vms(void)
 			continue;
 		}
 
+		vm->flags |= VM_FLAGS_NATIVE;
 		count++;
 	}
 

@@ -211,6 +211,40 @@ int sched_reset_vcpu(struct vcpu *vcpu)
 	return 0;
 }
 
+int pcpu_remove_vcpu(int cpu, struct vcpu *vcpu)
+{
+	int ret;
+	struct pcpu *pcpu;
+
+	if (cpu >= NR_CPUS) {
+		pr_error("No such physical cpu:%d\n", cpu);
+		return -EINVAL;
+	}
+
+	if (vcpu->affinity != cpu) {
+		pr_error("vcpu don not belong to this pcpu\n");
+		return -EINVAL;
+	}
+
+	pcpu = get_per_cpu(pcpu, cpu);
+
+	ret = pcpu->sched_class->remove_vcpu(pcpu, vcpu);
+	if (ret) {
+		pr_error("remove the vcpu from pcpu failed\n");
+		return ret;
+	}
+
+	/* deinit the vcpu's sched private data */
+	pcpu->sched_class->deinit_vcpu_data(pcpu, vcpu);
+
+	spin_lock(&pcpu->lock);
+	list_del(&vcpu->list);
+	pcpu->nr_vcpus--;
+	spin_unlock(&pcpu->lock);
+
+	return 0;
+}
+
 int pcpu_add_vcpu(int cpu, struct vcpu *vcpu)
 {
 	int ret;

@@ -111,6 +111,13 @@ static int fifo_add_vcpu(struct pcpu *pcpu, struct vcpu *vcpu)
 	return 0;
 }
 
+static int fifo_remove_vcpu(struct pcpu *pcpu, struct vcpu *vcpu)
+{
+	/* do nothing */
+
+	return 0;
+}
+
 static int fifo_init_pcpu_data(struct pcpu *pcpu)
 {
 	struct fifo_pcpu_data *d;
@@ -221,6 +228,7 @@ static struct sched_class sched_fifo = {
 	.set_vcpu_state		= fifo_set_vcpu_state,
 	.pick_vcpu		= fifo_pick_vcpu,
 	.add_vcpu		= fifo_add_vcpu,
+	.remove_vcpu		= fifo_remove_vcpu,
 	.init_pcpu_data		= fifo_init_pcpu_data,
 	.deinit_pcpu_data	= fifo_deinit_pcpu_data,
 	.init_vcpu_data		= fifo_init_vcpu_data,

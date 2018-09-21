@@ -57,6 +57,7 @@ struct pcpu {
 void pcpus_init(void);
 void sched(void);
 int pcpu_add_vcpu(int cpu, struct vcpu *vcpu);
+int pcpu_remove_vcpu(int cpu, struct vcpu *vcpu);
 void set_vcpu_state(struct vcpu *vcpu, int state);
 void kick_vcpu(struct vcpu *vcpu);
 int sched_init(void);

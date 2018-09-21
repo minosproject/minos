@@ -85,7 +85,7 @@ int smp_function_call(int cpu, smp_function fn, void *data, int wait)
 	call->data = data;
 	smp_call_lock(call);
 
-	send_sgi(cpu, SMP_FUNCTION_CALL_IRQ);
+	send_sgi(SMP_FUNCTION_CALL_IRQ, cpu);
 
 	if (wait)
 		smp_call_wait(call);

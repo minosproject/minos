@@ -50,8 +50,8 @@ int vm_power_up(int vmid)
 		return -ENOENT;
 	}
 
-	vm->state = VM_STAT_ONLINE;
 	vm_vcpus_init(vm);
+	vm->state = VM_STAT_ONLINE;
 
 	return 0;
 }
@@ -59,7 +59,6 @@ int vm_power_up(int vmid)
 static int __vm_power_off(struct vm *vm, void *args)
 {
 	int ret = 0;
-	int need_sched = 0;
 	struct vcpu *vcpu;
 
 	if (vm_is_hvm(vm))
@@ -68,9 +67,6 @@ static int __vm_power_off(struct vm *vm, void *args)
 	/* set the vm to offline state */
 	pr_info("power off vm-%d\n", vm->vmid);
 	vm->state = VM_STAT_OFFLINE;
-
-	if (vm == current_vm)
-		need_sched = 1;
 
 	/*
 	 * just set all the vcpu of this vm to idle
@@ -82,6 +78,7 @@ static int __vm_power_off(struct vm *vm, void *args)
 		if (ret)
 			pr_warn("power off vcpu-%d failed\n",
 					vcpu->vcpu_id);
+		pcpu_remove_vcpu(vcpu->affinity, vcpu);
 	}
 
 	if (args == NULL) {
@@ -89,8 +86,8 @@ static int __vm_power_off(struct vm *vm, void *args)
 		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
 			VMTRAP_REASON_SHUTDOWN, 0, NULL);
 
-		if (need_sched)
-			sched();
+		/* called by itself need to sched out */
+		sched();
 	}
 
 	return 0;
@@ -155,7 +152,8 @@ int create_new_vm(struct vm_info *info)
 	/*
 	 * allocate memory to this vm
 	 */
-	vm->bit64 = !!vm_info->bit64;
+	if (vm_info->bit64)
+		vm->flags |= VM_FLAGS_64BIT;
 	vm_mm_struct_init(vm);
 
 	ret = vm_mmap_init(vm, size);
@@ -228,8 +226,7 @@ static int __vm_reset(struct vm *vm, void *args)
 		* the state will be reset when power up, then sched
 		* out if the reset is called by itself
 		*/
-		if (current_vm == vm)
-			sched();
+		sched();
 	}
 
 	return 0;

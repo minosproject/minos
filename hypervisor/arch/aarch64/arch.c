@@ -252,7 +252,7 @@ static void aarch64_system_state_save(struct vcpu *vcpu, void *c)
 	context->afsr0 = read_sysreg(AFSR0_EL1);
 	context->afsr1 = read_sysreg(AFSR1_EL1);
 
-	if (is_32bit_vm(vcpu->vm)) {
+	if (vm_is_32bit(vcpu->vm)) {
 		context->teecr = read_sysreg32(TEECR32_EL1);
 		context->teehbr = read_sysreg32(TEEHBR32_EL1);
 		context->dacr32_el2 = read_sysreg32(DACR32_EL2);
@@ -286,7 +286,7 @@ static void aarch64_system_state_restore(struct vcpu *vcpu, void *c)
 	write_sysreg(context->afsr0, AFSR0_EL1);
 	write_sysreg(context->afsr1, AFSR1_EL1);
 
-	if (is_32bit_vm(vcpu->vm)) {
+	if (vm_is_32bit(vcpu->vm)) {
 		write_sysreg(context->teecr, TEECR32_EL1);
 		write_sysreg(context->teehbr, TEEHBR32_EL1);
 		write_sysreg(context->dacr32_el2, DACR32_EL2);

@@ -57,6 +57,8 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 		break;
 
 	case HVC_VM_POWER_DOWN:
+		vmid = vm_power_off((int)args[0], (void *)c);
+		HVC_RET1(c, vmid);
 		break;
 
 	case HVC_VM_MMAP:
