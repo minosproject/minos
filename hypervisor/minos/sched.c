@@ -190,9 +190,7 @@ void set_vcpu_state(struct vcpu *vcpu, int state)
 			pr_info("disable sched_timer\n");
 			sched_tick_disable();
 		}
-	}
-
-	if ((!a) && (!b)) {
+	} else if ((!a) && (!b)) {
 		pcpu->nr_running_vcpus++;
 		if (pcpu->nr_running_vcpus == 2) {
 			pr_info("enable sched_timer\n");
@@ -201,6 +199,16 @@ void set_vcpu_state(struct vcpu *vcpu, int state)
 	}
 
 	local_irq_restore(flags);
+}
+
+int sched_reset_vcpu(struct vcpu *vcpu)
+{
+	struct pcpu *pcpu = get_per_cpu(pcpu, vcpu->affinity);
+
+	if (pcpu->sched_class->reset_vcpu_data)
+		pcpu->sched_class->reset_vcpu_data(pcpu, vcpu);
+
+	return 0;
 }
 
 int pcpu_add_vcpu(int cpu, struct vcpu *vcpu)

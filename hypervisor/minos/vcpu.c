@@ -68,11 +68,6 @@ void vcpu_online(struct vcpu *vcpu)
 	set_vcpu_ready(vcpu);
 }
 
-void vcpu_offline(struct vcpu *vcpu)
-{
-	set_vcpu_suspend(vcpu);
-}
-
 int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 		unsigned long entry, unsigned long unsed)
 {
@@ -334,6 +329,18 @@ static int create_vcpus(struct vm *vm)
 	return 0;
 }
 
+int vcpu_reset(struct vcpu *vcpu)
+{
+	if (!vcpu)
+		return -EINVAL;
+
+	vcpu->stack_base = vcpu->stack_origin;
+	vcpu_virq_struct_reset(vcpu);
+	sched_reset_vcpu(vcpu);
+
+	return 0;
+}
+
 void destroy_vm(struct vm *vm)
 {
 	int i;
@@ -409,6 +416,40 @@ struct vcpu *create_idle_vcpu(void)
 	next_vcpu = idle;
 
 	return idle;
+}
+
+void vcpu_power_off_call(void *data)
+{
+	struct vcpu *vcpu = (struct vcpu *)data;
+
+	if (!vcpu)
+		return;
+
+	if (vcpu->affinity != smp_processor_id()) {
+		pr_error("vcpu-%s do not belong to this pcpu\n",
+				vcpu->name);
+		return;
+	}
+
+	set_vcpu_state(vcpu, VCPU_STAT_IDLE);
+}
+
+int vcpu_power_off(struct vcpu *vcpu, int timeout)
+{
+	int cpuid = smp_processor_id();
+
+	if (!vcpu)
+		return -EINVAL;
+
+	if (vcpu->affinity != cpuid) {
+		pr_debug("call vcpu_power_off_call for vcpu-%s\n",
+				vcpu->name);
+		return smp_function_call(vcpu->affinity,
+				vcpu_power_off_call, (void *)vcpu, 1);
+	}
+
+	set_vcpu_state(vcpu, VCPU_STAT_IDLE);
+	return 0;
 }
 
 struct vm *create_vm(struct vmtag *vme)
@@ -502,6 +543,7 @@ int static_vms_init(void)
 		if (vm->vmid == 0)
 			arch_hvm_init(vm);
 
+		vm->state = VM_STAT_ONLINE;
 		vm_vcpus_init(vm);
 	}
 

@@ -25,12 +25,22 @@ static inline unsigned long psci_fn(uint32_t id, unsigned long a1,
 	return smc_call(id, a1, a2, a3, 0, 0, 0);
 }
 
-unsigned long psci_cpu_on(unsigned long cpu, unsigned long entry)
+int psci_cpu_on(unsigned long cpu, unsigned long entry)
 {
-	return psci_fn(PSCI_0_2_FN_CPU_ON, cpu, entry, 0);
+	return (int)psci_fn(PSCI_0_2_FN_CPU_ON, cpu, entry, 0);
 }
 
-unsigned long psci_cpu_off(unsigned long cpu)
+int psci_cpu_off(unsigned long cpu)
 {
-	return psci_fn(PSCI_0_2_FN_CPU_OFF, cpu, 0, 0);
+	return (int)psci_fn(PSCI_0_2_FN_CPU_OFF, cpu, 0, 0);
+}
+
+void psci_system_reboot(int mode, const char *cmd)
+{
+	psci_fn(PSCI_0_2_FN_SYSTEM_RESET, 0, 0, 0);
+}
+
+void psci_system_shutdown(void)
+{
+	psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
 }

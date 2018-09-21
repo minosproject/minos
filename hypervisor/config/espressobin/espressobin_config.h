@@ -18,6 +18,7 @@
 
 #define CONFIG_IRQ_CHIP_NAME		"gicv3"
 #define CONFIG_MMU_CHIP_NAME		"armv8-mmu"
+#define CONFIG_PLATFORM_NAME		"espressobin"
 
 #define CONFIG_LOG_LEVEL		3
 

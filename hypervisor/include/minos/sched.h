@@ -23,7 +23,7 @@ DECLARE_PER_CPU(int, need_resched);
 #define current_vcpu		get_cpu_var(percpu_current_vcpu)
 #define next_vcpu		get_cpu_var(percpu_next_vcpu)
 
-#define current_vm		current_vcpu->vm;
+#define current_vm		current_vcpu->vm
 
 #define get_vcpu_state(vcpu)	vcpu->state
 #define need_resched		(get_cpu_var(need_resched))
@@ -63,6 +63,7 @@ int sched_init(void);
 int local_sched_init(void);
 void sched_new(void);
 void pcpu_resched(int pcpu_id);
+int sched_reset_vcpu(struct vcpu *vcpu);
 
 static inline void set_vcpu_ready(struct vcpu *vcpu)
 {

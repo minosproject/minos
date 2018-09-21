@@ -11,7 +11,11 @@
 #define for_all_cpu(cpu)	\
 	for (cpu = 0; cpu < NR_CPUS; cpu++)
 
+typedef void (*smp_function)(void *);
+
 void smp_cpus_up(void);
 void smp_init(void);
+int smp_function_call(int cpu, smp_function fn,
+		void *data, int wait);
 
 #endif

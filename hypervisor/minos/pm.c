@@ -18,6 +18,22 @@
 #include <asm/arch.h>
 #include <minos/sched.h>
 
+void system_reboot(void)
+{
+	if (platform->system_reboot)
+		platform->system_reboot(0, NULL);
+
+	panic("can not reboot system now\n");
+}
+
+void system_shutdown(void)
+{
+	if (platform->system_shutdown)
+		platform->system_shutdown();
+
+	panic("cant not shutdown system now\n");
+}
+
 void cpu_idle()
 {
 	struct pcpu *pcpu = get_cpu_var(pcpu);

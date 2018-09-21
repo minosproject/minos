@@ -21,8 +21,8 @@ struct vdev {
 			unsigned long, unsigned long *);
 	int (*write)(struct vdev *, gp_regs *,
 			unsigned long, unsigned long *);
-
 	void (*deinit)(struct vdev *vdev);
+	void (*reset)(struct vdev *vdev);
 };
 
 struct vdev *create_host_vdev(struct vm *vm,

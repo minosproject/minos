@@ -36,6 +36,8 @@ struct irqtag;
 #define MAX_HVM_VIRQ		(HVM_SPI_VIRQ_NR + VM_LOCAL_VIRQ_NR)
 #define MAX_GVM_VIRQ		(GVM_SPI_VIRQ_NR + VM_LOCAL_VIRQ_NR)
 
+#define VIRQ_FLAGS_CAN_WAKEUP	(1 << 0)
+
 enum virq_domain_type {
 	VIRQ_DOMAIN_SGI = 0,
 	VIRQ_DOMAIN_PPI,
@@ -50,7 +52,7 @@ struct virq_desc {
 	uint8_t pr;
 	uint8_t vcpu_id;
 	uint8_t type;
-	uint8_t res;
+	uint8_t flags;
 	uint16_t vmid;
 	uint16_t vno;
 	uint16_t hno;
@@ -81,7 +83,9 @@ struct virq_struct {
 int virq_enable(struct vcpu *vcpu, uint32_t virq);
 int virq_disable(struct vcpu *vcpu, uint32_t virq);
 void vcpu_virq_struct_init(struct vcpu *vcpu);
+void vcpu_virq_struct_reset(struct vcpu *vcpu);
 
+void vm_virq_reset(struct vm *vm);
 void send_vsgi(struct vcpu *sender,
 		uint32_t sgi, cpumask_t *cpumask);
 void clear_pending_virq(struct vcpu *vcpu, uint32_t irq);

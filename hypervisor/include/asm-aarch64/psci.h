@@ -97,7 +97,9 @@
 #define PSCI_VERSION(major, minor)	\
 		(0 | (major << PSCI_VERSION_MAJOR_SHIFT) | (minor))
 
-unsigned long psci_cpu_on(unsigned long cpu, unsigned long entry);
-unsigned long psci_cpu_off(unsigned long cpu);
+int psci_cpu_on(unsigned long cpu, unsigned long entry);
+int psci_cpu_off(unsigned long cpu);
+void psci_system_reboot(int mode, const char *cmd);
+void psci_system_shutdown(void);
 
 #endif

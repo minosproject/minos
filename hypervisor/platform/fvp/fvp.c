@@ -20,25 +20,22 @@
 #include <minos/io.h>
 #include <minos/vmm.h>
 
-void *refclk_cnt_base = (void *)0x2a430000;
-
-extern int pl011_init(void *addr);
-
-int platform_serial_init(void)
-{
-	return pl011_init((void *)0x1c090000);
-}
-
-int platform_cpu_on(int cpu, unsigned long entry)
-{
-	return psci_cpu_on(cpu, entry);
-}
-
-int platform_time_init(void)
+static int fvp_time_init(void)
 {
 	io_remap(0x2a430000, 0x2a430000, 64 * 1024);
 
 	/* enable the counter */
-	iowrite32(refclk_cnt_base + CNTCR, 1);
+	iowrite32((void *)0x2a430000 + CNTCR, 1);
 	return 0;
 }
+
+static struct platform platform_fvp = {
+	.name 		 = "fvp",
+	.time_init 	 = fvp_time_init,
+	.cpu_on		 = psci_cpu_on,
+	.cpu_off	 = psci_cpu_off,
+	.system_reboot	 = psci_system_reboot,
+	.system_shutdown = psci_system_shutdown,
+};
+
+DEFINE_PLATFORM(platform_fvp);

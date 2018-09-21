@@ -45,7 +45,10 @@ int __vcpu_trap(uint32_t type, uint32_t reason,
 	vmcs->trap_type = type;
 	vmcs->trap_reason = reason;
 	vmcs->trap_data = data;
-	vmcs->trap_result = *ret;
+	if (ret)
+		vmcs->trap_result = *ret;
+	else
+		vmcs->trap_result = 0;
 	vmcs->trap_ret = 0;
 	vmcs->host_index++;
 
@@ -65,9 +68,12 @@ int __vcpu_trap(uint32_t type, uint32_t reason,
 				cpu_relax();
 		}
 
-		*ret = vmcs->trap_result;
-	} else
-		*ret = 0;
+		if (ret)
+			*ret = vmcs->trap_result;
+	} else {
+		if (ret)
+			*ret = 0;
+	}
 
 	return vmcs->trap_ret;
 }

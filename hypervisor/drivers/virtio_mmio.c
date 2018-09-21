@@ -174,6 +174,11 @@ static void virtio_dev_deinit(struct vdev *vdev)
 	release_virtio_dev(vdev->vm, dev);
 }
 
+static void virtio_dev_reset(struct vdev *vdev)
+{
+	pr_info("virtio device reset\n");
+}
+
 void *create_virtio_device(struct vm *vm)
 {
 	int ret;
@@ -196,6 +201,7 @@ void *create_virtio_device(struct vm *vm)
 	vdev->read = virtio_mmio_read;
 	vdev->write = virtio_mmio_write;
 	vdev->deinit = virtio_dev_deinit;
+	vdev->reset = virtio_dev_reset;
 
 	virtio_dev->gvm_irq = alloc_gvm_virq(vm);
 	if (virtio_dev->gvm_irq <= 0)

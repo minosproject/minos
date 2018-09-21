@@ -223,7 +223,7 @@ do_start:
 	bl	memset
 
 	/* init the uart */
-	bl	platform_serial_init
+	bl	serial_init
 	dsb	sy
 
 	mov	x0, x27		//restore the dtb address

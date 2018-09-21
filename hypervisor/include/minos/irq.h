@@ -10,7 +10,6 @@
 #include <minos/spinlock.h>
 #include <minos/cpumask.h>
 
-#define MAX_IRQ_NAME_SIZE	32
 #define BAD_IRQ			(1023)
 
 #define IRQ_FLAGS_NONE           		(0x00000000)
@@ -30,6 +29,9 @@
 #define IRQ_FLAGS_MASKED			(BIT(IRQ_FLAGS_MASKED_BIT))
 #define IRQ_FLAGS_VCPU_BIT			(9)
 #define IRQ_FLAGS_VCPU				(BIT(IRQ_FLAGS_VCPU_BIT))
+
+#define RESCHED_IRQ				(7)
+#define SMP_FUNCTION_CALL_IRQ			(6)
 
 typedef enum sgi_mode {
 	SGI_TO_LIST = 0,
@@ -63,6 +65,8 @@ typedef int (*irq_handle_t)(uint32_t irq, void *data);
 struct irq_chip {
 	uint32_t (*get_pending_irq)(void);
 	void (*irq_mask)(uint32_t irq);
+	void (*irq_mask_cpu)(uint32_t irq, int cpu);
+	void (*irq_unmask_cpu)(uint32_t irq, int cpu);
 	void (*irq_unmask)(uint32_t irq);
 	void (*irq_eoi)(uint32_t irq);
 	void (*irq_dir)(uint32_t irq);
@@ -90,7 +94,7 @@ struct irq_desc {
 	unsigned long irq_count;
 	irq_handle_t handler;
 	void *pdata;
-	char name[MAX_IRQ_NAME_SIZE];
+	char *name;
 };
 
 struct irq_domain;
@@ -121,6 +125,8 @@ void setup_irqs(void);
 int do_irq_handler(void);
 
 int request_irq(uint32_t irq, irq_handle_t handler,
+		unsigned long flags, char *name, void *data);
+int request_irq_percpu(uint32_t irq, irq_handle_t handler,
 		unsigned long flags, char *name, void *data);
 
 int irq_alloc_spi(uint32_t start, uint32_t cnt);

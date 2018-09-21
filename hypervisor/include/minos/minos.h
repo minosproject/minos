@@ -16,12 +16,16 @@
 #include <minos/arch.h>
 #include <minos/calltrace.h>
 #include <minos/preempt.h>
+#include <minos/platform.h>
+#include <minos/calltrace.h>
 
 struct vcpu;
 
-#define BUG_ON(condition)	\
-	if ((condition)) {	\
-		do { ; } while (1); \
+#define BUG_ON(condition)		\
+	if ((condition)) {		\
+		do {			\
+			cpu_relax(); 	\
+		} while (1); 		\
 	}
 
 typedef int (*hook_func_t)(void *item, void *contex);

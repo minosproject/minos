@@ -54,21 +54,6 @@ static void gicv3_gicr_wait_for_rwp(void)
 	while (ioread32(gicr_rd_base() + GICR_CTLR) & (1 << 31));
 }
 
-static void gicv3_mask_irq(uint32_t irq)
-{
-	uint32_t mask = 1 << (irq % 32);
-
-	spin_lock(&gicv3_lock);
-	if (irq < GICV3_NR_LOCAL_IRQS) {
-		iowrite32(gicr_sgi_base() + GICR_ICENABLER + (irq / 32) * 4, mask);
-		gicv3_gicr_wait_for_rwp();
-	} else {
-		iowrite32(gicd_base + GICD_ICENABLER + (irq / 32) * 4, mask);
-		gicv3_gicd_wait_for_rwp();
-	}
-	spin_unlock(&gicv3_lock);
-}
-
 static void gicv3_eoi_irq(uint32_t irq)
 {
 	write_sysreg32(irq, ICC_EOIR1_EL1);
@@ -355,6 +340,21 @@ static void gicv3_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *cpu)
 	}
 }
 
+static void gicv3_mask_irq(uint32_t irq)
+{
+	uint32_t mask = 1 << (irq % 32);
+
+	spin_lock(&gicv3_lock);
+	if (irq < GICV3_NR_LOCAL_IRQS) {
+		iowrite32(gicr_sgi_base() + GICR_ICENABLER + (irq / 32) * 4, mask);
+		gicv3_gicr_wait_for_rwp();
+	} else {
+		iowrite32(gicd_base + GICD_ICENABLER + (irq / 32) * 4, mask);
+		gicv3_gicd_wait_for_rwp();
+	}
+	spin_unlock(&gicv3_lock);
+}
+
 static void gicv3_unmask_irq(uint32_t irq)
 {
 	uint32_t mask = 1 << (irq % 32);
@@ -368,6 +368,48 @@ static void gicv3_unmask_irq(uint32_t irq)
 		iowrite32(gicd_base + GICD_ISENABLER + (irq / 32) * 4, mask);
 		gicv3_gicd_wait_for_rwp();
 	}
+
+	spin_unlock(&gicv3_lock);
+}
+
+static void gicv3_mask_irq_cpu(uint32_t irq, int cpu)
+{
+	void *base;
+	uint32_t mask = 1 << (irq % 32);
+
+	if (irq >= GICV3_NR_LOCAL_IRQS)
+		return;
+
+	if (cpu >= NR_CPUS)
+		return;
+
+	spin_lock(&gicv3_lock);
+
+	base = get_per_cpu(gicr_sgi_base, cpu);
+	base = base + GICR_ICENABLER + (irq / 32) * 4;
+	iowrite32(base, mask);
+	gicv3_gicr_wait_for_rwp();
+
+	spin_unlock(&gicv3_lock);
+}
+
+static void gicv3_unmask_irq_cpu(uint32_t irq, int cpu)
+{
+	void *base;
+	uint32_t mask = 1 << (irq % 32);
+
+	if (irq >= GICV3_NR_LOCAL_IRQS)
+		return;
+
+	if (cpu >= NR_CPUS)
+		return;
+
+	spin_lock(&gicv3_lock);
+
+	base = get_per_cpu(gicr_sgi_base, cpu);
+	base = base + GICR_ISENABLER + (irq / 32) * 4;
+	iowrite32(base, mask);
+	gicv3_gicr_wait_for_rwp();
 
 	spin_unlock(&gicv3_lock);
 }
@@ -734,7 +776,9 @@ int gicv3_secondary_init(void)
 
 static struct irq_chip gicv3_chip = {
 	.irq_mask 		= gicv3_mask_irq,
+	.irq_mask_cpu		= gicv3_mask_irq_cpu,
 	.irq_unmask 		= gicv3_unmask_irq,
+	.irq_unmask_cpu 	= gicv3_unmask_irq_cpu,
 	.irq_eoi 		= gicv3_eoi_irq,
 	.irq_dir		= gicv3_dir_irq,
 	.irq_set_type 		= gicv3_set_irq_type,

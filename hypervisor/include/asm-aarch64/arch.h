@@ -46,6 +46,12 @@ typedef struct aarch64_regs {
 } gp_regs __align(sizeof(uint64_t));
 
 #define NR_LOCAL_IRQS	(32)
+#define NR_SGI_IRQS	(16)
+#define NR_PPI_IRQS	(16)
+
+#define SGI_IRQ_BASE	(0)
+#define PPI_IRQ_BASE	(16)
+
 #define SPI_OFFSET(n)	(n - NR_LOCAL_IRQS);
 #define LOCAL_OFFSET(n) (n)
 

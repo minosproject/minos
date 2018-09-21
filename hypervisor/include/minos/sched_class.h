@@ -14,6 +14,7 @@ struct sched_class {
 	int (*init_pcpu_data)(struct pcpu *);
 	void (*deinit_pcpu_data)(struct pcpu *);
 	int (*init_vcpu_data)(struct pcpu *, struct vcpu *k);
+	int (*reset_vcpu_data)(struct pcpu *, struct vcpu *k);
 	void (*deinit_vcpu_data)(struct pcpu *, struct vcpu *k);
 	void (*sched)(struct pcpu *, struct vcpu *, struct vcpu *);
 	int (*sched_vcpu)(struct pcpu *, struct vcpu *);

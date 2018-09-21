@@ -36,12 +36,21 @@ get_virq_desc(struct vcpu *vcpu, uint32_t virq)
 	return &vm->vspi_desc[VIRQ_SPI_OFFSET(virq)];
 }
 
+static void inline virq_kick_vcpu(struct vcpu *vcpu,
+		struct virq_desc *desc)
+{
+	kick_vcpu(vcpu);
+}
+
 static int __send_virq(struct vcpu *vcpu,
 		uint32_t vno, uint32_t hno, int hw, int pr)
 {
 	int index;
 	struct virq *virq;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
+
+	if (vcpu->vm->state == VM_STAT_OFFLINE)
+		return -EINVAL;
 
 	spin_lock(&virq_struct->lock);
 
@@ -102,8 +111,34 @@ out:
 
 	spin_unlock(&virq_struct->lock);
 
-	kick_vcpu(vcpu);
+	return 0;
+}
 
+static int inline send_virq(struct vcpu *vcpu, struct virq_desc *desc)
+{
+	int ret;
+	struct vm *vm = vcpu->vm;
+
+	/*
+	 * check the state of the vm, if the vm
+	 * is in suspend state and the irq can not
+	 * wake up the vm, just return other wise
+	 * need to kick the vcpu
+	 */
+	if (vm->state == VM_STAT_SUSPEND) {
+		if (!(desc->flags & VIRQ_FLAGS_CAN_WAKEUP))
+			return -EAGAIN;
+	}
+
+	ret = __send_virq(vcpu, desc->vno, desc->hno,
+			desc->hw, desc->pr);
+	if (ret) {
+		pr_warn("send virq to vcpu-%d-%d failed\n",
+				get_vmid(vcpu), get_vcpu_id(vcpu));
+		return ret;
+	}
+
+	virq_kick_vcpu(vcpu, desc);
 	return 0;
 }
 
@@ -127,7 +162,7 @@ static int guest_irq_handler(uint32_t irq, void *data)
 		return -ENOENT;
 	}
 
-	return __send_virq(vcpu, desc->vno, irq, 1, desc->pr);
+	return send_virq(vcpu, desc);
 }
 
 uint32_t virq_get_type(struct vcpu *vcpu, uint32_t virq)
@@ -220,17 +255,6 @@ int virq_disable(struct vcpu *vcpu, uint32_t virq)
 	return 0;
 }
 
-static inline int virq_is_enabled(struct vcpu *vcpu, uint32_t virq)
-{
-	struct virq_desc *desc;
-
-	desc = get_virq_desc(vcpu, virq);
-	if (!desc)
-		return 0;
-
-	return desc->enable;
-}
-
 int __send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq, int hw)
 {
 	int ret;
@@ -242,8 +266,7 @@ int __send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq, int hw)
 		return -EINVAL;
 
 	local_irq_save(flags);
-	ret = __send_virq(vcpu, desc->vno, desc->hno,
-			desc->hw, desc->pr);
+	ret = send_virq(vcpu, desc);
 	local_irq_restore(flags);
 
 	return ret;
@@ -283,8 +306,7 @@ int send_virq_to_vm(struct vm *vm, uint32_t virq)
 		return -ENOENT;
 
 	local_irq_save(flags);
-	ret = __send_virq(vcpu, desc->vno, desc->hno,
-			desc->hw, desc->pr);
+	ret = send_virq(vcpu, desc);
 	local_irq_restore(flags);
 
 	return ret;
@@ -302,7 +324,7 @@ void send_vsgi(struct vcpu *sender, uint32_t sgi, cpumask_t *cpumask)
 	for_each_set_bit(cpu, cpumask->bits, vm->vcpu_nr) {
 		vcpu = vm->vcpus[cpu];
 		desc = get_virq_desc(vcpu, sgi);
-		__send_virq(vcpu, sgi, 0, 0, desc->pr);
+		send_virq(vcpu, desc);
 	}
 	local_irq_restore(flags);
 }
@@ -417,6 +439,39 @@ static int irq_exit_from_guest(void *item, void *data)
 	spin_unlock(&virq_struct->lock);
 
 	return 0;
+}
+
+void vcpu_virq_struct_reset(struct vcpu *vcpu)
+{
+	int i;
+	struct virq *virq;
+	struct virq_desc *desc;
+	struct virq_struct *virq_struct = vcpu->virq_struct;
+
+	virq_struct->active_count = 0;
+	spin_lock_init(&virq_struct->lock);
+	init_list(&virq_struct->pending_list);
+	init_list(&virq_struct->active_list);
+	virq_struct->pending_virq = 0;
+	virq_struct->pending_hirq = 0;
+
+	bitmap_clear(virq_struct->irq_bitmap,
+			0, CONFIG_VCPU_MAX_ACTIVE_IRQS);
+
+	for (i = 0; i < CONFIG_VCPU_MAX_ACTIVE_IRQS; i++) {
+		virq = &virq_struct->virqs[i];
+		virq->h_intno = 0;
+		virq->v_intno = 0;
+		virq->state = VIRQ_STATE_INACTIVE;
+		virq->id = i;
+		virq->hw = 0;
+		virq->list.next = NULL;
+	}
+
+	for (i = 0; i < VM_LOCAL_VIRQ_NR; i++) {
+		desc = &virq_struct->local_desc[i];
+		desc->enable = 0;
+	}
 }
 
 void vcpu_virq_struct_init(struct vcpu *vcpu)
@@ -590,6 +645,23 @@ static int virq_create_vm(void *item, void *args)
 	vm_config_virq(vm);
 
 	return 0;
+}
+
+void vm_virq_reset(struct vm *vm)
+{
+	int i;
+	struct virq_desc *desc;
+
+	/* reset the all the spi virq for the vm */
+	for ( i = 0; i < vm->vspi_nr; i++) {
+		desc = &vm->vspi_desc[i];
+		desc->enable = 0;
+		desc->pr = 0x0;
+		desc->type = 0x0;
+
+		if (desc->hw)
+			irq_mask(desc->hno);
+	}
 }
 
 static int virq_destroy_vm(void *item, void *data)

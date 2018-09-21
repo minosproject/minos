@@ -18,6 +18,9 @@
 #include <minos/types.h>
 #include <minos/print.h>
 #include <minos/arch.h>
+#include <minos/platform.h>
+#include <minos/string.h>
+#include <minos/calltrace.h>
 
 extern unsigned char __init_func_0_start;
 extern unsigned char __init_func_1_start;
@@ -30,6 +33,7 @@ extern unsigned char __init_func_7_start;
 extern unsigned char __init_func_8_start;
 extern unsigned char __init_func_9_start;
 extern unsigned char __init_func_end;
+extern void log_init(void);
 
 static void call_init_func(unsigned long fn_start, unsigned long fn_end)
 {
@@ -49,8 +53,45 @@ static void call_init_func(unsigned long fn_start, unsigned long fn_end)
 	}
 }
 
+void platform_early_init(void)
+{
+	int i, count;
+	extern unsigned char __platform_start;
+	extern unsigned char __platform_end;
+	unsigned long pstart;
+	unsigned long pend;
+	struct platform **pp;
+	struct platform *p;
+
+	log_init();
+
+	pstart =(unsigned long)&__platform_start;
+	pend = (unsigned long)&__platform_end;
+	count = (pend - pstart) / sizeof(struct platform *);
+	pp = (struct platform **)pstart;
+
+	if (count == 0)
+		panic("no platform found for minos");
+
+	for (i = 0; i < count; i++) {
+		p = *pp;
+		if (strcmp(p->name, CONFIG_PLATFORM_NAME) == 0) {
+			platform = p;
+			break;
+		}
+
+		pp++;
+	}
+
+	if (platform == NULL)
+		panic("no platform found for minos\n");
+
+	pr_info("platform-%s\n", platform->name);
+}
+
 void early_init(void *setup_data)
 {
+	/* get the platform for the minos */
 	arch_early_init(setup_data);
 
 	call_init_func((unsigned long)&__init_func_0_start,

@@ -20,8 +20,7 @@
 #include <minos/mmu.h>
 #include <minos/init.h>
 
-static void *base = (void *)0x1c090000;
-extern void flush_log_buf(void);
+static void *base = NULL;
 
 int pl011_init(void *addr)
 {
@@ -48,7 +47,7 @@ int pl011_init(void *addr)
 	return 0;
 }
 
-void serial_putc(char c)
+void serial_pl011_putc(char c)
 {
 	while (ioread32(base + UARTFR) & PL011_FR_BUSY_FLAG);
 
@@ -58,7 +57,7 @@ void serial_putc(char c)
 	iowrite32(base + UARTDR, c);
 }
 
-char serial_getc(void)
+char serial_pl011_getc(void)
 {
 	while (ioread32(base + UARTFR) & PL011_FR_BUSY_FLAG);
 

@@ -63,6 +63,14 @@ SECTIONS
 
 	. = ALIGN(8);
 
+	__platform_start = .;
+	.__platform : {
+		*(.__platform)
+	}
+	__platform_end = .;
+
+	. = ALIGN(8);
+
 	__irqchip_start = .;
 	.__irqchip : {
 		*(.__irqchip)

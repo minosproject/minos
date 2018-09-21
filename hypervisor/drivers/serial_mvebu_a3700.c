@@ -41,7 +41,7 @@ static inline void __serial_putc(char ch)
 	iowrite32(base + UART_TX_REG, ch);
 }
 
-void serial_putc(char ch)
+void serial_mvebu_putc(char ch)
 {
 	if (ch == '\n')
 		__serial_putc('\r');
@@ -49,7 +49,7 @@ void serial_putc(char ch)
 	__serial_putc(ch);
 }
 
-char serial_getc(void)
+char serial_mvebu_getc(void)
 {
 	while (!(ioread32(base + UART_STATUS_REG) & UART_STATUS_RX_RDY));
 

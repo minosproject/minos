@@ -39,7 +39,9 @@ void panic(char *str)
 {
 	pr_fatal("[Panic] : %s", str);
 	dump_stack(NULL, NULL);
-	while (1);
+
+	for (;;)
+		cpu_relax();
 }
 
 static int locate_symbol_pos(unsigned long addr)

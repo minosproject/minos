@@ -339,6 +339,24 @@ static struct irq_desc *get_irq_desc(uint32_t irq)
 	return domain->ops->get_irq_desc(domain, irq);
 }
 
+static struct irq_desc *get_irq_desc_cpu(uint32_t irq, int cpu)
+{
+	struct irq_desc **irq_descs;
+
+	if (irq >= NR_LOCAL_IRQS)
+		return NULL;
+
+	if (irq >= PPI_IRQ_BASE) {
+		irq_descs = get_per_cpu(ppi_irqs, cpu);
+		return irq_descs[irq - PPI_IRQ_BASE];
+	} else {
+		irq_descs = get_per_cpu(sgi_irqs, cpu);
+		return irq_descs[irq - SGI_IRQ_BASE];
+	}
+
+	return NULL;
+}
+
 void irq_update_virq(struct virq *virq, int action)
 {
 	if (irq_chip->update_virq)
@@ -464,10 +482,41 @@ error:
 	return ret;
 }
 
+int request_irq_percpu(uint32_t irq, irq_handle_t handler,
+		unsigned long flags, char *name, void *data)
+{
+	int i;
+	struct irq_desc *irq_desc;
+	unsigned long flag;
+
+	if (irq >= NR_LOCAL_IRQS)
+		return -EINVAL;
+
+	for (i = 0; i < NR_CPUS; i++) {
+		irq_desc = get_irq_desc_cpu(irq, i);
+		if (!irq_desc)
+			continue;
+
+		spin_lock_irqsave(&irq_desc->lock, flag);
+		irq_desc->handler = handler;
+		irq_desc->pdata = data;
+		irq_desc->name = name;
+
+		/* call irq_chip->unmask_irq_cpu to enable the irq */
+		if (!test_and_set_bit(IRQ_FLAGS_MASKED_BIT, &irq_desc->flags))
+			irq_chip->irq_unmask_cpu(irq, i);
+
+		irq_desc->flags |= flags;
+		spin_unlock_irqrestore(&irq_desc->lock, flag);
+	}
+
+	return 0;
+}
+
 int request_irq(uint32_t irq, irq_handle_t handler,
 		unsigned long flags, char *name, void *data)
 {
-	int len, type;
+	int type;
 	struct irq_desc *irq_desc;
 	unsigned long flag;
 
@@ -484,20 +533,16 @@ int request_irq(uint32_t irq, irq_handle_t handler,
 	spin_lock_irqsave(&irq_desc->lock, flag);
 	irq_desc->handler = handler;
 	irq_desc->pdata = data;
-	irq_desc->flags |= flags;
-	if (name) {
-		len = strlen(name);
+	irq_desc->name = name;
 
-		if (len > MAX_IRQ_NAME_SIZE -1)
-			len = MAX_IRQ_NAME_SIZE -1;
-		strncpy(irq_desc->name, name, len);
-	}
+	if (!test_and_set_bit(IRQ_FLAGS_MASKED_BIT, &irq_desc->flags))
+			irq_chip->irq_unmask(irq);
+
+	irq_desc->flags |= flags;
 	spin_unlock_irqrestore(&irq_desc->lock, flag);
 
 	if (type)
 		irq_set_type(irq, type);
-
-	irq_unmask(irq);
 
 	return 0;
 }

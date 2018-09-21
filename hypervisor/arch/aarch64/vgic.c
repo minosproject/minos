@@ -501,6 +501,13 @@ static void vgic_deinit(struct vdev *vdev)
 	return vm_release_gic(dev);
 }
 
+static void vgic_reset(struct vdev *vdev)
+{
+	pr_info("vgic device reset\n");
+
+	/* do nothing when reset the vm */
+}
+
 int vgic_create_vm(void *item, void *arg)
 {
 	int i, j, ret = 0;
@@ -565,6 +572,7 @@ int vgic_create_vm(void *item, void *arg)
 	vgic_dev->vdev.read = vgic_mmio_read;
 	vgic_dev->vdev.write = vgic_mmio_write;
 	vgic_dev->vdev.deinit = vgic_deinit;
+	vgic_dev->vdev.reset = vgic_reset;
 
 	/* here we put the vgic to header vdev_list */
 	list_del(&vgic_dev->vdev.list);
@@ -579,9 +587,7 @@ release_gic:
 
 static int vgic_init(void)
 {
-	register_hook(vgic_create_vm, MINOS_HOOK_TYPE_CREATE_VM_VDEV);
-
-	return 0;
+	return register_hook(vgic_create_vm, MINOS_HOOK_TYPE_CREATE_VM_VDEV);
 }
 
 module_initcall(vgic_init);

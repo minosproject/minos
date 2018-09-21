@@ -123,7 +123,8 @@ static int timers_arch_init(void)
 	boot_tick = read_sysreg64(CNTPCT_EL0);
 	pr_info("boot_tick:0x%x cpu_khz:%d\n", boot_tick, cpu_khz);
 
-	platform_time_init();
+	if (platform->time_init)
+		platform->time_init();
 
 	return 0;
 }

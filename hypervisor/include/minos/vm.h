@@ -19,6 +19,13 @@
 #define VMID_HOST		(65535)
 #define VMID_INVALID		(-1)
 
+#define VM_FLAGS_NATIVE		(1 << 0)
+#define VM_FLAGS_64BIT		(1 << 1)
+
+#define VM_STAT_ONLINE		(1)
+#define VM_STAT_SUSPEND		(3)
+#define VM_STAT_OFFLINE		(2)
+
 struct vcpu;
 struct os;
 struct vmtag;
@@ -41,6 +48,7 @@ struct vm {
 	int vmid;
 	uint32_t vcpu_nr;
 	int8_t bit64;
+	int state;
 	uint8_t vcpu_affinity[VM_MAX_VCPU];
 	unsigned long entry_point;
 	unsigned long setup_data;
@@ -79,6 +87,8 @@ struct vm *create_vm(struct vmtag *vme);
 int create_new_vm(struct vm_info *info);
 void destroy_vm(struct vm *vm);
 int vm_power_up(int vmid);
+int vm_reset(int vmid, void *args);
+int vm_power_off(int vmid, void *arg);
 
 static inline struct vm *get_vm_by_id(uint32_t vmid)
 {

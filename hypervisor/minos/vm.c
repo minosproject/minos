@@ -22,6 +22,8 @@
 #include <minos/vmm.h>
 #include <minos/os.h>
 #include <minos/sched.h>
+#include <minos/vdev.h>
+#include <minos/pm.h>
 
 extern void get_vcpu_affinity(uint8_t *aff, int nr);
 
@@ -48,8 +50,64 @@ int vm_power_up(int vmid)
 		return -ENOENT;
 	}
 
+	vm->state = VM_STAT_ONLINE;
 	vm_vcpus_init(vm);
+
 	return 0;
+}
+
+static int __vm_power_off(struct vm *vm, void *args)
+{
+	int ret = 0;
+	int need_sched = 0;
+	struct vcpu *vcpu;
+
+	if (vm_is_hvm(vm))
+		panic("hvm can not call power_off_vm\n");
+
+	/* set the vm to offline state */
+	pr_info("power off vm-%d\n", vm->vmid);
+	vm->state = VM_STAT_OFFLINE;
+
+	if (vm == current_vm)
+		need_sched = 1;
+
+	/*
+	 * just set all the vcpu of this vm to idle
+	 * state, then send a virq to host to notify
+	 * host that this vm need to be reset
+	 */
+	vm_for_each_vcpu(vm, vcpu) {
+		ret = vcpu_power_off(vcpu, 1000);
+		if (ret)
+			pr_warn("power off vcpu-%d failed\n",
+					vcpu->vcpu_id);
+	}
+
+	if (args == NULL) {
+		pr_info("vm shutdown request by itself\n");
+		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
+			VMTRAP_REASON_SHUTDOWN, 0, NULL);
+
+		if (need_sched)
+			sched();
+	}
+
+	return 0;
+}
+
+int vm_power_off(int vmid, void *arg)
+{
+	struct vm *vm = NULL;
+
+	if (vmid == 0)
+		system_shutdown();
+
+	vm = get_vm_by_id(vmid);
+	if (!vm)
+		return -EINVAL;
+
+	return __vm_power_off(vm, arg);
 }
 
 int create_new_vm(struct vm_info *info)
@@ -122,12 +180,18 @@ release_vm:
 	return -ENOMEM;
 }
 
-#if 0
-void vm_reset(struct vm *vm, void *args)
+static int __vm_reset(struct vm *vm, void *args)
 {
 	int ret;
 	struct vdev *vdev;
 	struct vcpu *vcpu;
+
+	if (vm_is_hvm(vm))
+		panic("hvm can not call reset vm\n");
+
+	/* set the vm to offline state */
+	pr_info("reset vm-%d\n", vm->vmid);
+	vm->state = VM_STAT_OFFLINE;
 
 	/*
 	 * if the args is NULL, then this reset is requested by
@@ -153,6 +217,38 @@ void vm_reset(struct vm *vm, void *args)
 			vdev->reset(vdev);
 	}
 
-	sched();
+	vm_virq_reset(vm);
+
+	if (args == NULL) {
+		pr_info("vm reset trigger by itself\n");
+		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
+			VMTRAP_REASON_REBOOT, 0, NULL);
+		/*
+		 * no need to reset the vmodules for the vm, since
+		* the state will be reset when power up, then sched
+		* out if the reset is called by itself
+		*/
+		if (current_vm == vm)
+			sched();
+	}
+
+	return 0;
 }
-#endif
+
+int vm_reset(int vmid, void *args)
+{
+	struct vm *vm;
+
+	/*
+	 * if the vmid is 0, means the host request a
+	 * hardware reset
+	 */
+	if (vmid == 0)
+		system_reboot();
+
+	vm = get_vm_by_id(vmid);
+	if (!vm)
+		return -ENOENT;
+
+	return __vm_reset(vm, args);
+}

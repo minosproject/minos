@@ -34,8 +34,10 @@ extern void cpu_idle();
 extern void sched_tick_enable(unsigned long exp);
 extern void vmm_init(void);
 extern void bootmem_init(void);
+extern void platform_early_init(void);
 
 struct list_head hook_lists[MINOS_HOOK_TYPE_UNKNOWN];
+struct platform *platform = NULL;
 
 static void hooks_init(void)
 {
@@ -124,7 +126,8 @@ void irq_exit(gp_regs *reg)
 
 void boot_main(void *setup_data)
 {
-	log_init();
+	/* get the platform and init the serial */
+	platform_early_init();
 
 	pr_info("Starting Minos ...\n");
 
@@ -152,8 +155,8 @@ void boot_main(void *setup_data)
 	arch_init_percpu();
 
 	pcpus_init();
-	smp_init();
 	irq_init();
+	smp_init();
 	softirq_init();
 	init_timers();
 

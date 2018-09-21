@@ -15,20 +15,14 @@
  */
 
 #include <asm/psci.h>
+#include <minos/platform.h>
 
-extern int mvebu_serial_probe(void *addr);
+static struct platform platform_espressobin = {
+	.name		 = "marvell_espressobin",
+	.cpu_on		 = psci_cpu_on,
+	.cpu_off	 = psci_cpu_off,
+	.system_reboot	 = psci_system_reboot,
+	.system_shutdown = psci_system_shutdown,
+};
 
-int platform_serial_init(void)
-{
-	return mvebu_serial_probe((void *)0xd0012000);
-}
-
-int platform_cpu_on(int cpu, unsigned long entry)
-{
-	return psci_cpu_on(cpu, entry);
-}
-
-int platform_time_init(void)
-{
-	return 0;
-}
+DEFINE_PLATFORM(platform_espressobin);

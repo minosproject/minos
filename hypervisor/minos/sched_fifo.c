@@ -40,17 +40,33 @@ static void fifo_set_vcpu_state(struct pcpu *pcpu,
 	if (vcpu->is_idle)
 		return;
 
+	/*
+	 * what will happend if the interrupt is happend
+	 * here ? and the interrupt trigger kick_vcpu to
+	 * set the vcpu to an other state ?
+	 *
+	 * for now: the only case is, when the vcpu is called
+	 * to go to suspend/idle state, but here a interrupt is
+	 * happend and the vcpu is set to ready state, exit
+	 * int will set to suspend again. and now the suspend
+	 * and idle state is only in reset or idle case.
+	 * the finaly state is ok for these two case.
+	 */
+
 	local_irq_save(flags);
 
-	if (state == VCPU_STAT_READY) {
+	/* delete the vcpu from current list */
+	if (td->fifo_list.next != NULL)
 		list_del(&td->fifo_list);
+
+	if (state == VCPU_STAT_READY)
 		list_add(&pd->ready_list, &td->fifo_list);
-	} else if ((state == VCPU_STAT_SUSPEND) ||
-		state == VCPU_STAT_IDLE) {
-		list_del(&td->fifo_list);
+	else if (state == VCPU_STAT_SUSPEND)
 		list_add_tail(&pd->sleep_list, &td->fifo_list);
-		pr_info("vm-%d-%d suspend\n", vcpu->vcpu_id, vcpu->vm->vmid);
-	}
+	else if (state == VCPU_STAT_IDLE)
+		td->fifo_list.next = NULL;
+	else
+		panic("unsupport vcpu state for fifo sched\n");
 
 	vcpu->state = state;
 
@@ -88,7 +104,7 @@ static int fifo_add_vcpu(struct pcpu *pcpu, struct vcpu *vcpu)
 	}
 
 	local_irq_save(flags);
-	list_add_tail(&pd->sleep_list, &td->fifo_list);
+	td->fifo_list.next = NULL;
 	vcpu->state = VCPU_STAT_IDLE;
 	local_irq_restore(flags);
 

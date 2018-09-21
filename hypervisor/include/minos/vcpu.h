@@ -105,9 +105,12 @@ struct vcpu *create_idle_vcpu(void);
 int vm_vcpus_init(struct vm *vm);
 
 void vcpu_idle(void);
+int vcpu_reset(struct vcpu *vcpu);
 int vcpu_suspend(gp_regs *c, uint32_t state, unsigned long entry);
 void vcpu_online(struct vcpu *vcpu);
 void vcpu_offline(struct vcpu *vcpu);
 int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 		unsigned long entry, unsigned long unsed);
+int vcpu_power_off(struct vcpu *vcpu, int timeout);
+
 #endif
