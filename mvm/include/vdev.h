@@ -9,8 +9,9 @@ struct vdev;
 
 struct vdev_ops {
 	char *name;
-	int (*dev_init)(struct vdev *, char *);
-	void (*dev_deinit)(struct vdev *);
+	int (*init)(struct vdev *, char *);
+	void (*deinit)(struct vdev *);
+	void (*reset)(struct vdev *);
 	int (*handle_event)(struct vdev *, int,
 			unsigned long, unsigned long *);
 };
@@ -42,6 +43,7 @@ int create_vdev(struct vm *vm, char *class, char *args);
 void *vdev_map_iomem(void *iomem, size_t size);
 void vdev_setup_env(struct vm *vm, char *data, int os_type);
 void vdev_send_irq(struct vdev *vdev);
+void release_vdev(struct vdev *vdev);
 
 static void inline vdev_set_pdata(struct vdev *vdev, void *data)
 {

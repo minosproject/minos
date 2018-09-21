@@ -17,7 +17,7 @@ endif
 
 TARGET := mvm
 
-CCFLAG := -Wall -march=armv8-a -I$(PWD)/include
+CCFLAG := -Wall -D_XOPEN_SOURCE -D_GNU_SOURCE -march=armv8-a -I$(PWD)/include
 
 src	:= main/mvm.c main/bootimage.c main/os_linux.c main/os_other.c
 src	+= libfdt/fdt_addresses.c libfdt/fdt.c libfdt/fdt_empty_tree.c

@@ -56,8 +56,6 @@ static pthread_t mevent_tid;
 static int mevent_pipefd[2];
 static pthread_mutex_t mevent_lmutex = PTHREAD_MUTEX_INITIALIZER;
 
-extern int pthread_setname_np(pthread_t thread, const char *name);
-
 struct mevent {
 	void	(*me_func)(int, enum ev_type, void *);
 	int	me_fd;
@@ -143,7 +141,6 @@ mevent_destroy()
 		ee.events = mevent_kq_filter(mevp);
 		ee.data.ptr = mevp;
 		epoll_ctl(epoll_fd, EPOLL_CTL_DEL, mevp->me_fd, &ee);
-
 		if ((mevp->me_type == EVF_READ ||
 			mevp->me_type == EVF_WRITE)
 			&& mevp->me_fd != STDIN_FILENO)

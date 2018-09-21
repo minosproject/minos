@@ -97,7 +97,7 @@ alloc_and_init_vdev(struct vm *vm, char *class, char *args)
 	sprintf(pdev->name, "%s%2d", buf, vdev_id);
 	vdev_id++;
 
-	ret = plat_ops->dev_init(pdev, args);
+	ret = plat_ops->init(pdev, args);
 	if (ret) {
 		free(pdev);
 		pdev = NULL;
@@ -111,7 +111,7 @@ void release_vdev(struct vdev *vdev)
 	if (!vdev)
 		return;
 
-	vdev->ops->dev_deinit(vdev);
+	vdev->ops->deinit(vdev);
 	free(vdev);
 }
 

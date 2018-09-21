@@ -43,10 +43,9 @@ int mvm_queue_init(struct mvm_queue *queue)
 
 	pthread_mutex_lock(&queue->mutex);
 	queue->head = NULL;
-	queue->count = 0;
 	queue->tail = NULL;
 	queue->count = 0;
-	queue->flags = 0;
+	queue->flags |= QUEUE_START;
 	pthread_mutex_unlock(&queue->mutex);
 
 	return 0;
@@ -64,7 +63,7 @@ int mvm_queue_reset(struct mvm_queue *queue)
 	c = queue->head;
 	while (c) {
 		n = c->next;
-		c->pop_index = c->push_index = 0;
+		c->server_index = c->client_index = 0;
 		c = n;
 	}
 
@@ -92,7 +91,7 @@ int mvm_queue_push_node(struct mvm_queue *queue,
 		return -EINVAL;
 
 	node->next = NULL;
-	node->push_index++;
+	node->client_index++;
 	pthread_mutex_lock(&queue->mutex);
 
 	if (!queue->tail)
@@ -158,7 +157,6 @@ struct mvm_node *mvm_queue_pop(struct mvm_queue *queue)
 			if (!queue->head)
 				queue->tail = NULL;
 			queue->count--;
-			node->pop_index++;
 			break;
 		} else
 			pthread_cond_wait(&queue->cond, &queue->mutex);
@@ -172,7 +170,7 @@ struct mvm_node *mvm_queue_pop(struct mvm_queue *queue)
 void mvm_queue_free(struct mvm_node *node)
 {
 	if (node->flags & NODE_STATIC) {
-		return;
+		node->server_index++;
 	} else {
 		if (node->data) {
 			free(node->data);

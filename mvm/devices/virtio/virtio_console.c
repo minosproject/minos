@@ -108,8 +108,6 @@ struct virtio_console_backend {
 struct virtio_console {
 	struct virtio_device		virtio_dev;
 	pthread_mutex_t			mtx;
-	uint64_t			cfg;
-	uint64_t			features;
 	int				nports;
 	bool				ready;
 	struct virtio_console_port	control_port;
@@ -141,10 +139,6 @@ struct virtio_console_console_resize {
 
 static int stdio_in_use;
 
-extern int posix_openpt(int flags);
-extern int grantpt(int fd);
-extern int unlockpt(int fd);
-extern char *ptsname(int fd);
 static int virtio_console_notify_rx(struct virt_queue *);
 static int virtio_console_notify_tx(struct virt_queue *);
 static void virtio_console_control_send(struct virtio_console *,
@@ -449,7 +443,6 @@ virtio_console_backend_read(int fd __attribute__((unused)),
 
 	if (!virtq_has_descs(vq)) {
 		len = read(be->fd, dummybuf, sizeof(dummybuf));
-		virtq_notify(vq);
 		if (len == 0)
 			goto close;
 		return;
@@ -595,7 +588,7 @@ virtio_console_config_backend(struct virtio_console_backend *be)
 			return -1;
 		}
 
-		slave_fd = open(pts_name, O_RDWR);
+		slave_fd = open(pts_name, O_RDWR | O_NOCTTY);
 		if (slave_fd == -1) {
 			pr_warn("vtcon: slave_fd open failed, errno = %d\n",
 				errno);
@@ -906,24 +899,36 @@ static int virtio_console_event(struct vdev *vdev, int read,
 	return virtio_handle_mmio(&vcon->virtio_dev, read, addr, value);
 }
 
-static void
-virtio_console_deinit(struct vdev *dev)
+static void virtio_console_vdev_reset(struct vdev *vdev)
+{
+	struct virtio_console *vcon;
+
+	if (!vdev)
+		return;
+
+	vcon = (struct virtio_console *)vdev_get_pdata(vdev);
+	if (!vcon)
+		return;
+
+	virtio_device_reset(&vcon->virtio_dev);
+}
+
+static void virtio_console_deinit(struct vdev *dev)
 {
 	struct virtio_console *console;
 
-	console = (struct virtio_console *)vdev_get_pdata;
+	console = (struct virtio_console *)vdev_get_pdata(dev);
 	if (console) {
 		virtio_console_close_all(console);
-		if (console->config)
-			free(console->config);
 		free(console);
 	}
 }
 
 struct vdev_ops virtio_console_ops = {
 	.name 		= "virtio_console",
-	.dev_init	= virtio_console_init,
-	.dev_deinit	= virtio_console_deinit,
+	.init		= virtio_console_init,
+	.deinit		= virtio_console_deinit,
+	.reset		= virtio_console_vdev_reset,
 	.handle_event	= virtio_console_event,
 };
 

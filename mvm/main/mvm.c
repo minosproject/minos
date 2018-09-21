@@ -95,7 +95,7 @@ static struct vm_config *global_config = NULL;
 int verbose;
 
 static void free_vm_config(struct vm_config *config);
-extern int pthread_setname_np(pthread_t thread, const char *name);
+int vm_shutdown(struct vm *vm);
 
 void *map_vm_memory(struct vm *vm)
 {
@@ -180,6 +180,7 @@ static int release_vm(int vmid)
 int destroy_vm(struct vm *vm)
 {
 	int i;
+	struct vdev *vdev;
 	struct epoll_event ee;
 
 	if (!vm)
@@ -216,6 +217,9 @@ int destroy_vm(struct vm *vm)
 					(unsigned long)vm->irqs[i]);
 		}
 	}
+
+	list_for_each_entry(vdev, &vm->vdev_list, list)
+		release_vdev(vdev);
 
 	mevent_deinit();
 
@@ -257,12 +261,14 @@ static void signal_handler(int signum)
 		if (mvm_vm)
 			vmid = mvm_vm->vmid;
 
-		pr_info("received signal %i vm-%d\n", signum, vmid);
-		destroy_vm(mvm_vm);
-		exit(0);
+		pr_info("received signal %i shutdown vm-%d\n", signum, vmid);
+		vm_shutdown(mvm_vm);
+		break;
 	default:
 		break;
 	}
+
+	exit(0);
 }
 
 void print_usage(void)
@@ -377,7 +383,7 @@ static struct vm_os *get_vm_os(char *os_type)
 	return default_os;
 }
 
-static int vm_rest_init(struct vm *vm, struct vm_config *config)
+static int vm_vdev_init(struct vm *vm, struct vm_config *config)
 {
 	int i;
 	char *tmp, *pos;
@@ -434,6 +440,22 @@ static int vcpu_handle_mmio(struct vm *vm, int trap_reason,
 	return -EIO;
 }
 
+static int vcpu_handle_common_trap(struct vm *vm, int trap_reason,
+		uint64_t trap_data, uint64_t *trap_result)
+{
+	switch (trap_reason) {
+	case VMTRAP_REASON_REBOOT:
+	case VMTRAP_REASON_SHUTDOWN:
+		mvm_queue_push(&vm->queue, trap_reason, NULL, 0);
+		break;
+
+	default:
+		break;
+	}
+
+	return 0;
+}
+
 static void handle_vcpu_event(struct vmcs *vmcs)
 {
 	int ret;
@@ -444,6 +466,8 @@ static void handle_vcpu_event(struct vmcs *vmcs)
 
 	switch (trap_type) {
 	case VMTRAP_TYPE_COMMON:
+		ret = vcpu_handle_common_trap(mvm_vm, trap_reason,
+				trap_data, &trap_result);
 		break;
 
 	case VMTRAP_TYPE_MMIO:
@@ -512,6 +536,95 @@ void *vm_vcpu_thread(void *data)
 	return NULL;
 }
 
+int __vm_shutdown(struct vm *vm)
+{
+	pr_info("***************************\n");
+	pr_info("vm-%d shutdown exit mvm\n", vm->vmid);
+	pr_info("***************************\n");
+
+	destroy_vm(vm);
+	exit(0);
+}
+
+int vm_shutdown(struct vm *vm)
+{
+	int ret;
+
+	ret = ioctl(vm->vm_fd, IOCTL_POWER_DOWN_VM, 0);
+	if (ret) {
+		pr_err("can not power-off vm-%d now, try again\n",
+				vm->vmid);
+		return -EAGAIN;
+	}
+
+	return __vm_shutdown(vm);
+}
+
+int __vm_reboot(struct vm *vm)
+{
+	int ret;
+	struct vdev *vdev;
+
+	/* hypervisor has been disable the vcpu */
+	pr_info("***************************\n");
+	pr_info("reboot the vm-%d\n", vm->vmid);
+	pr_info("***************************\n");
+
+	list_for_each_entry(vdev, &vm->vdev_list, list) {
+		if (vdev->ops->reset)
+			vdev->ops->reset(vdev);
+	}
+
+	/* load the image into the vm memory */
+	ret = vm->os->load_image(vm);
+	if (ret)
+		return ret;
+
+	ret = mvm_vm->os->setup_vm_env(vm, global_config->cmdline);
+	if (ret)
+		return ret;
+
+	if (ioctl(vm->vm_fd, IOCTL_POWER_UP_VM, 0)) {
+		pr_err("power up vm-%d failed\n", vm->vmid);
+		return -EAGAIN;
+	}
+
+	return 0;
+}
+
+int vm_reboot(struct vm *vm)
+{
+	int ret;
+
+	ret = ioctl(vm->vm_fd, IOCTL_RESTART_VM, 0);
+	if (ret) {
+		pr_err("can not reboot vm-%d now, try again\n",
+				vm->vmid);
+		return -EAGAIN;
+	}
+
+	return __vm_reboot(vm);
+}
+
+static void handle_vm_event(struct vm *vm, struct mvm_node *node)
+{
+	pr_info("handle vm event %d\n", node->type);
+
+	switch (node->type) {
+	case VMTRAP_REASON_REBOOT:
+		__vm_reboot(vm);
+		break;
+	case VMTRAP_REASON_SHUTDOWN:
+		__vm_shutdown(vm);
+		break;
+	default:
+		pr_err("unsupport vm event %d\n", node->type);
+		break;
+	}
+
+	mvm_queue_free(node);
+}
+
 static int mvm_main_loop(void)
 {
 	int ret, i, irq;
@@ -519,6 +632,7 @@ static int mvm_main_loop(void)
 	pthread_t vcpu_thread;
 	int *base;
 	uint64_t arg;
+	struct mvm_node *node;
 
 	/*
 	 * create the eventfd and the epoll_fds for
@@ -577,6 +691,13 @@ static int mvm_main_loop(void)
 
 	for (;;) {
 		/* here wait for the trap type for VM */
+		node = mvm_queue_pop(&vm->queue);
+		if (node == NULL) {
+			pr_err("mvm queue is abnormal shutdown vm\n");
+			vm_shutdown(vm);
+			break;
+		} else
+			handle_vm_event(vm, node);
 	}
 
 	return -EAGAIN;
@@ -640,12 +761,14 @@ static int mvm_main(struct vm_config *config)
 	if (ret)
 		goto release_vm;
 
+	mvm_queue_init(&vm->queue);
+
 	/* io events init before vdev init */
 	ret = mevent_init();
 	if (ret)
 		goto release_vm;
 
-	ret = vm_rest_init(vm, config);
+	ret = vm_vdev_init(vm, config);
 	if (ret)
 		goto release_vm;
 

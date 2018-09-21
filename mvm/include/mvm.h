@@ -18,6 +18,7 @@
 #include <mvm_ioctl.h>
 #include <compiler.h>
 #include <vmcs.h>
+#include <mvm_queue.h>
 
 /*
  * MVM_FLAGS_NO_RAMDISK - used for linux to indicate
@@ -78,6 +79,8 @@ struct vm {
 	uint64_t entry;
 	uint64_t setup_data;
 	uint64_t hvm_paddr;
+
+	struct mvm_queue queue;
 
 	void *vmcs;
 	int *eventfds;

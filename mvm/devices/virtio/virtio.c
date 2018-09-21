@@ -366,9 +366,26 @@ static int __virtio_vdev_init(struct vdev *vdev,
 
 }
 
+static void inline virtq_reset(struct virt_queue *vq)
+{
+	vq->desc = NULL;
+	vq->avail = NULL;
+	vq->used = NULL;
+	vq->last_avail_idx = 0;
+	vq->avail_idx = 0;
+	vq->last_used_idx = 0;
+	vq->used_flags = 0;
+	vq->signalled_used = 0;
+	vq->signalled_used_valid = 0;
+	vq->acked_features = 0;
+}
+
 void virtio_device_reset(struct virtio_device *dev)
 {
+	int i;
 
+	for (i = 0; i < dev->nr_vq; i++)
+		virtq_reset(&dev->vqs[i]);
 }
 
 int virtio_device_init(struct virtio_device *virt_dev,

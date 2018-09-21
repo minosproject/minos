@@ -10,8 +10,8 @@
 struct mvm_node {
 	uint32_t flags;
 	uint32_t type;
-	uint64_t pop_index;
-	uint64_t push_index;
+	uint64_t client_index;
+	uint64_t server_index;
 	uint32_t size;
 	void *data;
 	struct mvm_node *next;
@@ -37,5 +37,11 @@ int mvm_queue_push(struct mvm_queue *queue, uint32_t type,
 
 int mvm_queue_push_node(struct mvm_queue *queue,
 		struct mvm_node *node);
+
+static inline void mvm_queue_wait(struct mvm_node *node)
+{
+	if (node->flags & NODE_STATIC)
+		while (node->server_index < node->client_index);
+}
 
 #endif
