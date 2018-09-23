@@ -156,15 +156,6 @@ static const char *virtio_console_be_table[VIRTIO_CONSOLE_BE_MAX] = {
 static struct termios virtio_console_saved_tio;
 static int virtio_console_saved_flags;
 
-static int
-virtio_console_reset(struct virtio_device *dev)
-{
-	pr_debug("vtcon: device reset requested!\n");
-	virtio_device_reset(dev);
-
-	return 0;
-}
-
 static int vcon_init_vq(struct virt_queue *vq)
 {
 	if ((vq->vq_index % 2) == 0)
@@ -177,7 +168,6 @@ static int vcon_init_vq(struct virt_queue *vq)
 
 static struct virtio_ops vcon_ops = {
 	.vq_init = vcon_init_vq,
-	.reset	= virtio_console_reset,
 };
 
 static inline struct virtio_console_port *
@@ -434,7 +424,7 @@ virtio_console_backend_read(int fd __attribute__((unused)),
 	port = be->port;
 	vq = virtio_console_port_to_vq(port, true);
 
-	if (!be->open || !port->rx_ready) {
+	if (!be->open || !port->rx_ready || !vq->ready) {
 		len = read(be->fd, dummybuf, sizeof(dummybuf));
 		if (len == 0)
 			goto close;
@@ -443,6 +433,7 @@ virtio_console_backend_read(int fd __attribute__((unused)),
 
 	if (!virtq_has_descs(vq)) {
 		len = read(be->fd, dummybuf, sizeof(dummybuf));
+		virtq_notify(vq);
 		if (len == 0)
 			goto close;
 		return;
@@ -899,7 +890,7 @@ static int virtio_console_event(struct vdev *vdev, int read,
 	return virtio_handle_mmio(&vcon->virtio_dev, read, addr, value);
 }
 
-static void virtio_console_vdev_reset(struct vdev *vdev)
+static void virtio_console_reset(struct vdev *vdev)
 {
 	struct virtio_console *vcon;
 
@@ -928,7 +919,7 @@ struct vdev_ops virtio_console_ops = {
 	.name 		= "virtio_console",
 	.init		= virtio_console_init,
 	.deinit		= virtio_console_deinit,
-	.reset		= virtio_console_vdev_reset,
+	.reset		= virtio_console_reset,
 	.handle_event	= virtio_console_event,
 };
 

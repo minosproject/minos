@@ -378,6 +378,7 @@ static void inline virtq_reset(struct virt_queue *vq)
 	vq->signalled_used = 0;
 	vq->signalled_used_valid = 0;
 	vq->acked_features = 0;
+	vq->ready = 0;
 }
 
 void virtio_device_reset(struct virtio_device *dev)
@@ -547,9 +548,11 @@ static int virtio_buffer_event(struct virtio_device *dev, uint32_t arg)
 	vq->acked_features = u32_to_u64(
 			ioread32(iomem + VIRTIO_MMIO_DRIVER_FEATURE1),
 			ioread32(iomem + VIRTIO_MMIO_DRIVER_FEATURE0));
+	vq->ready = 1;
 
 	if (dev->ops && dev->ops->vq_init)
 		return dev->ops->vq_init(vq);
+
 
 	return 0;
 }

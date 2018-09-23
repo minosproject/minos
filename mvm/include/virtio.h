@@ -85,6 +85,7 @@ struct vring_desc {
 struct virtio_device;
 
 struct virt_queue {
+	int ready;
 	unsigned int num;
 	unsigned int iovec_size;
 	struct vring_desc *desc;
