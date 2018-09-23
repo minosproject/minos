@@ -127,6 +127,7 @@ static struct slab_pool slab_pool[] = {
 	{480, 	NULL, 0},
 	{496, 	NULL, 0},
 	{512, 	NULL, 0},
+	{0, 	NULL, 0},		/* size > 512 and freed by minos will in here */
 	{0, 	NULL, 0}		/* size > 512 will store here used as cache pool*/
 };
 
@@ -144,6 +145,9 @@ static LIST_HEAD(host_list);
 	((void *)((unsigned long)header + SLAB_HEADER_SIZE))
 #define ADDR_TO_SLAB_HEADER(base) \
 	((struct slab_header *)((unsigned long)base - SLAB_HEADER_SIZE))
+
+#define FREE_POOL_OFFSET		(2)
+#define CACHE_POOL_OFFSET		(1)
 
 static int add_memory_section(unsigned long mem_base, size_t size)
 {
@@ -655,7 +659,8 @@ static inline int slab_pool_id(size_t size)
 {
 	int id = (size >> SLAB_MIN_DATA_SIZE_SHIFT) - 1;
 
-	return id >= pslab->pool_nr ? (pslab->pool_nr - 1) : id;
+	return id >= (pslab->pool_nr - FREE_POOL_OFFSET) ?
+			(pslab->pool_nr - FREE_POOL_OFFSET) : id;
 }
 
 static void add_slab_mem(unsigned long base, size_t size)
@@ -664,7 +669,7 @@ static void add_slab_mem(unsigned long base, size_t size)
 	struct slab_pool *pool;
 	struct slab_header *header;
 
-	pr_info("add boot_mem-0x%x : 0x%x to slab\n", base, size);
+	pr_info("add mem : 0x%x : 0x%x to slab\n", base, size);
 
 	/*
 	 * this function will be only called on boot
@@ -674,7 +679,8 @@ static void add_slab_mem(unsigned long base, size_t size)
 	if (!(base & (MEM_BLOCK_SIZE - 1)))
 		pr_warn("memory may be a block\n");
 
-	if (size <= SLAB_SIZE(512)) {
+	pool = &pslab->pool[pslab->pool_nr - FREE_POOL_OFFSET - 1];
+	if (size <= SLAB_SIZE(pool->size)) {
 		if (size < SLAB_SIZE(SLAB_MIN_DATA_SIZE)) {
 			pr_warn("drop small slab memory 0x%p 0x%x\n", base, size);
 			return;
@@ -700,7 +706,7 @@ static void add_slab_mem(unsigned long base, size_t size)
 	 * slab memory region bigger than 512byte, it will
 	 * first used as a cached memory slab
 	 */
-	pool = &pslab->pool[pslab->pool_nr - 1];
+	pool = &pslab->pool[pslab->pool_nr - CACHE_POOL_OFFSET];
 	header = (struct slab_header *)base;
 	header->size = size - SLAB_HEADER_SIZE;
 	header->next = NULL;
@@ -759,7 +765,7 @@ static void *get_slab_from_pool(size_t size)
 	int id = slab_pool_id(size);
 
 	/* if big slab return directly */
-	if (id == (pslab->pool_nr - 1))
+	if (id >= (pslab->pool_nr - FREE_POOL_OFFSET))
 		return NULL;
 
 	slab_pool = &pslab->pool[id];
@@ -769,6 +775,43 @@ static void *get_slab_from_pool(size_t size)
 	header = get_slab_from_slab_pool(slab_pool);
 
 	return SLAB_HEADER_TO_ADDR(header);
+}
+
+static void *get_slab_from_big_pool(size_t size)
+{
+	struct slab_pool *slab_pool;
+	struct slab_header *header, *prev;
+
+	/* small slab size return directly */
+	if (slab_pool_id(size) < (pslab->pool_nr - FREE_POOL_OFFSET))
+		return NULL;
+
+	slab_pool = &pslab->pool[pslab->pool_nr - FREE_POOL_OFFSET];
+	header = prev = slab_pool->head;
+
+	/*
+	 * get_slab_from_big_pool will find the slab which its
+	 * size is equal to the new request slab's size, this
+	 * can allocate the slab which is freed by someone
+	 */
+	while (header != NULL) {
+		if (header->size == size) {
+			/* return the header and delete it from the pool */
+			if (header == prev)
+				slab_pool->head = header->next;
+			else
+				prev->next = header->next;
+
+			header->magic = SLAB_MAGIC;
+			return SLAB_HEADER_TO_ADDR(header);
+		} else {
+			prev = header;
+			header = header->next;
+			continue;
+		}
+	}
+
+	return NULL;
 }
 
 static void *get_slab_from_slab_free(size_t size)
@@ -817,7 +860,10 @@ static void *get_new_slab(size_t size)
 	}
 
 	if (pslab->free_size >= SLAB_SIZE(SLAB_MIN_DATA_SIZE)) {
+		/* left memory if is a big slab push to cache pool */
 		id = slab_pool_id(pslab->free_size - SLAB_HEADER_SIZE);
+		if (id >= pslab->pool_nr - FREE_POOL_OFFSET)
+			id = pslab->pool_nr - CACHE_POOL_OFFSET;
 		pool = &pslab->pool[id];
 
 		block = addr_to_mem_block(pslab->slab_free);
@@ -850,7 +896,7 @@ static void *get_slab_from_cache(size_t size)
 	uint32_t left_size;
 	unsigned long base;
 
-	slab_pool = &pslab->pool[pslab->pool_nr - 1];
+	slab_pool = &pslab->pool[pslab->pool_nr - CACHE_POOL_OFFSET];
 	header = slab_pool->head;
 	prev = slab_pool->head;
 
@@ -913,7 +959,7 @@ static void *get_big_slab(size_t size)
 		slab_pool = &pslab->pool[id];
 		if (!slab_pool->head) {
 			id++;
-			if (id == pslab->pool_nr)
+			if (id == (pslab->pool_nr - CACHE_POOL_OFFSET))
 				return NULL;
 		} else {
 			break;
@@ -929,6 +975,7 @@ typedef void *(*slab_alloc_func)(size_t size);
 
 static slab_alloc_func alloc_func[] = {
 	get_slab_from_pool,
+	get_slab_from_big_pool,
 	get_slab_from_cache,
 	get_slab_from_slab_free,
 	get_new_slab,
@@ -1061,6 +1108,7 @@ void release_pages(struct page *page)
 
 void free(void *addr)
 {
+	int id;
 	struct slab_header *header;
 	struct slab_pool *slab_pool;
 	struct mem_block *block;
@@ -1081,8 +1129,10 @@ void free(void *addr)
 		return;
 	}
 
+	/* big slab will default push to free cache pool */
 	spin_lock(&pslab->lock);
-	slab_pool = &pslab->pool[slab_pool_id(header->size)];
+	id = slab_pool_id(header->size);
+	slab_pool = &pslab->pool[id];
 	add_slab_to_slab_pool(header, slab_pool);
 	spin_unlock(&pslab->lock);
 }
