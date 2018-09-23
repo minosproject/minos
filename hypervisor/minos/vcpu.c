@@ -415,12 +415,13 @@ struct vcpu *create_idle_vcpu(void)
 
 	init_list(&idle->list);
 	idle->stack_size = VCPU_DEFAULT_STACK_SIZE;
-	idle->stack_origin = el2_stack_base - (cpu * 0x2000);
+	idle->stack_origin = el2_stack_base -
+			(cpu << IDLE_VCPU_STATCK_SHIFT);
 	idle->is_idle = 1;
 
 	pcpu_add_vcpu(cpu, idle);
 	idle->state = VCPU_STAT_RUNNING;
-	idle->affinity = smp_processor_id();
+	idle->affinity = cpu;
 
 	strncpy(idle->name, "idle", 4);
 

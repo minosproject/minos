@@ -70,7 +70,7 @@ do_start:
 
 	/* each idle task will have 16k stack */
 	ldr	x0, =__el2_stack_end
-	sub	x0, x0, x19, lsl #14
+	sub	x0, x0, x19, lsl #IDLE_VCPU_STATCK_SHIFT
 	mov	sp, x0
 
 	/* invalid the dcache and flush the tlb */

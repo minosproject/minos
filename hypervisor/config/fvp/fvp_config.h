@@ -51,4 +51,7 @@
 
 #define CONFIG_BOOTMEM_SIZE		(64 * 1024)
 
+#define IDLE_VCPU_STATCK_SIZE		(8 * 1024)
+#define IDLE_VCPU_STATCK_SHIFT		(13)
+
 #endif

@@ -203,7 +203,7 @@ SECTIONS
 	.el2_stack : {
 		. = ALIGN(64);
 		__el2_stack = .;
-		. = . + (CONFIG_NR_CPUS * 0x4000);
+		. = . + (CONFIG_NR_CPUS * IDLE_VCPU_STATCK_SIZE);
 		__el2_stack_end = .;
 	}
 

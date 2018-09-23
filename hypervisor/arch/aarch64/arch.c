@@ -82,7 +82,7 @@ void arch_dump_stack(gp_regs *regs, unsigned long *stack)
 		stack_base = (unsigned long)vcpu->stack_origin;
 	} else {
 		stack_base = (unsigned long)&__el2_stack_end -
-			(smp_processor_id() * 0x4000);
+			(smp_processor_id() << IDLE_VCPU_STATCK_SHIFT);
 	}
 
 	dump_register(regs);
