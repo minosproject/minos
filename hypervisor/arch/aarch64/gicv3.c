@@ -688,9 +688,6 @@ int gicv3_init(void)
 	if ((node < 0) || (len < 4))
 		panic("can not find gicv3 interrupt controller\n");
 
-	for (i = 0; i < len; i += 2)
-		array[i] += CONFIG_PLATFORM_IO_BASE;
-
 	/* only map gicd and gicr now */
 	pr = array[2] + array[3] - array[0];
 	io_remap((unsigned long)array[0], (unsigned long)array[0], pr);

@@ -22,9 +22,10 @@
 #define VM_FLAGS_64BIT		(1 << 0)
 #define VM_FLAGS_NATIVE		(1 << 1)
 
+#define VM_STAT_OFFLINE		(0)
 #define VM_STAT_ONLINE		(1)
-#define VM_STAT_SUSPEND		(3)
-#define VM_STAT_OFFLINE		(2)
+#define VM_STAT_SUSPEND		(2)
+#define VM_STAT_REBOOT		(3)
 
 struct vcpu;
 struct os;

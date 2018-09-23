@@ -176,15 +176,17 @@ int of_get_interrupt_regs(uint64_t *array, int *array_len)
 			return -EINVAL;
 
 		for (i = 0; i < len; i += 2) {
-			*array = (uint64_t)(fdt32_to_cpu(u32_data[i])) << 32 |
+			array[i / 2] = (uint64_t)(fdt32_to_cpu(u32_data[i])) << 32 |
 				fdt32_to_cpu(u32_data[i + 1]);
-			array++;
 		}
 #else
 		for (i = 0; i < len; i++)
 			array[i] = fdt32_to_cpu(u32_data[i]);
 #endif
 	}
+
+	for (i = 0; i < len; i += 2)
+		array[i] = array[i] + CONFIG_PLATFORM_IO_BASE;
 
 	return node;
 }

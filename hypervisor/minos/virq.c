@@ -49,9 +49,6 @@ static int __send_virq(struct vcpu *vcpu,
 	struct virq *virq;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
 
-	if (vcpu->vm->state == VM_STAT_OFFLINE)
-		return -EINVAL;
-
 	spin_lock(&virq_struct->lock);
 
 	/*
@@ -114,10 +111,18 @@ out:
 	return 0;
 }
 
-static int inline send_virq(struct vcpu *vcpu, struct virq_desc *desc)
+static int inline send_virq(struct vcpu *vcpu, struct virq_desc *desc, int hw)
 {
 	int ret;
 	struct vm *vm = vcpu->vm;
+
+	if (!desc || !desc->enable)
+		return -EINVAL;
+
+	/* do not send irq to vm if not online or suspend state */
+	if ((vm->state == VM_STAT_OFFLINE) ||
+			(vm->state == VM_STAT_REBOOT))
+		return -EINVAL;
 
 	/*
 	 * check the state of the vm, if the vm
@@ -130,8 +135,7 @@ static int inline send_virq(struct vcpu *vcpu, struct virq_desc *desc)
 			return -EAGAIN;
 	}
 
-	ret = __send_virq(vcpu, desc->vno, desc->hno,
-			desc->hw, desc->pr);
+	ret = __send_virq(vcpu, desc->vno, desc->hno, hw, desc->pr);
 	if (ret) {
 		pr_warn("send virq to vcpu-%d-%d failed\n",
 				get_vmid(vcpu), get_vcpu_id(vcpu));
@@ -162,7 +166,7 @@ static int guest_irq_handler(uint32_t irq, void *data)
 		return -ENOENT;
 	}
 
-	return send_virq(vcpu, desc);
+	return send_virq(vcpu, desc, desc->hw);
 }
 
 uint32_t virq_get_type(struct vcpu *vcpu, uint32_t virq)
@@ -262,11 +266,8 @@ int __send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq, int hw)
 	struct virq_desc *desc;
 
 	desc = get_virq_desc(vcpu, virq);
-	if (!desc || !desc->enable)
-		return -EINVAL;
-
 	local_irq_save(flags);
-	ret = send_virq(vcpu, desc);
+	ret = send_virq(vcpu, desc, hw);
 	local_irq_restore(flags);
 
 	return ret;
@@ -306,7 +307,7 @@ int send_virq_to_vm(struct vm *vm, uint32_t virq)
 		return -ENOENT;
 
 	local_irq_save(flags);
-	ret = send_virq(vcpu, desc);
+	ret = send_virq(vcpu, desc, desc->hw);
 	local_irq_restore(flags);
 
 	return ret;
@@ -324,7 +325,7 @@ void send_vsgi(struct vcpu *sender, uint32_t sgi, cpumask_t *cpumask)
 	for_each_set_bit(cpu, cpumask->bits, vm->vcpu_nr) {
 		vcpu = vm->vcpus[cpu];
 		desc = get_virq_desc(vcpu, sgi);
-		send_virq(vcpu, desc);
+		send_virq(vcpu, desc, desc->hw);
 	}
 	local_irq_restore(flags);
 }
@@ -445,7 +446,6 @@ void vcpu_virq_struct_reset(struct vcpu *vcpu)
 {
 	int i;
 	struct virq *virq;
-	struct virq_desc *desc;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
 
 	virq_struct->active_count = 0;
@@ -457,7 +457,11 @@ void vcpu_virq_struct_reset(struct vcpu *vcpu)
 
 	bitmap_clear(virq_struct->irq_bitmap,
 			0, CONFIG_VCPU_MAX_ACTIVE_IRQS);
-
+	/*
+	 * reset the virq struct to the default state, the
+	 * local irq desc do not need to reset, and keep the
+	 * default vaule
+	 */
 	for (i = 0; i < CONFIG_VCPU_MAX_ACTIVE_IRQS; i++) {
 		virq = &virq_struct->virqs[i];
 		virq->h_intno = 0;
@@ -466,11 +470,6 @@ void vcpu_virq_struct_reset(struct vcpu *vcpu)
 		virq->id = i;
 		virq->hw = 0;
 		virq->list.next = NULL;
-	}
-
-	for (i = 0; i < VM_LOCAL_VIRQ_NR; i++) {
-		desc = &virq_struct->local_desc[i];
-		desc->enable = 0;
 	}
 }
 

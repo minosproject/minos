@@ -245,7 +245,11 @@ out:
 
 void destroy_hvm_iomem_map(unsigned long vir, uint32_t size)
 {
-	/* TBD */
+	struct vm *vm0 = get_vm_by_id(0);
+
+	/* just destroy the vm0's mapping entry */
+	size = PAGE_BALIGN(size);
+	destroy_guest_mapping(vm0, vir, size);
 }
 
 int vm_mmap_init(struct vm *vm, size_t memsize)

@@ -220,7 +220,7 @@ static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
 		     HCR_EL2_TIDCP | HCR_EL2_IMO | HCR_EL2_FMO | \
 		     HCR_EL2_BSU_IS | HCR_EL2_FB | HCR_EL2_PTW | \
 		     HCR_EL2_TSC | HCR_EL2_TACR | HCR_EL2_AMO | \
-		     HCR_EL2_RW | HCR_EL2_VM | HCR_EL2_AMO;
+		     HCR_EL2_RW | HCR_EL2_VM;
 
 	context->vmpidr = get_vcpu_id(vcpu);
 }

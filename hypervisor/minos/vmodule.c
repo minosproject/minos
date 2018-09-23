@@ -109,7 +109,7 @@ int vcpu_vmodules_init(struct vcpu *vcpu)
 		vmodule = list_entry(list, struct vmodule, list);
 		if (vmodule->context_size) {
 			data = (void *)malloc(vmodule->context_size);
-			memset((char *)data, 0, size);
+			memset((char *)data, 0, vmodule->context_size);
 			vcpu->vmodule_context[vmodule->id] = data;
 
 			if (vmodule->state_init)

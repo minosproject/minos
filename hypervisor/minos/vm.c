@@ -189,7 +189,7 @@ static int __vm_reset(struct vm *vm, void *args)
 
 	/* set the vm to offline state */
 	pr_info("reset vm-%d\n", vm->vmid);
-	vm->state = VM_STAT_OFFLINE;
+	vm->state = VM_STAT_REBOOT;
 
 	/*
 	 * if the args is NULL, then this reset is requested by

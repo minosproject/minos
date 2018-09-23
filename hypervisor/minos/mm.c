@@ -609,6 +609,7 @@ static struct page *__alloc_pages_internal(struct page_pool *pool,
 	memset(page_meta, 0, PAGE_META_SIZE);
 	block->pages_bitmap = page_meta;
 	list_add(&pool->block_list, &block->list);
+	pool->page_blocks++;
 
 	page = alloc_pages_from_block(block, count, align);
 
@@ -680,7 +681,7 @@ static void add_slab_mem(unsigned long base, size_t size)
 		}
 
 		i = size - SLAB_HEADER_SIZE;
-		i &= (SLAB_MIN_DATA_SIZE - 1);
+		i &= ~(SLAB_MIN_DATA_SIZE - 1);
 		if (i < SLAB_MIN_DATA_SIZE)
 			return;
 
@@ -756,6 +757,10 @@ static void *get_slab_from_pool(size_t size)
 	struct slab_pool *slab_pool;
 	struct slab_header *header;
 	int id = slab_pool_id(size);
+
+	/* if big slab return directly */
+	if (id == (pslab->pool_nr - 1))
+		return NULL;
 
 	slab_pool = &pslab->pool[id];
 	if (!slab_pool->head)
@@ -1022,9 +1027,9 @@ void free_pages(void *addr)
 	}
 
 	if (block->flags & GFB_IO)
-		pool = page_pool;
-	else
 		pool = io_pool;
+	else
+		pool = page_pool;
 
 	spin_lock(&pool->lock);
 
@@ -1041,7 +1046,7 @@ void free_pages(void *addr)
 		list_add_tail(&pool->block_list, &block->list);
 
 	bitmap_clear(block->pages_bitmap, start, count);
-	for (i = start; i < count; i++) {
+	for (i = start; i < (start + count); i++) {
 		meta->phy_base = 0;
 		meta++;
 	}

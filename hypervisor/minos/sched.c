@@ -73,14 +73,22 @@ void switch_to_vcpu(struct vcpu *current, struct vcpu *next)
 
 	if (current != next) {
 		if (!current->is_idle)
-			save_vcpu_vcpu_state(current);
+			save_vcpu_state(current);
 
 		if (!next->is_idle)
-			restore_vcpu_vcpu_state(next);
+			restore_vcpu_state(next);
 
 		pcpu->sched_class->sched(pcpu, current, next);
 
-		current->state = VCPU_STAT_READY;
+		/*
+		 * if the current vcpu's state is running, indicate
+		 * the switch is caused by timer tick, change the
+		 * state here, otherwise is caused by the state
+		 * change by other reason
+		 */
+		if (current->state == VCPU_STAT_RUNNING)
+			current->state = VCPU_STAT_READY;
+
 		next->state = VCPU_STAT_RUNNING;
 	}
 
@@ -131,7 +139,6 @@ void sched(void)
 
 	if (vcpu != current) {
 		local_irq_save(flags);
-		pcpu->sched_class->sched(pcpu, current, vcpu);
 		switch_to_vcpu(current, vcpu);
 		next_vcpu = vcpu;
 		dsb();

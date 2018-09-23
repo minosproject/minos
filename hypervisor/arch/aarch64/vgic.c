@@ -510,7 +510,7 @@ static void vgic_reset(struct vdev *vdev)
 
 int vgic_create_vm(void *item, void *arg)
 {
-	int i, j, ret = 0;
+	int i, ret = 0;
 	struct vgic_gicr *gicr;
 	struct vm *vm = (struct vm *)item;
 	struct vgic_dev *vgic_dev;
@@ -533,9 +533,6 @@ int vgic_create_vm(void *item, void *arg)
 		ret = of_get_interrupt_regs(array, &i);
 		if ((ret < 0) || (i < 4))
 			return -ENOENT;
-
-		for (j = 0; j < i; j += 2)
-			array[j] += CONFIG_PLATFORM_IO_BASE;
 
 		/* count the iomem size of gic */
 		size = array[2] + array[3] - array[0];

@@ -67,12 +67,12 @@ static inline void enter_to_guest(struct vcpu *vcpu, gp_regs *regs)
 			MINOS_HOOK_TYPE_ENTER_TO_GUEST);
 }
 
-static inline void save_vcpu_vcpu_state(struct vcpu *vcpu)
+static inline void save_vcpu_state(struct vcpu *vcpu)
 {
 	save_vcpu_vmodule_state(vcpu);
 }
 
-static inline void restore_vcpu_vcpu_state(struct vcpu *vcpu)
+static inline void restore_vcpu_state(struct vcpu *vcpu)
 {
 	restore_vcpu_vmodule_state(vcpu);
 }

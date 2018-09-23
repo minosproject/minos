@@ -169,6 +169,7 @@ static struct vm *__create_vm(struct vmtag *vme)
 	vm->vcpu_nr = vme->nr_vcpu;
 	vm->entry_point = vme->entry;
 	vm->setup_data = vme->setup_data;
+	vm->state = VM_STAT_OFFLINE;
 	init_list(&vm->vdev_list);
 	memcpy(vm->vcpu_affinity, vme->vcpu_affinity,
 			sizeof(uint8_t) * VM_MAX_VCPU);
@@ -215,7 +216,7 @@ static void release_vcpu(struct vcpu *vcpu)
 	if (vcpu->vmcs_irq >= 0)
 		release_hvm_virq(vcpu->vmcs_irq);
 
-	free(vcpu->stack_origin);
+	free(vcpu->stack_origin - vcpu->stack_size);
 	free(vcpu->virq_struct);
 	free(vcpu);
 }
@@ -298,8 +299,13 @@ int vm_vcpus_init(struct vm *vm)
 		arch_init_vcpu(vcpu, (void *)vm->entry_point);
 		pr_info("vm-%d vcpu-%d affnity to pcpu-%d\n",
 				vm->vmid, vcpu->vcpu_id, vcpu->affinity);
-		pcpu_add_vcpu(vcpu->affinity, vcpu);
-		vcpu_vmodules_init(vcpu);
+
+		/* only when the vm is offline state do this */
+		if (vm->state == VM_STAT_OFFLINE) {
+			vcpu_vmodules_init(vcpu);
+			pcpu_add_vcpu(vcpu->affinity, vcpu);
+		}
+
 		vm->os->ops->vcpu_init(vcpu);
 
 		if (!vm_is_native(vm)) {
@@ -340,7 +346,6 @@ int vcpu_reset(struct vcpu *vcpu)
 	if (!vcpu)
 		return -EINVAL;
 
-	vcpu->stack_base = vcpu->stack_origin;
 	vcpu_virq_struct_reset(vcpu);
 	sched_reset_vcpu(vcpu);
 
@@ -394,6 +399,8 @@ void destroy_vm(struct vm *vm)
 
 	vm_vmodules_deinit(vm);
 	free(vm);
+	vms[i] = NULL;
+	total_vms--;
 }
 
 struct vcpu *create_idle_vcpu(void)
@@ -445,6 +452,9 @@ void vcpu_power_off_call(void *data)
 	 */
 	if (vcpu == current_vcpu)
 		need_resched = 1;
+
+	pr_info("power off vcpu-%d-%d done\n", get_vmid(vcpu),
+			get_vcpu_id(vcpu));
 }
 
 int vcpu_power_off(struct vcpu *vcpu, int timeout)
@@ -459,8 +469,11 @@ int vcpu_power_off(struct vcpu *vcpu, int timeout)
 				vcpu->name);
 		return smp_function_call(vcpu->affinity,
 				vcpu_power_off_call, (void *)vcpu, 1);
-	} else
+	} else {
 		set_vcpu_state(vcpu, VCPU_STAT_IDLE);
+		pr_info("power off vcpu-%d-%d done\n", get_vmid(vcpu),
+				get_vcpu_id(vcpu));
+	}
 
 	return 0;
 }
@@ -557,8 +570,8 @@ int static_vms_init(void)
 		if (vm->vmid == 0)
 			arch_hvm_init(vm);
 
-		vm->state = VM_STAT_ONLINE;
 		vm_vcpus_init(vm);
+		vm->state = VM_STAT_ONLINE;
 	}
 
 	return 0;

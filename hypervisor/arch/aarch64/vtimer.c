@@ -49,11 +49,6 @@ static void virt_timer_expire_function(unsigned long data)
 	send_virq_to_vcpu(vtimer->vcpu, vtimer->virq);
 }
 
-static void vtimer_vm_init(struct vm *vm)
-{
-	vm->time_offset = NOW();
-}
-
 static void vtimer_state_restore(struct vcpu *vcpu, void *context)
 {
 	struct vtimer_context *c = (struct vtimer_context *)context;
@@ -90,6 +85,9 @@ static void vtimer_state_init(struct vcpu *vcpu, void *context)
 {
 	struct vtimer *vtimer;
 	struct vtimer_context *c = (struct vtimer_context *)context;
+
+	if (get_vcpu_id(vcpu) == 0)
+		vcpu->vm->time_offset = NOW();
 
 	c->offset = vcpu->vm->time_offset;
 
@@ -245,7 +243,6 @@ static int vtimer_vmodule_init(struct vmodule *vmodule)
 	vmodule->state_init = vtimer_state_init;
 	vmodule->state_save = vtimer_state_save;
 	vmodule->state_restore = vtimer_state_restore;
-	vmodule->vm_init = vtimer_vm_init;
 	vtimer_vmodule_id = vmodule->id;
 
 	return 0;

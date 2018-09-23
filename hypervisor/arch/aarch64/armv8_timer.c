@@ -180,7 +180,7 @@ static int virtual_timer_irq_handler(uint32_t irq, void *data)
 		return -ENOENT;
 	}
 
-	return send_virq_to_vcpu(current_vcpu, irq);
+	return send_hirq_to_vcpu(current_vcpu, irq);
 }
 
 static int timers_init(void)
