@@ -174,7 +174,7 @@ def parse_struct(struct, jdata):
     if struct['static']:
         c += 'static '
 
-    c += "struct " + struct['struct_name'] + ' __section(.__config) ' + struct['member_name']
+    c += "struct " + struct['struct_name'] + ' __section(\".__config\") ' + struct['member_name']
 
     if struct['type'] is 'ARRAY':
         c += '[] '
