@@ -202,5 +202,6 @@ void virtq_add_used_and_signal_n(struct virt_queue *vq,
 				unsigned int count);
 
 void virtio_device_reset(struct virtio_device *dev);
+void virtio_device_deinit(struct virtio_device *dev);
 
 #endif

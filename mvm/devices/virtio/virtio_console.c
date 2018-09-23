@@ -910,6 +910,7 @@ static void virtio_console_deinit(struct vdev *dev)
 
 	console = (struct virtio_console *)vdev_get_pdata(dev);
 	if (console) {
+		virtio_device_deinit(&console->virtio_dev);
 		virtio_console_close_all(console);
 		free(console);
 	}

@@ -42,6 +42,12 @@ void *vdev_map_iomem(void *base, size_t size)
 	return hvm_map_iomem(base, size);
 }
 
+void vdev_unmap_iomem(void *base, size_t size)
+{
+	if (munmap(base, size))
+		pr_err("unmap io memory 0x%p failed\n", base);
+}
+
 void vdev_send_irq(struct vdev *vdev)
 {
 	if (!vdev->gvm_irq)

@@ -41,6 +41,7 @@ extern void *__stop_vdev_ops;
 
 int create_vdev(struct vm *vm, char *class, char *args);
 void *vdev_map_iomem(void *iomem, size_t size);
+void vdev_unmap_iomem(void *iomem, size_t size);
 void vdev_setup_env(struct vm *vm, char *data, int os_type);
 void vdev_send_irq(struct vdev *vdev);
 void release_vdev(struct vdev *vdev);

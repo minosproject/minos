@@ -389,6 +389,20 @@ void virtio_device_reset(struct virtio_device *dev)
 		virtq_reset(&dev->vqs[i]);
 }
 
+void virtio_device_deinit(struct virtio_device *virt_dev)
+{
+	int i;
+	struct virt_queue *vq;
+
+	for (i = 0; i < virt_dev->nr_vq; i++) {
+		vq = &virt_dev->vqs[i];
+		free(vq->iovec);
+	}
+
+	free(virt_dev->vqs);
+	vdev_unmap_iomem(virt_dev->vdev->iomem_physic, PAGE_SIZE);
+}
+
 int virtio_device_init(struct virtio_device *virt_dev,
 		struct vdev *vdev, int type, int queue_nr, int rs)
 {
