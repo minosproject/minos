@@ -2,7 +2,6 @@
  * Refers to linux/kernel/softirq.c
  *
  * Copyright (C) 1992 Linus Torvalds
- * Copyright (C) 2018 Min Le (lemin9538@gmail.com)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as

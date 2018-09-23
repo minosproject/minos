@@ -13,8 +13,6 @@
  *  2002-05-31	Move sys_sysinfo here and make its locking sane, Robert Love
  *  2000-10-05  Implemented scalable SMP per-CPU timer handling.
  *                              Copyright (C) 2000, 2001, 2002  Ingo Molnar
- *  Copyright (C) 2018 Min Le (lemin9538@gmail.com)
- *
  */
 
 #include <minos/minos.h>

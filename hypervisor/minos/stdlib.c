@@ -4,7 +4,6 @@
  * Copyright (c) 2007 Keir Fraser, XenSource Inc
  * Copyright (c) 2008 Intel Corporation
  * Copyright 2009 Red Hat, Inc. and/or its affiliates.
- * Copyright (C) 2018 Min Le (lemin9538@gmail.com)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
