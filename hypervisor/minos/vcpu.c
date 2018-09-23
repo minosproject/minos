@@ -301,11 +301,10 @@ int vm_vcpus_init(struct vm *vm)
 				vm->vmid, vcpu->vcpu_id, vcpu->affinity);
 
 		/* only when the vm is offline state do this */
-		if (vm->state == VM_STAT_OFFLINE) {
-			vcpu_vmodules_init(vcpu);
+		if (vm->state == VM_STAT_OFFLINE)
 			pcpu_add_vcpu(vcpu->affinity, vcpu);
-		}
 
+		vcpu_vmodules_init(vcpu);
 		vm->os->ops->vcpu_init(vcpu);
 
 		if (!vm_is_native(vm)) {

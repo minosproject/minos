@@ -72,6 +72,9 @@ static void vtimer_state_save(struct vcpu *vcpu, void *context)
 	write_sysreg32(vtimer->cnt_ctl & ~CNT_CTL_ENABLE, CNTV_CTL_EL0);
 	vtimer->cnt_cval = read_sysreg64(CNTV_CVAL_EL0);
 
+	if (vcpu->state == VCPU_STAT_IDLE)
+		return;
+
 	if ((vtimer->cnt_ctl & CNT_CTL_ENABLE) &&
 		!(vtimer->cnt_ctl & CNT_CTL_IMASK)) {
 		mod_timer(&vtimer->timer, ticks_to_ns(vtimer->cnt_cval +

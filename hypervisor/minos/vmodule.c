@@ -108,10 +108,14 @@ int vcpu_vmodules_init(struct vcpu *vcpu)
 	list_for_each(&vmodule_list, list) {
 		vmodule = list_entry(list, struct vmodule, list);
 		if (vmodule->context_size) {
-			data = (void *)malloc(vmodule->context_size);
-			memset((char *)data, 0, vmodule->context_size);
-			vcpu->vmodule_context[vmodule->id] = data;
+			/* for reboot if memory is areadly allocated skip it */
+			data = vcpu->vmodule_context[vmodule->id];
+			if (!data) {
+				data = (void *)malloc(vmodule->context_size);
+				vcpu->vmodule_context[vmodule->id] = data;
+			}
 
+			memset((char *)data, 0, vmodule->context_size);
 			if (vmodule->state_init)
 				vmodule->state_init(vcpu, data);
 		}
