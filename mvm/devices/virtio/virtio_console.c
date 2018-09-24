@@ -791,6 +791,7 @@ virtio_console_init(struct vdev *vdev, char *opts)
 				VIRTIO_CONSOLE_RINGSZ);
 	if (rc) {
 		pr_err("failed to init vdev %d\n", rc);
+		free(console);
 		return rc;
 	}
 
@@ -887,21 +888,22 @@ static int virtio_console_event(struct vdev *vdev, int read,
 	if (!vcon)
 		return -EINVAL;
 
-	return virtio_handle_mmio(&vcon->virtio_dev, read, addr, value);
+	return virtio_handle_mmio(&vcon->virtio_dev,
+			read, addr, value);
 }
 
-static void virtio_console_reset(struct vdev *vdev)
+static int virtio_console_reset(struct vdev *vdev)
 {
 	struct virtio_console *vcon;
 
 	if (!vdev)
-		return;
+		return -EINVAL;
 
 	vcon = (struct virtio_console *)vdev_get_pdata(vdev);
 	if (!vcon)
-		return;
+		return -EINVAL;
 
-	virtio_device_reset(&vcon->virtio_dev);
+	return virtio_device_reset(&vcon->virtio_dev);
 }
 
 static void virtio_console_deinit(struct vdev *dev)

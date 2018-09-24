@@ -11,7 +11,7 @@ struct vdev_ops {
 	char *name;
 	int (*init)(struct vdev *, char *);
 	void (*deinit)(struct vdev *);
-	void (*reset)(struct vdev *);
+	int (*reset)(struct vdev *);
 	int (*handle_event)(struct vdev *, int,
 			unsigned long, unsigned long *);
 };

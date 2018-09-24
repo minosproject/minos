@@ -381,12 +381,14 @@ static void inline virtq_reset(struct virt_queue *vq)
 	vq->ready = 0;
 }
 
-void virtio_device_reset(struct virtio_device *dev)
+int virtio_device_reset(struct virtio_device *dev)
 {
 	int i;
 
 	for (i = 0; i < dev->nr_vq; i++)
 		virtq_reset(&dev->vqs[i]);
+
+	return 0;
 }
 
 void virtio_device_deinit(struct virtio_device *virt_dev)
