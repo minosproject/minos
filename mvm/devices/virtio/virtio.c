@@ -35,6 +35,7 @@
 #include <virtio.h>
 #include <virtio_mmio.h>
 #include <io.h>
+#include <barrier.h>
 
 static void *hv_create_virtio_device(struct vm *vm)
 {
@@ -68,7 +69,8 @@ static void translate_desc(struct vring_desc *desc, int index,
 }
 
 static int get_indirect_buf(struct vring_desc *desc, int index,
-		struct iovec *iov, int iov_size)
+		struct iovec *iov, int iov_size, unsigned int *in,
+		unsigned int *out)
 {
 	struct vring_desc *in_desc, *vd;
 	unsigned int nr_in, old_index = index;
@@ -90,9 +92,13 @@ static int get_indirect_buf(struct vring_desc *desc, int index,
 		}
 
 		translate_desc(desc, index, iov, iov_size);
-		index++;
+		if (desc->flags & VRING_DESC_F_WRITE)
+			*in += 1;
+		else
+			*out += 1;
 
-		if (index > iov_size) {
+		index++;
+		if (index >= iov_size) {
 			pr_err("%d out of ivo size\n", index);
 			return -ENOMEM;
 		}
@@ -107,17 +113,20 @@ static int get_indirect_buf(struct vring_desc *desc, int index,
 			break;
 	}
 
+	/* return how many iovs get in the desc */
 	return (index - old_index);
 }
 
 static void virtq_update_used_flags(struct virt_queue *vq)
 {
 	vq->used->flags = vq->used_flags;
+	mb();
 }
 
 static void virtq_update_avail_event(struct virt_queue *vq, uint16_t event)
 {
 	*virtq_avail_event(vq) = event;
+	mb();
 }
 
 int virtq_enable_notify(struct virt_queue *vq)
@@ -159,6 +168,8 @@ int virtq_get_descs(struct virt_queue *vq,
 	uint16_t avail_idx;
 	int iov_index = 0, count, ret;
 
+	rmb();
+
 	last_avail_idx = vq->last_avail_idx;
 	avail_idx = vq->avail->idx;
 	vq->avail_idx = avail_idx;
@@ -179,8 +190,8 @@ int virtq_get_descs(struct virt_queue *vq,
 	}
 
 	*in_num = *out_num = 0;
-
 	i = head;
+
 	do {
 		if (iov_index >= iov_size) {
 			pr_err("iov count out of iov range %d\n", iov_size);
@@ -195,7 +206,8 @@ int virtq_get_descs(struct virt_queue *vq,
 
 		desc = &vq->desc[i];
 		if (desc->flags & VRING_DESC_F_INDIRECT) {
-			ret = get_indirect_buf(desc, iov_index, iov, iov_size);
+			ret = get_indirect_buf(desc, iov_index, iov,
+					iov_size, in_num, out_num);
 			if (ret < 0) {
 				pr_err("failed to get indirect buf\n");
 				return ret;
@@ -221,6 +233,7 @@ int virtq_get_descs(struct virt_queue *vq,
 void virtq_discard_desc(struct virt_queue *vq, int n)
 {
 	vq->last_avail_idx -= n;
+	wmb();
 }
 
 static int __virtq_add_used_n(struct virt_queue *vq,
@@ -239,6 +252,8 @@ static int __virtq_add_used_n(struct virt_queue *vq,
 		used->len = heads[0].len;
 	} else
 		memcpy(used, heads, count * sizeof(*used));
+
+	wmb();
 
 	old = vq->last_used_idx;
 	new = (vq->last_used_idx += count);
@@ -476,6 +491,7 @@ release_virtio_dev:
 static void inline virtio_hvm_ack(struct virtio_device *dev)
 {
 	iowrite32(dev->vdev->iomem + VIRTIO_MMIO_EVENT_ACK, 1);
+	wmb();
 }
 
 static int virtio_status_event(struct virtio_device *dev, uint32_t arg)

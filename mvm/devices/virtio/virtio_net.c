@@ -44,6 +44,7 @@
 #include <mevent.h>
 #include <virtio.h>
 #include <netmap_user.h>
+#include <barrier.h>
 
 #define VIRTIO_NET_RINGSZ	1024
 #define VIRTIO_NET_MAXSEGS	256
@@ -682,7 +683,7 @@ virtio_net_tx_thread(void *param)
 		while (net->resetting || !virtq_has_descs(vq)) {
 			virtq_enable_notify(vq);
 			/* memory barrier */
-			dsb();
+			dsb(sy);
 			if (!net->resetting && virtq_has_descs(vq))
 				break;
 

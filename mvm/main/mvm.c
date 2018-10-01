@@ -60,6 +60,7 @@
 #include <mvm.h>
 #include <vdev.h>
 #include <mevent.h>
+#include <barrier.h>
 
 struct vm_info {
 	char name[32];
@@ -420,7 +421,7 @@ static void vmcs_ack(struct vmcs *vmcs)
 		return;
 
 	vmcs->guest_index++;
-	dmb();
+	wmb();
 
 	if (vmcs->guest_index < vmcs->host_index)
 		pr_warn("something wrong or there are new message\n");
