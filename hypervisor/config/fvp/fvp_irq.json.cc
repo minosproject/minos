@@ -1,13 +1,6 @@
 /* "hw": 1-host 0-guest */
 "irqtags": [
 	{
-		"vno": 27,
-		"hno": 27,
-		"vmid" : 65535,
-		"vcpu_id": 65535,
-		"name": "virtual timer"
-	},
-	{
 		"hno": 32,
 		"vno": 32,
 		"vmid": 0,
