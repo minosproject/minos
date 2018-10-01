@@ -26,7 +26,7 @@ extern char serial_pl011_getc(void);
 
 int serial_init(void)
 {
-#ifdef CONFIG_PLATFORM_ESPRESSOBIN
+#ifdef CONFIG_PLATFORM_ARMADA
 	return mvebu_serial_probe((void *)0xd0012000);
 #endif
 
@@ -38,7 +38,7 @@ int serial_init(void)
 
 void serial_putc(char ch)
 {
-#ifdef CONFIG_PLATFORM_ESPRESSOBIN
+#ifdef CONFIG_PLATFORM_ARMADA
 	return serial_mvebu_putc(ch);
 #endif
 
@@ -49,8 +49,8 @@ void serial_putc(char ch)
 
 char serial_getc(void)
 {
-#ifdef CONFIG_PLATFORM_ESPRESSOBIN
-	return serial_mvebu_putc(ch);
+#ifdef CONFIG_PLATFORM_ARMADA
+	return serial_mvebu_getc();
 #endif
 
 #ifdef CONFIG_PLATFORM_FVP

@@ -18,7 +18,7 @@
 #include <minos/platform.h>
 
 static struct platform platform_espressobin = {
-	.name		 = "marvell_espressobin",
+	.name		 = "marvel_armada",
 	.cpu_on		 = psci_cpu_on,
 	.cpu_off	 = psci_cpu_off,
 	.system_reboot	 = psci_system_reboot,
