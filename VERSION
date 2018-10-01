@@ -1,0 +1,8 @@
+MAJOR_VERSION=0
+MINOR_VERSION=1
+EXTRA_VERSION=0
+
+Known issue:
+1: when two VM whose vcpu is at the same pcpu request
+   power off at the same time, the system will meet
+   issue.
