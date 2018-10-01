@@ -119,7 +119,7 @@ static void vcpu_release_vtimer(void *data)
 	struct vtimer *vtimer = (struct vtimer *)data;
 
 	del_timer(&vtimer->timer);
-	pr_info("delete timer of vtimer in smp call done\n");
+	pr_debug("delete timer of vtimer in smp call done\n");
 }
 
 static void vtimer_state_deinit(struct vcpu *vcpu, void *context)
@@ -148,8 +148,6 @@ static void vtimer_state_deinit(struct vcpu *vcpu, void *context)
 				vcpu_release_vtimer, vtimer, 1);
 		} else
 			del_timer(&vtimer->timer);
-
-		pr_info("delete vtimer for vcpu done %d\n");
 	}
 }
 
