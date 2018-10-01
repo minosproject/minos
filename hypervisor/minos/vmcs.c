@@ -19,6 +19,8 @@
 #include <minos/sched.h>
 #include <minos/virq.h>
 
+static int vm0_vcpu0_aff = 0;
+
 int __vcpu_trap(uint32_t type, uint32_t reason,
 		uint64_t data, uint64_t *ret, int nonblock)
 {
@@ -35,7 +37,12 @@ int __vcpu_trap(uint32_t type, uint32_t reason,
 			(reason >= VMTRAP_REASON_UNKNOWN))
 		return -EINVAL;
 
-	while (vmcs->guest_index < vmcs->host_index) {
+	/*
+	 * wait for the last trap complete, if the gvm
+	 * has the same affinity pcpu with the vm0, need
+	 * to use sched() in case of dead lock
+	 */
+	while (vmcs->guest_index != vmcs->host_index) {
 		if (vcpu_affinity(vcpu) < vm->vcpu_nr)
 			sched();
 		else
@@ -45,15 +52,27 @@ int __vcpu_trap(uint32_t type, uint32_t reason,
 	vmcs->trap_type = type;
 	vmcs->trap_reason = reason;
 	vmcs->trap_data = data;
+	vmcs->trap_ret = 0;
 	if (ret)
 		vmcs->trap_result = *ret;
 	else
 		vmcs->trap_result = 0;
-	vmcs->trap_ret = 0;
-	vmcs->host_index++;
 
+	/*
+	 * increase the host index of the vmcs, then send the
+	 * virq to the vcpu0 of the vm0
+	 */
+	vmcs->host_index++;
 	dsb();
+
 	send_virq_to_vm(get_vm_by_id(0), vcpu->vmcs_irq);
+
+	/*
+	 * if vcpu's pcpu is equal the vm0_vcpu0's pcpu
+	 * force to block
+	 */
+	if (vcpu_affinity(vcpu) == vm0_vcpu0_aff)
+		nonblock = 0;
 
 	/*
 	 * if gvm's vcpu is on the same pcpu which hvm
@@ -149,3 +168,18 @@ int vm_create_vmcs_irq(struct vm *vm, int vcpu_id)
 
 	return vcpu->vmcs_irq;
 }
+
+static int vmcs_init(void)
+{
+	struct vcpu *vm0_vcpu0 = NULL;
+
+	vm0_vcpu0 = get_vcpu_by_id(0, 0);
+	if (!vm0_vcpu0)
+		panic("vm0 is not created\n");
+
+	vm0_vcpu0_aff = vcpu_affinity(vm0_vcpu0);
+
+	return 0;
+}
+
+device_initcall(vmcs_init);

@@ -93,6 +93,7 @@ alloc_and_init_vdev(struct vm *vm, char *class, char *args)
 	memset(pdev, 0, sizeof(struct vdev));
 	pdev->ops = plat_ops;
 	pdev->vm = vm;
+	pthread_mutex_init(&pdev->lock, NULL);
 
 	memset(buf, 0, 32);
 	len = strlen(class);

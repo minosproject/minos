@@ -139,8 +139,8 @@ struct virtio_console_console_resize {
 
 static int stdio_in_use;
 
-static int virtio_console_notify_rx(struct virt_queue *);
-static int virtio_console_notify_tx(struct virt_queue *);
+static void virtio_console_notify_rx(struct virt_queue *);
+static void virtio_console_notify_tx(struct virt_queue *);
 static void virtio_console_control_send(struct virtio_console *,
 	struct virtio_console_control *, const void *, size_t);
 static void virtio_console_announce_port(struct virtio_console_port *);
@@ -327,7 +327,7 @@ virtio_console_control_send(struct virtio_console *console,
 		sizeof(struct virtio_console_control) + len);
 }
 
-static int
+static void
 virtio_console_notify_tx(struct virt_queue *vq)
 {
 	struct virtio_console *console;
@@ -365,11 +365,9 @@ virtio_console_notify_tx(struct virt_queue *vq)
 
 		virtq_add_used_and_signal(vq, idx, 0);
 	}
-
-	return 0;
 }
 
-static int
+static void
 virtio_console_notify_rx(struct virt_queue *vq)
 {
 	struct virtio_console *console;
@@ -382,8 +380,6 @@ virtio_console_notify_rx(struct virt_queue *vq)
 		port->rx_ready = 1;
 		virtq_disable_notify(vq);
 	}
-
-	return 0;
 }
 
 static void
@@ -902,6 +898,8 @@ static int virtio_console_reset(struct vdev *vdev)
 	vcon = (struct virtio_console *)vdev_get_pdata(vdev);
 	if (!vcon)
 		return -EINVAL;
+
+	vcon->ready = false;
 
 	return virtio_device_reset(&vcon->virtio_dev);
 }

@@ -49,7 +49,7 @@
 #define VIRTIO_DEV_NEEDS_RESET		(64)
 #define VIRTIO_DEV_STATUS_FAILED	(128)
 
-#define VIRTQUEUE_MAX_SIZE		(512)
+#define VIRTQUEUE_MAX_SIZE		(1024)
 #define VIRTIO_MAX_FEATURE_SIZE		(4)
 
 #define u32_to_u64(high, low) \
@@ -98,12 +98,11 @@ struct virt_queue {
 	uint16_t signalled_used;
 	uint16_t signalled_used_valid;
 	uint16_t vq_index;
-	uint64_t acked_features;
 
 	struct virtio_device *dev;
 	struct iovec *iovec;
 
-	int (*callback)(struct virt_queue *);
+	void (*callback)(struct virt_queue *);
 };
 
 #define virtq_used_event(vq) \
@@ -113,14 +112,16 @@ struct virt_queue {
 
 struct virtio_ops {
 	int (*vq_init)(struct virt_queue *);
+	int (*vq_reset)(struct virt_queue *);
 	void (*vq_deinit)(struct virt_queue *);
-	int (*reset)(struct virtio_device *);
+	void (*neg_features)(struct virtio_device *);
 };
 
 struct virtio_device {
 	struct vdev *vdev;
 	struct virt_queue *vqs;
 	int nr_vq;
+	uint64_t acked_features;
 	void *config;
 	struct virtio_ops *ops;
 };
@@ -162,7 +163,7 @@ virtio_set_feature(struct virtio_device *dev, uint32_t feature)
 
 static int inline virtq_has_feature(struct virt_queue *vq, int fe)
 {
-	return !!(vq->acked_features & (1UL << fe));
+	return !!(vq->dev->acked_features & (1UL << fe));
 }
 
 static inline void virtio_send_irq(struct virtio_device *dev, int type)

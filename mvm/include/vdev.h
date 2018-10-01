@@ -2,6 +2,7 @@
 #define __MVM_MVM_DEVICE_H__
 
 #include <mvm.h>
+#include <pthread.h>
 
 #define PDEV_NAME_SIZE		(31)
 
@@ -31,6 +32,7 @@ struct vdev {
 	int dev_type;
 	char name[PDEV_NAME_SIZE + 1];
 	struct list_head list;
+	pthread_mutex_t lock;
 };
 
 #define DEFINE_VDEV_TYPE(ops)	\
