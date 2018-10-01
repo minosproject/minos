@@ -92,6 +92,7 @@ static void vtimer_state_init(struct vcpu *vcpu, void *context)
 	if (get_vcpu_id(vcpu) == 0)
 		vcpu->vm->time_offset = NOW();
 
+	memset(c, 0, sizeof(struct vtimer_context));
 	c->offset = vcpu->vm->time_offset;
 
 	vtimer = &c->virt_timer;
@@ -111,6 +112,45 @@ static void vtimer_state_init(struct vcpu *vcpu, void *context)
 	vtimer->virq = 30;
 	vtimer->cnt_ctl = 0;
 	vtimer->cnt_cval = 0;
+}
+
+static void vcpu_release_vtimer(void *data)
+{
+	struct vtimer *vtimer = (struct vtimer *)data;
+
+	del_timer(&vtimer->timer);
+	pr_info("delete timer of vtimer in smp call done\n");
+}
+
+static void vtimer_state_deinit(struct vcpu *vcpu, void *context)
+{
+	int i;
+	struct vtimer *vtimers[2];
+	struct vtimer *vtimer;
+	int cpuid = smp_processor_id();
+	struct vtimer_context *c = (struct vtimer_context *)context;
+
+	/*
+	 * need to delete the vcpu's vtimer before release
+	 * the vcpu, if the vcpu is on the current pcpu, del
+	 * it directly, otherwise need to call smp_function_call
+	 * to delete it on the pcpu which it belongs to, to avoid
+	 * race
+	 */
+	vtimers[0] = &c->virt_timer;
+	vtimers[1] = &c->phy_timer;
+
+	for (i = 0; i < 2; i++) {
+		vtimer = vtimers[i];
+		if (vcpu_affinity(vcpu) != cpuid) {
+			pr_debug("delete vtimer using smp call\n");
+			smp_function_call(vcpu_affinity(vcpu),
+				vcpu_release_vtimer, vtimer, 1);
+		} else
+			del_timer(&vtimer->timer);
+
+		pr_info("delete vtimer for vcpu done %d\n");
+	}
 }
 
 static void vtimer_handle_cntp_ctl(gp_regs *regs,
@@ -246,6 +286,8 @@ static int vtimer_vmodule_init(struct vmodule *vmodule)
 	vmodule->state_init = vtimer_state_init;
 	vmodule->state_save = vtimer_state_save;
 	vmodule->state_restore = vtimer_state_restore;
+	vmodule->state_deinit = vtimer_state_deinit;
+	vmodule->state_reset = vtimer_state_deinit;
 	vtimer_vmodule_id = vmodule->id;
 
 	return 0;

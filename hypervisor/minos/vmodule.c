@@ -141,24 +141,18 @@ int vcpu_vmodules_deinit(struct vcpu *vcpu)
 	return 0;
 }
 
-void vm_vmodules_init(struct vm *vm)
+int vcpu_vmodules_reset(struct vcpu *vcpu)
 {
 	struct vmodule *vmodule;
+	void *data;
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
-		if (vmodule->vm_init)
-			vmodule->vm_init(vm);
+		data = vcpu->vmodule_context[vmodule->id];
+		if (vmodule->state_reset)
+			vmodule->state_reset(vcpu, data);
 	}
-}
 
-void vm_vmodules_deinit(struct vm *vm)
-{
-	struct vmodule *vmodule;
-
-	list_for_each_entry(vmodule, &vmodule_list, list) {
-		if (vmodule->vm_deinit)
-			vmodule->vm_deinit(vm);
-	}
+	return 0;
 }
 
 void *get_vmodule_pdata(char *name, char *type)

@@ -183,7 +183,6 @@ static struct vm *__create_vm(struct vmtag *vme)
 	list_add_tail(&vm_list, &vm->vm_list);
 	spin_unlock(&vms_lock);
 
-	vm_vmodules_init(vm);
 	vm->os = get_vm_os(vm->os_type);
 
 	return vm;
@@ -345,6 +344,7 @@ int vcpu_reset(struct vcpu *vcpu)
 	if (!vcpu)
 		return -EINVAL;
 
+	vcpu_vmodules_reset(vcpu);
 	vcpu_virq_struct_reset(vcpu);
 	sched_reset_vcpu(vcpu);
 
@@ -396,7 +396,6 @@ void destroy_vm(struct vm *vm)
 	list_del(&vm->vm_list);
 	spin_unlock(&vms_lock);
 
-	vm_vmodules_deinit(vm);
 	free(vm);
 	vms[i] = NULL;
 	total_vms--;

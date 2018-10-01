@@ -25,8 +25,7 @@ struct vmodule {
 	void (*state_restore)(struct vcpu *vcpu, void *context);
 	void (*state_init)(struct vcpu *vcpu, void *context);
 	void (*state_deinit)(struct vcpu *vcpu, void *context);
-	void (*vm_init)(struct vm *vm);
-	void (*vm_deinit)(struct vm *vm);
+	void (*state_reset)(struct vcpu *vcpu, void *context);
 };
 
 void *get_vmodule_data(unsigned long s, unsigned long e,
@@ -34,6 +33,7 @@ void *get_vmodule_data(unsigned long s, unsigned long e,
 
 int vcpu_vmodules_init(struct vcpu *vcpu);
 int vcpu_vmodules_deinit(struct vcpu *vcpu);
+int vcpu_vmodules_reset(struct vcpu *vcpu);
 void *get_vmodule_data_by_name(struct vcpu *vcpu, char *name);
 void *get_vmodule_data_by_id(struct vcpu *vcpu, int id);
 void save_vcpu_vmodule_state(struct vcpu *vcpu);
