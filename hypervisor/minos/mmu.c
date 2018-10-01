@@ -329,9 +329,8 @@ int destroy_mem_mapping(struct mm_struct *mm, unsigned long vir,
 	__destroy_mem_mapping(&map_info);
 	spin_unlock(&mm->lock);
 
-	if (flags & VM_HOST) {
+	if (flags & VM_HOST)
 		flush_tlb_va_host(vir, size);
-	}
 	else
 		flush_local_tlb_guest();
 

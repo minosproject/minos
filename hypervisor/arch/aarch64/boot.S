@@ -74,7 +74,7 @@ do_start:
 	mov	sp, x0
 
 	/* invalid the dcache and flush the tlb */
-	bl	inv_unified_dcache
+	bl	inv_dcache_all
 	tlbi	alle2
 	isb
 

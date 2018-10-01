@@ -273,13 +273,17 @@ extern unsigned long smc_call(uint32_t id, unsigned long a1,
 		unsigned long a2, unsigned long a3, unsigned long a4,
 		unsigned long a5, unsigned long a6);
 
-void dcsw_op_louis(uint32_t op_type);
-void dcsw_op_all(uint32_t op_type);
+static inline void flush_icache_all(void)
+{
+	asm volatile("ic ialluis");
+	dsbsy();
+}
+
 void flush_dcache_range(unsigned long addr, size_t size);
-void clean_dcache_range(unsigned long addr, size_t size);
 void inv_dcache_range(unsigned long addr, size_t size);
 void flush_cache_all(void);
 void flush_dcache_all(void);
+void inv_dcache_all(void);
 
 int arch_taken_from_guest(gp_regs *regs);
 void arch_switch_vcpu_sw(void);

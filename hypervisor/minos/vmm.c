@@ -319,9 +319,6 @@ int vm_mmap(struct vm *vm, unsigned long offset, unsigned long size)
 			vir_off++;
 			phy_off++;
 
-			flush_dcache_range((unsigned long)(vm0_pmd + phy_off),
-					sizeof(unsigned long));
-
 			if ((phy_off & (PAGE_MAPPING_COUNT - 1)) == 0) {
 				phy_off = 0;
 				vm0_pmd = (unsigned long *)alloc_guest_pmd(mm0, phy);
@@ -333,7 +330,9 @@ int vm_mmap(struct vm *vm, unsigned long offset, unsigned long size)
 		left -= count;
 	}
 
+	/* this function always run in vm0 */
 	flush_local_tlb_guest();
+	flush_icache_all();
 
 	return 0;
 }
@@ -359,8 +358,6 @@ void vm_unmmap(struct vm *vm)
 		count = PAGE_MAPPING_COUNT - offset;
 		memset((void *)(vm0_pmd + offset), 0,
 				count * sizeof(unsigned long));
-		flush_dcache_range((unsigned long)(vm0_pmd + offset),
-				count *sizeof(unsigned long));
 
 		if ((offset == 0) && (count == PAGE_MAPPING_COUNT)) {
 			/* here we can free this pmd page TBD */
