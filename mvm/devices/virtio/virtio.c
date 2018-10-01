@@ -164,9 +164,10 @@ int virtq_get_descs(struct virt_queue *vq,
 {
 	struct vring_desc *desc;
 	unsigned int i, head;
-	uint16_t last_avail_idx;
+	uint32_t last_avail_idx;
 	uint16_t avail_idx;
-	int iov_index = 0, count, ret;
+	uint32_t count;
+	int iov_index = 0, ret;
 
 	rmb();
 
@@ -174,12 +175,14 @@ int virtq_get_descs(struct virt_queue *vq,
 	avail_idx = vq->avail->idx;
 	vq->avail_idx = avail_idx;
 
-	count = avail_idx - last_avail_idx;
+	/* to avoid uint16_t overflow */
+	count = (uint16_t)((uint32_t)avail_idx - last_avail_idx);
 	if (count == 0)
 		return vq->num;
 
 	if (count > vq->num) {
-		pr_err("avail ring out of range\n");
+		pr_err("avail ring out of range %d %d\n",
+				avail_idx, last_avail_idx);
 		return -EINVAL;
 	}
 
