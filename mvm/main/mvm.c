@@ -422,9 +422,6 @@ static void vmcs_ack(struct vmcs *vmcs)
 
 	vmcs->guest_index++;
 	wmb();
-
-	if (vmcs->guest_index < vmcs->host_index)
-		pr_warn("something wrong or there are new message\n");
 }
 
 static int vcpu_handle_mmio(struct vm *vm, int trap_reason,
@@ -529,7 +526,7 @@ void *vm_vcpu_thread(void *data)
 		ret = epoll_wait(epfd, &ep_events, 1, -1);
 		if (ret <= 0) {
 			pr_err("epoll failed for vcpu\n");
-			continue;
+			break;
 		}
 
 		eventfd_read(eventfd, &value);
