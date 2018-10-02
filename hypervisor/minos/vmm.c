@@ -356,6 +356,9 @@ void vm_unmmap(struct vm *vm)
 
 		offset = pmd_idx(phy);
 		count = PAGE_MAPPING_COUNT - offset;
+		if (count > left)
+			count = left;
+
 		memset((void *)(vm0_pmd + offset), 0,
 				count * sizeof(unsigned long));
 
