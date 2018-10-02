@@ -1,19 +1,19 @@
 # Minos - Type 1 Hypervisor for ARMv8-A
 
-Minos是一款轻量级的面向移动及嵌入式系统的开源Type 1 Hypervisor, 直接运行于裸机环境。Minos实现了一套完整的虚拟化框架，可以在同一硬件平台上同时运行多个不同操作系统的VM(Linux or RTOS). Minos提供了包括CPU虚拟化; 中断虚拟化; 内存虚拟化; Timer虚拟化; 以及一些常用外设虚拟化的支持。
+Minos is a lightweight open source Type 1 Hypervisor for mobile and embedded systems that runs directly in bare metal environments. Minos implements a complete virtualization framework that can run multiple VMs (Linux or RTOS) on one hardware platform. Minos provides CPU virtualization; interrupt virtualization; memory virtualization; Timer virtual ; and the virtualization of some common peripherals.
 
-Minos提供一个运行于VM0上的应用程序"mvm"来支持Guest VM的管理。同时mvm提供基于virtio的半虚拟化解决方案, 支持virtio-console, virtio-blk(测试中)，virtio-net(测试中)等设备。
+Minos provides an application "mvm" running on VM0 to support the management of the Guest VM. At the same time, mvm provides a viviro-based paravirtualization solution that supports virtio-console, virtio-blk (in testing), virtio-net (in testing) and other devices.
 
-Minos适用于移动及嵌入式平台，目前只支持ARMv8-A架构。硬件上支持Marvell的Esspressobin开发板，且理论上ARMv8-A + GICV3组合的硬件平台都可以被支持。软件调试平台支持ARM官方的Fix Virtual Platform (简称FVP), 开发者可以用ARM DS5工具来进行仿真和调试。
+Minos is suitable for mobile and embedded platforms and currently only supports the ARMv8-A architecture. Marvell's Esspressobin development board is supported, and the hardware platform of the ARMv8-A + GICV3 combination can theoretically be supported. The software debugging platform supports ARM's official Fix Virtual Platform (FVP), and developers can use ARM DS5 tools for simulation and debugging.
 
 # Download Source Code And Tools for Minos
 
-1. 创建工作目录
+1. Create a working directory
 
         # mkdir ~/minos-workspace
         # cd ~/minos-workspace
 
-2. 安装gcc交叉编译工具
+2. Install aarch64 gcc cross compilation tool
 
         # wget https://releases.linaro.org/components/toolchain/binaries/latest/aarch64-linux-gnu/gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu.tar.xz
         # tar xjf gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu.tar.xz
@@ -21,52 +21,52 @@ Minos适用于移动及嵌入式平台，目前只支持ARMv8-A架构。硬件�
         # echo "export PATH=/opt/gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu/bin:$PATH" >> ~/.bashrc
         # source ~/.bashrc
 
-3. 安装abootimg工具
+3. Install abootimg android image tool
 
         # sudo apt-get install abootimg
 
-	abootimg 工具用来制作Linux VM的bootimge，mvm使用此格式image来加载linux内核，ramdisk和dtb文件
+	The abootimg tool is used to make the bootimge of the Linux VM. mvm uses this format image to load the linux kernel, ramdisk and dtb files.
 
-4. 安装device tree代码编译工具
+4. Install devicetree tool
 
         # sudo apt-get install device-tree-compiler
 
-5. 下载Minos sample
+5. Download Minos sample
 
         # git clone https://github.com/minos-project/minos-samples.git
 
-	minos-sample提供了Guest VM的dts/dtb文件，以及制作好的Guest VM boot.img文件
+	The minos-sample provides the dts/dtb file of the Guest VM and the created Guest VM boot.img file.
 
-6. 下载Minos hypervisor 源码
+6. Download Minos hypervisor source code
 
         # git clone https://github.com/minos-project/minos-hypervisor.git
 
-7. 下载Linux Kernel 源码
+7. Download Linux Kernel source code
 
         # git clone https://github.com/minos-project/linux-marvell.git
         # cd linux-marvell
         # git checkout -b minos origin/minos
 
-	默认下载的是添加了Minos驱动的Marvell平台的Linux Kernel, 如果用的是别的硬件平台，只需要添加Minos驱动就行，下面命令可以获取Minos驱动以及必要的Kernel Patch
+	The default download is the Marvell linux kernel source which added the Minos kernel driver. If you are using another hardware platform, just add the Minos driver. The following command can get the Minos driver and the necessary Kernel Patch.
 
         # git clone  https://github.com/minos-project/minos-linux-driver.git
 
-8. 下载ATF源码
+8. Download the ATF source code
 
         # git clone https://github.com/ARM-software/arm-trusted-firmware.git
 
-	在FVP上运行和调试Minos时需要用到
+	Will be used when testing Minos on the ARM FVP
 
 # Run Minos on Marvell Esspressobin
 
-1. 编译Minos
+1. Compile Minos
 
         # cd ~/minos-workspace/minos
         # make
 
-	Minos默认平台为Marvel Esspressobin，编译完成后会在 hypervisor/out目录下生成minos.bin以及在mvm目录下生成mvm应用程序
+	The default platform for Minos is Marvel Esspressobin. After the compilation is completed, minos.bin will be generated in the hypervisor/out directory and the mvm application will be generated in the mvm directory.
 
-2. 编译Marvell Linux Kernel
+2. Compile Marvell Linux Kernel
 
         # cd ~/minos-workspace/linux-marvell
         # export ARCH=arm64
@@ -74,20 +74,20 @@ Minos适用于移动及嵌入式平台，目前只支持ARMv8-A架构。硬件�
         # make mvebu_v8_lsp_defconfig
         # make -j4
 
-	编译完成后会在arch/arm64/boot目录下生成Image内核二进制文件。
+	After the compilation is complete, the kernel binary image will be generated in the arch/arm64/boot directory.
 
-3. Esspressobin默认的内核存放在开发板的/boot目录下，把minos.bin和新的Kernel Image拷贝到/boot目录下, 并把mvm应用拷贝到开发板的用户根目录下。
+3. The default kernel of Esspressobin is stored in the /boot directory of the development board. Copy the minos.bin and the new Kernel Image to the /boot directory, and copy the mvm application to the user root directory of the development board.
 
-4. 更新开发板Uboot启动设置
+4. Update Uboot boot settings of the development board
 
-	启动开发板到命令行状态，执行以下命令更新Uboot启动设置（这里以EMMC版本的Esspressobin开发板举例，采用SD卡方式启动的开发板，方法类似)
+	Start the development board to the command line environment, execute the following command to update the Uboot startup settings (here is the example of the EMMC version of the Esspressobin).
 
         # setenv bootcmd “mmc dev 1; ext4load mmc 1:1 0x3c000000 boot/minos.bin; ext4load mmc 1:1 0x280000 boot/Image; ext4load mmc 1:1 0xfe00000 boot/armada-3720-community-v5.dtb; setenv bootargs console=ttyMV0,115200 earlycon=ar3700_uart,0xd0012000 root=PARTUUID=89708921-01 rw rootwait net.ifnames=0 biosdevname=0; booti 0x3c000000 - 0xfe00000”
         # saveenv
 
-5. 设置完之后重启开发板，之后每次开机将会先跳转到Minos执行hypervisor相关设置，然后再启动VM0
+5. After the setup is complete, restart the development board, then every time the board startup, it will first jump to the Minos to execute virtualization related settings, and then start VM0.
 
-	提示: 如果因为Minos代码错误导致系统启动不了，只需要用原来的启动参数先启动到非虚拟化环境，然后把能正常运行的minos.bin替换到/boot目录下就可以
+	Tip: If the system cannot be started because of the Minos code error, just start the non-virtualized environment with the original startup parameters, and then replace the right minos.bin to the /boot directory.
 
         # mmc dev 1; ext4load mmc 1:1 $kernel_addr $image_name; ext4load mmc 1:1 $fdt_addr $fdt_name; setenv bootargs $console root=PARTUUID=89708921-01 rw rootwait net.ifnames=0 biosdevname=0; booti $kernel_addr - $fdt_addr
 
@@ -95,38 +95,38 @@ Minos适用于移动及嵌入式平台，目前只支持ARMv8-A架构。硬件�
 
 # Run Minos on ARM FVP
 
-1. 下载ARM FVP,创建工作目录
+1. Download ARM FVP and create a working directory
 
         # mkdir ~/minos-workspace/arm-fvp
 
-	FVP可以在ARM的官网下载，Minos支持FVP_Base_AEMv8A 以及FVP_Base_Cortex-A57x2-A53x4 ，这里我们默认使用FVP_Base_AEMv8A来进行测试。另外如果想基于Minos做相关开发，也可以直接安装ARM DS5调试工具，安装完之后自带以上两个FVP。以下是安装使用DS5的相关教程
+	FVP can be downloaded from ARM's official website. Minos supports FVP_Base_AEMv8A and FVP_Base_Cortex-A57x2-A53x4. Here we use FVP_Base_AEMv8A to do the testing. In addition, if you want to do related development based on Minos, you can also directly install the ARM DS5 debugging tool, and bring the above two FVPs after installation. The following is a tutorial on installing and using DS5.
 
-- **ARM FVP(固定虚拟平台)Linux内核调试简明手册:**[https://www.jianshu.com/p/c0a9a4b9569d](https://www.jianshu.com/p/c0a9a4b9569d)
+- **ARM FVP (Fixed Virtual Platform) Linux Kernel Debugging Concise Manual:**[https://www.jianshu.com/p/c0a9a4b9569d](https://www.jianshu.com/p/c0a9a4b9569d)
 
-2. 编译Minos
+2. Compile Minos
 
         # cd ~/minos-workspace/minos
-        # make distclean  (每次改变编译target前需要执行 make distclean)
+        # make distclean  (Need to execute before changing the compile target)
         # make PLATFORM=fvp
 
-3. 编译FVP Kernel
+3. Compile FVP Kernel
 
         # cd ~/minos-workspace/minos
         # make ARCH=arm64 defconfig && make ARCH=arm64 -j8 Image
 
-4. 编译ARM Trusted Firmware
+4. Compile ARM Trusted Firmware
 
         # cd ~/minos-workspace/arm-trusted-firmware
         # make PLAT=fvp RESET_TO_BL31=1 ARM_LINUX_KERNEL_AS_BL33=1 PRELOADED_BL33_BASE=0xc0000000 ARM_PRELOADED_DTB_BASE=0x83e00000
 
-5. 下载ARM64 virtio-block image
+5. Download ARM64 virtio-block image
 
         # cd ~/minos-workspace
         # wget https://releases.linaro.org/archive/14.07/openembedded/aarch64/vexpress64-openembedded_minimal-armv8-gcc-4.9_20140727-682.img.gz
         # gunzip vexpress64-openembedded_minimal-armv8-gcc-4.9_20140727-682.img.gz
         # mv vexpress64-openembedded_minimal-armv8-gcc-4.9_20140727-682.img sd.img
 
-6. 运行FVP
+6. Run FVP with Minos
 
         # cd ~/minos-workspace/arm-fvp
         # ln -s ~/minos-workspace/sd.img sd.img
@@ -154,15 +154,15 @@ Minos适用于移动及嵌入式平台，目前只支持ARMv8-A架构。硬件�
         --data cluster0.cpu0=Image@0x80080000                       \
         --data cluster0.cpu0=minos.bin@0xc0000000
 
-8. 启动FVP之后，可以在主机上运行以下命令通过ssh来登入FVP
+8. After starting FVP, you can run the following command on the host to log in to FVP through ssh.
 
         # ssh -p 8022 root@127.0.0.1
 
 ![Run Minos on FVP ](http://leyunxi.com/static/minos-fvp-00.png)
 
-# mvm使用方法
+# MVM usage
 
-Minos提供两种方式来创建VM, 一种是使用Minos源码下的JSON文件(例如hypervisor/config/fvp/fvp.json.cc)，通过创建一个vmtag的json成员来创建对应的VM，且这种VM的内存, IRQ等硬件资源都是通过对应的json文件来管理的，此方式适合用来创建嵌入式系统中拥有真实硬件权限的VM, Minos支持将特定的硬件设备分配给特定的VM。通过这种方式创建的VM当前没法被mvm管理。
+Minos provides two ways to create a VM. One is to use the JSON file under the Minos source (for example, hypervisor/config/fvp/fvp.json.cc) to create a corresponding VM by creating a json member of the vmtag. VM memory, IRQ and other hardware resources are managed by the corresponding json file. This method is suitable for creating VMs with real hardware permissions in embedded systems. Minos supports assigning specific hardware devices to specific VMs. VMs created this way are currently not managed by mvm.
 
 ```
 #include "fvp_config.h"
@@ -195,7 +195,7 @@ Minos提供两种方式来创建VM, 一种是使用Minos源码下的JSON文件(�
 }
 ```
 
-另外一种方式就是通过Minos提供的VM管理工具mvm来配置, 当前mvm已经支持了VM的创建，销毁，重启和关机操作。
+Another way is to use the VM management tool mvm provided by Minos. Currently mvm already supports VM creation, destruction, restart and shutdown operations.
 
         Usage: mvm [options]
 
@@ -212,11 +212,11 @@ Minos提供两种方式来创建VM, 一种是使用Minos源码下的JSON文件(�
         -D                         (device argument)
         -C                         (set the cmdline for the os)
 
-例如以下命令用来创建一个拥有 2 个vcpu， 84M内存， bootimage为boot.img以及带有virtio-console设备的64位的(当前Minos只支持64位VM)Linux虚拟机.
+For example, the following command is used to create a Linux virtual machine with 2 vcpu, 84M memory, bootimage as boot.img, and 64-bit (current Minos only supports 64-bit VM) with virtio-console device.
 
         #./mvm -c 2 -m 84M -i boot.img -n elinux -t linux -b 64 -v -d -C "console=hvc0 loglevel=8 consolelog=9 loglevel=8 consolelog=9" -D virtio_console,@pty:
 
-创建成功的话会有以下log输出
+If the creation is successful, the following log output will be generated.
 
         [INFO ] no rootfs is point using ramdisk if exist
         root@genericarmv8:~# [INFO ] boot image infomation :
@@ -259,15 +259,15 @@ Minos提供两种方式来创建VM, 一种是使用Minos源码下的JSON文件(�
         [INFO ] set ramdisk : 0x83000000 0x104e21
         [INFO ] add vdev success addr-0x40000000 virq-32
 
-Minos当前已经支持virtio-console后端驱动，创建完VM之后可以用minicom等终端工具登入VM
+Minos currently supports the virtio-console backend driver. After creating the VM, you can log in to the VM with terminal tools such as minicom. (In FVP, you need to wait for a while. The VM startup speed depends on the performance of the host. You can turn off the FVP's cache to speed up the startup.)
 
         # minicom /dev/pts/1
 
 ![minicom to connect VM](http://leyunxi.com/static/minos-fvp-01.png)
 
-# 制作自定义bootimage
+# Make a custom bootimage
 
-Minos默认提供的boot.img的ramdisk.img基于busybox默认rootfs配置,如果需要自定义自己定制ramdisk,也很简单，只需要将制作好ramdisk.img和Image以及dtb文件重新打包:
+The default ramdisk.img in the boot.img provided by Minos is based on the default rootfs configuration of the busybox. If you need to customize your own ramdisk, it is also very simple. You only need to repackage the ramdisk.img, Image and dtb file.
 
         # dtc -I dts -O dtb -o guest-vm.dtb guest-vm.dts
         # abootimg --create boot.img -c kerneladdr=0x80080000 -c ramdiskaddr=0x83000000 -c secondaddr=0x83e00000 -c cmdline="console=hvc0 loglevel=8 consolelog=9" -k Image -s guest-vm.dtb -r ramdisk.img
