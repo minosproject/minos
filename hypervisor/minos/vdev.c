@@ -80,7 +80,7 @@ int guest_vdev_init(struct vm *vm, struct vdev *vdev, uint32_t size)
 
 	vdev->gvm_paddr = mm->gvm_iomem_base;
 	vdev->mem_size = size;
-	mm->gvm_iomem_base -= size;
+	mm->gvm_iomem_base += size;
 	mm->gvm_iomem_size -= size;
 	vdev->vm = vm;
 	vdev->deinit = vdev_deinit;
