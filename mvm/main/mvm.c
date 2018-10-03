@@ -86,7 +86,6 @@ struct vm_config {
 	struct vm_info vm_info;
 	struct device_info device_info;
 	char bootimage_path[256];
-	char rootfs_path[256];
 	char cmdline[256];
 };
 
@@ -855,11 +854,6 @@ static int check_vm_config(struct vm_config *config)
 	if (strlen(config->bootimage_path) == 0) {
 		pr_err("please point the image for this VM\n");
 		return -EINVAL;
-	}
-
-	if (strlen(config->rootfs_path) == 0) {
-		pr_info("no rootfs is point using ramdisk if exist\n");
-		config->flags &= ~(MVM_FLAGS_NO_RAMDISK);
 	}
 
 	if (config->vm_info.nr_vcpus > VM_MAX_VCPUS) {

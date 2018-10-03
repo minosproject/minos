@@ -91,7 +91,7 @@ static int get_indirect_buf(struct vring_desc *desc, int index,
 			return -EINVAL;
 		}
 
-		translate_desc(desc, index, iov, iov_size);
+		translate_desc(vd, index, iov, iov_size);
 		if (desc->flags & VRING_DESC_F_WRITE)
 			*in += 1;
 		else
@@ -103,14 +103,13 @@ static int get_indirect_buf(struct vring_desc *desc, int index,
 			return -ENOMEM;
 		}
 
-		next = next_desc(desc);
-		if (next >= nr_in) {
+		next = next_desc(vd);
+		if (next == -1)
+			break;
+		else if (next >= nr_in) {
 			pr_err("out of indirect desc range\n");
 			return -EINVAL;
 		}
-
-		if (next == -1)
-			break;
 	}
 
 	/* return how many iovs get in the desc */

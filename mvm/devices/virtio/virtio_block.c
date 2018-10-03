@@ -116,6 +116,8 @@ struct virtio_blk {
 	(struct virtio_blk *)container_of(dev, \
 			struct virtio_blk, virtio_dev);
 
+#define DBG(...)
+
 static void
 virtio_blk_done(struct blockif_req *br, int err)
 {
@@ -151,7 +153,7 @@ virtio_blk_proc(struct virtio_blk *blk,
 	int i;
 	int err;
 	ssize_t iolen;
-	int writeop, type;
+	int __unused writeop, type;
 	struct iovec *iov = vq->iovec;
 
 	/*
@@ -162,10 +164,18 @@ virtio_blk_proc(struct virtio_blk *blk,
 	 * XXX - note - this fails on crash dump, which does a
 	 * VIRTIO_BLK_T_FLUSH with a zero transfer length
 	 */
-	assert(n >= 2 && n <= BLOCKIF_IOV_MAX + 2);
+	if (n < 2 || n > BLOCKIF_IOV_MAX + 2) {
+		pr_err("wrong desc value\n");
+		return;
+	}
 
 	io = &blk->ios[idx];
-	assert(iov[0].iov_len == sizeof(struct virtio_blk_hdr));
+	if (iov[0].iov_len != sizeof(struct virtio_blk_hdr)) {
+		pr_err("wrong size of virtio_blk_hdr %ld %ld\n",
+				iov[0].iov_len, sizeof(struct virtio_blk_hdr));
+		return;
+	}
+
 	vbh = iov[0].iov_base;
 	memcpy(&io->req.iov, &iov[1], sizeof(struct iovec) * (n - 2));
 	io->req.iovcnt = n - 2;
@@ -193,7 +203,7 @@ virtio_blk_proc(struct virtio_blk *blk,
 	}
 	io->req.resid = iolen;
 
-	pr_debug("virtio-block: %s op, %zd bytes, %d segs, offset %ld\n\r",
+	DBG("virtio-block: %s op, %zd bytes, %d segs, offset %ld\n\r",
 		 writeop ? "write" : "read/ident", iolen, i - 1,
 		 io->req.offset);
 
@@ -235,7 +245,7 @@ virtio_blk_notify(struct virt_queue *vq)
 
 	while (virtq_has_descs(vq)) {
 		idx = virtq_get_descs(vq, vq->iovec,
-				BLOCKIF_IOV_MAX + 2, &in, &out);
+				vq->iovec_size, &in, &out);
 		if (idx < 0)
 			return;
 
@@ -281,7 +291,7 @@ virtio_blk_init(struct vdev *vdev, char *opts)
 	pthread_mutexattr_t attr;
 	int rc;
 
-	if (opts == NULL) {
+	if (opts == NULL || opts[0] == 0) {
 		printf("virtio-block: backing device required\n");
 		return -1;
 	}
@@ -371,6 +381,7 @@ virtio_blk_init(struct vdev *vdev, char *opts)
 		virtio_set_feature(&blk->virtio_dev, VIRTIO_BLK_F_CONFIG_WCE);
 	}
 
+	virtio_set_feature(&blk->virtio_dev, VIRTIO_F_VERSION_1);
 	virtio_set_feature(&blk->virtio_dev, VIRTIO_BLK_F_SEG_MAX);
 	virtio_set_feature(&blk->virtio_dev, VIRTIO_BLK_F_BLK_SIZE);
 	virtio_set_feature(&blk->virtio_dev, VIRTIO_BLK_F_TOPOLOGY);
@@ -432,7 +443,7 @@ static int virtio_blk_reset(struct vdev *vdev)
 }
 
 struct vdev_ops virtio_blk_ops = {
-	.name		= "virtio-blk",
+	.name		= "virtio_blk",
 	.init		= virtio_blk_init,
 	.deinit		= virtio_blk_deinit,
 	.reset		= virtio_blk_reset,
