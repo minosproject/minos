@@ -1,8 +1,9 @@
 MAJOR_VERSION=0
 MINOR_VERSION=1
-EXTRA_VERSION=0
+EXTRA_VERSION=1
 
 Known issue:
-1: when two VM whose vcpu is at the same pcpu request
-   power off at the same time, the system will meet
-   issue.
+1: the virtio-net devce is created in guest, and can set
+   the ip, but can not ping between host and guest, there
+   may be some issue in the network config or the virtio
+   network driver
