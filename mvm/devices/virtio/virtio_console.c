@@ -47,6 +47,7 @@
 #include <compiler.h>
 
 #define	VIRTIO_CONSOLE_RINGSZ	64
+#define	VIRTIO_CONSOLE_IOVSZ	64
 #define	VIRTIO_CONSOLE_MAXPORTS	16
 #define	VIRTIO_CONSOLE_MAXQ	(VIRTIO_CONSOLE_MAXPORTS * 2 + 2)
 
@@ -784,7 +785,8 @@ virtio_console_init(struct vdev *vdev, char *opts)
 	rc = virtio_device_init(&console->virtio_dev, vdev,
 				VIRTIO_TYPE_CONSOLE,
 				VIRTIO_CONSOLE_MAXQ,
-				VIRTIO_CONSOLE_RINGSZ);
+				VIRTIO_CONSOLE_RINGSZ,
+				VIRTIO_CONSOLE_IOVSZ);
 	if (rc) {
 		pr_err("failed to init vdev %d\n", rc);
 		free(console);

@@ -268,13 +268,13 @@ rx_iov_trim(struct iovec *iov, int *niov, int tlen)
 static void
 virtio_net_tap_rx(struct virtio_net *net)
 {
-	struct iovec iov[VIRTIO_NET_MAXSEGS], *riov;
 	struct virt_queue *vq;
 	void *vrx;
-	int len, n;
+	int len;
 	uint16_t idx;
 	ssize_t ret;
 	unsigned int in, out;
+	struct iovec *iov, *riov;
 
 	/*
 	 * Should never be called without a valid tap fd
@@ -311,6 +311,9 @@ virtio_net_tap_rx(struct virtio_net *net)
 		return;
 	}
 
+	iov = vq->iovec;
+	virtq_disable_notify(vq);
+
 	do {
 		/*
 		 * Get descriptor chain.
@@ -318,16 +321,25 @@ virtio_net_tap_rx(struct virtio_net *net)
 		idx = virtq_get_descs(vq, vq->iovec,
 				VIRTIO_NET_MAXSEGS, &in, &out);
 
-		assert(in >= 1 && in <= VIRTIO_NET_MAXSEGS);
+		if (idx < 0)
+			return;
+
+		if (idx == vq->num) {
+			if (virtq_enable_notify(vq)) {
+				virtq_disable_notify(vq);
+				continue;
+			}
+			break;
+		}
 
 		/*
 		 * Get a pointer to the rx header, and use the
 		 * data immediately following it for the packet buffer.
 		 */
 		vrx = iov[0].iov_base;
-		riov = rx_iov_trim(iov, &n, net->rx_vhdrlen);
+		riov = rx_iov_trim(iov, (int *)&in, net->rx_vhdrlen);
 
-		len = readv(net->tapfd, riov, n);
+		len = readv(net->tapfd, riov, in);
 
 		if (len < 0 && errno == EWOULDBLOCK) {
 			/*
@@ -335,6 +347,7 @@ virtio_net_tap_rx(struct virtio_net *net)
 			 * entries.  Interrupt if needed/appropriate.
 			 */
 			virtq_discard_desc(vq, 1);
+			virtq_enable_notify(vq);
 			virtq_notify(vq);
 			return;
 		}
@@ -355,7 +368,7 @@ virtio_net_tap_rx(struct virtio_net *net)
 		/*
 		 * Release this chain and handle more chains.
 		 */
-		virtq_add_used_and_signal(vq, idx, len + net->rx_vhdrlen);
+		virtq_add_used(vq, idx, len + net->rx_vhdrlen);
 	} while (virtq_has_descs(vq));
 
 	/* Interrupt if needed, including for NOTIFY_ON_EMPTY. */
@@ -473,12 +486,12 @@ virtio_net_netmap_tx(struct virtio_net *net, struct iovec *iov, int iovcnt,
 static void
 virtio_net_netmap_rx(struct virtio_net *net)
 {
-	struct iovec iov[VIRTIO_NET_MAXSEGS], *riov;
 	struct virt_queue *vq;
 	void *vrx;
-	int len, n;
+	int len;
 	uint16_t idx;
 	unsigned int in, out;
+	struct iovec *iov, *riov;
 
 	/*
 	 * Should never be called without a valid netmap descriptor
@@ -511,6 +524,7 @@ virtio_net_netmap_rx(struct virtio_net *net)
 		return;
 	}
 
+	iov = vq->iovec;
 	virtq_disable_notify(vq);
 
 	for (;;) {
@@ -530,22 +544,20 @@ virtio_net_netmap_rx(struct virtio_net *net)
 			break;
 		}
 
-		assert(in >= 1 && in <= VIRTIO_NET_MAXSEGS);
-
 		/*
 		 * Get a pointer to the rx header, and use the
 		 * data immediately following it for the packet buffer.
 		 */
 		vrx = iov[0].iov_base;
-		riov = rx_iov_trim(iov, &n, net->rx_vhdrlen);
+		riov = rx_iov_trim(iov, (int *)&in, net->rx_vhdrlen);
 
-		len = virtio_net_netmap_readv(net->nmd, riov, n);
-
+		len = virtio_net_netmap_readv(net->nmd, riov, in);
 		if (len == 0) {
 			/*
 			 * No more packets, but still some avail ring
 			 * entries.  Interrupt if needed/appropriate.
 			 */
+			virtq_enable_notify(vq);
 			virtq_notify(vq);
 			return;
 		}
@@ -619,7 +631,6 @@ virtio_net_proctx(struct virtio_net *net, struct virt_queue *vq)
 	if (idx == vq->num)
 		return;
 
-	assert( out >= 1 && out <= VIRTIO_NET_MAXSEGS);
 	plen = 0;
 	tlen = vq->iovec[0].iov_len;
 	for (i = 1; i < out; i++) {
@@ -627,7 +638,7 @@ virtio_net_proctx(struct virtio_net *net, struct virt_queue *vq)
 		tlen += vq->iovec[i].iov_len;
 	}
 
-	pr_info("virtio: packet send, %d bytes, %d segs\n\r", plen, out);
+	pr_info("virtio: packet send, %d %d bytes, %d segs\n\r", tlen, plen, out);
 	net->virtio_net_tx(net, &vq->iovec[1], out - 1, plen);
 
 	/* chain is processed, release it and set tlen */
@@ -787,26 +798,15 @@ virtio_net_tap_open(char *devname)
 static void
 virtio_net_tap_setup(struct virtio_net *net, char *devname)
 {
-	char tbuf[80 + 6];	/* room for "minos_" prefix */
-	char *tbuf_ptr;
-
-	tbuf_ptr = tbuf;
-
-	strcpy(tbuf, "minos_");
-
-	tbuf_ptr += 6;
-
-	strncat(tbuf_ptr, devname, sizeof(tbuf) - 7);
-
 	net->virtio_net_rx = virtio_net_tap_rx;
 	net->virtio_net_tx = virtio_net_tap_tx;
 
-	net->tapfd = virtio_net_tap_open(tbuf);
+	net->tapfd = virtio_net_tap_open(devname);
 	if (net->tapfd == -1) {
-		pr_warn("open of tap device %s failed\n", tbuf);
+		pr_warn("open of tap device %s failed\n", devname);
 		return;
 	}
-	pr_info("open of tap device %s success!\n", tbuf);
+	pr_info("open of tap device %s success!\n", devname);
 
 	/*
 	 * Set non-blocking and register for read
@@ -887,7 +887,6 @@ static struct virtio_ops vnet_ops = {
 
 static int virtio_net_init(struct vdev *vdev, char *opts)
 {
-	char nstr[80];
 	char tname[MAXCOMLEN + 1];
 	struct virtio_net *net;
 	char *devname;
@@ -903,8 +902,8 @@ static int virtio_net_init(struct vdev *vdev, char *opts)
 	}
 
 	rc = virtio_device_init(&net->virtio_dev, vdev,
-			VIRTIO_TYPE_NET, VIRTIO_NET_MAXQ,
-			VIRTIO_NET_RINGSZ);
+			VIRTIO_TYPE_NET, VIRTIO_NET_MAXQ - 1,
+			VIRTIO_NET_RINGSZ, VIRTIO_NET_MAXSEGS);
 	if (rc) {
 		pr_err("failed to init virtio net device\n");
 		free(net);
@@ -929,6 +928,7 @@ static int virtio_net_init(struct vdev *vdev, char *opts)
 		pr_info("virtio_net: pthread_mutex_init failed with "
 			"error %d!\n", rc);
 
+	virtio_set_feature(&net->virtio_dev, VIRTIO_F_VERSION_1);
 	virtio_set_feature(&net->virtio_dev, VIRTIO_NET_F_MAC);
 	virtio_set_feature(&net->virtio_dev, VIRTIO_NET_F_MRG_RXBUF);
 	virtio_set_feature(&net->virtio_dev, VIRTIO_NET_F_STATUS);
@@ -942,7 +942,7 @@ static int virtio_net_init(struct vdev *vdev, char *opts)
 	mac_provided = 0;
 	net->tapfd = -1;
 	net->nmd = NULL;
-	if (opts != NULL) {
+	if ((opts != NULL) && (opts[0] != 0)) {
 		int err;
 
 		devname = vtopts = strdup(opts);
@@ -976,14 +976,12 @@ static int virtio_net_init(struct vdev *vdev, char *opts)
 	 * followed by an MD5 of the PCI slot/func number and dev name
 	 */
 	if (!mac_provided) {
-		snprintf(nstr, sizeof(nstr), "%d-%d-%s",
-				0x0, 0x1, "minos");
 		net->config->mac[0] = 0x00;
-		net->config->mac[1] = 0x16;
-		net->config->mac[2] = 0x3E;
-		net->config->mac[3] = 0x11;
-		net->config->mac[4] = 0x22;
-		net->config->mac[5] = 0x33;
+		net->config->mac[1] = 0x11;
+		net->config->mac[2] = 0x22;
+		net->config->mac[3] = 0x33;
+		net->config->mac[4] = 0x44;
+		net->config->mac[5] = 0x55;
 	}
 
 	/* Link is up if we managed to open tap device or vale port. */
@@ -1093,7 +1091,7 @@ static int virtio_net_reset(struct vdev *vdev)
 }
 
 struct vdev_ops virtio_net_ops = {
-	.name		= "virtio-net",
+	.name		= "virtio_net",
 	.init		= virtio_net_init,
 	.deinit		= virtio_net_deinit,
 	.reset		= virtio_net_reset,

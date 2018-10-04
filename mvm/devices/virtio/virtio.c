@@ -428,8 +428,8 @@ void virtio_device_deinit(struct virtio_device *virt_dev)
 	vdev_unmap_iomem(virt_dev->vdev->iomem_physic, PAGE_SIZE);
 }
 
-int virtio_device_init(struct virtio_device *virt_dev,
-		struct vdev *vdev, int type, int queue_nr, int rs)
+int virtio_device_init(struct virtio_device *virt_dev, struct vdev *vdev,
+		int type, int queue_nr, int rs, int iov_size)
 {
 	void *iomem;
 	int ret, i;
@@ -448,6 +448,9 @@ int virtio_device_init(struct virtio_device *virt_dev,
 	if (!iomem)
 		return -ENOMEM;
 
+	if (rs > VIRTQUEUE_MAX_SIZE)
+		rs = VIRTQUEUE_MAX_SIZE;
+
 	ret = __virtio_vdev_init(vdev, iomem, type, rs);
 	if (ret) {
 		pr_err("failed to init virtio device\n");
@@ -457,9 +460,6 @@ int virtio_device_init(struct virtio_device *virt_dev,
 	virt_dev->vdev = vdev;
 	virt_dev->config = vdev->iomem + VIRTIO_MMIO_CONFIG;
 
-	if (rs > VIRTQUEUE_MAX_SIZE)
-		rs = VIRTQUEUE_MAX_SIZE;
-
 	/* alloc memory for virtio queue */
 	virt_dev->vqs = malloc(sizeof(struct virt_queue) * queue_nr);
 	if (!virt_dev->vqs) {
@@ -467,20 +467,22 @@ int virtio_device_init(struct virtio_device *virt_dev,
 		goto release_virtio_dev;
 	}
 
-
 	virt_dev->nr_vq = queue_nr;
 	memset(virt_dev->vqs, 0, sizeof(struct virt_queue) * queue_nr);
+
+	if (iov_size > VIRTQUEUE_MAX_SIZE)
+		iov_size = VIRTQUEUE_MAX_SIZE;
 
 	/* alloc the iovec */
 	for (i = 0; i < queue_nr; i++) {
 		vq = &virt_dev->vqs[i];
-		vq->iovec = malloc(sizeof(struct iovec) * rs);
+		vq->iovec = malloc(sizeof(struct iovec) * iov_size);
 		if (!vq->iovec) {
 			pr_err("failed to get memory for iovec %d\n", i);
 			goto release_virtio_dev;
 		}
 
-		vq->iovec_size = rs;
+		vq->iovec_size = iov_size;
 	}
 
 	return 0;

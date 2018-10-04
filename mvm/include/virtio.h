@@ -173,7 +173,7 @@ static inline void virtio_send_irq(struct virtio_device *dev, int type)
 }
 
 int virtio_device_init(struct virtio_device *,
-		struct vdev *, int, int, int);
+		struct vdev *, int, int, int, int);
 int virtq_enable_notify(struct virt_queue *vq);
 void virtq_disable_notify(struct virt_queue *vq);
 

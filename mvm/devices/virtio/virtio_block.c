@@ -39,6 +39,7 @@
 #include <compiler.h>
 
 #define VIRTIO_BLK_RINGSZ	64
+#define VIRTIO_BLK_IOVSZ	64
 
 #define VIRTIO_BLK_S_OK		0
 #define VIRTIO_BLK_S_IOERR	1
@@ -318,7 +319,8 @@ virtio_blk_init(struct vdev *vdev, char *opts)
 
 	/* virtio blk only has 1 virt queue */
 	rc = virtio_device_init(&blk->virtio_dev, vdev,
-			VIRTIO_TYPE_BLOCK, 1, VIRTIO_BLK_RINGSZ);
+			VIRTIO_TYPE_BLOCK, 1, VIRTIO_BLK_RINGSZ,
+			VIRTIO_BLK_IOVSZ);
 	if (rc) {
 		pr_err("failed to init virtio blk device\n");
 		free(blk);
