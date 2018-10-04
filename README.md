@@ -2,7 +2,7 @@
 
 Minos is a lightweight open source Type 1 Hypervisor for mobile and embedded systems that runs directly in bare metal environments. Minos implements a complete virtualization framework that can run multiple VMs (Linux or RTOS) on one hardware platform. Minos provides CPU virtualization; interrupt virtualization; memory virtualization; Timer virtual ; and the virtualization of some common peripherals.
 
-Minos provides an application "mvm" running on VM0 to support the management of the Guest VM. At the same time, mvm provides a viviro-based paravirtualization solution that supports virtio-console, virtio-blk (in testing), virtio-net (in testing) and other devices.
+Minos provides an application "mvm" running on VM0 to support the management of the Guest VM. At the same time, mvm provides a viviro-based paravirtualization solution that supports virtio-console, virtio-blk, virtio-net and other devices.
 
 Minos is suitable for mobile and embedded platforms and currently only supports the ARMv8-A architecture. Marvell's Esspressobin development board is supported, and the hardware platform of the ARMv8-A + GICV3 combination can theoretically be supported. The software debugging platform supports ARM's official Fix Virtual Platform (FVP), and developers can use ARM DS5 tools for simulation and debugging.
 
@@ -212,9 +212,13 @@ Another way is to use the VM management tool mvm provided by Minos. Currently mv
         -D                         (device argument)
         -C                         (set the cmdline for the os)
 
-For example, the following command is used to create a Linux virtual machine with 2 vcpu, 84M memory, bootimage as boot.img, and 64-bit (current Minos only supports 64-bit VM) with virtio-console device.
+For example, the following command is used to create a Linux virtual machine with 2 vcpu, 84M memory, bootimage as boot.img, and 64-bit (current Minos only supports 64-bit VM) with virtio-console device and virtio-net device. Below command will use ramdisk in boot.img as the rootfs instead of block device.
 
-        #./mvm -c 2 -m 84M -i boot.img -n elinux -t linux -b 64 -v -d -C "console=hvc0 loglevel=8 consolelog=9 loglevel=8 consolelog=9" -D virtio_console,@pty:
+        # ./mvm -c 2 -m 84M -i boot.img -n elinux -t linux -b 64 -v -d -C "console=hvc0 loglevel=8 consolelog=9 loglevel=8 consolelog=9" -D virtio_console,@pty: -D virtio_net,tap0
+
+Now Minos also support using virtio block device as the root device, below command will create a linux vm using virtio-blk device as root device instead of ramdisk
+
+        # ./mvm -c 1 -m 64M -i boot.img -n linux -t linux -v -r -d -D virtio_console,@pty: -D virtio_blk,~/minos-workspace/sd.img -D virtio_net,tap0 -C "console=hvc0 loglevel=8 consolelog=9 root=/dev/vda2 rw"
 
 If the creation is successful, the following log output will be generated.
 
@@ -265,10 +269,24 @@ Minos currently supports the virtio-console backend driver. After creating the V
 
 ![minicom to connect VM](http://leyunxi.com/static/minos-fvp-01.png)
 
-# Make a custom bootimage
+# Create a customize bootimage
 
 The default ramdisk.img in the boot.img provided by Minos is based on the default rootfs configuration of the busybox. If you need to customize your own ramdisk, it is also very simple. You only need to repackage the ramdisk.img, Image and dtb file.
 
         # dtc -I dts -O dtb -o guest-vm.dtb guest-vm.dts
         # abootimg --create boot.img -c kerneladdr=0x80080000 -c ramdiskaddr=0x83000000 -c secondaddr=0x83e00000 -c cmdline="console=hvc0 loglevel=8 consolelog=9" -k Image -s guest-vm.dtb -r ramdisk.img
 
+# Create a customize virtio-blk image
+
+Minos provide a sample virtio-blk image which size is only 512M, the sample virtio block image can be download:
+
+        # wget http://leyunxi.com/static/sd.img
+
+The below commands is to create a bigger block image with 2G size and LAMP support. All the tools and commands are from Linaro, and test on Ubuntu 14.04, more information can refers to [Linaro release https://releases.linaro.org/openembedded/aarch64/15.08/](https://releases.linaro.org/openembedded/aarch64/15.08/)
+
+        # sudo add-apt-repository ppa:linaro-maintainers/tools
+        # sudo apt-get update
+        # sudo apt-get install linaro-image-tools
+        # wget https://releases.linaro.org/openembedded/aarch64/15.08/linaro-image-lamp-genericarmv8-20150729-758.rootfs.tar.gz
+        # wget https://releases.linaro.org/openembedded/aarch64/15.08/hwpack_linaro-vexpress64-rtsm_20150821-726_arm64_supported.tar.gz
+        # linaro-media-create --dev fastmodel --output-directory fastmodel --image_size 2048M --hwpack hwpack_linaro-vexpress64-rtsm_20150821-726_arm64_supported.tar.gz --binary linaro-image-lamp-genericarmv8-20150729-758.rootfs.tar.gz
