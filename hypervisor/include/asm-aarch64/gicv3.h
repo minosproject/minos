@@ -122,7 +122,7 @@
 #define GICV3_NR_LOCAL_IRQS	(32)
 #define GICV3_NR_SGI		(16)
 
-struct gic_context {
+struct gicv3_context {
 	uint64_t ich_lr0_el2;
 	uint64_t ich_lr1_el2;
 	uint64_t ich_lr2_el2;

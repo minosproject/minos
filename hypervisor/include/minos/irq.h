@@ -58,7 +58,7 @@ enum irq_domain_type {
 };
 
 struct irq_desc;
-struct virq;
+struct virq_desc;
 
 typedef int (*irq_handle_t)(uint32_t irq, void *data);
 
@@ -74,9 +74,10 @@ struct irq_chip {
 	int (*irq_set_type)(uint32_t irq, unsigned int flow_type);
 	int (*irq_set_priority)(uint32_t irq, uint32_t pr);
 	void (*send_sgi)(uint32_t irq, enum sgi_mode mode, cpumask_t *mask);
-	int (*send_virq)(struct virq *virq);
-	int (*get_virq_state)(struct virq *virq);
-	int (*update_virq)(struct virq *virq, int action);
+	int (*send_virq)(struct virq_desc *virq);
+	int (*get_virq_state)(struct virq_desc *virq);
+	int (*update_virq)(struct virq_desc *virq, int action);
+	int (*get_virq_nr)(void);
 	int (*init)(void);
 	int (*secondary_init)(void);
 };
@@ -138,12 +139,13 @@ int irq_alloc_special(uint32_t start, uint32_t cnt);
 void __irq_enable(uint32_t irq, int enable);
 void send_sgi(uint32_t sgi, int cpu);
 
-void irq_update_virq(struct virq *virq, int action);
-int irq_get_virq_state(struct virq *virq);
-void irq_send_virq(struct virq *virq);
+void irq_update_virq(struct virq_desc *virq, int action);
+int irq_get_virq_state(struct virq_desc *virq);
+void irq_send_virq(struct virq_desc *virq);
 
 void irq_set_affinity(uint32_t irq, int cpu);
 void irq_set_type(uint32_t irq, int type);
+int irq_get_virq_nr(void);
 
 static inline void irq_unmask(uint32_t irq)
 {

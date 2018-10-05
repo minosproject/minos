@@ -357,19 +357,19 @@ static struct irq_desc *get_irq_desc_cpu(uint32_t irq, int cpu)
 	return NULL;
 }
 
-void irq_update_virq(struct virq *virq, int action)
+void irq_update_virq(struct virq_desc *virq, int action)
 {
 	if (irq_chip->update_virq)
 		irq_chip->update_virq(virq, action);
 }
 
-void irq_send_virq(struct virq *virq)
+void irq_send_virq(struct virq_desc *virq)
 {
 	if (irq_chip->send_virq)
 		irq_chip->send_virq(virq);
 }
 
-int irq_get_virq_state(struct virq *virq)
+int irq_get_virq_state(struct virq_desc *virq)
 {
 	if (irq_chip->get_virq_state)
 		return irq_chip->get_virq_state(virq);
@@ -436,6 +436,14 @@ void irq_set_type(uint32_t irq, int type)
 
 out:
 	spin_unlock(&irq_desc->lock);
+}
+
+int irq_get_virq_nr(void)
+{
+	if (irq_chip->get_virq_nr)
+		return irq_chip->get_virq_nr();
+
+	return 16;
 }
 
 static int do_bad_int(uint32_t irq)

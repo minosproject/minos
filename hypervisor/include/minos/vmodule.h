@@ -13,6 +13,7 @@
 
 #define INVAILD_MODULE_ID		(0xffff)
 
+
 struct vmodule {
 	char name[32];
 	char type[32];
@@ -28,8 +29,7 @@ struct vmodule {
 	void (*state_reset)(struct vcpu *vcpu, void *context);
 };
 
-void *get_vmodule_data(unsigned long s, unsigned long e,
-		int (*check)(struct module_id *vmodule));
+typedef int (*vmodule_init_fn)(struct vmodule *);
 
 int vcpu_vmodules_init(struct vcpu *vcpu);
 int vcpu_vmodules_deinit(struct vcpu *vcpu);
@@ -39,8 +39,7 @@ void *get_vmodule_data_by_id(struct vcpu *vcpu, int id);
 void save_vcpu_vmodule_state(struct vcpu *vcpu);
 void restore_vcpu_vmodule_state(struct vcpu *vcpu);
 int get_vmodule_id(char *type);
-void vm_vmodules_init(struct vm *vm);
-void vm_vmodules_deinit(struct vm *vm);
 int vmodules_init(void);
+int register_vcpu_vmodule(char *name, vmodule_init_fn fn);
 
 #endif

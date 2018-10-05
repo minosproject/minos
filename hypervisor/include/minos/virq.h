@@ -10,7 +10,9 @@ struct irqtag;
 #define VIRQ_STATE_PENDING		(0x1)
 #define VIRQ_STATE_ACTIVE		(0x2)
 #define VIRQ_STATE_ACTIVE_AND_PENDING	(0x3)
-#define VIRQ_STATE_OFFLINE		(0x4)
+
+#define VCPU_MAX_ACTIVE_VIRQS		(64)
+#define VIRQ_INVALID_ID			(0xff)
 
 #define VIRQ_ACTION_REMOVE	(0x0)
 #define VIRQ_ACTION_ADD		(0x1)
@@ -25,7 +27,7 @@ struct irqtag;
 #define HVM_SPI_VIRQ_NR		(384)
 #define HVM_SPI_VIRQ_BASE	(VM_LOCAL_VIRQ_NR)
 
-#define GVM_SPI_VIRQ_NR		(128)
+#define GVM_SPI_VIRQ_NR		(64)
 #define GVM_SPI_VIRQ_BASE	(VM_LOCAL_VIRQ_NR)
 
 #define VIRQ_SPI_OFFSET(virq)	((virq) - VM_LOCAL_VIRQ_NR)
@@ -46,8 +48,11 @@ enum virq_domain_type {
 	VIRQ_DOMAIN_MAX,
 };
 
+/* virq_desc use 32 bytes */
 struct virq_desc {
-	int8_t hw;
+	uint8_t id;
+	uint8_t state;
+	uint8_t hw;
 	uint8_t enable;
 	uint8_t pr;
 	uint8_t vcpu_id;
@@ -56,27 +61,19 @@ struct virq_desc {
 	uint16_t vmid;
 	uint16_t vno;
 	uint16_t hno;
+	uint16_t padding;
+	struct list_head list;
 } __packed__;
 
-struct virq {
-	uint16_t h_intno;
-	uint16_t v_intno;
-	uint8_t hw;
-	uint8_t state;
-	uint8_t id;
-	uint8_t pr;
-	struct list_head list;
-} __packed__ ;
-
 struct virq_struct {
+	int active_virqs;
 	uint32_t active_count;
 	uint32_t pending_hirq;
 	uint32_t pending_virq;
 	spinlock_t lock;
 	struct list_head pending_list;
 	struct list_head active_list;
-	DECLARE_BITMAP(irq_bitmap, CONFIG_VCPU_MAX_ACTIVE_IRQS);
-	struct virq virqs[CONFIG_VCPU_MAX_ACTIVE_IRQS];
+	DECLARE_BITMAP(irq_bitmap, VCPU_MAX_ACTIVE_VIRQS);
 	struct virq_desc local_desc[VM_LOCAL_VIRQ_NR];
 };
 
@@ -93,7 +90,6 @@ int virq_set_priority(struct vcpu *vcpu, uint32_t virq, int pr);
 int virq_set_type(struct vcpu *vcpu, uint32_t virq, int value);
 uint32_t virq_get_type(struct vcpu *vcpu, uint32_t virq);
 
-int send_hirq_to_vcpu(struct vcpu *vcpu, uint32_t virq);
 int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq);
 int send_virq_to_vm(struct vm *vm, uint32_t virq);
 

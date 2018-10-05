@@ -24,11 +24,9 @@
 extern unsigned char __vmodule_start;
 extern unsigned char __vmodule_end;
 
-static struct list_head vmodule_list;
-static struct spinlock vmodule_lock;
 static int vmodule_class_nr = 0;
-
-typedef int (*vmodule_init_fn)(struct vmodule *);
+static DEFINE_SPIN_LOCK(vmodule_lock);
+static LIST_HEAD(vmodule_list);
 
 int get_vmodule_id(char *type)
 {
@@ -69,6 +67,23 @@ static struct vmodule *create_vmodule(struct module_id *id)
 
 	list_add(&vmodule_list, &vmodule->list);
 	return vmodule;
+}
+
+int register_vcpu_vmodule(char *name, vmodule_init_fn fn)
+{
+	struct module_id mid;
+	struct vmodule *vmodule;
+
+	memset(&mid, 0, sizeof(struct module_id));
+	mid.data = fn;
+	strncpy(mid.type, "vmodule", 7);
+	strncpy(mid.name, name, strlen(name) > 31 ? 31 : strlen(name));
+
+	vmodule = create_vmodule(&mid);
+	if (!vmodule)
+		pr_error("create vmodule %s failed\n", name);
+
+	return 0;
 }
 
 void *get_vmodule_data_by_name(struct vcpu *vcpu, char *name)
@@ -210,9 +225,6 @@ int vmodules_init(void)
 	uint32_t size;
 	struct module_id *mid;
 	struct vmodule *vmodule;
-
-	init_list(&vmodule_list);
-	spin_lock_init(&vmodule_lock);
 
 	base = (unsigned long)&__vmodule_start;
 	end = (unsigned long)&__vmodule_end;
