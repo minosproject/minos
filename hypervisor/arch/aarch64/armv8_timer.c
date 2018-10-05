@@ -17,7 +17,7 @@
 #include <minos/minos.h>
 #include <minos/time.h>
 #include <minos/init.h>
-#include <minos/io.h>
+#include <asm/io.h>
 #include <minos/stdlib.h>
 #include <minos/softirq.h>
 #include <asm/vtimer.h>

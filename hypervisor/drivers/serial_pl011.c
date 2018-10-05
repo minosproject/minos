@@ -15,7 +15,7 @@
  */
 
 #include <minos/errno.h>
-#include <minos/io.h>
+#include <asm/io.h>
 #include <drivers/pl011.h>
 #include <minos/mmu.h>
 #include <minos/init.h>
@@ -29,20 +29,20 @@ int pl011_init(void *addr)
 
 	base = addr;
 
-	iowrite32(base + UARTCR, 0x0);
-	iowrite32(base + UARTECR, 0x0);
-	iowrite32(base + UARTLCR_H, 0x0 | PL011_LCR_WORD_LENGTH_8 | \
-			PL011_LCR_ONE_STOP_BIT | \
-			PL011_LCR_PARITY_DISABLE | \
-			PL011_LCR_BREAK_DISABLE);
-	iowrite32(base + UARTIBRD, PL011_IBRD_DIV_38400);
-	iowrite32(base + UARTFBRD, PL011_FBRD_DIV_38400);
+	iowrite32(0x0, base + UARTCR);
+	iowrite32(0x0, base + UARTECR);
+	iowrite32(0x0 | PL011_LCR_WORD_LENGTH_8 | \
+		  PL011_LCR_ONE_STOP_BIT | \
+		  PL011_LCR_PARITY_DISABLE | \
+		  PL011_LCR_BREAK_DISABLE, base + UARTLCR_H);
+	iowrite32(PL011_IBRD_DIV_38400, base + UARTIBRD);
+	iowrite32(PL011_FBRD_DIV_38400, base + UARTFBRD);
 
-	iowrite32(base + UARTIMSC, 0x0);
-	iowrite32(base + UARTICR, PL011_ICR_CLR_ALL_IRQS);
-	iowrite32(base + UARTCR, 0x0 | PL011_CR_UART_ENABLE | \
-			PL011_CR_TX_ENABLE | \
-			PL011_CR_RX_ENABLE);
+	iowrite32(0X0, base + UARTIMSC);
+	iowrite32(PL011_ICR_CLR_ALL_IRQS, base + UARTICR);
+	iowrite32(0x0 | PL011_CR_UART_ENABLE | \
+		  PL011_CR_TX_ENABLE | \
+		  PL011_CR_RX_ENABLE, base + UARTCR);
 
 	return 0;
 }
@@ -52,9 +52,9 @@ void serial_pl011_putc(char c)
 	while (ioread32(base + UARTFR) & PL011_FR_BUSY_FLAG);
 
 	if (c == '\n')
-		iowrite32(base + UARTDR, '\r');
+		iowrite32('\r', base + UARTDR);
 
-	iowrite32(base + UARTDR, c);
+	iowrite32(c, base + UARTDR);
 }
 
 char serial_pl011_getc(void)

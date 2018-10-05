@@ -16,7 +16,7 @@
 #include <minos/minos.h>
 #include <minos/vmodule.h>
 #include <asm/vtimer.h>
-#include <minos/io.h>
+#include <asm/io.h>
 #include <asm/processer.h>
 #include <asm/exception.h>
 #include <minos/timer.h>

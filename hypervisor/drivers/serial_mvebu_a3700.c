@@ -5,7 +5,7 @@
  */
 
 #include <minos/minos.h>
-#include <minos/io.h>
+#include <asm/io.h>
 
 static void *base = (void *)0xd0012000;
 
@@ -38,7 +38,7 @@ static inline void __serial_putc(char ch)
 {
 	while (ioread32(base + UART_STATUS_REG) & UART_STATUS_TXFIFO_FULL);
 
-	iowrite32(base + UART_TX_REG, ch);
+	iowrite32(ch, base + UART_TX_REG);
 }
 
 void serial_mvebu_putc(char ch)
@@ -62,13 +62,13 @@ static int mvebu_serial_setbrg(int baudrate)
 	 * Calculate divider
 	 * baudrate = clock / 16 / divider
 	 */
-	iowrite32(base + UART_BAUD_REG, CONFIG_UART_BASE_CLOCK / baudrate / 16);
+	iowrite32(CONFIG_UART_BASE_CLOCK / baudrate / 16, base + UART_BAUD_REG);
 
 	/*
 	 * Set Programmable Oversampling Stack to 0,
 	 * UART defaults to 16x scheme
 	 */
-	iowrite32(base + UART_POSSR_REG, 0);
+	iowrite32(0, base + UART_POSSR_REG);
 
 	return 0;
 }
@@ -78,11 +78,11 @@ int mvebu_serial_probe(void *addr)
 	base = addr;
 
 	/* reset FIFOs */
-	iowrite32(base + UART_CTRL_REG, UART_CTRL_RXFIFO_RESET |
-			UART_CTRL_TXFIFO_RESET);
+	iowrite32(UART_CTRL_RXFIFO_RESET | UART_CTRL_TXFIFO_RESET,
+			base + UART_CTRL_REG);
 
 	/* No Parity, 1 Stop */
-	iowrite32(base + UART_CTRL_REG, 0);
+	iowrite32(0, base + UART_CTRL_REG);
 
 	/* set brg to 115200 */
 	mvebu_serial_setbrg(115200);

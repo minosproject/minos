@@ -17,7 +17,7 @@
 #include <minos/minos.h>
 #include <asm/psci.h>
 #include <asm/vtimer.h>
-#include <minos/io.h>
+#include <asm/io.h>
 #include <minos/vmm.h>
 
 static int fvp_time_init(void)
@@ -25,7 +25,7 @@ static int fvp_time_init(void)
 	io_remap(0x2a430000, 0x2a430000, 64 * 1024);
 
 	/* enable the counter */
-	iowrite32((void *)0x2a430000 + CNTCR, 1);
+	iowrite32(1, (void *)0x2a430000 + CNTCR);
 	return 0;
 }
 

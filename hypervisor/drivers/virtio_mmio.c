@@ -19,7 +19,7 @@
 #include <minos/mm.h>
 #include <minos/bitmap.h>
 #include <minos/virtio.h>
-#include <minos/io.h>
+#include <asm/io.h>
 #include <minos/sched.h>
 #include <minos/vdev.h>
 #include <minos/virq.h>
@@ -52,45 +52,45 @@ static int virtio_mmio_write(struct vdev *vdev, gp_regs *regs,
 		}
 		tmp = ioread32(iomem + VIRTIO_MMIO_HOST_FEATURE0 +
 				value * sizeof(uint32_t));
-		iowrite32(iomem + VIRTIO_MMIO_HOST_FEATURES, tmp);
+		iowrite32(tmp, iomem + VIRTIO_MMIO_HOST_FEATURES);
 		break;
 	case VIRTIO_MMIO_GUEST_FEATURES_SEL:
-		iowrite32(iomem + VIRTIO_MMIO_GUEST_FEATURES_SEL, value);
+		iowrite32(value, iomem + VIRTIO_MMIO_GUEST_FEATURES_SEL);
 		break;
 	case VIRTIO_MMIO_GUEST_FEATURES:
 		tmp = ioread32(iomem + VIRTIO_MMIO_GUEST_FEATURES_SEL);
 		tmp = tmp * sizeof(uint32_t) + VIRTIO_MMIO_DRIVER_FEATURE0;
-		iowrite32(iomem + tmp, value);
+		iowrite32(value, iomem + tmp);
 		break;
 	case VIRTIO_MMIO_GUEST_PAGE_SIZE:
 		/* version 1 virtio device */
-		iowrite32(iomem + VIRTIO_MMIO_GUEST_PAGE_SIZE, value);
+		iowrite32(value, iomem + VIRTIO_MMIO_GUEST_PAGE_SIZE);
 		break;
 	case VIRTIO_MMIO_QUEUE_SEL:
-		iowrite32(iomem + VIRTIO_MMIO_QUEUE_SEL, value);
+		iowrite32(value, iomem + VIRTIO_MMIO_QUEUE_SEL);
 
 		/* clear the queue information in the memory */
-		iowrite32(iomem + VIRTIO_MMIO_QUEUE_READY, 0);
-		iowrite32(iomem + VIRTIO_MMIO_QUEUE_NUM, 0);
-		iowrite32(iomem + VIRTIO_MMIO_QUEUE_DESC_LOW, 0);
-		iowrite32(iomem + VIRTIO_MMIO_QUEUE_DESC_HIGH, 0);
-		iowrite32(iomem + VIRTIO_MMIO_QUEUE_AVAIL_LOW, 0);
-		iowrite32(iomem + VIRTIO_MMIO_QUEUE_AVAIL_HIGH, 0);
-		iowrite32(iomem + VIRTIO_MMIO_QUEUE_USED_LOW, 0);
-		iowrite32(iomem + VIRTIO_MMIO_QUEUE_USED_HIGH, 0);
+		iowrite32(0, iomem + VIRTIO_MMIO_QUEUE_READY);
+		iowrite32(0, iomem + VIRTIO_MMIO_QUEUE_NUM);
+		iowrite32(0, iomem + VIRTIO_MMIO_QUEUE_DESC_LOW);
+		iowrite32(0, iomem + VIRTIO_MMIO_QUEUE_DESC_HIGH);
+		iowrite32(0, iomem + VIRTIO_MMIO_QUEUE_AVAIL_LOW);
+		iowrite32(0, iomem + VIRTIO_MMIO_QUEUE_AVAIL_HIGH);
+		iowrite32(0, iomem + VIRTIO_MMIO_QUEUE_USED_LOW);
+		iowrite32(0, iomem + VIRTIO_MMIO_QUEUE_USED_HIGH);
 		break;
 	case VIRTIO_MMIO_QUEUE_NUM:
 		tmp = ioread32(iomem + VIRTIO_MMIO_QUEUE_NUM_MAX);
 		if (value > tmp)
 			pr_warn("invalid queue sel %d\n", value);
-		iowrite32(iomem + VIRTIO_MMIO_QUEUE_NUM, value);
+		iowrite32(value, iomem + VIRTIO_MMIO_QUEUE_NUM);
 		break;
 	case VIRTIO_MMIO_QUEUE_ALIGN:
-		iowrite32(iomem + VIRTIO_MMIO_QUEUE_ALIGN, value);
+		iowrite32(value, iomem + VIRTIO_MMIO_QUEUE_ALIGN);
 		break;
 	case VIRTIO_MMIO_QUEUE_PFN:
 		/* this is for version 1 virtio device */
-		iowrite32(iomem + VIRTIO_MMIO_QUEUE_PFN, value);
+		iowrite32(value, iomem + VIRTIO_MMIO_QUEUE_PFN);
 		break;
 	case VIRTIO_MMIO_QUEUE_NOTIFY:
 		/*
@@ -104,27 +104,27 @@ static int virtio_mmio_write(struct vdev *vdev, gp_regs *regs,
 		tmp = ioread32(iomem + VIRTIO_MMIO_STATUS);
 		value = value - tmp;
 		*write_value = value;
-		iowrite32(iomem + VIRTIO_MMIO_STATUS, value);
+		iowrite32(value, iomem + VIRTIO_MMIO_STATUS);
 		trap_vcpu(VMTRAP_TYPE_MMIO, VMTRAP_REASON_WRITE,
 				address, (uint64_t *)write_value);
 		break;
 	case VIRTIO_MMIO_QUEUE_DESC_LOW:
-		iowrite32(iomem + VIRTIO_MMIO_QUEUE_DESC_LOW, value);
+		iowrite32(value, iomem + VIRTIO_MMIO_QUEUE_DESC_LOW);
 		break;
 	case VIRTIO_MMIO_QUEUE_AVAIL_LOW:
-		iowrite32(iomem + VIRTIO_MMIO_QUEUE_AVAIL_LOW, value);
+		iowrite32(value, iomem + VIRTIO_MMIO_QUEUE_AVAIL_LOW);
 		break;
 	case VIRTIO_MMIO_QUEUE_USED_LOW:
-		iowrite32(iomem + VIRTIO_MMIO_QUEUE_USED_LOW, value);
+		iowrite32(value, iomem + VIRTIO_MMIO_QUEUE_USED_LOW);
 		break;
 	case VIRTIO_MMIO_QUEUE_DESC_HIGH:
-		iowrite32(iomem + VIRTIO_MMIO_QUEUE_DESC_HIGH, value);
+		iowrite32(value, iomem + VIRTIO_MMIO_QUEUE_DESC_HIGH);
 		break;
 	case VIRTIO_MMIO_QUEUE_USED_HIGH:
-		iowrite32(iomem + VIRTIO_MMIO_QUEUE_USED_HIGH, value);
+		iowrite32(value, iomem + VIRTIO_MMIO_QUEUE_USED_HIGH);
 		break;
 	case VIRTIO_MMIO_QUEUE_AVAIL_HIGH:
-		iowrite32(iomem + VIRTIO_MMIO_QUEUE_AVAIL_HIGH, value);
+		iowrite32(value, iomem + VIRTIO_MMIO_QUEUE_AVAIL_HIGH);
 		break;
 	case VIRTIO_MMIO_QUEUE_READY:
 		value = ioread32(iomem + VIRTIO_MMIO_QUEUE_SEL);
@@ -133,8 +133,8 @@ static int virtio_mmio_write(struct vdev *vdev, gp_regs *regs,
 				address, (uint64_t *)write_value);
 		break;
 	case VIRTIO_MMIO_INTERRUPT_ACK:
-		iowrite32(iomem + VIRTIO_MMIO_INTERRUPT_ACK, 0);
-		iowrite32(iomem + VIRTIO_MMIO_INTERRUPT_STATUS, 0);
+		iowrite32(0, iomem + VIRTIO_MMIO_INTERRUPT_ACK);
+		iowrite32(0, iomem + VIRTIO_MMIO_INTERRUPT_STATUS);
 		break;
 	default:
 		break;
@@ -148,9 +148,9 @@ static inline void virtio_device_init(struct vm *vm,
 {
 	void *base = dev->vdev.iomem;
 
-	iowrite32(base + VIRTIO_MMIO_GVM_ADDR, dev->vdev.gvm_paddr);
-	iowrite32(base + VIRTIO_MMIO_MEM_SIZE, dev->vdev.mem_size);
-	iowrite32(base + VIRTIO_MMIO_GVM_IRQ, dev->gvm_irq);
+	iowrite32(dev->vdev.gvm_paddr, base + VIRTIO_MMIO_GVM_ADDR);
+	iowrite32(dev->vdev.mem_size, base + VIRTIO_MMIO_MEM_SIZE);
+	iowrite32(dev->gvm_irq, base + VIRTIO_MMIO_GVM_IRQ);
 }
 
 void release_virtio_dev(struct vm *vm, struct virtio_device *dev)

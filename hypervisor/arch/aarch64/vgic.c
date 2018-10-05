@@ -18,7 +18,7 @@
 #include <minos/vmodule.h>
 #include <minos/irq.h>
 #include <asm/gicv3.h>
-#include <minos/io.h>
+#include <asm/io.h>
 #include <minos/vmodule.h>
 #include <minos/cpumask.h>
 #include <minos/irq.h>

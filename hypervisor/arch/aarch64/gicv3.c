@@ -15,7 +15,7 @@
  */
 
 #include <minos/minos.h>
-#include <minos/io.h>
+#include <asm/io.h>
 #include <minos/percpu.h>
 #include <minos/spinlock.h>
 #include <minos/print.h>
@@ -98,7 +98,7 @@ static int gicv3_set_irq_type(uint32_t irq, uint32_t type)
 	else if (type & IRQ_FLAGS_EDGE_BOTH)
 		cfg |= edgebit;
 
-	iowrite32(base, cfg);
+	iowrite32(cfg, base);
 	isb();
 
 	spin_unlock(&gicv3_lock);
@@ -113,13 +113,13 @@ static void gicv3_clear_pending(uint32_t irq)
 	spin_lock(&gicv3_lock);
 
 	if (irq >= GICV3_NR_LOCAL_IRQS) {
-		iowrite32((void *)gicr_sgi_base() + GICR_ICPENDR0, BIT(irq));
+		iowrite32(BIT(irq), (void *)gicr_sgi_base() + GICR_ICPENDR0);
 	} else {
 		irq = irq - 32;
 		offset = irq / 32;
 		bit = offset % 32;
-		iowrite32((void *)gicd_base + GICD_ICPENDR \
-				+ (offset * 4), BIT(bit));
+		iowrite32(BIT(bit), (void *)gicd_base + \
+				GICD_ICPENDR + (offset * 4));
 	}
 
 	spin_unlock(&gicv3_lock);
@@ -130,9 +130,9 @@ static int gicv3_set_irq_priority(uint32_t irq, uint32_t pr)
 	spin_lock(&gicv3_lock);
 
 	if (irq < GICV3_NR_LOCAL_IRQS)
-		iowrite8(gicr_sgi_base() + GICR_IPRIORITYR0 + irq, pr);
+		iowrite8(pr, gicr_sgi_base() + GICR_IPRIORITYR0 + irq);
 	else
-		iowrite8(gicd_base + GICD_IPRIORITYR + irq, pr);
+		iowrite8(pr, gicd_base + GICD_IPRIORITYR + irq);
 
 	spin_unlock(&gicv3_lock);
 
@@ -147,7 +147,7 @@ static int gicv3_set_irq_affinity(uint32_t irq, uint32_t pcpu)
 	affinity &= ~(1 << 31); //GICD_IROUTER_SPI_MODE_ANY
 
 	spin_lock(&gicv3_lock);
-	iowrite64(gicd_base + GICD_IROUTER + irq * 8, affinity);
+	iowrite64(affinity, gicd_base + GICD_IROUTER + irq * 8);
 	spin_unlock(&gicv3_lock);
 
 	return 0;
@@ -346,10 +346,10 @@ static void gicv3_mask_irq(uint32_t irq)
 
 	spin_lock(&gicv3_lock);
 	if (irq < GICV3_NR_LOCAL_IRQS) {
-		iowrite32(gicr_sgi_base() + GICR_ICENABLER + (irq / 32) * 4, mask);
+		iowrite32(mask, gicr_sgi_base() + GICR_ICENABLER + (irq / 32) * 4);
 		gicv3_gicr_wait_for_rwp();
 	} else {
-		iowrite32(gicd_base + GICD_ICENABLER + (irq / 32) * 4, mask);
+		iowrite32(mask, gicd_base + GICD_ICENABLER + (irq / 32) * 4);
 		gicv3_gicd_wait_for_rwp();
 	}
 	spin_unlock(&gicv3_lock);
@@ -362,10 +362,10 @@ static void gicv3_unmask_irq(uint32_t irq)
 	spin_lock(&gicv3_lock);
 
 	if (irq < GICV3_NR_LOCAL_IRQS) {
-		iowrite32(gicr_sgi_base() + GICR_ISENABLER + (irq / 32) * 4, mask);
+		iowrite32(mask, gicr_sgi_base() + GICR_ISENABLER + (irq / 32) * 4);
 		gicv3_gicr_wait_for_rwp();
 	} else {
-		iowrite32(gicd_base + GICD_ISENABLER + (irq / 32) * 4, mask);
+		iowrite32(mask, gicd_base + GICD_ISENABLER + (irq / 32) * 4);
 		gicv3_gicd_wait_for_rwp();
 	}
 
@@ -387,7 +387,7 @@ static void gicv3_mask_irq_cpu(uint32_t irq, int cpu)
 
 	base = get_per_cpu(gicr_sgi_base, cpu);
 	base = base + GICR_ICENABLER + (irq / 32) * 4;
-	iowrite32(base, mask);
+	iowrite32(mask, base);
 	gicv3_gicr_wait_for_rwp();
 
 	spin_unlock(&gicv3_lock);
@@ -408,7 +408,7 @@ static void gicv3_unmask_irq_cpu(uint32_t irq, int cpu)
 
 	base = get_per_cpu(gicr_sgi_base, cpu);
 	base = base + GICR_ISENABLER + (irq / 32) * 4;
-	iowrite32(base, mask);
+	iowrite32(mask, base);
 	gicv3_gicr_wait_for_rwp();
 
 	spin_unlock(&gicv3_lock);
@@ -420,7 +420,7 @@ static void gicv3_wakeup_gicr(void)
 
 	gicv3_waker_value = ioread32(gicr_rd_base() + GICR_WAKER);
 	gicv3_waker_value &= ~(GICR_WAKER_PROCESSOR_SLEEP);
-	iowrite32(gicr_rd_base() + GICR_WAKER, gicv3_waker_value);
+	iowrite32(gicv3_waker_value, gicr_rd_base() + GICR_WAKER);
 
 	while ((ioread32(gicr_rd_base() + GICR_WAKER)
 			& GICR_WAKER_CHILDREN_ASLEEP) != 0);
@@ -489,19 +489,19 @@ static int gicv3_gicr_init(void)
 	/* set the priority on PPI and SGI */
 	pr = (0x90 << 24) | (0x90 << 16) | (0x90 << 8) | 0x90;
 	for (i = 0; i < GICV3_NR_SGI; i += 4)
-		iowrite32(gicr_sgi_base() + GICR_IPRIORITYR0 + (i / 4) * 4, pr);
+		iowrite32(pr, gicr_sgi_base() + GICR_IPRIORITYR0 + (i / 4) * 4);
 
 	pr = (0xa0 << 24) | (0xa0 << 16) | (0xa0 << 8) | 0xa0;
 	for (i = GICV3_NR_SGI; i < GICV3_NR_LOCAL_IRQS; i += 4)
-		iowrite32(gicr_sgi_base() + GICR_IPRIORITYR0 + (i / 4) * 4, pr);
+		iowrite32(pr, gicr_sgi_base() + GICR_IPRIORITYR0 + (i / 4) * 4);
 
 	/* disable all PPI and enable all SGI */
-	iowrite32(gicr_sgi_base() + GICR_ICENABLER, 0xffff0000);
-	iowrite32(gicr_sgi_base() + GICR_ISENABLER, 0x0000ffff);
+	iowrite32(0xffff0000, gicr_sgi_base() + GICR_ICENABLER);
+	iowrite32(0x0000ffff, gicr_sgi_base() + GICR_ISENABLER);
 
 
 	/* configure SGI and PPI as non-secure Group-1 */
-	iowrite32(gicr_sgi_base() + GICR_IGROUPR0, 0xffffffff);
+	iowrite32(0xffffffff, gicr_sgi_base() + GICR_IGROUPR0);
 
 	gicv3_gicr_wait_for_rwp();
 	isb();
@@ -714,7 +714,7 @@ int gicv3_init(void)
 	spin_lock(&gicv3_lock);
 
 	/* disable gicd */
-	iowrite32(gicd_base + GICD_CTLR, 0);
+	iowrite32(0, gicd_base + GICD_CTLR);
 
 	type = ioread32(gicd_base + GICD_TYPER);
 	pr_info("gicv3 typer reg of gicv3 is 0x%x\n", type);
@@ -729,28 +729,28 @@ int gicv3_init(void)
 
 	/* default all golbal IRQS to level, active low */
 	for (i = GICV3_NR_LOCAL_IRQS; i < nr_lines; i += 16)
-		iowrite32(gicd_base + GICD_ICFGR + (i / 16) * 4, 0);
+		iowrite32(0, gicd_base + GICD_ICFGR + (i / 16) * 4);
 
 	/* default priority for global interrupts */
 	for (i = GICV3_NR_LOCAL_IRQS; i < nr_lines; i += 4) {
 		pr = (0xa0 << 24) | (0xa0 << 16) | (0xa0 << 8) | 0xa0;
-		iowrite32(gicd_base + GICD_IPRIORITYR + (i / 4) * 4, pr);
+		iowrite32(pr, gicd_base + GICD_IPRIORITYR + (i / 4) * 4);
 		pr = ioread32(gicd_base + GICD_IPRIORITYR + (i / 4) * 4);
 	}
 
 	/* disable all global interrupt */
 	for (i = GICV3_NR_LOCAL_IRQS; i < nr_lines; i += 32)
-		iowrite32(gicd_base + GICD_ICENABLER + (i / 32) *4, 0xffffffff);
+		iowrite32(0xffffffff, gicd_base + GICD_ICENABLER + (i / 32) *4);
 
 	/* configure SPIs as non-secure GROUP-1 */
 	for (i = GICV3_NR_LOCAL_IRQS; i < nr_lines; i += 32)
-		iowrite32(gicd_base + GICD_IGROUPR + (i / 32) *4, 0xffffffff);
+		iowrite32(0xffffffff, gicd_base + GICD_IGROUPR + (i / 32) *4);
 
 	gicv3_gicd_wait_for_rwp();
 
 	/* enable the gicd */
-	iowrite32(gicd_base + GICD_CTLR, 1 | GICD_CTLR_ENABLE_GRP1 |
-			GICD_CTLR_ENABLE_GRP1A | GICD_CTLR_ARE_NS);
+	iowrite32(1 | GICD_CTLR_ENABLE_GRP1 | GICD_CTLR_ENABLE_GRP1A |
+			GICD_CTLR_ARE_NS, gicd_base + GICD_CTLR);
 	isb();
 
 	gicv3_gicr_init();
