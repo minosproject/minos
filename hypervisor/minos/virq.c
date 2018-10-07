@@ -94,6 +94,9 @@ static int inline __send_virq(struct vcpu *vcpu, struct virq_desc *desc)
 		list_add_tail(&virq_struct->pending_list, &desc->list);
 	}
 
+	if (desc->vno < VM_SGI_VIRQ_NR)
+		desc->src = get_vcpu_id(current_vcpu);
+
 	spin_unlock_irqrestore(&virq_struct->lock, flags);
 
 	return 0;
@@ -172,9 +175,42 @@ uint32_t virq_get_type(struct vcpu *vcpu, uint32_t virq)
 
 	desc = get_virq_desc(vcpu, virq);
 	if (!desc)
-		return -ENOENT;
+		return 0;
 
 	return desc->type;
+}
+
+uint32_t virq_get_state(struct vcpu *vcpu, uint32_t virq)
+{
+	struct virq_desc *desc;
+
+	desc = get_virq_desc(vcpu, virq);
+	if (!desc)
+		return 0;
+
+	return desc->enable;
+}
+
+uint32_t virq_get_affinity(struct vcpu *vcpu, uint32_t virq)
+{
+	struct virq_desc *desc;
+
+	desc = get_virq_desc(vcpu, virq);
+	if (!desc)
+		return 0;
+
+	return desc->vcpu_id;
+}
+
+uint32_t virq_get_pr(struct vcpu *vcpu, uint32_t virq)
+{
+	struct virq_desc *desc;
+
+	desc = get_virq_desc(vcpu, virq);
+	if (!desc)
+		return 0;
+
+	return desc->pr;
 }
 
 int virq_set_type(struct vcpu *vcpu, uint32_t virq, int value)
@@ -392,6 +428,7 @@ static int irq_exit_from_guest(void *item, void *data)
 	list_for_each_entry_safe(virq, n, &virq_struct->active_list, list) {
 
 		status = irq_get_virq_state(virq);
+		dsb();
 
 		/*
 		 * the virq has been handled by the VCPU, if
@@ -554,6 +591,7 @@ int alloc_vm_virq(struct vm *vm)
 		desc = &vm->vspi_desc[virq];
 		desc->vno = virq + VM_LOCAL_VIRQ_NR;
 		desc->hw = 0;
+		desc->pr = 0xa0;
 		desc->vmid = vm->vmid;
 		desc->id = VIRQ_INVALID_ID;
 		desc->state = VIRQ_STATE_INACTIVE;
@@ -637,7 +675,7 @@ void vm_virq_reset(struct vm *vm)
 	for ( i = 0; i < vm->vspi_nr; i++) {
 		desc = &vm->vspi_desc[i];
 		desc->enable = 0;
-		desc->pr = 0x0;
+		desc->pr = 0xa0;
 		desc->type = 0x0;
 		desc->id = VIRQ_INVALID_ID;
 		desc->state = VIRQ_STATE_INACTIVE;

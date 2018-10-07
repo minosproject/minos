@@ -86,6 +86,72 @@ static void vgicv2_set_virq_type(struct vcpu *vcpu,
 	}
 }
 
+static uint32_t vgicv2_get_virq_affinity(struct vcpu *vcpu,
+		unsigned long offset)
+{
+	int i;
+	int irq;
+	uint32_t value = 0, t;
+
+	offset = (offset - GICD_ITARGETSR) / 4;
+	irq = 4 * offset;
+
+	for (i = 0; i < 4; i++, irq++) {
+		t = virq_get_affinity(vcpu, irq);
+		value |= (1 << t) << (8 * i);
+	}
+
+	return value;
+}
+
+static uint32_t vgicv2_get_virq_pr(struct vcpu *vcpu,
+		unsigned long offset)
+{
+	int i;
+	uint32_t irq;
+	uint32_t value = 0, t;
+
+	offset = (offset - GICD_IPRIORITYR) / 4;
+	irq = offset * 4;
+
+	for (i = 0; i < 4; i++, irq++) {
+		t = virq_get_pr(vcpu, irq);
+		value |= t << (8 * i);
+	}
+
+	return value;
+}
+
+static uint32_t inline vgicv2_get_virq_state(struct vcpu *vcpu,
+		unsigned long offset, unsigned long reg)
+{
+	int i;
+	uint32_t irq;
+	uint32_t value = 0, t;
+
+	offset = (offset - reg) / 4;
+	irq = offset * 32;
+
+	for (i = 0; i < 32; i++, irq++) {
+		t = virq_get_state(vcpu, irq);
+		value |= t << i;
+	}
+
+	return value;
+}
+
+static uint32_t vgicv2_get_virq_mask(struct vcpu *vcpu,
+		unsigned long offset)
+{
+	return vgicv2_get_virq_state(vcpu, offset, GICD_ICENABLER);
+}
+
+static uint32_t vgicv2_get_virq_unmask(struct vcpu *vcpu,
+		unsigned long offset)
+{
+	return vgicv2_get_virq_state(vcpu, offset, GICD_ISENABLER);
+}
+
 static int vgicv2_read(struct vcpu *vcpu, struct vgicv2_dev *gic,
 		unsigned long offset, unsigned long *v)
 {
@@ -105,10 +171,10 @@ static int vgicv2_read(struct vcpu *vcpu, struct vgicv2_dev *gic,
 		*value = 0xffffffff;
 		break;
 	case GICD_ISENABLER...GICD_ISENABLERN:
-		*value = 0;
+		*value = vgicv2_get_virq_unmask(vcpu, offset);
 		break;
 	case GICD_ICENABLER...GICD_ICENABLERN:
-		*value = 0;
+		*value = vgicv2_get_virq_mask(vcpu, offset);
 		break;
 	case GICD_ISPENDR...GICD_ISPENDRN:
 		*value = 0;
@@ -123,7 +189,7 @@ static int vgicv2_read(struct vcpu *vcpu, struct vgicv2_dev *gic,
 		*value = 0;
 		break;
 	case GICD_IPRIORITYR...GICD_IPRIORITYRN:
-		*value = 0;
+		*value = vgicv2_get_virq_pr(vcpu, offset);
 		break;
 	case GICD_ITARGETSR...GICD_ITARGETSR7:
 		tmp = 1 << get_vcpu_id(vcpu);
@@ -133,6 +199,7 @@ static int vgicv2_read(struct vcpu *vcpu, struct vgicv2_dev *gic,
 		*value |= tmp << 24;
 		break;
 	case GICD_ITARGETSR8...GICD_ITARGETSRN:
+		*value = vgicv2_get_virq_affinity(vcpu, offset);
 		break;
 	case GICD_ICFGR...GICD_ICFGRN:
 		*value = vgicv2_get_virq_type(vcpu, offset);
@@ -268,7 +335,7 @@ static int vgicv2_mmio_read(struct vdev *vdev, gp_regs *regs,
 static int vgicv2_mmio_write(struct vdev *vdev, gp_regs *regs,
 		unsigned long address, unsigned long *write_value)
 {
-	return vgicv2_mmio_handler(vdev, regs, 1, address, write_value);
+	return vgicv2_mmio_handler(vdev, regs, 0, address, write_value);
 }
 
 static void vgicv2_reset(struct vdev *vdev)
@@ -328,7 +395,7 @@ int vgicv2_create_vm(void *item, void *arg)
 		size = 0x2000;
 	}
 
-	create_guest_mapping(vm, base, vgicv2_info.gicc_base,
+	create_guest_mapping(vm, base, vgicv2_info.gicv_base,
 			size, VM_IO);
 
 	return 0;
@@ -342,7 +409,7 @@ int vigcv2_init(uint64_t *data, int len)
 	for (i = 0; i < len; i++)
 		value[i] = (unsigned long)data[i];
 
-	for (i = 0; i < 4; i++) {
+	for (i = 0; i < len; i++) {
 		if (value[i] == 0)
 			panic("invalid address of gicv2\n");
 	}

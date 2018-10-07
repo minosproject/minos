@@ -117,11 +117,13 @@ static inline uint32_t readl_gich(int unsigned offset)
 static void gicv2_eoi_irq(uint32_t irq)
 {
 	writel_gicc(irq, GICC_EOIR);
+	dsb();
 }
 
 static void gicv2_dir_irq(uint32_t irq)
 {
 	writel_gicc(irq, GICC_DIR);
+	dsb();
 }
 
 static uint32_t gicv2_read_irq(void)
@@ -133,6 +135,9 @@ static int gicv2_set_irq_type(uint32_t irq, uint32_t type)
 {
 	uint32_t cfg, edgebit;
 
+	if (irq < 16)
+		return 0;
+
 	spin_lock(&gicv2_lock);
 
 	/* Set edge / level */
@@ -140,7 +145,7 @@ static int gicv2_set_irq_type(uint32_t irq, uint32_t type)
 	edgebit = 2u << (2 * (irq % 16));
 	if ( type & IRQ_FLAGS_LEVEL_BOTH)
 		cfg &= ~edgebit;
-	else if ( type & IRQ_FLAGS_EDGE_BOTH)
+	else if (type & IRQ_FLAGS_EDGE_BOTH)
 		cfg |= edgebit;
 
 	writel_gicd(cfg, GICD_ICFGR + (irq / 16) * 4);
@@ -167,7 +172,7 @@ static int gicv2_set_irq_priority(uint32_t irq, uint32_t pr)
 
 static int gicv2_set_irq_affinity(uint32_t irq, uint32_t pcpu)
 {
-	if (pcpu > NR_GIC_CPU_IF)
+	if (pcpu > NR_GIC_CPU_IF || irq < 32)
 		return -EINVAL;
 
 	spin_lock(&gicv2_lock);
@@ -177,19 +182,10 @@ static int gicv2_set_irq_affinity(uint32_t irq, uint32_t pcpu)
 	return 0;
 }
 
-static uint32_t inline gicv2_read_lr(int lr)
-{
-	return readl_gich(GICH_LR + lr * 4);
-}
-
-static void inline gicv2_write_lr(int lr, uint32_t val)
-{
-	writel_gich(val, GICH_LR + lr * 4);
-}
-
 static int gicv2_send_virq(struct virq_desc *virq)
 {
 	uint32_t val;
+	uint32_t pid;
 	struct gich_lr *gich_lr;
 
 	if (virq->id >= gicv2_nr_lrs) {
@@ -197,15 +193,23 @@ static int gicv2_send_virq(struct virq_desc *virq)
 		return -EINVAL;
 	}
 
+	if (virq->hw)
+		pid = virq->hno;
+	else {
+		if (virq->vno < 16)
+			pid = virq->src;
+	}
+
 	gich_lr = (struct gich_lr *)&val;
 	gich_lr->vid = virq->vno;
-	gich_lr->pid = virq->hno;
+	gich_lr->pid = pid;
 	gich_lr->pr = virq->pr;
-	gich_lr->grp1 = 1;
+	gich_lr->grp1 = 0;
 	gich_lr->state = 1;
 	gich_lr->hw = virq->hw;
 
 	writel_gich(val, GICH_LR + virq->id * 4);
+	isb();
 
 	return 0;
 }
@@ -242,11 +246,12 @@ static void gicv2_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *mask)
 		break;
 	case SGI_TO_LIST:
 		for_each_cpu(cpu, mask)
-			value |= get_per_cpu(gic_cpu_id, cpu);
+			value |= (1 << cpu);
 
 		writel_gicd(GICD_SGI_TARGET_LIST |
 			(value << GICD_SGI_TARGET_SHIFT) | sgi,
 			GICD_SGIR);
+		dsb();
 		break;
 	default:
 		break;;
@@ -291,7 +296,10 @@ int gicv2_get_virq_state(struct virq_desc *virq)
 		return 0;
 
 	value = readl_gich(GICH_LR + virq->id * 4);
-	return ((value & 0x03000000) >> 28);
+	isb();
+	value = (value >> 28) & 0x3;
+
+	return value;
 }
 
 static void gicv2_state_save(struct vcpu *vcpu, void *context)
@@ -385,6 +393,8 @@ static void gicv2_hyp_init(void)
 	vtr = readl_gich(GICH_VTR);
 	nr_lrs = (vtr & GICH_V2_VTR_NRLRGS) + 1;
 	gicv2_nr_lrs = nr_lrs;
+	writel_gich(1, GICH_HCR);
+	isb();
 }
 
 static void gicv2_dist_init(void)

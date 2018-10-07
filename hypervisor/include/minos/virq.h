@@ -61,7 +61,8 @@ struct virq_desc {
 	uint16_t vmid;
 	uint16_t vno;
 	uint16_t hno;
-	uint16_t padding;
+	uint8_t src;	/* for sgi interrupt indicate which cpu trigger*/
+	uint8_t padding;
 	struct list_head list;
 } __packed__;
 
@@ -86,9 +87,13 @@ void vm_virq_reset(struct vm *vm);
 void send_vsgi(struct vcpu *sender,
 		uint32_t sgi, cpumask_t *cpumask);
 void clear_pending_virq(struct vcpu *vcpu, uint32_t irq);
+
 int virq_set_priority(struct vcpu *vcpu, uint32_t virq, int pr);
 int virq_set_type(struct vcpu *vcpu, uint32_t virq, int value);
 uint32_t virq_get_type(struct vcpu *vcpu, uint32_t virq);
+uint32_t virq_get_affinity(struct vcpu *vcpu, uint32_t virq);
+uint32_t virq_get_pr(struct vcpu *vcpu, uint32_t virq);
+uint32_t virq_get_state(struct vcpu *vcpu, uint32_t virq);
 
 int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq);
 int send_virq_to_vm(struct vm *vm, uint32_t virq);

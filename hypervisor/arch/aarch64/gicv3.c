@@ -442,6 +442,7 @@ static int gicv3_get_virq_state(struct virq_desc *virq)
 
 	value = gicv3_read_lr(virq->id);
 	value = (value & 0xc000000000000000) >> 62;
+	isb();
 
 	return ((int)value);
 }
@@ -815,4 +816,4 @@ static struct irq_chip gicv3_chip = {
 	.secondary_init		= gicv3_secondary_init,
 };
 
-IRQCHIP_DECLARE(gicv3_chip, "arm,gicv3", (void *)&gicv3_chip);
+IRQCHIP_DECLARE(gicv3_chip, "arm,gic-v3", (void *)&gicv3_chip);
