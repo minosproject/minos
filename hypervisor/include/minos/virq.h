@@ -52,17 +52,17 @@ enum virq_domain_type {
 struct virq_desc {
 	uint8_t id;
 	uint8_t state;
+	uint8_t pending;
 	uint8_t hw;
 	uint8_t enable;
 	uint8_t pr;
 	uint8_t vcpu_id;
 	uint8_t type;
 	uint8_t flags;
+	uint8_t src;	/* for sgi interrupt indicate which cpu trigger*/
 	uint16_t vmid;
 	uint16_t vno;
 	uint16_t hno;
-	uint8_t src;	/* for sgi interrupt indicate which cpu trigger*/
-	uint8_t padding;
 	struct list_head list;
 } __packed__;
 
@@ -98,21 +98,7 @@ uint32_t virq_get_state(struct vcpu *vcpu, uint32_t virq);
 int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq);
 int send_virq_to_vm(struct vm *vm, uint32_t virq);
 
-static inline int vcpu_has_virq_pending(struct vcpu *vcpu)
-{
-	return (!!vcpu->virq_struct->pending_virq);
-}
-
-static inline int vcpu_has_hwirq_pending(struct vcpu *vcpu)
-{
-	return (!!vcpu->virq_struct->pending_hirq);
-}
-
-static inline int vcpu_has_irq(struct vcpu *vcpu)
-{
-	return ((vcpu->virq_struct->pending_hirq +
-			vcpu->virq_struct->pending_virq));
-}
+int vcpu_has_irq(struct vcpu *vcpu);
 
 int alloc_vm_virq(struct vm *vm);
 void release_vm_virq(struct vm *vm, int virq);

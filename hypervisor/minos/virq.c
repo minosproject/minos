@@ -74,31 +74,28 @@ static int inline __send_virq(struct vcpu *vcpu, struct virq_desc *desc)
 	 * if the virq is in offline state, send it to vcpu
 	 * directly
 	 */
-	if (desc->state != VIRQ_STATE_INACTIVE) {
-		if (desc->state == VIRQ_STATE_PENDING) {
-			spin_unlock_irqrestore(&virq_struct->lock, flags);
-			return 0;
-		}
+	if (desc->pending) {
+		spin_unlock_irqrestore(&virq_struct->lock, flags);
+		return 0;
 	}
+
+	desc->pending = 1;
+	dsb();
 
 	/*
 	 * if desc->list.next is not NULL, the virq is in
 	 * actvie or pending list do not change it
 	 */
-	desc->state = VIRQ_STATE_PENDING;
 	if (desc->list.next == NULL) {
-		if (desc->hw)
-			virq_struct->pending_hirq++;
-		else
-			virq_struct->pending_virq++;
 		list_add_tail(&virq_struct->pending_list, &desc->list);
+		virq_struct->active_count++;
 	}
 
+	/* for gicv2 */
 	if (desc->vno < VM_SGI_VIRQ_NR)
 		desc->src = get_vcpu_id(current_vcpu);
 
 	spin_unlock_irqrestore(&virq_struct->lock, flags);
-
 	return 0;
 }
 
@@ -372,15 +369,20 @@ static int irq_enter_to_guest(void *item, void *data)
 	 * before it enter to guest
 	 */
 	int id = 0;
+	unsigned long flags;
 	struct virq_desc *virq, *n;
 	struct vcpu *vcpu = (struct vcpu *)item;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
 
-	spin_lock(&virq_struct->lock);
+	spin_lock_irqsave(&virq_struct->lock, flags);
 
 	list_for_each_entry_safe(virq, n, &virq_struct->pending_list, list) {
-		if (virq->state != VIRQ_STATE_PENDING) {
-			pr_error("something was wrong with this irq %d\n", virq->id);
+		if (!virq->pending) {
+			pr_error("virq is not request %d %d\n", virq->vno, virq->id);
+			virq->state = 0;
+			if (virq->id != VIRQ_INVALID_ID)
+				irq_update_virq(virq, VIRQ_ACTION_CLEAR);
+			list_del(&virq->list);
 			continue;
 		}
 
@@ -400,12 +402,14 @@ static int irq_enter_to_guest(void *item, void *data)
 
 __do_send_virq:
 		irq_send_virq(virq);
-		virq->state = VIRQ_STATE_ACTIVE;
+		virq->state = VIRQ_STATE_PENDING;
+		virq->pending = 0;
+		dsb();
 		list_del(&virq->list);
 		list_add_tail(&virq_struct->active_list, &virq->list);
 	}
 
-	spin_unlock(&virq_struct->lock);
+	spin_unlock_irqrestore(&virq_struct->lock, flags);
 
 	return 0;
 }
@@ -419,11 +423,12 @@ static int irq_exit_from_guest(void *item, void *data)
 	 * need spinlock
 	 */
 	int status;
+	unsigned long flags;
 	struct virq_desc *virq, *n;
 	struct vcpu *vcpu = (struct vcpu *)item;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
 
-	spin_lock(&virq_struct->lock);
+	spin_lock_irqsave(&virq_struct->lock, flags);
 
 	list_for_each_entry_safe(virq, n, &virq_struct->active_list, list) {
 
@@ -437,7 +442,7 @@ static int irq_exit_from_guest(void *item, void *data)
 		 * again
 		 */
 		if (status == VIRQ_STATE_INACTIVE) {
-			if (virq->state == VIRQ_STATE_ACTIVE) {
+			if (!virq->pending) {
 				irq_update_virq(virq, VIRQ_ACTION_CLEAR);
 				clear_bit(virq->id, virq_struct->irq_bitmap);
 				virq->state = VIRQ_STATE_INACTIVE;
@@ -445,20 +450,29 @@ static int irq_exit_from_guest(void *item, void *data)
 				virq->id = VIRQ_INVALID_ID;
 				virq->list.next = NULL;
 				virq_struct->active_count--;
-			} else if (virq->state == VIRQ_STATE_PENDING) {
+			} else {
 				irq_update_virq(virq, VIRQ_ACTION_CLEAR);
 				list_del(&virq->list);
 				list_add_tail(&virq_struct->pending_list, &virq->list);
 			}
-		} else {
-			if (virq->state == VIRQ_STATE_PENDING)
-				virq->state = VIRQ_STATE_ACTIVE;
-		}
+		} else
+			virq->state = status;
 	}
 
-	spin_unlock(&virq_struct->lock);
+	spin_unlock_irqrestore(&virq_struct->lock, flags);
 
 	return 0;
+}
+
+int vcpu_has_irq(struct vcpu *vcpu)
+{
+	struct virq_struct *vs = vcpu->virq_struct;
+	int pend, active;
+
+	pend = is_list_empty(&vs->pending_list);
+	active = is_list_empty(&vs->active_list);
+
+	return !(pend && active);
 }
 
 void vcpu_virq_struct_reset(struct vcpu *vcpu)

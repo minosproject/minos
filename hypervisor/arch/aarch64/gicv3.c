@@ -441,8 +441,8 @@ static int gicv3_get_virq_state(struct virq_desc *virq)
 		return 0;
 
 	value = gicv3_read_lr(virq->id);
-	value = (value & 0xc000000000000000) >> 62;
 	isb();
+	value = (value >> 62) & 0x03;
 
 	return ((int)value);
 }
@@ -474,15 +474,8 @@ static int gicv3_hyp_init(void)
 {
 	write_sysreg32(GICH_VMCR_VENG1 | (0xff << 24), ICH_VMCR_EL2);
 	write_sysreg32(GICH_HCR_EN, ICH_HCR_EL2);
-
-	/*
-	 * set IMO and FMO let physic irq and fiq taken to
-	 * EL2, without this irq and fiq will not send to
-	 * the cpu
-	 */
-	write_sysreg64(HCR_EL2_IMO | HCR_EL2_FMO, HCR_EL2);
-
 	isb();
+
 	return 0;
 }
 

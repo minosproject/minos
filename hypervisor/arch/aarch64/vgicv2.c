@@ -18,6 +18,7 @@
 #include <minos/vmodule.h>
 #include <minos/irq.h>
 #include <asm/gicv2.h>
+#include <asm/vgicv2.h>
 #include <asm/io.h>
 #include <minos/vmodule.h>
 #include <minos/cpumask.h>
@@ -368,8 +369,8 @@ int vgicv2_create_vm(void *item, void *arg)
 		base = vgicv2_info.gicd_base;
 		size = vgicv2_info.gicd_size;
 	} else {
-		base = 0x2f000000;
-		size = 0x10000;
+		base = VGICV2_GICD_GVM_BASE;
+		size = VGICV2_GICD_GVM_SIZE;
 	}
 
 	dev->gicd_base = base;
@@ -391,8 +392,8 @@ int vgicv2_create_vm(void *item, void *arg)
 		base = vgicv2_info.gicc_base;
 		size = vgicv2_info.gicc_size;
 	} else {
-		base = 0x2c000000;
-		size = 0x2000;
+		base = VGICV2_GICC_GVM_BASE;
+		size = VGICV2_GICC_GVM_SIZE;
 	}
 
 	create_guest_mapping(vm, base, vgicv2_info.gicv_base,

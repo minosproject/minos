@@ -177,14 +177,28 @@ static int virtual_timer_irq_handler(uint32_t irq, void *data)
 	uint32_t value;
 	struct vcpu *vcpu = current_vcpu;
 
-	/* if the current vcpu is idle, disable the vtimer */
+	/*
+	 * if the current vcpu is idle, disable the vtimer
+	 * since the pending request vtimer irq is set to
+	 * the timer
+	 */
 	if (vcpu->is_idle) {
 		write_sysreg32(0, CNTV_CTL_EL0);
 		return -ENOENT;
 	}
 
 	value = read_sysreg32(CNTV_CTL_EL0);
-	write_sysreg32(value | CNT_CTL_IMASK, CNTV_CTL_EL0);
+	dsb();
+
+	if (!(value & CNT_CTL_ISTATUS)) {
+		pr_error("vtimer is not trigger\n");
+		return 0;
+	}
+
+	value = value | CNT_CTL_IMASK;
+	write_sysreg32(value, CNTV_CTL_EL0);
+	dsb();
+
 	return send_virq_to_vcpu(vcpu, irq);
 }
 

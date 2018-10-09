@@ -166,6 +166,20 @@ void arch_hvm_init(struct vm *vm)
 	hvm_dtb_init(vm);
 }
 
+static int aarch64_init_percpu(void)
+{
+	/*
+	 * set IMO and FMO let physic irq and fiq taken to
+	 * EL2, without this irq and fiq will not send to
+	 * the cpu
+	 */
+	write_sysreg64(HCR_EL2_IMO | HCR_EL2_FMO, HCR_EL2);
+	dsb();
+
+	return 0;
+}
+arch_initcall_percpu(aarch64_init_percpu);
+
 struct aarch64_system_context {
 	uint64_t vbar_el1;
 	uint64_t esr_el1;

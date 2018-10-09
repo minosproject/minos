@@ -128,7 +128,13 @@ static void gicv2_dir_irq(uint32_t irq)
 
 static uint32_t gicv2_read_irq(void)
 {
-	return (readl_gicc(GICC_IAR) & GICC_IA_IRQ);
+	uint32_t irq;
+
+	irq = readl_gicc(GICC_IAR);
+	isb();
+	irq = irq & GICC_IA_IRQ;
+
+	return irq;
 }
 
 static int gicv2_set_irq_type(uint32_t irq, uint32_t type)
@@ -157,6 +163,7 @@ static int gicv2_set_irq_type(uint32_t irq, uint32_t type)
 static void __used gicv2_clear_pending(uint32_t irq)
 {
 	writel_gicd(1UL << (irq % 32), GICD_ICPENDR + (irq / 32) * 4);
+	dsb();
 }
 
 static int gicv2_set_irq_priority(uint32_t irq, uint32_t pr)
@@ -226,6 +233,7 @@ static int gicv2_update_virq(struct virq_desc *desc, int action)
 
 	case VIRQ_ACTION_CLEAR:
 		writel_gich(0, GICH_LR + desc->id * 4);
+		isb();
 		break;
 	}
 
@@ -251,7 +259,6 @@ static void gicv2_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *mask)
 		writel_gicd(GICD_SGI_TARGET_LIST |
 			(value << GICD_SGI_TARGET_SHIFT) | sgi,
 			GICD_SGIR);
-		dsb();
 		break;
 	default:
 		break;;
@@ -307,6 +314,8 @@ static void gicv2_state_save(struct vcpu *vcpu, void *context)
 	int i;
 	struct gicv2_context *c = (struct gicv2_context *)context;
 
+	dsb();
+
 	for (i = 0; i < gicv2_nr_lrs; i++)
 		c->lr[i] = readl_gich(GICH_LR + i * 4);
 
@@ -314,7 +323,6 @@ static void gicv2_state_save(struct vcpu *vcpu, void *context)
 	c->apr = readl_gich(GICH_APR);
 	c->hcr = readl_gich(GICH_HCR);
 	writel_gich(0, GICH_HCR);
-	isb();
 }
 
 static void gicv2_state_restore(struct vcpu *vcpu, void *context)
@@ -328,6 +336,7 @@ static void gicv2_state_restore(struct vcpu *vcpu, void *context)
 	writel_gich(c->apr, GICH_APR);
 	writel_gich(c->vmcr, GICH_VMCR);
 	writel_gich(c->hcr, GICH_HCR);
+	dsb();
 }
 
 static void gicv2_state_init(struct vcpu *vcpu, void *context)
@@ -383,6 +392,7 @@ static void gicv2_cpu_init(void)
 	writel_gicc(0x0, GICC_BPR);
 	/* Turn on delivery */
 	writel_gicc(GICC_CTL_ENABLE|GICC_CTL_EOI, GICC_CTLR);
+	dsb();
 }
 
 static void gicv2_hyp_init(void)
@@ -393,8 +403,6 @@ static void gicv2_hyp_init(void)
 	vtr = readl_gich(GICH_VTR);
 	nr_lrs = (vtr & GICH_V2_VTR_NRLRGS) + 1;
 	gicv2_nr_lrs = nr_lrs;
-	writel_gich(1, GICH_HCR);
-	isb();
 }
 
 static void gicv2_dist_init(void)
@@ -446,6 +454,7 @@ static void gicv2_dist_init(void)
 
 	/* Turn on the distributor */
 	writel_gicd(GICD_CTL_ENABLE, GICD_CTLR);
+	dsb();
 }
 
 static int gicv2_vmodule_init(struct vmodule *vmodule)

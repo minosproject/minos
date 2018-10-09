@@ -8,7 +8,7 @@
 			"vmid": 0,
 			"name": "linux-01",
 			"type": "linux",
-			"nr_vcpu": 2,
+			"nr_vcpu": 4,
 			"entry": "0x80080000",
 			"setup_data": "0x83e00000",
 			"vcpu0_affinity": 0,

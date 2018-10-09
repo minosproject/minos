@@ -119,9 +119,10 @@ void vcpu_idle(void)
 	struct vcpu *vcpu = current_vcpu;
 	unsigned long flags;
 
+	return;
 	if (vcpu_can_idle(vcpu)) {
 		local_irq_save(flags);
-		if (vcpu_can_idle(vcpu))
+		if (!vcpu_can_idle(vcpu))
 			goto out;
 
 		set_vcpu_suspend(vcpu);
