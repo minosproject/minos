@@ -28,6 +28,7 @@
  * that the system has no ramdisk image
  */
 #define MVM_FLAGS_NO_RAMDISK		(1 << 0)
+#define MVM_FLAGS_NO_BOOTIMAGE		(1 << 1)
 
 #define DEFINE_OS(os) \
 	static void *os_##os __section("mvm_os") __used = &os;
@@ -58,6 +59,37 @@ struct vm_os {
 
 #define OS_TYPE_LINUX		(1 << 0)
 
+struct vm_info {
+	char name[32];
+	char os_type[32];
+	int32_t nr_vcpus;
+	int32_t bit64;
+	uint64_t mem_size;
+	uint64_t mem_start;
+	uint64_t entry;
+	uint64_t setup_data;
+	uint64_t mmap_base;
+};
+
+#define VM_MAX_DEVICES	(10)
+
+struct device_info {
+	int nr_device;
+	char *device_args[VM_MAX_DEVICES];
+};
+
+struct vm_config {
+	unsigned long flags;
+	int gic_type;
+	struct vm_info vm_info;
+	struct device_info device_info;
+	char bootimage_path[256];
+	char cmdline[256];
+	char kernel_image[256];
+	char dtb_image[256];
+	char ramdisk_image[256];
+};
+
 /*
  * vmid	 : vmid allocated by hypervisor
  * flags : some flags of this vm
@@ -67,6 +99,9 @@ struct vm {
 	int vmid;
 	int vm_fd;
 	int image_fd;
+	int kfd;
+	int dfd;
+	int rfd;
 	unsigned long flags;
 	struct vm_os *os;
 	void *os_data;
@@ -83,6 +118,7 @@ struct vm {
 	uint64_t setup_data;
 	uint64_t hvm_paddr;
 
+	struct vm_config *vm_config;
 	struct mvm_queue queue;
 
 	void *vmcs;

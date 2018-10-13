@@ -43,11 +43,160 @@
 #include <errno.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 
 #include <mvm.h>
 #include <bootimage.h>
 #include <libfdt/libfdt.h>
 #include <vdev.h>
+
+#define GIC_TYPE_GICV3	(0)
+#define GIC_TYPE_GICV2	(1)
+#define GIC_TYPE_GICV4	(2)
+
+static int fdt_set_gicv2(void *dtb, int node)
+{
+	uint32_t regs[16];
+
+	pr_info("vm gic type is gic-v2\n");
+	fdt_setprop(dtb, node, "compatible",
+			"arm,cortex-a15-gic", 19);
+
+	/* gicd */
+	regs[0] = cpu_to_fdt32(0);
+	regs[1] = cpu_to_fdt32(0x2f000000);
+	regs[2] = cpu_to_fdt32(0x0);
+	regs[3] = cpu_to_fdt32(0x10000);
+
+	/* gicc */
+	regs[4] = cpu_to_fdt32(0);
+	regs[5] = cpu_to_fdt32(0x2c000000);
+	regs[6] = cpu_to_fdt32(0x0);
+	regs[7] = cpu_to_fdt32(0x2000);
+
+	/* gich */
+	regs[8] = cpu_to_fdt32(0);
+	regs[9] = cpu_to_fdt32(0x2c010000);
+	regs[10] = cpu_to_fdt32(0x0);
+	regs[11] = cpu_to_fdt32(0x2000);
+
+	/* gicv */
+	regs[12] = cpu_to_fdt32(0);
+	regs[13] = cpu_to_fdt32(0x2c02f000);
+	regs[14] = cpu_to_fdt32(0x0);
+	regs[15] = cpu_to_fdt32(0x2000);
+	fdt_setprop(dtb, node, "reg", (void *)regs, 64);
+
+	regs[0] = cpu_to_fdt32(1);
+	regs[1] = cpu_to_fdt32(9);
+	regs[2] = cpu_to_fdt32(4);
+	fdt_setprop(dtb, node, "interrupts", (void *)regs, 12);
+
+	return 0;
+}
+
+static int fdt_set_gicv3(void *dtb, int node)
+{
+	uint32_t regs[20];
+	int its_node;
+
+	pr_info("vm gic type is gic-v3\n");
+	fdt_setprop(dtb, node, "compatible", "arm,gic-v3", 11);
+
+	/* gicd */
+	regs[0] = cpu_to_fdt32(0x0);
+	regs[1] = cpu_to_fdt32(0x2f000000);
+	regs[2] = cpu_to_fdt32(0x0);
+	regs[3] = cpu_to_fdt32(0x10000);
+
+	/* gicr */
+	regs[4] = cpu_to_fdt32(0x0);
+	regs[5] = cpu_to_fdt32(0x2f100000);
+	regs[6] = cpu_to_fdt32(0x0);
+	regs[7] = cpu_to_fdt32(0x200000);
+
+	/* gicc */
+	regs[8] = cpu_to_fdt32(0x0);
+	regs[9] = cpu_to_fdt32(0x2c000000);
+	regs[10] = cpu_to_fdt32(0x0);
+	regs[11] = cpu_to_fdt32(0x2000);
+
+	/* gich */
+	regs[12] = cpu_to_fdt32(0x0);
+	regs[13] = cpu_to_fdt32(0x2c010000);
+	regs[14] = cpu_to_fdt32(0x0);
+	regs[15] = cpu_to_fdt32(0x2000);
+
+	/* gicv */
+	regs[16] = cpu_to_fdt32(0x0);
+	regs[17] = cpu_to_fdt32(0x2c02f000);
+	regs[18] = cpu_to_fdt32(0x0);
+	regs[19] = cpu_to_fdt32(0x2000);
+	fdt_setprop(dtb, node, "reg", (void *)regs, 80);
+
+	regs[0] = cpu_to_fdt32(1);
+	regs[1] = cpu_to_fdt32(9);
+	regs[2] = cpu_to_fdt32(4);
+	fdt_setprop(dtb, node, "interrupts", (void *)regs, 12);
+
+	/* add the its node */
+	its_node = fdt_add_subnode(dtb, node, "its@2f020000");
+	if (its_node < 0) {
+		pr_err("add its node for gicv3 failed\n");
+		return its_node;
+	}
+
+	fdt_setprop(dtb, its_node, "compatible",
+			"arm,gic-v3-its", 15);
+	fdt_setprop(dtb, its_node, "msi-controller", "", 0);
+
+	regs[0] = cpu_to_fdt32(0x0);
+	regs[1] = cpu_to_fdt32(0x2f020000);
+	regs[2] = cpu_to_fdt32(0x0);
+	regs[3] = cpu_to_fdt32(0x20000);
+	fdt_setprop(dtb, its_node, "reg", (void *)regs, 12);
+
+	return 0;
+}
+
+static int fdt_set_gicv4(void *dtb, int node)
+{
+	pr_info("vm gic type is gic-v4\n");
+	return 0;
+}
+
+static int fdt_set_gic(void *dtb, int gic_type)
+{
+	int node;
+
+	node = fdt_path_offset(dtb, "/interrupt-controller@2f000000");
+	if (node < 0) {
+		node = fdt_add_subnode(dtb, 0, "interrupt-controller");
+		if (node < 0) {
+			pr_err("add interrupt node failed\n");
+			return node;
+		}
+	}
+
+	switch (gic_type) {
+	case GIC_TYPE_GICV2:
+		fdt_set_gicv2(dtb, node);
+		break;
+	case GIC_TYPE_GICV3:
+		fdt_set_gicv3(dtb, node);
+		break;
+	case GIC_TYPE_GICV4:
+		fdt_set_gicv4(dtb, node);
+		break;
+	default:
+		pr_warn("unsupport gic version:%d now, using gicv3\n",
+				gic_type);
+		fdt_set_gicv3(dtb, node);
+		break;
+	}
+
+	return 0;
+}
 
 static int fdt_setup_commandline(void *dtb, char *cmdline)
 {
@@ -177,48 +326,19 @@ static int fdt_setup_ramdisk(void *dtb, uint32_t start, uint32_t size)
 
 static int linux_setup_env(struct vm *vm, char *cmdline)
 {
-	int ret = 0;
-	void *vbase;
-	uint32_t pages, seek, offset, load_size;
-	boot_img_hdr *hdr = (boot_img_hdr *)vm->os_data;
 	char *arg;
-
-	if (hdr->second_size == 0)
-		return -EINVAL;
-
-	pages = BALIGN(hdr->kernel_size, hdr->page_size) +
-		BALIGN(hdr->ramdisk_size, hdr->page_size);
-	pages = (pages / hdr->page_size) + 1;
-	seek = pages * hdr->page_size;
-	load_size = BALIGN(hdr->second_size, hdr->page_size);
-	offset = hdr->second_addr - vm->mem_start;
-
-	if (lseek(vm->image_fd, seek, SEEK_SET) == -1)
-		return -EIO;
-
-	/* the max size of dtb region is 2M */
-	vbase = malloc(MEM_BLOCK_SIZE);
-	if (!vbase)
-		return -ENOMEM;
-
-	ret = read(vm->image_fd, vbase, load_size);
-	if (ret <= 0) {
-		pr_err("read dtb image failed\n");
-		ret = -EIO;
-		goto free_mem;
-	}
+	boot_img_hdr *hdr = (boot_img_hdr *)vm->os_data;
+	void *vbase = vm->mmap + (vm->setup_data - vm->mem_start);
 
 	if (fdt_check_header(vbase)) {
 		pr_err("invalid DTB please check the bootimage\n");
-		ret = -EINVAL;
-		goto free_mem;
+		return -EINVAL;
 	}
 
-	fdt_open_into(vbase, vbase, 0x200000);
+	fdt_open_into(vbase, vbase, MEM_BLOCK_SIZE);
 	if (fdt_check_header(vbase)) {
 		pr_err("invalid DTB after open into\n");
-		ret = -EINVAL;
-		goto free_mem;
+		return -EINVAL;
 	}
 
 	/*
@@ -228,28 +348,33 @@ static int linux_setup_env(struct vm *vm, char *cmdline)
 	 */
 	if (cmdline && (strlen(cmdline) > 0))
 		arg = cmdline;
-	else
-		arg = (char *)hdr->cmdline;
+	else {
+		if (!(vm->flags & MVM_FLAGS_NO_BOOTIMAGE))
+			arg = (char *)hdr->cmdline;
+	}
 
 	fdt_setup_commandline(vbase, arg);
 	fdt_setup_cpu(vbase, vm->nr_vcpus);
 	fdt_setup_memory(vbase, vm->mem_start, vm->mem_size, vm->bit64);
+	fdt_set_gic(vbase, vm->vm_config->gic_type);
 
-	if (!(vm->flags & (MVM_FLAGS_NO_RAMDISK)))
-		fdt_setup_ramdisk(vbase, hdr->ramdisk_addr,
-				hdr->ramdisk_size);
+	if (!(vm->flags & (MVM_FLAGS_NO_RAMDISK))) {
+		if (vm->flags & MVM_FLAGS_NO_BOOTIMAGE) {
+			struct stat stbuf;
+			if (fstat(vm->rfd, &stbuf) != 0)
+				return -EINVAL;
+			fdt_setup_ramdisk(vbase, 0x83000000, stbuf.st_size);
+		} else
+			fdt_setup_ramdisk(vbase, hdr->ramdisk_addr,
+					hdr->ramdisk_size);
+	}
 
 	/* call the vdev call back */
 	vdev_setup_env(vm, vbase, OS_TYPE_LINUX);
 
 	fdt_pack(vbase);
 
-	ret = 0;
-	memcpy(vm->mmap + offset, vbase, MEM_BLOCK_SIZE);
-
-free_mem:
-	free(vbase);
-	return ret;
+	return 0;
 }
 
 static int load_image(struct vm *vm, uint32_t load_offset,
@@ -268,10 +393,10 @@ static int load_image(struct vm *vm, uint32_t load_offset,
 	return 0;
 }
 
-static int linux_load_image(struct vm *vm)
+static int linux_load_bootimage(struct vm *vm)
 {
 	int ret = 0;
-	uint32_t load_size, load_offset, seek, tmp = 1;
+	uint32_t load_size, pages, load_offset, seek, tmp = 1;
 	boot_img_hdr *hdr = (boot_img_hdr *)vm->os_data;
 
 	/* load the kernel image to guest memory */
@@ -284,7 +409,7 @@ static int linux_load_image(struct vm *vm)
 
 	ret = load_image(vm, load_offset, seek, load_size);
 	if (ret) {
-		perror("error - load kernel image failed\n");
+		pr_err("error - load kernel image failed\n");
 		return ret;
 	}
 
@@ -292,7 +417,7 @@ static int linux_load_image(struct vm *vm)
 
 	/* load the ramdisk image */
 	if (vm->flags & (MVM_FLAGS_NO_RAMDISK))
-		return 0;
+		goto load_dtb;
 
 	load_offset = hdr->ramdisk_addr - vm->mem_start;
 	load_size = hdr->ramdisk_size;
@@ -306,10 +431,89 @@ static int linux_load_image(struct vm *vm)
 		return ret;
 	}
 
+load_dtb:
+	if (hdr->second_size == 0)
+		return -EINVAL;
+
+	pages = BALIGN(hdr->kernel_size, hdr->page_size) +
+		BALIGN(hdr->ramdisk_size, hdr->page_size);
+	pages = (pages / hdr->page_size) + 1;
+	seek = pages * hdr->page_size;
+	load_size = BALIGN(hdr->second_size, hdr->page_size);
+	load_offset = hdr->second_addr - vm->mem_start;
+	ret = load_image(vm, load_offset, seek, load_size);
+	if (ret) {
+		pr_err("load dtb image failed\n");
+		return ret;
+	}
+
 	return 0;
 }
 
-static int linux_early_init(struct vm *vm)
+static int load_spare_image(int fd, void *target)
+{
+	size_t size;
+	struct stat stbuf;
+
+	if (fd < 0)
+		return -EINVAL;
+
+	if ((fstat(fd, &stbuf) != 0) ||
+			(!S_ISREG(stbuf.st_mode)))
+		return -EINVAL;
+
+	size = stbuf.st_size;
+	pr_debug("load 0x%lx to 0x%lx\n", size, (unsigned long)target);
+
+	if (read(fd, target, size) != size)
+		return -EIO;
+
+	lseek(fd, 0, SEEK_SET);
+
+	return 0;
+}
+
+static int linux_load_images(struct vm *vm)
+{
+	int ret;
+	void *base = vm->mmap;
+
+	if ((vm->kfd <= 0) || (vm->dfd <= 0))
+		return -EINVAL;
+
+	ret = load_spare_image(vm->kfd, base + 0x80000);
+	if (ret) {
+		pr_err("read kernel image failed\n");
+		return -EIO;
+	}
+
+	ret = load_spare_image(vm->dfd, base + 0x3e00000);
+	if (ret) {
+		pr_err("read dtb image failed\n");
+		return -EIO;
+	}
+
+	if (vm->flags & MVM_FLAGS_NO_RAMDISK)
+		return 0;
+
+	ret = load_spare_image(vm->rfd, base + 0x3000000);
+	if (ret) {
+		pr_err("read the ramdisk image failed\n");
+		return -EIO;
+	}
+
+	return 0;
+}
+
+static int linux_load_image(struct vm *vm)
+{
+	if (vm->flags & MVM_FLAGS_NO_BOOTIMAGE)
+		return linux_load_images(vm);
+	else
+		return linux_load_bootimage(vm);
+}
+
+static int linux_parse_bootimage(struct vm *vm)
 {
 	int ret;
 	boot_img_hdr *hdr;
@@ -333,6 +537,29 @@ static int linux_early_init(struct vm *vm)
 	vm->os_data = (void *)hdr;
 
 	return 0;
+
+}
+
+static int linux_parse_image(struct vm *vm)
+{
+	/* the images will loaded at fixed address */
+	vm->entry = 0x80080000;
+	vm->setup_data = 0x83e00000;
+	vm->mem_start = 0x80000000;
+
+	return 0;
+}
+
+static int linux_early_init(struct vm *vm)
+{
+	int ret = 0;
+
+	if (vm->flags & MVM_FLAGS_NO_BOOTIMAGE)
+		ret = linux_parse_image(vm);
+	else
+		ret = linux_parse_bootimage(vm);
+
+	return ret;
 }
 
 struct vm_os os_linux = {

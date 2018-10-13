@@ -62,33 +62,6 @@
 #include <mevent.h>
 #include <barrier.h>
 
-struct vm_info {
-	char name[32];
-	char os_type[32];
-	int32_t nr_vcpus;
-	int32_t bit64;
-	uint64_t mem_size;
-	uint64_t mem_start;
-	uint64_t entry;
-	uint64_t setup_data;
-	uint64_t mmap_base;
-};
-
-#define VM_MAX_DEVICES	(10)
-
-struct device_info {
-	int nr_device;
-	char *device_args[VM_MAX_DEVICES];
-};
-
-struct vm_config {
-	unsigned long flags;
-	struct vm_info vm_info;
-	struct device_info device_info;
-	char bootimage_path[256];
-	char cmdline[256];
-};
-
 struct vm *mvm_vm = NULL;
 static struct vm_config *global_config = NULL;
 
@@ -285,7 +258,12 @@ void print_usage(void)
 	fprintf(stderr, "    -v                         (verbose print debug information)\n");
 	fprintf(stderr, "    -d                         (run as a daemon process)\n");
 	fprintf(stderr, "    -D                         (device argument)\n");
-	fprintf(stderr, "    -C                         (set the cmdline for the os)\n");
+	fprintf(stderr, "    -K                         (kernel image path)\n");
+	fprintf(stderr, "    -S                         (second image path - like dtb image)\n");
+	fprintf(stderr, "    -R                         (Ramdisk image path)\n");
+	fprintf(stderr, "    --gicv2                    (using the gicv2 interrupt controller)\n");
+	fprintf(stderr, "    --gicv3                    (using the gicv3 interrupt controller)\n");
+	fprintf(stderr, "    --gicv4                    (using the gicv4 interrupt controller)\n");
 	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);
 }
@@ -705,9 +683,46 @@ static int mvm_main_loop(void)
 	return -EAGAIN;
 }
 
+static int mvm_open_images(struct vm *vm, struct vm_config *config)
+{
+	if (config->flags & MVM_FLAGS_NO_BOOTIMAGE) {
+		vm->kfd = open(config->kernel_image, O_RDONLY | O_NONBLOCK);
+		if (vm->kfd < 0) {
+			pr_err("can not open the kernel image file %s\n",
+					config->bootimage_path);
+			return -ENOENT;
+		}
+
+		vm->dfd = open(config->dtb_image, O_RDONLY | O_NONBLOCK);
+		if (vm->dfd < 0) {
+			pr_err("can not open the dtb image file %s\n",
+					config->dtb_image);
+			return -ENOENT;
+		}
+
+		if (!(config->flags & MVM_FLAGS_NO_RAMDISK)) {
+			vm->rfd = open(config->ramdisk_image,
+					O_RDONLY | O_NONBLOCK);
+			if (vm->rfd < 0)
+				config->flags |= MVM_FLAGS_NO_RAMDISK;
+		}
+	} else {
+		/* read the image to get the entry and other args */
+		vm->image_fd = open(config->bootimage_path,
+					O_RDONLY | O_NONBLOCK);
+		if (vm->image_fd < 0) {
+			pr_err("can not open the bootimage %s\n",
+					config->bootimage_path);
+			return -ENOENT;
+		}
+	}
+
+	return 0;
+}
+
 static int mvm_main(struct vm_config *config)
 {
-	int image_fd, ret;
+	int ret;
 	struct vm *vm;
 	struct vm_os *os;
 	struct vm_info *vm_info = &config->vm_info;
@@ -715,7 +730,7 @@ static int mvm_main(struct vm_config *config)
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
-	mvm_vm = vm = (struct vm *)malloc(sizeof(struct vm));
+	mvm_vm = vm = (struct vm *)calloc(1, sizeof(struct vm));
 	if (!vm)
 		return -ENOMEM;
 
@@ -723,18 +738,15 @@ static int mvm_main(struct vm_config *config)
 	if (!os)
 		return -EINVAL;
 
-	/* read the image to get the entry and other args */
-	image_fd = open(config->bootimage_path, O_RDWR | O_NONBLOCK);
-	if (image_fd < 0) {
+	ret = mvm_open_images(vm, config);
+	if (ret) {
 		free(vm);
-		perror(config->bootimage_path);
-		return -ENOENT;
+		return ret;
 	}
 
 	/* udpate the vm from vm_info */
 	vm->os = os;
 	vm->bit64 = 1;
-	vm->image_fd = image_fd;
 	vm->flags = config->flags;
 	vm->vmid = 0;
 	vm->vm_fd = -1;
@@ -745,6 +757,7 @@ static int mvm_main(struct vm_config *config)
 	strcpy(vm->name, vm_info->name);
 	strcpy(vm->os_type, vm_info->os_type);
 	init_list(&vm->vdev_list);
+	vm->vm_config = config;
 
 	ret = os->early_init(vm);
 	if (ret) {
@@ -794,6 +807,9 @@ static struct option options[] = {
 	{"os_type",	required_argument, NULL, 't'},
 	{"bit",		required_argument, NULL, 'b'},
 	{"no_ramdisk",	no_argument,	   NULL, 'r'},
+	{"gicv3",	no_argument,	   NULL, '0'},
+	{"gicv2",	no_argument,	   NULL, '1'},
+	{"gicv4",	no_argument,	   NULL, '2'},
 	{"help",	no_argument,	   NULL, 'h'},
 	{NULL,		0,		   NULL,  0}
 };
@@ -851,9 +867,17 @@ static int add_device_info(struct device_info *dinfo, char *name)
 
 static int check_vm_config(struct vm_config *config)
 {
-	if (strlen(config->bootimage_path) == 0) {
-		pr_err("please point the image for this VM\n");
-		return -EINVAL;
+	/* default will use bootimage as the vm image */
+	if (config->bootimage_path[0] == 0) {
+		config->flags |= MVM_FLAGS_NO_BOOTIMAGE;
+		if ((config->kernel_image[0] == 0) ||
+				config->dtb_image[0] == 0) {
+			pr_err("no bootimage and kernel image\n");
+			return -EINVAL;
+		}
+
+		if (config->ramdisk_image[0] == 0)
+			config->flags |= MVM_FLAGS_NO_RAMDISK;
 	}
 
 	if (config->vm_info.nr_vcpus > VM_MAX_VCPUS) {
@@ -888,10 +912,10 @@ static void free_vm_config(struct vm_config *config)
 int main(int argc, char **argv)
 {
 	int ret, opt, idx;
-	char *optstr = "c:C:m:i:s:n:D:t:b:rv?hd";
 	int run_as_daemon = 0;
 	struct vm_info *vm_info;
 	struct device_info *device_info;
+	static char *optstr = "K:R:S:c:C:m:i:s:n:D:t:b:rv?hd012";
 
 	global_config = calloc(1, sizeof(struct vm_config));
 	if (!global_config)
@@ -965,6 +989,43 @@ int main(int argc, char **argv)
 			free(global_config);
 			print_usage();
 			return 0;
+		case '2':
+			global_config->gic_type = 2;
+			break;
+		case '0':
+			global_config->gic_type = 0;
+			break;
+		case '1':
+			global_config->gic_type = 1;
+			break;
+		/* the below argument is deicated for linux vm
+		 * and will use the fixed loading address which
+		 * kernel will loaded at 0x80080000 and dtb will
+		 * loaded at (endadress  -2M) */
+		case 'K':
+			if (strlen(optarg) > 255) {
+				pr_err("kernel image is too long\n");
+				ret = -EINVAL;
+				goto exit;
+			}
+			strcpy(global_config->kernel_image, optarg);
+			break;
+		case 'S':
+			if (strlen(optarg) > 255) {
+				pr_err("kernel image is too long\n");
+				ret = -EINVAL;
+				goto exit;
+			}
+			strcpy(global_config->dtb_image, optarg);
+			break;
+		case 'R':
+			if (strlen(optarg) > 255) {
+				pr_err("kernel image is too long\n");
+				ret = -EINVAL;
+				goto exit;
+			}
+			strcpy(global_config->ramdisk_image, optarg);
+			break;
 		default:
 			break;
 		}
