@@ -152,10 +152,6 @@ int create_new_vm(struct vm_info *info)
 	/*
 	 * allocate memory to this vm
 	 */
-	if (vm_info->bit64)
-		vm->flags |= VM_FLAGS_64BIT;
-	vm_mm_struct_init(vm);
-
 	ret = vm_mmap_init(vm, size);
 	if (ret) {
 		pr_error("no more mmap space for vm\n");

@@ -21,6 +21,7 @@
 #include <minos/device_id.h>
 #include <minos/sched.h>
 #include <minos/virq.h>
+#include <asm/of.h>
 
 DEFINE_PER_CPU(struct irq_desc **, sgi_irqs);
 DEFINE_PER_CPU(struct irq_desc **, ppi_irqs);
@@ -555,23 +556,26 @@ int request_irq(uint32_t irq, irq_handle_t handler,
 	return 0;
 }
 
-static int check_irqchip(struct module_id *module)
-{
-	return (!(strcmp(module->name, CONFIG_IRQ_CHIP_NAME)));
-}
-
 int irq_init(void)
 {
 	extern unsigned char __irqchip_start;
 	extern unsigned char __irqchip_end;
+	int node;
+	const char *name;
 	unsigned long s, e;
 
 	s = (unsigned long)&__irqchip_start;
 	e = (unsigned long)&__irqchip_end;
 
-	irq_chip = (struct irq_chip *)
-		get_module_pdata(s, e, check_irqchip);
+	node = of_get_node_by_name(0, "interrupt-controller", 0);
+	if (node < 0)
+		panic("can not find irqchip node in dts\n");
 
+	name = of_get_compatible(node);
+	if (!name)
+		panic("can not get the irqchip's name\n");
+
+	irq_chip = (struct irq_chip *)get_module_pdata(s, e, name);
 	if (!irq_chip)
 		panic("can not find the irqchip for system\n");
 
@@ -586,7 +590,7 @@ int irq_init(void)
 	 * need used in the ssystem
 	 */
 	if (irq_chip->init)
-		irq_chip->init();
+		irq_chip->init(node);
 
 	if (!irq_chip->get_pending_irq)
 		panic("No function to get irq nr\n");

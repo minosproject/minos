@@ -49,8 +49,9 @@ void irq_exit(gp_regs *regs);
 
 int do_hooks(void *item, void *context, enum hook_type type);
 
-void *get_module_pdata(unsigned long s, unsigned long e,
-		int (*check)(struct module_id *module));
+void *get_module_pdata(unsigned long s,
+		unsigned long e, const char *name);
+
 int register_hook(hook_func_t fn, enum hook_type type);
 
 #endif

@@ -78,7 +78,7 @@ struct irq_chip {
 	int (*get_virq_state)(struct virq_desc *virq);
 	int (*update_virq)(struct virq_desc *virq, int action);
 	int (*get_virq_nr)(void);
-	int (*init)(void);
+	int (*init)(int node);
 	int (*secondary_init)(void);
 };
 

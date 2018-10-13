@@ -38,8 +38,6 @@ void cpu_idle()
 {
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	/* enable the sched_tick */
-
 	while (1) {
 		sched();
 		pcpu->state = PCPU_STATE_IDLE;

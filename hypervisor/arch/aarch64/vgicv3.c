@@ -22,16 +22,31 @@
 #include <minos/vmodule.h>
 #include <minos/cpumask.h>
 #include <minos/irq.h>
-#include <asm/vgic.h>
+#include <asm/vgicv3.h>
 #include <minos/sched.h>
 #include <minos/virq.h>
 #include <minos/vdev.h>
 #include <asm/of.h>
 
 #define vdev_to_vgic(vdev) \
-	(struct vgic_dev *)container_of(vdev, struct vgic_dev, vdev)
+	(struct vgicv3_dev *)container_of(vdev, struct vgicv3_dev, vdev)
 
-void vgic_send_sgi(struct vcpu *vcpu, unsigned long sgi_value)
+struct vgicv3_info {
+	unsigned long gicd_base;
+	unsigned long gicd_size;
+	unsigned long gicr_base;
+	unsigned long gicr_size;
+	unsigned long gicc_base;
+	unsigned long gicc_size;
+	unsigned long gich_base;
+	unsigned long gich_size;
+	unsigned long gicv_base;
+	unsigned long gicv_size;
+};
+
+static struct vgicv3_info vgicv3_info;
+
+void vgicv3_send_sgi(struct vcpu *vcpu, unsigned long sgi_value)
 {
 	sgi_mode_t mode;
 	uint32_t sgi;
@@ -59,13 +74,14 @@ void vgic_send_sgi(struct vcpu *vcpu, unsigned long sgi_value)
 			logic_cpu = affinity_to_logic_cpu(aff3, aff2, aff1, bit);
 			cpumask_set_cpu(logic_cpu, &cpumask);
 		}
-	} else {
+	} else if (mode == SGI_TO_OTHERS) {
 		for (bit = 0; bit < vm->vcpu_nr; bit++) {
 			if (bit == vcpu->vcpu_id)
 				continue;
 			cpumask_set_cpu(bit, &cpumask);
 		}
-	}
+	} else
+		cpumask_set_cpu(smp_processor_id(), &cpumask);
 
 	/*
 	 * here we update the gicr releated register
@@ -136,7 +152,6 @@ static void vgic_set_virq_type(struct vcpu *vcpu,
 		value = value >> 2;
 	}
 }
-
 
 static int vgic_gicd_mmio_read(struct vcpu *vcpu,
 			struct vgic_gicd *gicd,
@@ -360,7 +375,7 @@ static int vgic_mmio_handler(struct vdev *vdev, gp_regs *regs, int read,
 	struct vgic_gicd *gicd = NULL;
 	struct vgic_gicr *gicr = NULL;
 	struct vcpu *vcpu = current_vcpu;
-	struct vgic_dev *gic = vdev_to_vgic(vdev);
+	struct vgicv3_dev *gic = vdev_to_vgic(vdev);
 
 	gicr = gic->gicr[get_vcpu_id(vcpu)];
 	gicd = &gic->gicd;
@@ -474,7 +489,7 @@ static void vgic_gicr_init(struct vcpu *vcpu,
 	gicr->gicr_pidr2 = 0x3 << 4;
 }
 
-static void vm_release_gic(struct vgic_dev *gic)
+static void vm_release_gic(struct vgicv3_dev *gic)
 {
 	int i;
 	struct vm *vm = gic->vdev.vm;
@@ -496,7 +511,7 @@ static void vm_release_gic(struct vgic_dev *gic)
 
 static void vgic_deinit(struct vdev *vdev)
 {
-	struct vgic_dev *dev = vdev_to_vgic(vdev);
+	struct vgicv3_dev *dev = vdev_to_vgic(vdev);
 
 	return vm_release_gic(dev);
 }
@@ -504,22 +519,20 @@ static void vgic_deinit(struct vdev *vdev)
 static void vgic_reset(struct vdev *vdev)
 {
 	pr_info("vgic device reset\n");
-
-	/* do nothing when reset the vm */
 }
 
-int vgic_create_vm(void *item, void *arg)
+int vgicv3_create_vm(void *item, void *arg)
 {
 	int i, ret = 0;
 	struct vgic_gicr *gicr;
 	struct vm *vm = (struct vm *)item;
-	struct vgic_dev *vgic_dev;
+	struct vgicv3_dev *vgicv3_dev;
 	struct vcpu *vcpu;
-	uint64_t array[16];
-	uint64_t size;
+	struct vgicv3_info *info = &vgicv3_info;
+	unsigned long size;
 
-	vgic_dev = zalloc(sizeof(struct vgic_dev));
-	if (!vgic_dev)
+	vgicv3_dev = zalloc(sizeof(struct vgicv3_dev));
+	if (!vgicv3_dev)
 		return -ENOMEM;
 
 	/*
@@ -527,27 +540,23 @@ int vgic_create_vm(void *item, void *arg)
 	 * the dtb but for gvm, emulator the system of
 	 * arm FVP
 	 */
-	if (vm->vmid == 0) {
-		i = 16;
-		memset(array, 0, sizeof(array));
-		ret = of_get_interrupt_regs(array, &i);
-		if ((ret < 0) || (i < 4))
-			return -ENOENT;
-
-		/* count the iomem size of gic */
-		size = array[2] + array[3] - array[0];
-		host_vdev_init(vm, &vgic_dev->vdev, array[0], size);
+	if (vm_is_native(vm)) {
+		size = info->gicr_base + info->gicr_size -
+			info->gicd_base;
+		host_vdev_init(vm, &vgicv3_dev->vdev,
+				info->gicd_base, size);
 	} else
-		host_vdev_init(vm, &vgic_dev->vdev,
+		host_vdev_init(vm, &vgicv3_dev->vdev,
 				GVM_VGIC_IOMEM_BASE,
 				GVM_VGIC_IOMEM_SIZE);
 
-	vdev_set_name(&vgic_dev->vdev, "vgic");
+	vdev_set_name(&vgicv3_dev->vdev, "vgic");
 
-	if (vm->vmid == 0)
-		vgic_gicd_init(vm, &vgic_dev->gicd, array[0], array[1]);
+	if (vm_is_native(vm))
+		vgic_gicd_init(vm, &vgicv3_dev->gicd,
+				info->gicd_base, info->gicd_size);
 	else
-		vgic_gicd_init(vm, &vgic_dev->gicd, GVM_VGICD_IOMEM_BASE,
+		vgic_gicd_init(vm, &vgicv3_dev->gicd, GVM_VGICD_IOMEM_BASE,
 				GVM_VGICD_IOMEM_SIZE);
 
 	for (i = 0; i < vm->vcpu_nr; i++) {
@@ -558,33 +567,38 @@ int vgic_create_vm(void *item, void *arg)
 			goto release_gic;
 		}
 
-		if (vm->vmid == 0)
-			vgic_gicr_init(vcpu, gicr, array[2]);
+		if (vm_is_native(vm))
+			vgic_gicr_init(vcpu, gicr, info->gicr_base);
 		else
 			vgic_gicr_init(vcpu, gicr, GVM_VGICR_IOMEM_BASE);
 
-		vgic_dev->gicr[i] = gicr;
+		vgicv3_dev->gicr[i] = gicr;
 	}
 
-	vgic_dev->vdev.read = vgic_mmio_read;
-	vgic_dev->vdev.write = vgic_mmio_write;
-	vgic_dev->vdev.deinit = vgic_deinit;
-	vgic_dev->vdev.reset = vgic_reset;
-
-	/* here we put the vgic to header vdev_list */
-	list_del(&vgic_dev->vdev.list);
-	list_add(&vm->vdev_list, &vgic_dev->vdev.list);
+	vgicv3_dev->vdev.read = vgic_mmio_read;
+	vgicv3_dev->vdev.write = vgic_mmio_write;
+	vgicv3_dev->vdev.deinit = vgic_deinit;
+	vgicv3_dev->vdev.reset = vgic_reset;
 
 	return 0;
 
 release_gic:
-	vm_release_gic(vgic_dev);
+	vm_release_gic(vgicv3_dev);
 	return ret;
 }
 
-static int vgic_init(void)
+int vgicv3_init(uint64_t *data, int len)
 {
-	return register_hook(vgic_create_vm, MINOS_HOOK_TYPE_CREATE_VM_VDEV);
-}
+	int i;
+	unsigned long *value = (unsigned long *)&vgicv3_info;
 
-module_initcall(vgic_init);
+	for (i = 0; i < len; i++)
+		value[i] = (unsigned long)data[i];
+
+	if (vgicv3_info.gicd_base == 0 || vgicv3_info.gicr_base == 0 ||
+		vgicv3_info.gicd_size == 0 || vgicv3_info.gicr_size == 0)
+		panic("invalid gicv3 register base from irqchip\n");
+
+	return register_hook(vgicv3_create_vm,
+			MINOS_HOOK_TYPE_CREATE_VM_VDEV);
+}

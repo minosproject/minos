@@ -49,6 +49,18 @@ static void *of_getprop(char *path, char *attr, int *len)
 	return (void *)data;
 }
 
+const char *of_get_compatible(int node)
+{
+	const void *data;
+	int len;
+
+	data = fdt_getprop(dtb, node, "compatible", &len);
+	if (!data || len == 0)
+		return NULL;
+
+	return (const char *)data;
+}
+
 int of_get_u32_array(char *path, char *attr, uint32_t *array, int *len)
 {
 	void *data;
@@ -130,15 +142,14 @@ int of_get_node_by_name(int pnode, char *str, int deepth)
 	return -ENOENT;
 }
 
-int of_get_interrupt_regs(uint64_t *array, int *array_len)
+int of_get_interrupt_regs(int node, uint64_t *array, int *array_len)
 {
 	const void *data;
 	uint32_t *u32_data;
-	int node = -1, len, size_cell, i;
+	int len, size_cell, i;
 
-	node = of_get_node_by_name(0, "interrupt-controller", 0);
-	if (node < 0)
-		return -ENOENT;
+	if (node <= 0)
+		return -EINVAL;
 
 	size_cell = fdt_size_cells(dtb, node);
 	if ((size_cell != 1) && (size_cell != 2)) {
@@ -188,7 +199,7 @@ int of_get_interrupt_regs(uint64_t *array, int *array_len)
 	for (i = 0; i < len; i += 2)
 		array[i] = array[i] + CONFIG_PLATFORM_IO_BASE;
 
-	return node;
+	return 0;
 }
 
 int of_init(void *setup_data)

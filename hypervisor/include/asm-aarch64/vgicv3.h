@@ -1,5 +1,5 @@
-#ifndef _MINOS_VGIC_H_
-#define _MINOS_VGIC_H_
+#ifndef _MINOS_VGICV3_H_
+#define _MINOS_VGICV3_H_
 
 #include <minos/smp.h>
 #include <minos/vdev.h>
@@ -27,7 +27,7 @@ struct vgic_gicr {
 	spinlock_t gicr_lock;
 };
 
-struct vgic_dev {
+struct vgicv3_dev {
 	struct vdev vdev;
 	struct vgic_gicd gicd;
 	struct vgic_gicr *gicr[NR_CPUS];
@@ -47,6 +47,6 @@ struct vgic_dev {
 
 #define GVM_VGICR_IOMEM_BASE	(0x2f100000)
 
-void vgic_send_sgi(struct vcpu *vcpu, unsigned long sgi_value);
+void vgicv3_send_sgi(struct vcpu *vcpu, unsigned long sgi_value);
 
 #endif

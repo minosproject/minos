@@ -441,17 +441,17 @@ static int gicv2_vmodule_init(struct vmodule *vmodule)
 	return 0;
 }
 
-static int gicv2_init(void)
+static int gicv2_init(int node)
 {
-	int node, len;
+	int ret, len;
 	uint64_t array[16];
 
 	pr_info("*** gicv2 init ***\n");
 
 	len = 16;
 	memset(array, 0, sizeof(array));
-	node = of_get_interrupt_regs(array, &len);
-	if ((node < 0) || (len < 8))
+	ret = of_get_interrupt_regs(node, array, &len);
+	if (ret || (len < 8))
 		panic("invaild gic-v2 infomation in dts\n");
 
 	pr_info("gicv2 information :\n"
@@ -530,4 +530,12 @@ static struct irq_chip gicv2_chip = {
 	.secondary_init		= gicv2_secondary_init,
 };
 
-IRQCHIP_DECLARE(gicv2_chip, "gicv2", (void *)&gicv2_chip);
+IRQCHIP_DECLARE(gicv2_chip, "arm,gicv2", (void *)&gicv2_chip);
+IRQCHIP_DECLARE(gic_400, "arm,gic-400", (void *)&gicv2_chip);
+IRQCHIP_DECLARE(arm11mp_gic, "arm,arm11mp-gic", (void *)&gicv2_chip);
+IRQCHIP_DECLARE(arm1176jzf_dc_gic, "arm,arm1176jzf-devchip-gic", (void *)&gicv2_chip);
+IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", (void *)&gicv2_chip);
+IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", (void *)&gicv2_chip);
+IRQCHIP_DECLARE(cortex_a7_gic, "arm,cortex-a7-gic", (void *)&gicv2_chip);
+IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", (void *)&gicv2_chip);
+IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", (void *)&gicv2_chip);

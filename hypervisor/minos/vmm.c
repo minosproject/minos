@@ -385,15 +385,6 @@ int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size)
 	if (base != start)
 		pr_warn("memory base is not mem_block align\n");
 
-	/*
-	 * first allocate the page table for vm, since
-	 * the vm is not running, do not need to get
-	 * the spin lock
-	 */
-	mm->pgd_base = alloc_pgd();
-	if (!mm->pgd_base)
-		return -ENOMEM;
-
 	mm->mem_base = base;
 	mm->mem_size = size;
 	mm->mem_free = size;
@@ -457,6 +448,12 @@ void vm_mm_struct_init(struct vm *vm)
 	mm->pgd_base = 0;
 	spin_lock_init(&mm->lock);
 
+	mm->pgd_base = alloc_pgd();
+	if (mm->pgd_base == 0) {
+		pr_error("No memory for vm page table\n");
+		return;
+	}
+
 	/*
 	 * for guest vm
 	 *
@@ -466,7 +463,7 @@ void vm_mm_struct_init(struct vm *vm)
 	 * 0x40000000 - 0x7fffffff for vdev which controlled
 	 * by vm0, like virtio device, rtc device
 	 */
-	if (!vm_is_hvm(vm)) {
+	if (!vm_is_native(vm)) {
 		mm->gvm_iomem_base = GVM_IO_MEM_START + SIZE_1G;
 		mm->gvm_iomem_size = GVM_IO_MEM_SIZE - SIZE_1G;
 	}
@@ -475,15 +472,6 @@ void vm_mm_struct_init(struct vm *vm)
 int vm_mm_init(struct vm *vm)
 {
 	struct memory_region *region;
-	struct mm_struct *mm = &vm->mm;
-
-	vm_mm_struct_init(vm);
-
-	mm->pgd_base = alloc_pgd();
-	if (mm->pgd_base == 0) {
-		pr_error("No memory for vm page table\n");
-		return -ENOMEM;
-	}
 
 	list_for_each_entry(region, &mem_list, list) {
 		if (region->vmid != vm->vmid)

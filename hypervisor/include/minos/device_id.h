@@ -6,7 +6,6 @@
 struct module_id {
 	char name[32];
 	char type[32];
-	char cmpstr[32];
 	void *data;
 };
 

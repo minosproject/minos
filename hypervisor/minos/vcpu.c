@@ -481,6 +481,7 @@ struct vm *create_vm(struct vmtag *vme)
 {
 	int ret = 0;
 	struct vm *vm;
+	int native = 0;
 
 	if (!vme)
 		return NULL;
@@ -498,11 +499,17 @@ struct vm *create_vm(struct vmtag *vme)
 
 		set_bit(vme->vmid, vmid_bitmap);
 		spin_unlock(&vms_lock);
+		native = 1;
 	}
 
 	vm = __create_vm(vme);
 	if (!vm)
 		return NULL;
+
+	if (native)
+		vm->flags |= VM_FLAGS_NATIVE;
+
+	vm_mm_struct_init(vm);
 
 	ret = create_vcpus(vm);
 	if (ret) {
@@ -546,7 +553,6 @@ int create_static_vms(void)
 			continue;
 		}
 
-		vm->flags |= VM_FLAGS_NATIVE;
 		count++;
 	}
 

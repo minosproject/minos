@@ -13,7 +13,6 @@
 
 #define INVAILD_MODULE_ID		(0xffff)
 
-
 struct vmodule {
 	char name[32];
 	char type[32];

@@ -35,6 +35,8 @@ static void *gicd_base = 0;
 static int gicv3_nr_lr = 0;
 static int gicv3_nr_pr = 0;
 
+extern int vgicv3_init(uint64_t *data, int len);
+
 DEFINE_PER_CPU(void *, gicr_rd_base);
 DEFINE_PER_CPU(void *, gicr_sgi_base);
 
@@ -682,7 +684,7 @@ static int gicv3_vmodule_init(struct vmodule *vmodule)
 	return 0;
 }
 
-int gicv3_init(void)
+int gicv3_init(int node)
 {
 	int i;
 	uint32_t type;
@@ -690,7 +692,7 @@ int gicv3_init(void)
 	void *rbase;
 	uint64_t pr;
 	uint32_t value;
-	int len = 16, node;
+	int len = 16, ret;
 	uint64_t array[16];
 	void * __gicr_rd_base = 0;
 
@@ -699,9 +701,9 @@ int gicv3_init(void)
 	spin_lock_init(&gicv3_lock);
 
 	memset(array, 0, sizeof(array));
-	node = of_get_interrupt_regs(array, &len);
-	if ((node < 0) || (len < 4))
-		panic("can not find gicv3 interrupt controller\n");
+	ret = of_get_interrupt_regs(node, array, &len);
+	if (ret || (len < 4))
+		panic("can not find gicv3 reg info\n");
 
 	/* only map gicd and gicr now */
 	pr = array[2] + array[3] - array[0];
@@ -774,6 +776,7 @@ int gicv3_init(void)
 
 	spin_unlock(&gicv3_lock);
 
+	vgicv3_init(array, len);
 	register_vcpu_vmodule("gicv3-vmodule", gicv3_vmodule_init);
 
 	return 0;
@@ -781,9 +784,13 @@ int gicv3_init(void)
 
 int gicv3_secondary_init(void)
 {
+	spin_lock(&gicv3_lock);
+
 	gicv3_gicr_init();
 	gicv3_gicc_init();
 	gicv3_hyp_init();
+
+	spin_unlock(&gicv3_lock);
 
 	return 0;
 }
@@ -808,4 +815,4 @@ static struct irq_chip gicv3_chip = {
 	.secondary_init		= gicv3_secondary_init,
 };
 
-IRQCHIP_DECLARE(gicv3_chip, "gicv3", (void *)&gicv3_chip);
+IRQCHIP_DECLARE(gicv3_chip, "arm,gicv3", (void *)&gicv3_chip);

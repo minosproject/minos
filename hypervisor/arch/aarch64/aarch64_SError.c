@@ -21,7 +21,7 @@
 #include <minos/smp.h>
 #include <asm/processer.h>
 #include <minos/sched.h>
-#include <asm/vgic.h>
+#include <asm/vgicv3.h>
 #include <minos/irq.h>
 #include <asm/svccc.h>
 #include <asm/vtimer.h>
@@ -154,7 +154,7 @@ static int access_system_reg_handler(gp_regs *reg, uint32_t esr_value)
 		pr_debug("access system reg SGI1R_EL1\n");
 		if (!sysreg->read) {
 			reg_value = get_reg_value(reg, regindex);
-			vgic_send_sgi(current_vcpu, reg_value);
+			vgicv3_send_sgi(current_vcpu, reg_value);
 		}
 		break;
 

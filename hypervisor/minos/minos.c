@@ -80,8 +80,7 @@ int do_hooks(void *item, void *context, enum hook_type type)
 	return err;
 }
 
-void *get_module_pdata(unsigned long s, unsigned long e,
-		int (*check)(struct module_id *module))
+void *get_module_pdata(unsigned long s, unsigned long e, const char *name)
 {
 	int i, count;
 	struct module_id *module;
@@ -95,7 +94,7 @@ void *get_module_pdata(unsigned long s, unsigned long e,
 
 	for (i = 0; i < count; i++) {
 		module = (struct module_id *)s;
-		if (check(module))
+		if (!strcmp(module->name, name))
 			return module->data;
 
 		s += sizeof(struct module_id);
