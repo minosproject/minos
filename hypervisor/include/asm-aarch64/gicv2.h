@@ -28,6 +28,9 @@
 #define GICD_IGROUPRN   	(0x0FC)
 #define GICD_ISENABLER  	(0x100)
 #define GICD_ISENABLERN 	(0x17C)
+
+
+
 #define GICD_ICENABLER  	(0x180)
 #define GICD_ICENABLERN 	(0x1fC)
 #define GICD_ISPENDR    	(0x200)

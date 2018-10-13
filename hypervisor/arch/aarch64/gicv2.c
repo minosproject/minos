@@ -74,6 +74,8 @@ static int gicv2_nr_lines;
 
 static DEFINE_PER_CPU(uint8_t, gic_cpu_id);
 
+extern int vigcv2_init(uint64_t *data, int len);
+
 /* Maximum cpu interface per GIC */
 #define NR_GIC_CPU_IF 8
 
@@ -165,9 +167,12 @@ static int gicv2_set_irq_priority(uint32_t irq, uint32_t pr)
 
 static int gicv2_set_irq_affinity(uint32_t irq, uint32_t pcpu)
 {
+	if (pcpu > NR_GIC_CPU_IF)
+		return -EINVAL;
+
 	spin_lock(&gicv2_lock);
 	/* Set target CPU mask (RAZ/WI on uniprocessor) */
-	writeb_gicd(pcpu, GICD_ITARGETSR + irq);
+	writeb_gicd(1 << pcpu, GICD_ITARGETSR + irq);
 	spin_unlock(&gicv2_lock);
 	return 0;
 }
@@ -378,7 +383,7 @@ static void gicv2_hyp_init(void)
 	uint8_t nr_lrs;
 
 	vtr = readl_gich(GICH_VTR);
-	nr_lrs = (vtr * GICH_V2_VTR_NRLRGS) + 1;
+	nr_lrs = (vtr & GICH_V2_VTR_NRLRGS) + 1;
 	gicv2_nr_lrs = nr_lrs;
 }
 
@@ -404,6 +409,9 @@ static void gicv2_dist_init(void)
 		nr_lines, gic_cpus, (gic_cpus == 1) ? "" : "s",
 		(type & GICD_TYPE_SEC) ? ", secure" : "",
 		readl_gicd(GICD_IIDR));
+
+
+	irq_alloc_spi(32, nr_lines);
 
 	/* Default all global IRQs to level, active low */
 	for ( i = 32; i < nr_lines; i += 16 )
@@ -455,10 +463,10 @@ static int gicv2_init(int node)
 		panic("invaild gic-v2 infomation in dts\n");
 
 	pr_info("gicv2 information :\n"
-		"    gic_dist_addr=%p size=0x%x\n"
-		"    gic_cpu_addr=%p size=0x%x\n"
-		"    gic_hyp_addr=%p size=0x%x\n"
-		"    gic_vcpu_addr=%p size=0x%x\n",
+		"        gic_dist_addr=%p size=0x%x\n"
+		"        gic_cpu_addr=%p size=0x%x\n"
+		"        gic_hyp_addr=%p size=0x%x\n"
+		"        gic_vcpu_addr=%p size=0x%x\n",
 		array[0], array[1], array[2], array[3],
 		array[4], array[5], array[6], array[7]);
 
@@ -482,12 +490,16 @@ static int gicv2_init(int node)
 
 	spin_lock(&gicv2_lock);
 
+	irq_alloc_sgi(0, 16);
+	irq_alloc_ppi(16, 16);
+
 	gicv2_dist_init();
 	gicv2_cpu_init();
 	gicv2_hyp_init();
 
 	spin_unlock(&gicv2_lock);
 
+	vigcv2_init(array, len);
 	register_vcpu_vmodule("gicv2", gicv2_vmodule_init);
 
 	return 0;
