@@ -496,6 +496,7 @@ void vcpu_virq_struct_reset(struct vcpu *vcpu)
 		desc->id = VIRQ_INVALID_ID;
 		desc->list.next = NULL;
 		desc->state = VIRQ_STATE_INACTIVE;
+		desc->pending = 0;
 	}
 }
 
@@ -694,6 +695,7 @@ void vm_virq_reset(struct vm *vm)
 		desc->id = VIRQ_INVALID_ID;
 		desc->state = VIRQ_STATE_INACTIVE;
 		desc->list.next = NULL;
+		desc->pending = 0;
 
 		if (desc->hw)
 			irq_mask(desc->hno);
