@@ -153,8 +153,8 @@ int destroy_host_mapping(unsigned long vir, size_t size)
 	unsigned long end;
 
 	end = vir + size;
-	end = BALIGN(end, PAGE_SIZE);
-	vir = ALIGN(vir, PAGE_SIZE);
+	end = BALIGN(end, MEM_BLOCK_SIZE);
+	vir = ALIGN(vir, MEM_BLOCK_SIZE);
 	size = end - vir;
 
 	return destroy_mem_mapping(&host_mm, vir, size, VM_HOST);
@@ -165,8 +165,8 @@ int create_guest_mapping(struct vm *vm, unsigned long vir,
 {
 	unsigned long vir_base, phy_base, tmp;
 
-	vir_base = ALIGN(vir, SIZE_4K);
-	phy_base = ALIGN(phy, SIZE_4K);
+	vir_base = ALIGN(vir, PAGE_SIZE);
+	phy_base = ALIGN(phy, PAGE_SIZE);
 	tmp = BALIGN(vir_base + size, SIZE_4K);
 	size = tmp - vir_base;
 

@@ -180,7 +180,7 @@ static int create_table_entry(struct mm_struct *mm,
 				return -ENOMEM;
 
 			new_page = 1;
-			memset((void *)value, 0, SIZE_4K);
+			memset((void *)value, 0, PAGE_SIZE);
 			*(tbase + offset) = attr | (value &
 					DESC_MASK(config->des_offset));
 		} else {
