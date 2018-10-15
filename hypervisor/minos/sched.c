@@ -37,30 +37,63 @@ DEFINE_PER_CPU(struct vcpu *, percpu_next_vcpu);
 DEFINE_PER_CPU(int, need_resched);
 DEFINE_PER_CPU(atomic_t, preempt);
 
+static int e_base;
+static int f_base;
+static int e_base_current;
+static int f_base_current;
+static int e_nr;
+static int f_nr;
+DEFINE_SPIN_LOCK(affinity_lock);
+
 void get_vcpu_affinity(uint8_t *aff, int nr)
 {
-	int i;
-	static int base = 1 & (NR_CPUS - 1);
+	int i, e, f, j = 0;
 
-	if (nr == NR_CPUS) {
-		for (i = 0; i < nr; i++) {
-			aff[i] = base;
-			base++;
-			if (base >= NR_CPUS)
-				base = 0;
-		}
-	} else {
-		for (i = 0; i < nr; i++) {
-			if (base == 0)
-				base++;
+	e = MIN(nr, e_nr);
+	f = nr - e;
 
-			aff[i] = base;
-			base++;
-			if (base >= NR_CPUS)
-				base = 1;
-		}
+	spin_lock(&affinity_lock);
+
+	for (i = 0; i < e; i++) {
+		aff[j] = e_base_current;
+		e_base_current++;
+		if (e_base_current == NR_CPUS)
+			e_base_current = e_base;
+		j++;
 	}
+
+	for (i = 0; i < f; i++) {
+		if ( (f_base_current == 0) && ((f < f_nr) || (i == 0)) ) {
+			f_base_current++;
+			if (f_base_current == e_base)
+				f_base_current = f_base;
+		}
+
+		aff[j] = f_base_current;
+		j++;
+		f_base_current++;
+		if (f_base_current == e_base)
+			f_base_current = f_base;
+	}
+
+	spin_unlock(&affinity_lock);
 }
+
+static int vcpu_affinity_init(void)
+{
+	struct vm *vm0 = get_vm_by_id(0);
+
+	if (!vm0)
+		panic("vm0 is not created\n");
+
+	e_base_current = e_base = vm0->vcpu_nr;
+	e_nr =  NR_CPUS - vm0->vcpu_nr;
+	f_base_current = f_base = 0;
+	f_nr = vm0->vcpu_nr;
+
+	return 0;
+}
+device_initcall(vcpu_affinity_init);
 
 void pcpu_resched(int pcpu_id)
 {
