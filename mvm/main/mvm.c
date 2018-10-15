@@ -211,6 +211,15 @@ int destroy_vm(struct vm *vm)
 	if (vm->image_fd > 0)
 		close(vm->image_fd);
 
+	if (vm->kfd > 0)
+		close(vm->kfd);
+
+	if (vm->rfd > 0)
+		close(vm->rfd);
+
+	if (vm->dfd > 0)
+		close(vm->rfd);
+
 	if (vm->os_data > 0)
 		free(vm->os_data);
 
