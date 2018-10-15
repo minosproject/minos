@@ -16,7 +16,16 @@ QUIET ?= @
 
 include build/$(PLATFORM).mk
 
-src_dir-y				+= minos arch/$(ARCH) platform/$(PLATFORM)
+src_dir-y				+= minos platform/$(PLATFORM)
+
+ifeq ($(ARCH), aarch64)
+	src_dir-y += arch/arm/aarch64 arch/arm/common
+endif
+
+ifeq ($(ARCH), aarch32)
+	src_dir-y += arch/arm/aarch32 arch/arm/common
+endif
+
 src_dir-y				+= drivers
 src_dir-y				+= external/libfdt
 
