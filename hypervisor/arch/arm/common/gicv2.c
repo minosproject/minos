@@ -192,7 +192,7 @@ static int gicv2_set_irq_affinity(uint32_t irq, uint32_t pcpu)
 static int gicv2_send_virq(struct virq_desc *virq)
 {
 	uint32_t val;
-	uint32_t pid;
+	uint32_t pid = 0;
 	struct gich_lr *gich_lr;
 
 	if (virq->id >= gicv2_nr_lrs) {
@@ -323,6 +323,7 @@ static void gicv2_state_save(struct vcpu *vcpu, void *context)
 	c->apr = readl_gich(GICH_APR);
 	c->hcr = readl_gich(GICH_HCR);
 	writel_gich(0, GICH_HCR);
+	isb();
 }
 
 static void gicv2_state_restore(struct vcpu *vcpu, void *context)
@@ -336,7 +337,7 @@ static void gicv2_state_restore(struct vcpu *vcpu, void *context)
 	writel_gich(c->apr, GICH_APR);
 	writel_gich(c->vmcr, GICH_VMCR);
 	writel_gich(c->hcr, GICH_HCR);
-	dsb();
+	isb();
 }
 
 static void gicv2_state_init(struct vcpu *vcpu, void *context)

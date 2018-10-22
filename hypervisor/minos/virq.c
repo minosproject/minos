@@ -433,7 +433,6 @@ static int irq_exit_from_guest(void *item, void *data)
 	list_for_each_entry_safe(virq, n, &virq_struct->active_list, list) {
 
 		status = irq_get_virq_state(virq);
-		dsb();
 
 		/*
 		 * the virq has been handled by the VCPU, if
