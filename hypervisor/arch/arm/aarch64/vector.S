@@ -21,7 +21,7 @@
 	.balign 8
 
 	.global __irq_handler
-	.global __serror_handler
+	.global __sync_handler
 	.global arch_switch_vcpu_sw
 
 .macro save_gp_regs
@@ -170,9 +170,9 @@ arch_switch_vcpu_sw:
 	eret
 	.cfi_endproc
 
-	.type __serror_handler "function"
+	.type __sync_handler "function"
 	.cfi_startproc
-__serror_handler:
+__sync_handler:
 	//save_gp_regs
 	stp	x29, x30, [sp, #-16]!
 	stp	x27, x28, [sp, #-16]!
@@ -198,7 +198,7 @@ __serror_handler:
 	str	x0, [sp, #-8]!
 
 	mov	x0, sp
-	bl	serror_c_handler			// go to the c handler
+	bl	sync_c_handler			// go to the c handler
 
 	//restore_gp_regs
 	ldr	x0, [sp], #8

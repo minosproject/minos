@@ -39,25 +39,25 @@
 #define EC_VCTOR_CATCH		(0x3A)
 #define EC_BRK_INS		(0x3C)
 
-#define MAX_SERROR_TYPE		(0x40)
+#define MAX_SYNC_TYPE		(0x40)
 
 #define EC_TYPE_AARCH64		(0x1)
 #define EC_TYPE_AARCH32		(0X2)
 #define EC_TYPE_BOTH		(0x3)
 
-typedef int (*serror_handler_t)(gp_regs *reg, uint32_t esr_value);
+typedef int (*sync_handler_t)(gp_regs *reg, uint32_t esr_value);
 
-struct serror_desc {
+struct sync_desc {
 	int type;
 	int aarch;
-	serror_handler_t handler;
+	sync_handler_t handler;
 	int irq_safe;
 	int32_t ret_addr_adjust;
 };
 
-#define DEFINE_SERROR_DESC(t, arch, h, is, raa)		\
-	static struct serror_desc serror_desc_##t 	\
-	__section(".__serror_desc") __used = {	\
+#define DEFINE_SYNC_DESC(t, arch, h, is, raa)		\
+	static struct sync_desc sync_desc_##t 	\
+	__section(".__sync_desc") __used = {	\
 		.type = t, 	\
 		.aarch = arch, 	\
 		.handler = h,	\

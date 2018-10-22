@@ -28,18 +28,20 @@
 #include <minos/virt.h>
 #include <minos/vdev.h>
 
-extern unsigned char __serror_desc_start;
-extern unsigned char __serror_desc_end;
+extern unsigned char __sync_desc_start;
+extern unsigned char __sync_desc_end;
 
-static struct serror_desc *serror_descs[MAX_SERROR_TYPE] __align_cache_line;
+static struct sync_desc *sync_descs[MAX_SYNC_TYPE] __align_cache_line;
 
-void bad_error(void)
+void bad_mode(void)
 {
 	panic("Bad error received\n");
 }
 
 static int unknown_handler(gp_regs *reg, uint32_t esr_value)
 {
+	panic("unknown sync type\n");
+
 	return 0;
 }
 
@@ -52,11 +54,40 @@ static int wfi_wfe_handler(gp_regs *reg, uint32_t esr_value)
 
 static int mcr_mrc_cp15_handler(gp_regs *reg, uint32_t esr_value)
 {
+	switch (esr_value & HSR_CP32_REGS_MASK) {
+	case HSR_CPREG32(ACTLR):
+		break;
+	default:
+		pr_info("mcr_mrc_cp15_handler 0x%x\n", esr_value);
+		break;
+	}
+
 	return 0;
 }
 
 static int mcrr_mrrc_cp15_handler(gp_regs *reg, uint32_t esr_value)
 {
+	struct esr_cp64 *sysreg = (struct esr_cp64 *)&esr_value;
+	unsigned long reg_value0, reg_value1;
+	unsigned long reg_value;
+
+	switch (esr_value & HSR_CP64_REGS_MASK) {
+	case HSR_CPREG64(CNTP_CVAL):
+		break;
+
+	/* for aarch32 vm and using gicv3 */
+	case HSR_CPREG64(ICC_SGI1R):
+	case HSR_CPREG64(ICC_ASGI1R):
+	case HSR_CPREG64(ICC_SGI0R):
+		if (!sysreg->read) {
+			reg_value0 = get_reg_value(reg, sysreg->reg1);
+			reg_value1 = get_reg_value(reg, sysreg->reg2);
+			reg_value = (reg_value1 << 32) | reg_value0;
+			vgicv3_send_sgi(current_vcpu, reg_value);
+		}
+		break;
+	}
+
 	return 0;
 }
 
@@ -90,32 +121,13 @@ static int illegal_exe_state_handler(gp_regs *reg, uint32_t esr_value)
 	return 0;
 }
 
-static int armsvc_aarch32_handler(gp_regs *reg, uint32_t esr_value)
-{
-	return 0;
-}
-
-static int hvc_aarch32_handler(gp_regs *reg, uint32_t esr_value)
-{
-	return 0;
-}
-
-static int smc_aarch32_handler(gp_regs *reg, uint32_t esr_value)
-{
-	return 0;
-}
-
-static int armsvc_aarch64_handler(gp_regs *reg, uint32_t esr_value)
-{
-	return 0;
-}
-
-static inline int svc_aarch64_handler(gp_regs *reg, uint32_t esr_value, int smc)
+static inline int
+arm_svc_handler(gp_regs *reg, uint32_t esr_value, int smc)
 {
 	int fast;
 	uint32_t id;
 	uint16_t imm;
-	uint64_t args[6];
+	unsigned long args[6];
 
 	imm = esr_value & 0xff;
 	if (imm != 0)
@@ -123,7 +135,13 @@ static inline int svc_aarch64_handler(gp_regs *reg, uint32_t esr_value, int smc)
 
 	id = reg->x0;
 	fast = !!(id & SVC_CTYPE_MASK);
-	memcpy((void *)args, (void *)&reg->x1, 6 * sizeof(uint64_t));
+
+	args[0] = reg->x1;
+	args[1] = reg->x2;
+	args[2] = reg->x3;
+	args[3] = reg->x4;
+	args[4] = reg->x5;
+	args[5] = reg->x6;
 
 	if (!fast)
 		local_irq_enable();
@@ -131,14 +149,34 @@ static inline int svc_aarch64_handler(gp_regs *reg, uint32_t esr_value, int smc)
 	return do_svc_handler(reg, id, args, smc);
 }
 
+static int svc_aarch32_handler(gp_regs *reg, uint32_t esr_value)
+{
+	return 0;
+}
+
+static int hvc_aarch32_handler(gp_regs *reg, uint32_t esr_value)
+{
+	return arm_svc_handler(reg, esr_value, 0);
+}
+
+static int smc_aarch32_handler(gp_regs *reg, uint32_t esr_value)
+{
+	return arm_svc_handler(reg, esr_value, 1);
+}
+
+static int svc_aarch64_handler(gp_regs *reg, uint32_t esr_value)
+{
+	return 0;
+}
+
 static int hvc_aarch64_handler(gp_regs *reg, uint32_t esr_value)
 {
-	return svc_aarch64_handler(reg, esr_value, 0);
+	return arm_svc_handler(reg, esr_value, 0);
 }
 
 static int smc_aarch64_handler(gp_regs *reg, uint32_t esr_value)
 {
-	return svc_aarch64_handler(reg, esr_value, 1);
+	return arm_svc_handler(reg, esr_value, 1);
 }
 
 static int access_system_reg_handler(gp_regs *reg, uint32_t esr_value)
@@ -244,7 +282,6 @@ static int dataabort_tfl_handler(gp_regs *regs, uint32_t esr_value)
 
 static int dataabort_twe_handler(gp_regs *reg, uint32_t esr_value)
 {
-
 	pr_fatal("Unable to handle NULL pointer at address:0x%p\n",
 			read_sysreg(FAR_EL2));
 
@@ -317,115 +354,115 @@ static int brk_ins_handler(gp_regs *reg, uint32_t esr_value)
 }
 
 /* type defination is at armv8-spec 1906 */
-DEFINE_SERROR_DESC(EC_UNKNOWN, EC_TYPE_BOTH,
+DEFINE_SYNC_DESC(EC_UNKNOWN, EC_TYPE_BOTH,
 		unknown_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_WFI_WFE, EC_TYPE_BOTH,
+DEFINE_SYNC_DESC(EC_WFI_WFE, EC_TYPE_BOTH,
 		wfi_wfe_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_MCR_MRC_CP15, EC_TYPE_BOTH,
+DEFINE_SYNC_DESC(EC_MCR_MRC_CP15, EC_TYPE_BOTH,
 		mcr_mrc_cp15_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_MCRR_MRRC_CP15, EC_TYPE_AARCH32,
+DEFINE_SYNC_DESC(EC_MCRR_MRRC_CP15, EC_TYPE_AARCH32,
 		mcrr_mrrc_cp15_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_MCR_MRC_CP14, EC_TYPE_AARCH32,
+DEFINE_SYNC_DESC(EC_MCR_MRC_CP14, EC_TYPE_AARCH32,
 		mcr_mrc_cp14_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_LDC_STC_CP14, EC_TYPE_AARCH32,
+DEFINE_SYNC_DESC(EC_LDC_STC_CP14, EC_TYPE_AARCH32,
 		ldc_stc_cp14_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_ACCESS_SIMD_REG, EC_TYPE_BOTH,
+DEFINE_SYNC_DESC(EC_ACCESS_SIMD_REG, EC_TYPE_BOTH,
 		access_simd_reg_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_MCR_MRC_CP10, EC_TYPE_AARCH32,
+DEFINE_SYNC_DESC(EC_MCR_MRC_CP10, EC_TYPE_AARCH32,
 		mcr_mrc_cp10_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_MRRC_CP14, EC_TYPE_AARCH32,
+DEFINE_SYNC_DESC(EC_MRRC_CP14, EC_TYPE_AARCH32,
 		mrrc_cp14_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_ILLEGAL_EXE_STATE, EC_TYPE_BOTH,
+DEFINE_SYNC_DESC(EC_ILLEGAL_EXE_STATE, EC_TYPE_BOTH,
 		illegal_exe_state_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_SVC_AARCH32, EC_TYPE_AARCH32,
-		armsvc_aarch32_handler, 0, 0);
+DEFINE_SYNC_DESC(EC_SVC_AARCH32, EC_TYPE_AARCH32,
+		svc_aarch32_handler, 0, 0);
 
-DEFINE_SERROR_DESC(EC_HVC_AARCH32, EC_TYPE_AARCH32,
+DEFINE_SYNC_DESC(EC_HVC_AARCH32, EC_TYPE_AARCH32,
 		hvc_aarch32_handler, 0, 0);
 
-DEFINE_SERROR_DESC(EC_SMC_AARCH32, EC_TYPE_AARCH32,
-		smc_aarch32_handler, 0, 0);
+DEFINE_SYNC_DESC(EC_SMC_AARCH32, EC_TYPE_AARCH32,
+		smc_aarch32_handler, 0, 4);
 
-DEFINE_SERROR_DESC(EC_SVC_AARCH64, EC_TYPE_AARCH64,
-		armsvc_aarch64_handler, 0, 0);
+DEFINE_SYNC_DESC(EC_SVC_AARCH64, EC_TYPE_AARCH64,
+		svc_aarch64_handler, 0, 0);
 
-DEFINE_SERROR_DESC(EC_HVC_AARCH64, EC_TYPE_AARCH64,
+DEFINE_SYNC_DESC(EC_HVC_AARCH64, EC_TYPE_AARCH64,
 		hvc_aarch64_handler, 0, 0);
 
-DEFINE_SERROR_DESC(EC_SMC_AARCH64, EC_TYPE_AARCH64,
+DEFINE_SYNC_DESC(EC_SMC_AARCH64, EC_TYPE_AARCH64,
 		smc_aarch64_handler, 0, 4);
 
-DEFINE_SERROR_DESC(EC_ACESS_SYSTEM_REG, EC_TYPE_AARCH64,
+DEFINE_SYNC_DESC(EC_ACESS_SYSTEM_REG, EC_TYPE_AARCH64,
 		access_system_reg_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_INSABORT_TFL, EC_TYPE_BOTH,
+DEFINE_SYNC_DESC(EC_INSABORT_TFL, EC_TYPE_BOTH,
 		insabort_tfl_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_INSABORT_TWE, EC_TYPE_BOTH,
+DEFINE_SYNC_DESC(EC_INSABORT_TWE, EC_TYPE_BOTH,
 		insabort_twe_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_MISALIGNED_PC, EC_TYPE_BOTH,
+DEFINE_SYNC_DESC(EC_MISALIGNED_PC, EC_TYPE_BOTH,
 		misaligned_pc_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_DATAABORT_TFL, EC_TYPE_BOTH,
+DEFINE_SYNC_DESC(EC_DATAABORT_TFL, EC_TYPE_BOTH,
 		dataabort_tfl_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_DATAABORT_TWE, EC_TYPE_BOTH,
+DEFINE_SYNC_DESC(EC_DATAABORT_TWE, EC_TYPE_BOTH,
 		dataabort_twe_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_STACK_MISALIGN, EC_TYPE_BOTH,
+DEFINE_SYNC_DESC(EC_STACK_MISALIGN, EC_TYPE_BOTH,
 		stack_misalign_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_FLOATING_AARCH32, EC_TYPE_AARCH32,
+DEFINE_SYNC_DESC(EC_FLOATING_AARCH32, EC_TYPE_AARCH32,
 		floating_aarch32_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_FLOATING_AARCH64, EC_TYPE_AARCH64,
+DEFINE_SYNC_DESC(EC_FLOATING_AARCH64, EC_TYPE_AARCH64,
 		floating_aarch64_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_SERROR, EC_TYPE_BOTH, serror_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_SERROR, EC_TYPE_BOTH, serror_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_BREAKPOINT_TFL, EC_TYPE_BOTH,
+DEFINE_SYNC_DESC(EC_BREAKPOINT_TFL, EC_TYPE_BOTH,
 		breakpoint_tfl_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_BREAKPOINT_TWE, EC_TYPE_BOTH,
+DEFINE_SYNC_DESC(EC_BREAKPOINT_TWE, EC_TYPE_BOTH,
 		breakpoint_twe_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_SOFTWARE_STEP_TFL, EC_TYPE_BOTH,
+DEFINE_SYNC_DESC(EC_SOFTWARE_STEP_TFL, EC_TYPE_BOTH,
 		software_step_tfl_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_SOFTWARE_STEP_TWE, EC_TYPE_BOTH,
+DEFINE_SYNC_DESC(EC_SOFTWARE_STEP_TWE, EC_TYPE_BOTH,
 		software_step_twe_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_WATCHPOINT_TFL, EC_TYPE_BOTH,
+DEFINE_SYNC_DESC(EC_WATCHPOINT_TFL, EC_TYPE_BOTH,
 		watchpoint_tfl_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_WATCHPOINT_TWE, EC_TYPE_BOTH,
+DEFINE_SYNC_DESC(EC_WATCHPOINT_TWE, EC_TYPE_BOTH,
 		watchpoint_twe_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_BKPT_INS, EC_TYPE_AARCH32, bkpt_ins_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_BKPT_INS, EC_TYPE_AARCH32, bkpt_ins_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_VCTOR_CATCH, EC_TYPE_AARCH32,
+DEFINE_SYNC_DESC(EC_VCTOR_CATCH, EC_TYPE_AARCH32,
 		vctor_catch_handler, 1, 4);
 
-DEFINE_SERROR_DESC(EC_BRK_INS, EC_TYPE_AARCH64,
+DEFINE_SYNC_DESC(EC_BRK_INS, EC_TYPE_AARCH64,
 		brk_ins_handler, 1, 4);
 
-void SError_from_lower_EL_handler(gp_regs *data)
+void sync_from_lower_EL_handler(gp_regs *data)
 {
 	int cpuid = smp_processor_id();
 	uint32_t esr_value;
 	int ec_type;
-	struct serror_desc *ec;
+	struct sync_desc *ec;
 	struct vcpu *vcpu = current_vcpu;
 
 	if ((!vcpu) || (vcpu->affinity != cpuid))
@@ -436,7 +473,7 @@ void SError_from_lower_EL_handler(gp_regs *data)
 	esr_value = data->esr_elx;
 	ec_type = (esr_value & 0xfc000000) >> 26;
 
-	ec = serror_descs[ec_type];
+	ec = sync_descs[ec_type];
 	if (ec == NULL)
 		goto out;
 
@@ -452,15 +489,15 @@ out:
 	enter_to_guest(current_vcpu, NULL);
 }
 
-void SError_from_current_EL_handler(gp_regs *data)
+void sync_from_current_EL_handler(gp_regs *data)
 {
 	uint32_t esr_value;
 	uint32_t ec_type;
-	struct serror_desc *ec;
+	struct sync_desc *ec;
 
 	esr_value = read_esr_el2();
 	ec_type = (esr_value & 0xfc000000) >> 26;
-	ec = serror_descs[ec_type];
+	ec = sync_descs[ec_type];
 	pr_error("SError_from_current_EL_handler : 0x%x\n", ec_type);
 	if (ec != NULL)
 		ec->handler(data, esr_value);
@@ -469,34 +506,34 @@ void SError_from_current_EL_handler(gp_regs *data)
 	while (1);
 }
 
-static int aarch64_serror_init(void)
+static int aarch64_sync_init(void)
 {
 	int size, i;
 	unsigned long start, end;
-	struct serror_desc *desc;
+	struct sync_desc *desc;
 
-	memset((char *)serror_descs, 0, MAX_SERROR_TYPE
-			* sizeof(struct serror_desc *));
+	memset((char *)sync_descs, 0, MAX_SYNC_TYPE
+			* sizeof(struct sync_desc *));
 
-	start = (unsigned long)&__serror_desc_start;
-	end = (unsigned long)&__serror_desc_end;
-	size = (end - start) / sizeof(struct serror_desc);
-	desc = (struct serror_desc *)start;
+	start = (unsigned long)&__sync_desc_start;
+	end = (unsigned long)&__sync_desc_end;
+	size = (end - start) / sizeof(struct sync_desc);
+	desc = (struct sync_desc *)start;
 
 	for (i = 0; i < size; i++) {
-		serror_descs[desc->type] = desc;
+		sync_descs[desc->type] = desc;
 		desc++;
 	}
 
 	return 0;
 }
 
-void serror_c_handler(gp_regs *regs)
+void sync_c_handler(gp_regs *regs)
 {
 	if (taken_from_guest(regs))
-		SError_from_lower_EL_handler(regs);
+		sync_from_lower_EL_handler(regs);
 	else
-		SError_from_current_EL_handler(regs);
+		sync_from_current_EL_handler(regs);
 }
 
-arch_initcall(aarch64_serror_init);
+arch_initcall(aarch64_sync_init);

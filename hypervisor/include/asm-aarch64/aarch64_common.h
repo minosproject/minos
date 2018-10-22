@@ -20,6 +20,16 @@
 #define AARCH64_SPSR_Z		(1 << 30)
 #define AARCH64_SPSR_N		(1 << 31)
 
+#define AARCH32_USER		0b0000
+#define AARCH32_FIQ		0b0001
+#define AARCH32_IRQ		0b0010
+#define AARCH32_SVC		0b0011
+#define AARCH32_MON		0b0110
+#define AARCH32_ABT		0b0111
+#define AARCH32_HYP		0b1010
+#define AARCH32_UND		0b1011
+#define AARCH32_SYSTEM		0b1111
+
 #define MODE_EL3		(0x3UL)
 #define MODE_EL2		(0x2UL)
 #define MODE_EL1		(0x1UL)
@@ -126,9 +136,5 @@
 #define CLIDR_FIELD_WIDTH	(3)
 
 #define LEVEL_SHIFT		(1)
-
-#define DCISW			(0x0)
-#define DCCISW			(0x1)
-#define DCCSW			(0x2)
 
 #endif

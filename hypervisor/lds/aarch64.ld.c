@@ -95,11 +95,11 @@ SECTIONS
 
 	. = ALIGN(8);
 
-	__serror_desc_start = .;
-	.__serror_desc : {
-		*(.__serror_desc)
+	__sync_desc_start = .;
+	.__sync_desc : {
+		*(.__sync_desc)
 	}
-	__serror_desc_end = .;
+	__sync_desc_end = .;
 
 	. = ALIGN(8);
 
