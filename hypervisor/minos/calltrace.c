@@ -16,6 +16,7 @@
 
 #include <minos/minos.h>
 #include <asm/arch.h>
+#include <minos/smp.h>
 
 static unsigned long *allsyms_address;
 static unsigned int *allsyms_offset;
@@ -35,10 +36,29 @@ void dump_stack(gp_regs *regs, unsigned long *stack)
 	spin_unlock_irqrestore(&dump_lock, flags);
 }
 
+static void panic_other_cpu(void *data)
+{
+	pr_fatal("[Panic called by other cpu]");
+	dump_stack(NULL, NULL);
+
+	for (;;)
+		cpu_relax();
+}
+
 void panic(char *str)
 {
+	int cpu;
+
 	pr_fatal("[Panic] : %s", str);
 	dump_stack(NULL, NULL);
+
+	/* inform other cpu to do panic */
+	for (cpu = 0; cpu < NR_CPUS; cpu++) {
+		if (cpu == smp_processor_id())
+			continue;
+
+		smp_function_call(cpu, panic_other_cpu, NULL, 0);
+	}
 
 	for (;;)
 		cpu_relax();
