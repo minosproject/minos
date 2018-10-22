@@ -255,7 +255,7 @@ static int fdt_setup_memory(void *dtb, uint64_t mstart,
 		uint64_t msize, int bit64)
 {
 	int offset, i;
-	int size_cell, address_cell;
+	int size_cell;
 	uint32_t args[4];
 	char buf[64];
 
@@ -282,11 +282,7 @@ static int fdt_setup_memory(void *dtb, uint64_t mstart,
 	}
 
 	size_cell = fdt_size_cells(dtb, offset);
-	address_cell = fdt_address_cells(dtb, offset);
-	if (bit64) {
-		if ((size_cell != 2) && (address_cell != 2))
-			return -EINVAL;
-
+	if (size_cell == 2) {
 		args[0] = cpu_to_fdt32(mstart >> 32);
 		args[1] = cpu_to_fdt32(mstart);
 		args[2] = cpu_to_fdt32(msize >> 32);

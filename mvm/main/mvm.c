@@ -755,7 +755,7 @@ static int mvm_main(struct vm_config *config)
 
 	/* udpate the vm from vm_info */
 	vm->os = os;
-	vm->bit64 = 1;
+	vm->bit64 = vm_info->bit64;
 	vm->flags = config->flags;
 	vm->vmid = 0;
 	vm->vm_fd = -1;
