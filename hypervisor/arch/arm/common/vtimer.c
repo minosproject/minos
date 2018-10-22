@@ -261,13 +261,13 @@ static inline int vtimer_phy_mem_handler(gp_regs *regs, int read,
 	unsigned long offset = address - 0x2a830000;
 
 	switch (offset) {
-	case CNTP_CTL:
+	case REG_CNTP_CTL:
 		vtimer_handle_cntp_ctl(regs, ACCESS_MEM, read, value);
 		break;
-	case CNTP_CVAL:
+	case REG_CNTP_CVAL:
 		vtimer_handle_cntp_cval(regs, ACCESS_MEM, read, value);
 		break;
-	case CNTP_TVAL:
+	case REG_CNTP_TVAL:
 		vtimer_handle_cntp_tval(regs, ACCESS_MEM, read, value);
 		break;
 	default:

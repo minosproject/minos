@@ -5,21 +5,21 @@
 
 struct vcpu;
 
-#define CNTCR		0x000
-#define CNTSR		0x004
-#define CNTCV_L		0x008
-#define CNTCV_H		0x00c
-#define CNTFID0		0x020
+#define REG_CNTCR		0x000
+#define REG_CNTSR		0x004
+#define REG_CNTCV_L		0x008
+#define REG_CNTCV_H		0x00c
+#define REG_CNTFID0		0x020
 
-#define CNTVCT_LO	0x08
-#define CNTVCT_HI	0x0c
-#define CNTFRQ		0x10
-#define CNTP_CVAL	0x24
-#define CNTP_TVAL	0x28
-#define CNTP_CTL	0x2c
-#define CNTV_CVAL	0x30
-#define CNTV_TVAL	0x38
-#define CNTV_CTL	0x3c
+#define REG_CNTVCT_LO		0x08
+#define REG_CNTVCT_HI		0x0c
+#define REG_CNTFRQ		0x10
+#define REG_CNTP_CVAL		0x24
+#define REG_CNTP_TVAL		0x28
+#define REG_CNTP_CTL		0x2c
+#define REG_CNTV_CVAL		0x30
+#define REG_CNTV_TVAL		0x38
+#define REG_CNTV_CTL		0x3c
 
 #define CNT_CTL_ISTATUS		(1 << 2)
 #define CNT_CTL_IMASK		(1 << 1)

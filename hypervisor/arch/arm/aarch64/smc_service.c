@@ -21,7 +21,7 @@
 #include <minos/virt.h>
 
 static int std_smc_handler(gp_regs *c,
-		uint32_t id, uint64_t *args)
+		uint32_t id, unsigned long *args)
 {
 	int ret;
 
@@ -34,9 +34,8 @@ static int std_smc_handler(gp_regs *c,
 
 	case PSCI_0_2_FN64_CPU_ON:
 	case PSCI_0_2_FN_CPU_ON:
-		ret = vcpu_power_on(current_vcpu, (unsigned long)args[0],
-					(unsigned long)args[1],
-					(unsigned long)args[2]);
+		ret = vcpu_power_on(current_vcpu,
+				args[0], args[1], args[2]);
 		if (ret)
 			SVC_RET1(c, PSCI_RET_INVALID_PARAMS);
 		break;
@@ -47,7 +46,7 @@ static int std_smc_handler(gp_regs *c,
 		/*
 		 * only can be called by vcpu self
 		 */
-		ret = vcpu_suspend(c, (uint32_t)args[0], (unsigned long)args[1]);
+		ret = vcpu_suspend(c, (uint32_t)args[0], args[1]);
 		if (ret)
 			SVC_RET1(c, PSCI_RET_DENIED);
 		break;

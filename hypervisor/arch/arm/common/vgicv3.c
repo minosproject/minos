@@ -265,6 +265,9 @@ static int vgic_gicr_rd_mmio(struct vcpu *vcpu, struct vgic_gicr *gicr,
 		case GICR_TYPER:
 			*value = gicr->gicr_typer;
 			break;
+		case GICR_TYPER_HIGH:
+			*value = gicr->gicr_typer >> 32;	/* for aarch32 assume 32bit read */
+			break;
 		default:
 			*value = 0;
 			break;
@@ -350,6 +353,7 @@ static int vgic_check_gicr_access(struct vcpu *vcpu, struct vgic_gicr *gicr,
 			switch (offset) {
 			case GICR_TYPER:
 			case GICR_PIDR2:
+			case GICR_TYPER_HIGH:		// for aarch32 gicv3
 				return 1;
 			default:
 				return 0;

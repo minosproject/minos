@@ -104,6 +104,11 @@ static inline int vm_is_32bit(struct vm *vm)
 	return !(vm->flags & VM_FLAGS_64BIT);
 }
 
+static inline int vm_is_64bit(struct vm *vm)
+{
+	return !!(vm->flags & VM_FLAGS_64BIT);
+}
+
 static inline int vm_is_hvm(struct vm *vm)
 {
 	return (vm->vmid == 0);

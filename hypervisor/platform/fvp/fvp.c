@@ -25,7 +25,7 @@ static int fvp_time_init(void)
 	io_remap(0x2a430000, 0x2a430000, 64 * 1024);
 
 	/* enable the counter */
-	iowrite32(1, (void *)0x2a430000 + CNTCR);
+	iowrite32(1, (void *)0x2a430000 + REG_CNTCR);
 	return 0;
 }
 

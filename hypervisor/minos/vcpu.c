@@ -96,6 +96,7 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 		return -EINVAL;
 
 	os->ops->vcpu_power_on(vcpu, entry);
+	vcpu_online(vcpu);
 
 	return 0;
 }

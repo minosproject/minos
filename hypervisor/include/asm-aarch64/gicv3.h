@@ -66,6 +66,7 @@
 #define GICR_CTLR			(0x0000)
 #define GICR_IIDR			(0x0004)
 #define GICR_TYPER			(0x0008)
+#define GICR_TYPER_HIGH			(0x000c)
 #define GICR_STATUSR			(0X0010)
 #define GICR_WAKER			(0x0014)
 #define GICR_SETLPIR			(0x0040)

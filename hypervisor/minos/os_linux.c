@@ -27,7 +27,14 @@ static void linux_vcpu_init(struct vcpu *vcpu)
 
 	/* fill the dtb address to x0 */
 	if (get_vcpu_id(vcpu) == 0) {
-		regs->x0 = vcpu->vm->setup_data;
+		if (vm_is_64bit(vcpu->vm))
+			regs->x0 = vcpu->vm->setup_data;
+		else {
+			regs->x0 = 0;
+			regs->x1 = 2272;		/* arm vexpress machine type */
+			regs->x2 = vcpu->vm->setup_data;
+		}
+
 		vcpu_online(vcpu);
 	}
 }
@@ -41,7 +48,6 @@ static void linux_vcpu_power_on(struct vcpu *vcpu, unsigned long entry)
 	regs->x1 = 0;
 	regs->x2 = 0;
 	regs->x3 = 0;
-	vcpu_online(vcpu);
 }
 
 struct os_ops linux_os_ops = {
