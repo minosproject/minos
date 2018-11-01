@@ -97,16 +97,14 @@ static int virtio_mmio_write(struct vdev *vdev, gp_regs *regs,
 		 * indicate a queue is ready, need send a
 		 * event to hvm ?
 		 */
-		trap_vcpu_nonblock(VMTRAP_TYPE_MMIO, VMTRAP_REASON_WRITE,
-				address, (uint64_t *)write_value);
+		trap_mmio_write_nonblock(address, write_value);
 		break;
 	case VIRTIO_MMIO_STATUS:
 		tmp = ioread32(iomem + VIRTIO_MMIO_STATUS);
 		value = value - tmp;
 		*write_value = value;
 		iowrite32(value, iomem + VIRTIO_MMIO_STATUS);
-		trap_vcpu(VMTRAP_TYPE_MMIO, VMTRAP_REASON_WRITE,
-				address, (uint64_t *)write_value);
+		trap_mmio_write(address, write_value);
 		break;
 	case VIRTIO_MMIO_QUEUE_DESC_LOW:
 		iowrite32(value, iomem + VIRTIO_MMIO_QUEUE_DESC_LOW);
@@ -129,14 +127,14 @@ static int virtio_mmio_write(struct vdev *vdev, gp_regs *regs,
 	case VIRTIO_MMIO_QUEUE_READY:
 		value = ioread32(iomem + VIRTIO_MMIO_QUEUE_SEL);
 		*write_value = value;
-		trap_vcpu(VMTRAP_TYPE_MMIO, VMTRAP_REASON_WRITE,
-				address, (uint64_t *)write_value);
+		trap_mmio_write(address, write_value);
 		break;
 	case VIRTIO_MMIO_INTERRUPT_ACK:
 		iowrite32(0, iomem + VIRTIO_MMIO_INTERRUPT_ACK);
 		iowrite32(0, iomem + VIRTIO_MMIO_INTERRUPT_STATUS);
 		break;
 	default:
+		trap_mmio_write(address, write_value);
 		break;
 	}
 

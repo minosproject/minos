@@ -8,11 +8,11 @@ struct vmcs {
 	volatile uint32_t trap_type;
 	volatile uint32_t trap_reason;
 	volatile int32_t  trap_ret;
-	volatile uint64_t trap_data;
-	volatile uint64_t trap_result;
+	volatile unsigned long trap_data;
+	volatile unsigned long trap_result;
 	volatile uint64_t host_index;
 	volatile uint64_t guest_index;
-	volatile uint64_t data[0];
+	volatile unsigned long data[0];
 } __align(1024);
 
 #define VMCS_DATA_SIZE	(1024 - 48)
@@ -36,19 +36,47 @@ enum vm_trap_reason {
 int vm_create_vmcs_irq(struct vm *vm, int vcpu_id);
 unsigned long vm_create_vmcs(struct vm *vm);
 int setup_vmcs_data(void *data, size_t size);
-int __vcpu_trap(uint32_t type, uint32_t reason,
-		uint64_t data, uint64_t *ret, int nonblock);
+int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
+		unsigned long *ret, int nonblock);
 
 static inline int trap_vcpu(uint32_t type, uint32_t reason,
-		uint64_t data, uint64_t *ret)
+		unsigned long data, unsigned long *ret)
 {
 	return __vcpu_trap(type, reason, data, ret, 0);
 }
 
-static inline int trap_vcpu_nonblock(uint32_t type,
-		uint32_t reason, uint64_t data, uint64_t *ret)
+static inline int trap_vcpu_nonblock(uint32_t type, uint32_t reason,
+		unsigned long data, unsigned long *ret)
 {
 	return __vcpu_trap(type, reason, data, ret, 1);
+}
+
+static inline int
+trap_mmio_read(unsigned long addr, unsigned long *value)
+{
+	return __vcpu_trap(VMTRAP_TYPE_MMIO,
+			VMTRAP_REASON_READ, addr, value, 0);
+}
+
+static inline int
+trap_mmio_read_nonblock(unsigned long addr, unsigned long *value)
+{
+	return __vcpu_trap(VMTRAP_TYPE_MMIO,
+			VMTRAP_REASON_READ, addr, value, 1);
+}
+
+static inline int
+trap_mmio_write(unsigned long addr, unsigned long *value)
+{
+	return __vcpu_trap(VMTRAP_TYPE_MMIO,
+			VMTRAP_REASON_WRITE, addr, value, 0);
+}
+
+static inline int
+trap_mmio_write_nonblock(unsigned long addr, unsigned long *value)
+{
+	return __vcpu_trap(VMTRAP_TYPE_MMIO,
+			VMTRAP_REASON_WRITE, addr, value, 1);
 }
 
 #endif

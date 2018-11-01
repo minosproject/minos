@@ -800,6 +800,7 @@ virtio_console_init(struct vdev *vdev, char *opts)
 	virtio_set_feature(&console->virtio_dev, VIRTIO_CONSOLE_F_SIZE);
 	virtio_set_feature(&console->virtio_dev, VIRTIO_F_VERSION_1);
 	virtio_set_feature(&console->virtio_dev, VIRTIO_CONSOLE_F_MULTIPORT);
+	virtio_set_feature(&console->virtio_dev, VIRTIO_CONSOLE_F_EMERG_WRITE);
 
 	console->config = (struct virtio_console_config *)
 			console->virtio_dev.config;
@@ -878,6 +879,10 @@ static int virtio_console_event(struct vdev *vdev, int read,
 		unsigned long addr, unsigned long *value)
 {
 	struct virtio_console *vcon;
+	unsigned long offset;
+	int nr = 0, i;
+	char buf[16], *tmp = (char *)value;
+	struct virtio_console_backend *be;
 
 	if (!vdev)
 		return -EINVAL;
@@ -885,6 +890,29 @@ static int virtio_console_event(struct vdev *vdev, int read,
 	vcon = (struct virtio_console *)vdev_get_pdata(vdev);
 	if (!vcon)
 		return -EINVAL;
+
+	/* the early printk support */
+	offset = addr - vcon->virtio_dev.vdev->guest_iomem;
+	if (offset == 0x108) {
+		be = vcon->ports[0].arg;
+		if (!be || !be->open)
+			return 0;
+
+		for (i = 0; i < 4; i++) {
+			if (tmp[i] == 0)
+				break;
+
+			if (tmp[i] == '\n') {
+				buf[nr] = '\r';
+				nr++;
+			}
+
+			buf[nr] = tmp[i];
+			nr++;
+		}
+
+		return write(be->fd, buf, nr);
+	}
 
 	return virtio_handle_mmio(&vcon->virtio_dev,
 			read, addr, value);

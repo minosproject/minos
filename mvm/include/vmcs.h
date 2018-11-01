@@ -9,11 +9,11 @@ struct vmcs {
 	volatile uint32_t trap_type;
 	volatile uint32_t trap_reason;
 	volatile int32_t  trap_ret;
-	volatile uint64_t trap_data;
-	volatile uint64_t trap_result;
+	volatile unsigned long trap_data;
+	volatile unsigned long trap_result;
 	volatile uint64_t host_index;
 	volatile uint64_t guest_index;
-	volatile uint64_t data[0];
+	volatile unsigned long data[0];
 } __align(1024);
 
 #define VMCS_DATA_SIZE	(1024 - 48)

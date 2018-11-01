@@ -19,10 +19,8 @@
 #include <minos/sched.h>
 #include <minos/virq.h>
 
-static int vm0_vcpu0_aff = 0;
-
-int __vcpu_trap(uint32_t type, uint32_t reason,
-		uint64_t data, uint64_t *ret, int nonblock)
+int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
+		unsigned long *ret, int nonblock)
 {
 	struct vcpu *vcpu = current_vcpu;
 	struct vmcs *vmcs = vcpu->vmcs;
@@ -43,7 +41,7 @@ int __vcpu_trap(uint32_t type, uint32_t reason,
 	 * to use sched() in case of dead lock
 	 */
 	while (vmcs->guest_index != vmcs->host_index) {
-		if (vcpu_affinity(vcpu) < vm0->vcpu_nr)
+		if (vcpu_affinity(vcpu) < vcpu_affinity(vm0->vcpus[0]))
 			sched();
 		else
 			cpu_relax();
@@ -71,7 +69,7 @@ int __vcpu_trap(uint32_t type, uint32_t reason,
 	 * if vcpu's pcpu is equal the vm0_vcpu0's pcpu
 	 * force to block
 	 */
-	if (vcpu_affinity(vcpu) == vm0_vcpu0_aff)
+	if (vcpu_affinity(vcpu) == vcpu_affinity(vm0->vcpus[0]))
 		nonblock = 0;
 
 	/*
@@ -169,17 +167,3 @@ int vm_create_vmcs_irq(struct vm *vm, int vcpu_id)
 	return vcpu->vmcs_irq;
 }
 
-static int vmcs_init(void)
-{
-	struct vcpu *vm0_vcpu0 = NULL;
-
-	vm0_vcpu0 = get_vcpu_by_id(0, 0);
-	if (!vm0_vcpu0)
-		panic("vm0 is not created\n");
-
-	vm0_vcpu0_aff = vcpu_affinity(vm0_vcpu0);
-
-	return 0;
-}
-
-device_initcall(vmcs_init);
