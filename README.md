@@ -1,10 +1,10 @@
 # Minos - Type 1 Hypervisor for ARMv8-A
 
-Minos is a lightweight open source Type 1 Hypervisor for mobile and embedded systems that runs directly in bare metal environments. Minos implements a complete virtualization framework that can run multiple VMs (Linux or RTOS) on one hardware platform. Minos provides CPU virtualization; interrupt virtualization; memory virtualization; Timer virtual ; and the virtualization of some common peripherals.
+Minos is a lightweight open source Type 1 Hypervisor for mobile and embedded systems that runs directly in bare metal environments. Minos implements a complete virtualization framework that can run multiple VMs (Linux or RTOS) on one hardware platform. Minos provides CPU virtualization; interrupt virtualization; memory virtualization; Timer virtual; and the virtualization of some common peripherals.
 
-Minos provides an application "mvm" running on VM0 to support the management of the Guest VM. At the same time, mvm provides a viviro-based paravirtualization solution that supports virtio-console, virtio-blk, virtio-net and other devices.
+Minos provides an application "mvm" running on VM0 to support the management of the Guest VM. At the same time, mvm provides a viviro-based paravirtualization solution that supports virtio-console, virtio-blk, virtio-net and other devices. Minos can support both 64bit and 32bit guest VM, but VM0 must use 64bit.
 
-Minos is suitable for mobile and embedded platforms and currently only supports the ARMv8-A architecture. Marvell's Esspressobin development board is supported, and the hardware platform of the ARMv8-A + GICV3 combination can theoretically be supported. The software debugging platform supports ARM's official Fix Virtual Platform (FVP), and developers can use ARM DS5 tools for simulation and debugging.
+Minos is suitable for mobile and embedded platforms and currently only supports the ARMv8-A architecture. Marvell's Esspressobin development board is supported, and the hardware platform of the ARMv8-A + GICV3/GICV2 combination can theoretically be supported. The software debugging platform supports ARM's official Fix Virtual Platform (FVP), and developers can use ARM DS5 tools for simulation and debugging.
 
 # Download Source Code And Tools for Minos
 
@@ -111,7 +111,7 @@ Minos is suitable for mobile and embedded platforms and currently only supports 
 
 3. Compile FVP Kernel
 
-        # cd ~/minos-workspace/minos
+        # cd ~/minos-workspace/linux-marvell
         # make ARCH=arm64 defconfig && make ARCH=arm64 -j8 Image
 
 4. Compile ARM Trusted Firmware
@@ -211,8 +211,14 @@ Another way is to use the VM management tool mvm provided by Minos. Currently mv
         -d                         (run as a daemon process)
         -D                         (device argument)
         -C                         (set the cmdline for the os)
+        -K                         (kernel image path)
+        -S                         (second image path - like dtb image)
+        -R                         (Ramdisk image path)
+        --gicv2                    (using the gicv2 interrupt controller)
+        --gicv3                    (using the gicv3 interrupt controller - default value)
+        --gicv4                    (using the gicv4 interrupt controller - not support now)
 
-For example, the following command is used to create a Linux virtual machine with 2 vcpu, 84M memory, bootimage as boot.img, and 64-bit (current Minos only supports 64-bit VM) with virtio-console device and virtio-net device. Below command will use ramdisk in boot.img as the rootfs instead of block device.
+For example, the following command is used to create a Linux virtual machine with 2 vcpu, 84M memory, bootimage as boot.img, and 64-bit with virtio-console device and virtio-net device. Below command will use ramdisk in boot.img as the rootfs instead of block device.
 
         # ./mvm -c 2 -m 84M -i boot.img -n elinux -t linux -b 64 -v -d -C "console=hvc0 loglevel=8 consolelog=9 loglevel=8 consolelog=9" -D virtio_console,@pty: -D virtio_net,tap0
 
@@ -278,7 +284,7 @@ The default ramdisk.img in the boot.img provided by Minos is based on the defaul
 
 # Create a customize virtio-blk image
 
-Minos provide a sample virtio-blk image which size is only 512M, the sample virtio block image can be download:
+Minos provide a sample virtio-blk image which size is only 512M, the sample virtio block image can be download, various virtio block images can be also downloaded from Linaro:
 
         # wget http://leyunxi.com/static/sd.img
 

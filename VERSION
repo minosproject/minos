@@ -1,6 +1,6 @@
 MAJOR_VERSION=0
-MINOR_VERSION=1
-EXTRA_VERSION=1
+MINOR_VERSION=2
+EXTRA_VERSION=0
 
 Known issue:
 1: the virtio-net devce is created in guest, and can set
