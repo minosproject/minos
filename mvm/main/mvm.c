@@ -423,10 +423,12 @@ static int vcpu_handle_mmio(struct vm *vm, int trap_reason,
 			ret = vdev->ops->handle_event(vdev, trap_reason,
 					trap_data, trap_result);
 			pthread_mutex_unlock(&vdev->lock);
+
+			return ret;
 		}
 	}
 
-	return ret;
+	return -ENODEV;
 }
 
 static int vcpu_handle_common_trap(struct vm *vm, int trap_reason,

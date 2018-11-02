@@ -158,5 +158,9 @@ int vdev_mmio_emulation(gp_regs *regs, int write,
 		}
 	}
 
-	return -ENOENT;
+	/*
+	 * trap the mmio rw event to hvm if there is no vdev
+	 * in host can handle it
+	 */
+	return trap_vcpu(VMTRAP_TYPE_MMIO, write, address, value);
 }

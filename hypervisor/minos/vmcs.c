@@ -20,7 +20,7 @@
 #include <minos/virq.h>
 
 int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
-		unsigned long *ret, int nonblock)
+		unsigned long *result, int nonblock)
 {
 	struct vcpu *vcpu = current_vcpu;
 	struct vmcs *vmcs = vcpu->vmcs;
@@ -51,8 +51,8 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 	vmcs->trap_reason = reason;
 	vmcs->trap_data = data;
 	vmcs->trap_ret = 0;
-	if (ret)
-		vmcs->trap_result = *ret;
+	if (result)
+		vmcs->trap_result = *result;
 	else
 		vmcs->trap_result = 0;
 
@@ -78,18 +78,18 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 	 * hvm's vcpu in case of dead lock
 	 */
 	if (!nonblock) {
-		while (vmcs->guest_index < vmcs->host_index) {
+		while (vmcs->guest_index != vmcs->host_index) {
 			if (vcpu_affinity(vcpu) < vm0->vcpu_nr)
 				sched();
 			else
 				cpu_relax();
 		}
 
-		if (ret)
-			*ret = vmcs->trap_result;
+		if (result)
+			*result = vmcs->trap_result;
 	} else {
-		if (ret)
-			*ret = 0;
+		if (result)
+			*result = 0;
 	}
 
 	return vmcs->trap_ret;
