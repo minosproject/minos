@@ -932,6 +932,7 @@ int main(int argc, char **argv)
 
 	vm_info = &global_config->vm_info;
 	device_info = &global_config->device_info;
+	vm_info->bit64 = 1;
 
 	while ((opt = getopt_long(argc, argv, optstr, options, &idx)) != -1) {
 		switch(opt) {
