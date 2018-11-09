@@ -52,7 +52,7 @@ static void vdev_deinit(struct vdev *vdev)
 	free(vdev);
 }
 
-int guest_vdev_init(struct vm *vm, struct vdev *vdev, uint32_t size)
+int iomem_vdev_init(struct vm *vm, struct vdev *vdev, uint32_t size)
 {
 	struct mm_struct *mm = &vm->mm;
 
@@ -71,7 +71,7 @@ int guest_vdev_init(struct vm *vm, struct vdev *vdev, uint32_t size)
 		}
 
 		vdev->hvm_paddr = create_hvm_iomem_map((unsigned long)
-				vdev->iomem, PAGE_SIZE);
+				vdev->iomem, size);
 		if (!vdev->hvm_paddr)
 			return -ENOMEM;
 
@@ -91,7 +91,7 @@ int guest_vdev_init(struct vm *vm, struct vdev *vdev, uint32_t size)
 	return 0;
 }
 
-struct vdev *create_guest_vdev(struct vm *vm, uint32_t size)
+struct vdev *create_iomem_vdev(struct vm *vm, uint32_t size)
 {
 	struct vdev *vdev;
 
@@ -99,7 +99,7 @@ struct vdev *create_guest_vdev(struct vm *vm, uint32_t size)
 	if (!vdev)
 		return NULL;
 
-	if (guest_vdev_init(vm, vdev, size)) {
+	if (iomem_vdev_init(vm, vdev, size)) {
 		free(vdev);
 		return NULL;
 	}
@@ -140,6 +140,28 @@ struct vdev *create_host_vdev(struct vm *vm, unsigned long base, uint32_t size)
 	host_vdev_init(vm, vdev, base, size);
 
 	return vdev;
+}
+
+unsigned long create_guest_vdev(struct vm *vm, uint32_t size)
+{
+	struct mm_struct *mm = &vm->mm;
+	unsigned long vdev_base;
+
+	/*
+	 * for the vdev which totally handled in the
+	 * host vm, just update the gvm_iomem_base and the
+	 * gvm_iomem_size, hypervisor will trap the event
+	 * to hvm directly
+	 */
+	size = PAGE_BALIGN(size);
+	if (mm->gvm_iomem_size < size)
+		return 0;
+
+	vdev_base = mm->gvm_iomem_base;
+	mm->gvm_iomem_base += size;
+	mm->gvm_iomem_size -= size;
+
+	return vdev_base;
 }
 
 int vdev_mmio_emulation(gp_regs *regs, int write,

@@ -37,6 +37,20 @@
 #include <sys/mman.h>
 #include <libfdt/libfdt.h>
 
+void *hv_create_guest_device(struct vm *vm)
+{
+	int ret;
+	void *iomem = 0;
+
+	ret = ioctl(vm->vm_fd, IOCTL_CREATE_GUEST_DEVICE, &iomem);
+	if (ret) {
+		pr_err("create guest device failed %d\n", ret);
+		return NULL;
+	}
+
+	return iomem;
+}
+
 void *vdev_map_iomem(void *base, size_t size)
 {
 	return hvm_map_iomem(base, size);
@@ -82,7 +96,7 @@ alloc_and_init_vdev(struct vm *vm, char *class, char *args)
 
 	plat_ops = get_vdev_ops(class);
 	if (!plat_ops) {
-		pr_err("can not find such vdev %s\n", class);
+		pr_err("can not find such vdev class %s\n", class);
 		return NULL;
 	}
 
@@ -93,6 +107,7 @@ alloc_and_init_vdev(struct vm *vm, char *class, char *args)
 	memset(pdev, 0, sizeof(struct vdev));
 	pdev->ops = plat_ops;
 	pdev->vm = vm;
+	pdev->dev_type = VDEV_TYPE_PLATFORM;
 	pthread_mutex_init(&pdev->lock, NULL);
 
 	memset(buf, 0, 32);
@@ -102,6 +117,7 @@ alloc_and_init_vdev(struct vm *vm, char *class, char *args)
 	else
 		strcpy(buf, class);
 	sprintf(pdev->name, "%s%2d", buf, vdev_id);
+	pdev->id = vdev_id;
 	vdev_id++;
 
 	ret = plat_ops->init(pdev, args);
@@ -135,21 +151,22 @@ int create_vdev(struct vm *vm, char *class, char *args)
 	return 0;
 }
 
-static int dtb_add_platform(struct vdev *vdev, char *dtb, int offset)
+static int dtb_add_virtio(struct vdev *vdev, void *dtb)
 {
-	return 0;
-}
-
-static int dtb_add_virtio(struct vdev *vdev, char *dtb, int offset)
-{
-	int node;
+	int node, offset;
 	char buf[64];
 	uint32_t args[3];
-	uint32_t addr;
+	void *addr;
+
+	offset = fdt_path_offset(dtb, "/smb/motherboard/vdev");
+	if (offset < 0) {
+		pr_err("set up vdev failed no vdev node\n");
+		return -ENOENT;
+	}
 
 	memset(buf, 0, 64);
-	addr = (uint32_t)vdev->guest_iomem - 0x40000000;
-	sprintf(buf, "%s@%x", vdev->name, addr);
+	addr = vdev->guest_iomem - 0x40000000;
+	sprintf(buf, "%s@%lx", vdev->name, (unsigned long)addr);
 	node = fdt_add_subnode(dtb, offset, buf);
 	if (node < 0) {
 		pr_err("add %s failed\n", vdev->name);
@@ -159,8 +176,8 @@ static int dtb_add_virtio(struct vdev *vdev, char *dtb, int offset)
 	fdt_setprop(dtb, node, "compatible", "virtio,mmio", 12);
 
 	/* setup the reg value */
-	args[0] = cpu_to_fdt32(addr);
-	args[1] = cpu_to_fdt32(PAGE_SIZE);
+	args[0] = cpu_to_fdt32((unsigned long)addr);
+	args[1] = cpu_to_fdt32(vdev->iomem_size);
 	fdt_setprop(dtb, node, "reg", (void *)args,
 			2 * sizeof(uint32_t));
 
@@ -173,29 +190,25 @@ static int dtb_add_virtio(struct vdev *vdev, char *dtb, int offset)
 				3 * sizeof(uint32_t));
 	}
 
-	pr_info("add vdev success addr-0x%lx virq-%d\n",
+	pr_info("add vdev success addr-0x%p virq-%d\n",
 			vdev->guest_iomem, vdev->gvm_irq);
 	return 0;
 }
 
-static void vdev_setup_dtb(struct vm *vm, char *dtb)
+static void vdev_setup_dtb(struct vm *vm, void *dtb)
 {
 	struct vdev *vdev;
-	int offset;
-
-	offset = fdt_path_offset(dtb, "/smb/motherboard/vdev");
-	if (offset < 0) {
-		pr_err("set up vdev failed no vdev node\n");
-		return;
-	}
 
 	list_for_each_entry(vdev, &vm->vdev_list, list) {
 		switch (vdev->dev_type) {
 		case VDEV_TYPE_PLATFORM:
-			dtb_add_platform(vdev, dtb, offset);
+			if (vdev->ops->setup)
+				vdev->ops->setup(vdev, dtb, OS_TYPE_LINUX);
 			break;
 		case VDEV_TYPE_VIRTIO:
-			dtb_add_virtio(vdev, dtb, offset);
+			dtb_add_virtio(vdev, dtb);
+			if (vdev->ops->setup)
+				vdev->ops->setup(vdev, dtb, OS_TYPE_LINUX);
 			break;
 		default:
 			pr_err("unsupported device type now\n");
@@ -204,7 +217,7 @@ static void vdev_setup_dtb(struct vm *vm, char *dtb)
 	}
 }
 
-void vdev_setup_env(struct vm *vm, char *data, int os_type)
+void vdev_setup_env(struct vm *vm, void *data, int os_type)
 {
 	switch (os_type) {
 	case OS_TYPE_LINUX:

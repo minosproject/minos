@@ -70,6 +70,9 @@ int verbose;
 static void free_vm_config(struct vm_config *config);
 int vm_shutdown(struct vm *vm);
 
+extern int virtio_mmio_init(struct vm *vm, int nr_devs);
+extern int virtio_mmio_deinit(struct vm *vm);
+
 void *map_vm_memory(struct vm *vm)
 {
 	uint64_t args[2];
@@ -194,6 +197,7 @@ int destroy_vm(struct vm *vm)
 	list_for_each_entry(vdev, &vm->vdev_list, list)
 		release_vdev(vdev);
 
+	virtio_mmio_deinit(vm);
 	mevent_deinit();
 
 	if (vm->mmap) {
@@ -266,13 +270,15 @@ void print_usage(void)
 	fprintf(stderr, "    -r                         (do not load ramdisk image)\n");
 	fprintf(stderr, "    -v                         (verbose print debug information)\n");
 	fprintf(stderr, "    -d                         (run as a daemon process)\n");
-	fprintf(stderr, "    -D                         (device argument)\n");
+	fprintf(stderr, "    -D                         (create a platform bus device)\n");
+	fprintf(stderr, "    -V                         (create a virtio device)\n");
 	fprintf(stderr, "    -K                         (kernel image path)\n");
 	fprintf(stderr, "    -S                         (second image path - like dtb image)\n");
 	fprintf(stderr, "    -R                         (Ramdisk image path)\n");
 	fprintf(stderr, "    --gicv2                    (using the gicv2 interrupt controller)\n");
 	fprintf(stderr, "    --gicv3                    (using the gicv3 interrupt controller)\n");
 	fprintf(stderr, "    --gicv4                    (using the gicv4 interrupt controller)\n");
+	fprintf(stderr, "    --earlyprintk              (enable the earlyprintk based on virtio-console)\n");
 	fprintf(stderr, "\n");
 	exit(EXIT_FAILURE);
 }
@@ -372,10 +378,17 @@ static struct vm_os *get_vm_os(char *os_type)
 
 static int vm_vdev_init(struct vm *vm, struct vm_config *config)
 {
-	int i;
+	int i, ret;
 	char *tmp, *pos;
 	char *type = NULL, *arg = NULL;
 	struct device_info *info = &config->device_info;
+
+	/* init the virtio framework */
+	ret = virtio_mmio_init(vm, info->nr_virtio_dev);
+	if (ret) {
+		pr_err("unable to init the virtio framework\n");
+		return ret;
+	}
 
 	for (i = 0; i < info->nr_device; i++) {
 		tmp = info->device_args[i];
@@ -415,10 +428,12 @@ static int vcpu_handle_mmio(struct vm *vm, int trap_reason,
 {
 	int ret = -EIO;
 	struct vdev *vdev;
+	unsigned long base, size;
 
 	list_for_each_entry(vdev, &vm->vdev_list, list) {
-		if ((trap_data >= vdev->guest_iomem) &&
-				(trap_data < vdev->guest_iomem + PAGE_SIZE)) {
+		base = (unsigned long)vdev->guest_iomem;
+		size = vdev->iomem_size;
+		if ((trap_data >= base) && (trap_data < base + size)) {
 			pthread_mutex_lock(&vdev->lock);
 			ret = vdev->ops->handle_event(vdev, trap_reason,
 					trap_data, trap_result);
@@ -821,6 +836,7 @@ static struct option options[] = {
 	{"gicv3",	no_argument,	   NULL, '0'},
 	{"gicv2",	no_argument,	   NULL, '1'},
 	{"gicv4",	no_argument,	   NULL, '2'},
+	{"earlyprintk",	no_argument,	   NULL, '3'},
 	{"help",	no_argument,	   NULL, 'h'},
 	{NULL,		0,		   NULL,  0}
 };
@@ -856,7 +872,7 @@ static int parse_vm_membase(char *buf, unsigned long *value)
 	return -EINVAL;
 }
 
-static int add_device_info(struct device_info *dinfo, char *name)
+static int add_device_info(struct device_info *dinfo, char *name, int type)
 {
 	char *arg = NULL;
 
@@ -872,6 +888,8 @@ static int add_device_info(struct device_info *dinfo, char *name)
 	strcpy(arg, name);
 	dinfo->device_args[dinfo->nr_device] = arg;
 	dinfo->nr_device++;
+	if (type == VDEV_TYPE_VIRTIO)
+		dinfo->nr_virtio_dev++;
 
 	return 0;
 }
@@ -926,7 +944,7 @@ int main(int argc, char **argv)
 	int run_as_daemon = 0;
 	struct vm_info *vm_info;
 	struct device_info *device_info;
-	static char *optstr = "K:R:S:c:C:m:i:s:n:D:t:b:rv?hd012";
+	static char *optstr = "K:R:S:c:C:m:i:s:n:D:V:t:b:rv?hd0123";
 
 	global_config = calloc(1, sizeof(struct vm_config));
 	if (!global_config)
@@ -987,7 +1005,12 @@ int main(int argc, char **argv)
 			run_as_daemon = 1;
 			break;
 		case 'D':
-			add_device_info(device_info, optarg);
+			add_device_info(device_info,
+					optarg, VDEV_TYPE_PLATFORM);
+			break;
+		case 'V':
+			add_device_info(device_info,
+					optarg, VDEV_TYPE_VIRTIO);
 			break;
 		case 'C':
 			if (strlen(optarg) > 255) {
@@ -1001,6 +1024,9 @@ int main(int argc, char **argv)
 			free(global_config);
 			print_usage();
 			return 0;
+		case '3':
+			global_config->flags |= MVM_FLAGS_HAS_EARLYPRINTK;
+			break;
 		case '2':
 			global_config->gic_type = 2;
 			break;
@@ -1013,7 +1039,7 @@ int main(int argc, char **argv)
 		/* the below argument is deicated for linux vm
 		 * and will use the fixed loading address which
 		 * kernel will loaded at 0x80080000 and dtb will
-		 * loaded at (endadress  -2M) */
+		 * loaded at (endadress - 2M) */
 		case 'K':
 			if (strlen(optarg) > 255) {
 				pr_err("kernel image is too long\n");

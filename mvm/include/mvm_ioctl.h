@@ -14,5 +14,8 @@
 #define IOCTL_CREATE_VMCS		(0xf00a)
 #define IOCTL_CREATE_VMCS_IRQ		(0xf00b)
 #define IOCTL_UNREGISTER_VCPU		(0xf00c)
+#define IOCTL_VIRTIO_MMIO_INIT		(0xf00d)
+#define IOCTL_VIRTIO_MMIO_DEINIT	(0xf00e)
+#define IOCTL_CREATE_GUEST_DEVICE	(0xf00f)
 
 #endif

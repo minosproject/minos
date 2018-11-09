@@ -22,6 +22,12 @@ struct mm_struct {
 	unsigned long hvm_mmap_base;
 	unsigned long gvm_iomem_base;
 	unsigned long gvm_iomem_size;
+
+	/* for virtio devices */
+	unsigned long virtio_mmio_gbase;
+	void *virtio_mmio_iomem;
+	size_t virtio_mmio_size;
+
 	struct page *head;
 	struct list_head mem_list;
 	struct list_head block_list;

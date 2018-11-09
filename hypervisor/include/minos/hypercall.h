@@ -29,5 +29,7 @@
 
 /* hypercall for virtio releate operation */
 #define HVC_MISC_CREATE_VIRTIO_DEVICE	HVC_MISC_FN(0)
+#define HVC_MISC_VIRTIO_MMIO_INIT	HVC_MISC_FN(1)
+#define HVC_MISC_VIRTIO_MMIO_DEINIT	HVC_MISC_FN(2)
 
 #endif

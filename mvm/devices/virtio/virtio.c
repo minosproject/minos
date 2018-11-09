@@ -37,18 +37,102 @@
 #include <io.h>
 #include <barrier.h>
 
-static void *hv_create_virtio_device(struct vm *vm)
+static void *virtio_guest_iobase;
+static void *virtio_host_iobase;
+static size_t virtio_iomem_size;
+static size_t virtio_iomem_free;
+
+static int hv_create_virtio_device(struct vm *vm,
+		void **gbase, void **hbase)
 {
 	int ret;
-	void *iomem;
+	void *__gbase, *__hbase;
 
-	ret = ioctl(vm->vm_fd, IOCTL_CREATE_VIRTIO_DEVICE, &iomem);
+	if (virtio_iomem_free < VIRTIO_DEVICE_IOMEM_SIZE)
+		return -ENOMEM;
+
+	__gbase = virtio_guest_iobase + (virtio_iomem_size - virtio_iomem_free);
+	__hbase = virtio_host_iobase + (virtio_iomem_size - virtio_iomem_free);
+	virtio_iomem_free -= VIRTIO_DEVICE_IOMEM_SIZE;
+
+	ret = ioctl(vm->vm_fd, IOCTL_CREATE_VIRTIO_DEVICE,
+			(unsigned long)__gbase);
 	if (ret) {
 		pr_err("create virtio device failed %d\n", ret);
-		return NULL;
+		return ret;
 	}
 
-	return iomem;
+	*gbase = __gbase;
+	*hbase = __hbase;
+
+	return 0;
+}
+
+static int hv_virtio_mmio_deinit(struct vm *vm)
+{
+	return ioctl(vm->vm_fd, IOCTL_VIRTIO_MMIO_DEINIT, NULL);
+}
+
+static int hv_virtio_mmio_init(struct vm *vm,
+		size_t size, void **gbase, void **hbase)
+{
+	int ret = 0;
+	void *map_base;
+	uint64_t args[2] = {size, 0};
+
+	ret = ioctl(vm->vm_fd, IOCTL_VIRTIO_MMIO_INIT, args);
+	if (ret || !args[0] || !args[1]) {
+		pr_err("virtio mmio init failed in hypervisor\n");
+		return ret;
+	}
+
+	map_base = vdev_map_iomem((void *)((unsigned long)args[1]), size);
+	if (map_base == (void *)-1) {
+		hv_virtio_mmio_deinit(vm);
+		return -ENOMEM;
+	}
+
+
+	*gbase = (void *)(unsigned long)args[0];
+	*hbase = map_base;
+
+	return 0;
+}
+
+int virtio_mmio_init(struct vm *vm, int nr_devs)
+{
+	int ret = 0;
+	size_t size;
+	void *gbase = NULL, *hbase = NULL;
+
+	/*
+	 * each virtio device will have 0x400 iomem
+	 * space for communicated between guest and host
+	 *
+	 * and the total virtio mem space must PAGE_ALIGN
+	 */
+	size = nr_devs * VIRTIO_DEVICE_IOMEM_SIZE;
+	size = BALIGN(size, PAGE_SIZE);
+
+	ret = hv_virtio_mmio_init(vm, size, &gbase, &hbase);
+	if (ret || !gbase || !hbase)
+		return ret;
+
+	virtio_guest_iobase = gbase;
+	virtio_host_iobase = hbase;
+	virtio_iomem_size = size;
+	virtio_iomem_free = size;
+
+	pr_info("virtio-mmio : 0x%p 0x%p 0x%lx\n", gbase, hbase, size);
+
+	return 0;
+}
+
+int virtio_mmio_deinit(struct vm *vm)
+{
+	vdev_unmap_iomem(virtio_host_iobase, virtio_iomem_size);
+
+	return hv_virtio_mmio_deinit(vm);
 }
 
 static inline int next_desc(struct vring_desc *desc)
@@ -350,37 +434,29 @@ void virtq_add_used_and_signal_n(struct virt_queue *vq,
 }
 
 static int __virtio_vdev_init(struct vdev *vdev,
-		void *iomem, int type, int rs)
+		void *gbase, void *hbase, int type, int rs)
 {
-	void *base;
+	if (!gbase || !hbase)
+		return -EINVAL;
 
 	vdev->dev_type = VDEV_TYPE_VIRTIO;
-	vdev->iomem_physic = iomem;
-	base = vdev_map_iomem(iomem, 4096);
-	if (base == (void *)-1)
-		return -ENOMEM;
+	vdev->iomem = hbase;
+	vdev->guest_iomem = gbase;
+	vdev->gvm_irq = ioread32(hbase + VIRTIO_MMIO_GVM_IRQ);
 
-	vdev->iomem = base;
-	vdev->gvm_irq = ioread32(base + VIRTIO_MMIO_GVM_IRQ);
-
-	/* TO BE FIX need to covert to 64bit address */
-	vdev->guest_iomem = (unsigned long)ioread32(base +
-			VIRTIO_MMIO_GVM_ADDR);
-
-	pr_debug("vdev : irq-%d gpa-0x%lx gva-0x%lx\n", vdev->gvm_irq,
-			(unsigned long)vdev->iomem, vdev->guest_iomem);
+	pr_debug("vdev : irq-%d hpa-0x%p gva-0x%p\n", vdev->gvm_irq,
+			vdev->iomem, vdev->guest_iomem);
 
 	if (rs > VIRTQUEUE_MAX_SIZE)
 		rs = VIRTQUEUE_MAX_SIZE;
 
-	iowrite32(base + VIRTIO_MMIO_MAGIC_VALUE, VIRTIO_MMIO_MAGIG);
-	iowrite32(base + VIRTIO_MMIO_VERSION, VIRTIO_VERSION);
-	iowrite32(base + VIRTIO_MMIO_VENDOR_ID, VIRTIO_VENDER_ID);
-	iowrite32(base + VIRTIO_MMIO_DEVICE_ID, type);
-	iowrite32(base + VIRTIO_MMIO_QUEUE_NUM_MAX, rs);
+	iowrite32(hbase + VIRTIO_MMIO_MAGIC_VALUE, VIRTIO_MMIO_MAGIG);
+	iowrite32(hbase + VIRTIO_MMIO_VERSION, VIRTIO_VERSION);
+	iowrite32(hbase + VIRTIO_MMIO_VENDOR_ID, VIRTIO_VENDER_ID);
+	iowrite32(hbase + VIRTIO_MMIO_DEVICE_ID, type);
+	iowrite32(hbase + VIRTIO_MMIO_QUEUE_NUM_MAX, rs);
 
 	return 0;
-
 }
 
 static void inline virtq_reset(struct virt_queue *vq)
@@ -421,17 +497,18 @@ void virtio_device_deinit(struct virtio_device *virt_dev)
 		if (virt_dev->ops && virt_dev->ops->vq_deinit)
 			virt_dev->ops->vq_deinit(vq);
 
-		free(vq->iovec);
+		if (vq->iovec)
+			free(vq->iovec);
 	}
 
-	free(virt_dev->vqs);
-	vdev_unmap_iomem(virt_dev->vdev->iomem_physic, PAGE_SIZE);
+	if (virt_dev->vqs)
+		free(virt_dev->vqs);
 }
 
 int virtio_device_init(struct virtio_device *virt_dev, struct vdev *vdev,
 		int type, int queue_nr, int rs, int iov_size)
 {
-	void *iomem;
+	void *gbase, *hbase;
 	int ret, i;
 	struct virt_queue *vq;
 
@@ -444,19 +521,20 @@ int virtio_device_init(struct virtio_device *virt_dev, struct vdev *vdev,
 		return -EINVAL;
 	}
 
-	iomem = hv_create_virtio_device(vdev->vm);
-	if (!iomem)
+	ret = hv_create_virtio_device(vdev->vm, &gbase, &hbase);
+	if (ret)
 		return -ENOMEM;
 
 	if (rs > VIRTQUEUE_MAX_SIZE)
 		rs = VIRTQUEUE_MAX_SIZE;
 
-	ret = __virtio_vdev_init(vdev, iomem, type, rs);
+	ret = __virtio_vdev_init(vdev, gbase, hbase, type, rs);
 	if (ret) {
 		pr_err("failed to init virtio device\n");
 		return ret;
 	}
 
+	vdev->iomem_size = VIRTIO_DEVICE_IOMEM_SIZE;
 	virt_dev->vdev = vdev;
 	virt_dev->config = vdev->iomem + VIRTIO_MMIO_CONFIG;
 
@@ -488,14 +566,8 @@ int virtio_device_init(struct virtio_device *virt_dev, struct vdev *vdev,
 	return 0;
 
 release_virtio_dev:
-	/* tbd */
+	virtio_device_deinit(virt_dev);
 	return ret;
-}
-
-static void inline virtio_hvm_ack(struct virtio_device *dev)
-{
-	iowrite32(dev->vdev->iomem + VIRTIO_MMIO_EVENT_ACK, 1);
-	wmb();
 }
 
 static int virtio_status_event(struct virtio_device *dev, uint32_t arg)
@@ -561,7 +633,8 @@ static int virtio_buffer_event(struct virtio_device *dev, uint32_t arg)
 	uint32_t high, low;
 
 	if (arg >= dev->nr_vq) {
-		pr_err("invaild virt queue index %d\n", arg);
+		pr_err("invaild virt queue index %d %s\n",
+				arg, dev->vdev->name);
 		return -EINVAL;
 	}
 
@@ -617,7 +690,7 @@ static int virtio_mmio_write(struct virtio_device *dev,
 	unsigned long offset;
 	uint32_t arg = (uint32_t)(*value);
 
-	offset = addr - dev->vdev->guest_iomem;
+	offset = addr - (unsigned long)dev->vdev->guest_iomem;
 	switch (offset) {
 	case VIRTIO_MMIO_STATUS:
 		ret = virtio_status_event(dev, arg);

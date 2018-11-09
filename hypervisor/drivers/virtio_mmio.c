@@ -146,8 +146,6 @@ static inline void virtio_device_init(struct vm *vm,
 {
 	void *base = dev->vdev.iomem;
 
-	iowrite32(dev->vdev.gvm_paddr, base + VIRTIO_MMIO_GVM_ADDR);
-	iowrite32(dev->vdev.mem_size, base + VIRTIO_MMIO_MEM_SIZE);
 	iowrite32(dev->gvm_irq, base + VIRTIO_MMIO_GVM_IRQ);
 }
 
@@ -176,24 +174,35 @@ static void virtio_dev_reset(struct vdev *vdev)
 	pr_info("virtio device reset\n");
 }
 
-void *create_virtio_device(struct vm *vm)
+int create_virtio_device(struct vm *vm, unsigned long base)
 {
 	int ret;
+	unsigned long offset = 0;
 	struct vdev *vdev;
 	struct virtio_device *virtio_dev = NULL;
+	struct mm_struct *mm = &vm->mm;
 
-	if (!vm)
-		return NULL;
+	if (!mm->virtio_mmio_iomem || !base)
+		return -EINVAL;
+
+	if (base >= (mm->virtio_mmio_gbase + mm->virtio_mmio_size)) {
+		pr_error("invalid virtio mmio range 0x%x\n", base);
+		return -EINVAL;
+	}
 
 	virtio_dev = malloc(sizeof(struct virtio_device));
 	if (!virtio_dev)
-		return NULL;
+		return -ENOMEM;
 
 	memset(virtio_dev, 0, sizeof(struct virtio_device));
 	vdev = &virtio_dev->vdev;
-	ret = guest_vdev_init(vm, vdev, PAGE_SIZE);
+	ret = host_vdev_init(vm, vdev, base, VIRTIO_DEVICE_IOMEM_SIZE);
 	if (ret)
 		goto out;
+
+	/* set up the iomem base of the vdev */
+	offset = base - mm->virtio_mmio_gbase;
+	vdev->iomem = mm->virtio_mmio_iomem + offset;
 
 	vdev->read = virtio_mmio_read;
 	vdev->write = virtio_mmio_write;
@@ -204,22 +213,83 @@ void *create_virtio_device(struct vm *vm)
 	if (virtio_dev->gvm_irq <= 0)
 		goto out;
 
+	virtio_device_init(vm, virtio_dev);
+	return 0;
+
+out:
+	release_virtio_dev(vm, virtio_dev);
+	return -EFAULT;
+}
+
+int virtio_mmio_init(struct vm *vm, size_t size,
+		unsigned long *gbase, unsigned long *hbase)
+{
+	void *iomem = NULL;
+	unsigned long __gbase = 0;
+	struct mm_struct *mm = &vm->mm;
+
+	if (mm->virtio_mmio_iomem) {
+		pr_error("virtio mmio has been inited\n");
+		return -EINVAL;
+	}
+
+	if (size == 0) {
+		pr_error("invaild virtio mmio size\n");
+		return -EINVAL;
+	}
+
+	*gbase = 0;
+	*hbase = 0;
+	size = PAGE_BALIGN(size);
+
+	__gbase = create_guest_vdev(vm, size);
+	if (__gbase == 0)
+		return -ENOMEM;
+
+	iomem = get_io_pages(PAGE_NR(size));
+	if (!iomem)
+		return -ENOMEM;
+
+	memset(iomem, 0, size);
+
 	/*
 	 * virtio's io memory need to mapped to host vm mem space
 	 * then the backend driver can read/write the io memory
 	 * by the way, this memory also need to mapped to the
 	 * guest vm 's memory space
 	 */
-	if (create_guest_mapping(vm, vdev->gvm_paddr,
-				(unsigned long)vdev->iomem,
-				PAGE_SIZE, VM_IO | VM_RO))
-		goto out;
+	*hbase = create_hvm_iomem_map((unsigned long)iomem, size);
+	if (*hbase == 0) {
+		free_pages(iomem);
+		return -ENOMEM;
+	}
 
-	virtio_device_init(vm, virtio_dev);
+	if (create_guest_mapping(vm, __gbase, (unsigned long)iomem,
+				size, VM_IO | VM_RO)) {
+		free_pages(iomem);
+		return -EFAULT;
+	}
 
-	return (void *)vdev->hvm_paddr;
+	/* update the virtio information of the vm */
+	mm->virtio_mmio_gbase = __gbase;
+	mm->virtio_mmio_iomem = iomem;
+	mm->virtio_mmio_size = size;
 
-out:
-	release_virtio_dev(vm, virtio_dev);
-	return NULL;
+	*gbase = __gbase;
+
+	return 0;
+}
+
+int virtio_mmio_deinit(struct vm *vm)
+{
+	struct mm_struct *mm = &vm->mm;
+
+	if (mm->virtio_mmio_iomem)
+		free_pages(mm->virtio_mmio_iomem);
+
+	mm->virtio_mmio_gbase = 0;
+	mm->virtio_mmio_iomem = NULL;
+	mm->virtio_mmio_size = 0;
+
+	return 0;
 }

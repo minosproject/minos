@@ -29,6 +29,7 @@
  */
 #define MVM_FLAGS_NO_RAMDISK		(1 << 0)
 #define MVM_FLAGS_NO_BOOTIMAGE		(1 << 1)
+#define MVM_FLAGS_HAS_EARLYPRINTK	(1 << 2)
 
 #define DEFINE_OS(os) \
 	static void *os_##os __section("mvm_os") __used = &os;
@@ -75,6 +76,7 @@ struct vm_info {
 
 struct device_info {
 	int nr_device;
+	int nr_virtio_dev;
 	char *device_args[VM_MAX_DEVICES];
 };
 

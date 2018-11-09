@@ -100,12 +100,23 @@ static int pm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 
 static int misc_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 {
-	void *addr;
+	int ret;
+	unsigned long gbase = 0, hbase = 0;
+	struct vm *vm = get_vm_by_id((int)args[0]);
 
 	switch (id) {
 	case HVC_MISC_CREATE_VIRTIO_DEVICE:
-		addr = create_virtio_device(get_vm_by_id((int)args[0]));
-		HVC_RET1(c, addr);
+		ret = create_virtio_device(vm, args[1]);
+		HVC_RET1(c, ret);
+		break;
+	case HVC_MISC_VIRTIO_MMIO_INIT:
+		ret = virtio_mmio_init(vm, args[1], &gbase, &hbase);
+		HVC_RET3(c, ret, gbase, hbase);
+		break;
+	case HVC_MISC_VIRTIO_MMIO_DEINIT:
+		ret = virtio_mmio_deinit(vm);
+		break;
+	default:
 		break;
 	}
 

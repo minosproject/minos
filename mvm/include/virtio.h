@@ -6,6 +6,7 @@
 #include <vdev.h>
 #include <io.h>
 #include <virtio_mmio.h>
+#include <barrier.h>
 
 #define VRING_DESC_F_NEXT		(1)
 #define VRING_DESC_F_WRITE		(2)
@@ -168,7 +169,15 @@ static int inline virtq_has_feature(struct virt_queue *vq, int fe)
 
 static inline void virtio_send_irq(struct virtio_device *dev, int type)
 {
-	iowrite32(dev->vdev->iomem + VIRTIO_MMIO_INTERRUPT_STATUS, type);
+	uint32_t value = 0;
+
+	value = ioread32(dev->vdev->iomem + VIRTIO_MMIO_INTERRUPT_STATUS);
+	rmb();
+
+	value |= type;
+	iowrite32(dev->vdev->iomem + VIRTIO_MMIO_INTERRUPT_STATUS, value);
+	wmb();
+
 	vdev_send_irq(dev->vdev);
 }
 

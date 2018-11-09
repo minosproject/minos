@@ -45,6 +45,7 @@
 #include <assert.h>
 
 #include <compiler.h>
+#include <libfdt/libfdt.h>
 
 #define	VIRTIO_CONSOLE_RINGSZ	64
 #define	VIRTIO_CONSOLE_IOVSZ	64
@@ -892,7 +893,7 @@ static int virtio_console_event(struct vdev *vdev, int read,
 		return -EINVAL;
 
 	/* the early printk support */
-	offset = addr - vcon->virtio_dev.vdev->guest_iomem;
+	offset = addr - (unsigned long)vcon->virtio_dev.vdev->guest_iomem;
 	if (offset == 0x108) {
 		be = vcon->ports[0].arg;
 		if (!be || !be->open)
@@ -946,11 +947,51 @@ static void virtio_console_deinit(struct vdev *dev)
 	}
 }
 
+static int virtio_console_setup(struct vdev *vdev, void *data, int os)
+{
+	int offset, len, slen;
+	const void *cmdline;
+	char buf[512];
+
+	if (!data)
+		return -EINVAL;
+
+	switch (os) {
+	case OS_TYPE_LINUX:
+		offset = fdt_path_offset(data, "/chosen");
+		if (offset < 0)
+			return -ENOENT;
+
+		memset(buf, 0, 512);
+		sprintf(buf, "earlycon=virtio_console,0x%lx ",
+				(unsigned long)vdev->guest_iomem);
+		slen = strlen(buf);
+
+		cmdline = fdt_getprop(data, offset, "bootargs", &len);
+		if (cmdline && len > 0) {
+			if (slen + len > 511) {
+				pr_err("cmdline size is too long\n");
+				len = 0;
+			} else
+				strcpy(buf + slen, cmdline);
+		}
+
+		pr_info("update cmdline -  %s\n", buf);
+		fdt_setprop(data, offset, "bootargs", buf, slen + len + 1);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
 struct vdev_ops virtio_console_ops = {
 	.name 		= "virtio_console",
 	.init		= virtio_console_init,
 	.deinit		= virtio_console_deinit,
 	.reset		= virtio_console_reset,
+	.setup		= virtio_console_setup,
 	.handle_event	= virtio_console_event,
 };
 

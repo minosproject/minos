@@ -10,6 +10,9 @@ struct virtio_device {
 	int gvm_irq;
 };
 
-void *create_virtio_device(struct vm *vm);
+int create_virtio_device(struct vm *vm, unsigned long addr);
+int virtio_mmio_init(struct vm *vm, size_t size,
+		unsigned long *gbase, unsigned long *hbase);
+int virtio_mmio_deinit(struct vm *vm);
 
 #endif

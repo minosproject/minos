@@ -13,6 +13,7 @@ struct vdev_ops {
 	int (*init)(struct vdev *, char *);
 	void (*deinit)(struct vdev *);
 	int (*reset)(struct vdev *);
+	int (*setup)(struct vdev *, void *data, int os);
 	int (*handle_event)(struct vdev *, int,
 			unsigned long, unsigned long *);
 };
@@ -22,14 +23,14 @@ struct vdev_ops {
 
 struct vdev {
 	struct vm *vm;
-	void *iomem;
-	void *iomem_physic;
 	int gvm_irq;
-	unsigned long guest_iomem;
-	int guest_visable;
+	void *iomem;
+	void *guest_iomem;
+	size_t iomem_size;
 	struct vdev_ops *ops;
 	void *pdata;
 	int dev_type;
+	int id;
 	char name[PDEV_NAME_SIZE + 1];
 	struct list_head list;
 	pthread_mutex_t lock;
@@ -44,7 +45,7 @@ extern void *__stop_vdev_ops;
 int create_vdev(struct vm *vm, char *class, char *args);
 void *vdev_map_iomem(void *iomem, size_t size);
 void vdev_unmap_iomem(void *iomem, size_t size);
-void vdev_setup_env(struct vm *vm, char *data, int os_type);
+void vdev_setup_env(struct vm *vm, void *data, int os_type);
 void vdev_send_irq(struct vdev *vdev);
 void release_vdev(struct vdev *vdev);
 
