@@ -209,7 +209,8 @@ Another way is to use the VM management tool mvm provided by Minos. Currently mv
         -r                         (do not load ramdisk image)
         -v                         (verbose print debug information)
         -d                         (run as a daemon process)
-        -D                         (device argument)
+        -D                         (create a platform bus device)
+        -V                         (create a virtio device)
         -C                         (set the cmdline for the os)
         -K                         (kernel image path)
         -S                         (second image path - like dtb image)
@@ -217,14 +218,15 @@ Another way is to use the VM management tool mvm provided by Minos. Currently mv
         --gicv2                    (using the gicv2 interrupt controller)
         --gicv3                    (using the gicv3 interrupt controller - default value)
         --gicv4                    (using the gicv4 interrupt controller - not support now)
+        --earlyprintk              (enable the earlyprintk based on virtio-console)
 
 For example, the following command is used to create a Linux virtual machine with 2 vcpu, 84M memory, bootimage as boot.img, and 64-bit with virtio-console device and virtio-net device. Below command will use ramdisk in boot.img as the rootfs instead of block device.
 
-        # ./mvm -c 2 -m 84M -i boot.img -n elinux -t linux -b 64 -v -d -C "console=hvc0 loglevel=8 consolelog=9 loglevel=8 consolelog=9" -D virtio_console,@pty: -D virtio_net,tap0
+        # ./mvm -c 2 -m 84M -i boot.img -n elinux -t linux -b 64 -v -d -C "console=hvc0 loglevel=8 consolelog=9 loglevel=8 consolelog=9" -V virtio_console,@pty: -V virtio_net,tap0
 
 Now Minos also support using virtio block device as the root device, below command will create a linux vm using virtio-blk device as root device instead of ramdisk
 
-        # ./mvm -c 1 -m 64M -i boot.img -n linux -t linux -v -r -d -D virtio_console,@pty: -D virtio_blk,~/minos-workspace/sd.img -D virtio_net,tap0 -C "console=hvc0 loglevel=8 consolelog=9 root=/dev/vda2 rw"
+        # ./mvm -c 1 -m 64M -i boot.img -n linux -t linux -v -r -d -V virtio_console,@pty: -V virtio_blk,~/minos-workspace/sd.img -V virtio_net,tap0 -C "console=hvc0 loglevel=8 consolelog=9 root=/dev/vda2 rw"
 
 If the creation is successful, the following log output will be generated.
 
