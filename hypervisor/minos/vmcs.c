@@ -18,10 +18,12 @@
 #include <minos/vcpu.h>
 #include <minos/sched.h>
 #include <minos/virq.h>
+#include <minos/irq.h>
 
 int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 		unsigned long *result, int nonblock)
 {
+	unsigned long flags;
 	struct vcpu *vcpu = current_vcpu;
 	struct vmcs *vmcs = vcpu->vmcs;
 	struct vm *vm0 = get_vm_by_id(0);
@@ -34,6 +36,14 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 	if ((type >= VMTRAP_TYPE_UNKNOWN) ||
 			(reason >= VMTRAP_REASON_UNKNOWN))
 		return -EINVAL;
+
+	/*
+	 * enable the interrupt in case the vm0 shutdown
+	 * or reboot this vm when the vm is waitting for
+	 * vmcs ack
+	 */
+	local_irq_save(flags);
+	local_irq_enable();
 
 	/*
 	 * wait for the last trap complete, if the gvm
@@ -91,6 +101,8 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 		if (result)
 			*result = 0;
 	}
+
+	local_irq_restore(flags);
 
 	return vmcs->trap_ret;
 }
