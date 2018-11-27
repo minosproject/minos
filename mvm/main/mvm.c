@@ -452,6 +452,7 @@ static int vcpu_handle_common_trap(struct vm *vm, int trap_reason,
 	switch (trap_reason) {
 	case VMTRAP_REASON_REBOOT:
 	case VMTRAP_REASON_SHUTDOWN:
+	case VMTRAP_REASON_WDT_TIMEOUT:
 		mvm_queue_push(&vm->queue, trap_reason, NULL, 0);
 		break;
 
@@ -617,6 +618,10 @@ static void handle_vm_event(struct vm *vm, struct mvm_node *node)
 	pr_info("handle vm event %d\n", node->type);
 
 	switch (node->type) {
+	case VMTRAP_REASON_WDT_TIMEOUT:
+		pr_err("vm-%d watchdog timeout reboot vm\n", vm->vmid);
+		vm_reboot(vm);
+		break;
 	case VMTRAP_REASON_REBOOT:
 		__vm_reboot(vm);
 		break;
