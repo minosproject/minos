@@ -21,13 +21,6 @@
 
 struct vcpu;
 
-#define BUG_ON(condition)		\
-	if ((condition)) {		\
-		do {			\
-			cpu_relax(); 	\
-		} while (1); 		\
-	}
-
 typedef int (*hook_func_t)(void *item, void *contex);
 
 enum hook_type {

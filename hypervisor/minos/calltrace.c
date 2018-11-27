@@ -45,11 +45,21 @@ static void panic_other_cpu(void *data)
 		cpu_relax();
 }
 
-void panic(char *str)
+void panic(char *fmt, ...)
 {
 	int cpu;
+	va_list arg;
+	int printed;
+	char buffer[512];
 
-	pr_fatal("[Panic] : %s", str);
+	va_start(arg, fmt);
+	printed = vsprintf(buffer, fmt, arg);
+	va_end(arg);
+
+	printed = printed >= 512 ? 511 : printed;
+	buffer[printed + 1] = 0;
+
+	pr_fatal("[Panic] : %s", buffer);
 	dump_stack(NULL, NULL);
 
 	/* inform other cpu to do panic */

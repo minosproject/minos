@@ -466,7 +466,7 @@ void sync_from_lower_EL_handler(gp_regs *data)
 	struct vcpu *vcpu = current_vcpu;
 
 	if ((!vcpu) || (vcpu->affinity != cpuid))
-		panic("this vcpu is not belont to the pcpu");
+		panic("this vcpu is not belong to the pcpu");
 
 	exit_from_guest(current_vcpu, data);
 
