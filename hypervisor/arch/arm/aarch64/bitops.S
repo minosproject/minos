@@ -85,10 +85,9 @@
 func test_bit
 	and	w3, w0, #31		// Get bit offset
 	eor	w0, w0, w3		// Clear low bits
-	mov	x2, #1
 	add	x1, x1, x0, lsr #3	// Get word offset
-	lsl	x4, x2, x3		// Create mask
 1:	ldxr	w2, [x1]
 	lsr	w0, w2, w3		// Save old value of bit
+	and	w0, w0, #1
 	ret
 endfunc test_bit
