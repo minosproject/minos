@@ -7,6 +7,7 @@
 #include <minos/time.h>
 
 struct timer_list {
+	int cpu;
 	struct list_head entry;
 	unsigned long expires;
 	void (*function)(unsigned long);

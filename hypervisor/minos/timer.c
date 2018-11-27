@@ -93,39 +93,54 @@ static inline unsigned long slack_expires(unsigned long expires)
 	return expires;
 }
 
-int mod_timer(struct timer_list *timer, unsigned long expires)
+static int __mod_timer(struct timer_list *timer)
 {
 	unsigned long flags;
 	struct timers *timers = timer->timers;
-
-	/*
-	 * if the timer is on pending on the timers active list
-	 * and the new expires equal the timer->expires, just
-	 * return
-	 */
-	if ((timer_pending(timer)) && (timer->expires == expires))
-		return 1;
 
 	pr_debug("modify timer to 0x%x\n", expires);
 
 	spin_lock_irqsave(&timers->lock, flags);
 
-	expires = slack_expires(expires);
-	timer->expires = expires;
-
 	detach_timer(timers, timer);
 	list_add_tail(&timers->active, &timer->entry);
 
 	/*
-	 * reprogram the timer for next event
+	 * reprogram the timer for next event do not
+	 * need to check the NOW() value, since the timer
+	 * also need to trigger event even if the time is
+	 * smaller than NOW()
 	 */
-	if ((timers->running_expires > expires) ||
+	if ((timers->running_expires > timer->expires) ||
 			(timers->running_expires == 0)) {
-		timers->running_expires = expires;
+		timers->running_expires = timer->expires;
 		enable_timer(timers->running_expires);
 	}
 
 	spin_unlock_irqrestore(&timers->lock, flags);
+
+	return 0;
+}
+
+static void smp_mod_timer(void *data)
+{
+	__mod_timer((struct timer_list *)data);
+}
+
+int mod_timer(struct timer_list *timer, unsigned long expires)
+{
+	/* timer's expires smaller or equal than current */
+	if ((timer_pending(timer)) && (timer->expires <= expires))
+		return 0;
+
+	expires = slack_expires(expires);
+	timer->expires = expires;
+
+	if (timer->cpu == smp_processor_id())
+		__mod_timer(timer);
+	else
+		smp_function_call(timer->cpu, smp_mod_timer,
+				(void *)timer, 0);
 
 	return 0;
 }
@@ -140,18 +155,13 @@ void init_timer_on_cpu(struct timer_list *timer, int cpu)
 	timer->function = NULL;
 	timer->data = 0;
 	timer->timers = &get_per_cpu(timers, cpu);
+	timer->cpu = cpu;
 }
 
 void init_timer(struct timer_list *timer)
 {
 	BUG_ON(!timer);
-
-	init_list(&timer->entry);
-	timer->entry.next = NULL;
-	timer->expires = 0;
-	timer->function = NULL;
-	timer->data = 0;
-	timer->timers = &get_cpu_var(timers);
+	init_timer_on_cpu(timer, smp_processor_id());
 }
 
 int del_timer(struct timer_list *timer)
