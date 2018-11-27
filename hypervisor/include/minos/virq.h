@@ -102,6 +102,7 @@ int vcpu_has_irq(struct vcpu *vcpu);
 
 int alloc_vm_virq(struct vm *vm);
 void release_vm_virq(struct vm *vm, int virq);
+int virq_unmask_and_init(struct vm *vm, uint32_t virq);
 
 static inline int alloc_hvm_virq(void)
 {

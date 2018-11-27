@@ -499,6 +499,37 @@ void vcpu_virq_struct_reset(struct vcpu *vcpu)
 	}
 }
 
+int virq_unmask_and_init(struct vm *vm, uint32_t virq)
+{
+	struct virq_desc *desc;
+	uint32_t bit = virq - VM_LOCAL_VIRQ_NR;
+
+	/* do not handle the ppi and sgi */
+	if (virq < VM_LOCAL_VIRQ_NR)
+		return 0;
+
+	if (virq >= MAX_GVM_VIRQ) {
+		pr_error("virq_unmask_and_init: invaild virq-%d\n", virq);
+		return -EINVAL;
+	}
+
+	if (test_bit(bit, vm->vspi_map))
+		pr_warn("may dupilicate usage of virq %d\n", virq);
+
+	set_bit(bit, vm->vspi_map);
+	desc = &vm->vspi_desc[bit];
+	desc->vno = virq;
+	desc->enable = 1;
+	desc->hw = 0;
+	desc->pr = 0xa0;
+	desc->vmid = vm->vmid;
+	desc->id = VIRQ_INVALID_ID;
+	desc->state = VIRQ_STATE_INACTIVE;
+	desc->list.next = NULL;
+
+	return 0;
+}
+
 void vcpu_virq_struct_init(struct vcpu *vcpu)
 {
 	int i;
@@ -592,28 +623,18 @@ int alloc_vm_virq(struct vm *vm)
 {
 	int virq;
 	int count = vm->vspi_nr;
-	struct virq_desc *desc;
 
-	if (vm->vmid == 0)
+	if (vm_is_hvm(vm))
 		spin_lock(&hvm_irq_lock);
 
 	virq = find_next_zero_bit_loop(vm->vspi_map, count, 0);
 	if (virq >= count)
 		virq = -1;
 
-	if (virq >= 0) {
-		desc = &vm->vspi_desc[virq];
-		desc->vno = virq + VM_LOCAL_VIRQ_NR;
-		desc->hw = 0;
-		desc->pr = 0xa0;
-		desc->vmid = vm->vmid;
-		desc->id = VIRQ_INVALID_ID;
-		desc->state = VIRQ_STATE_INACTIVE;
-		desc->list.next = NULL;
-		set_bit(virq, vm->vspi_map);
-	}
+	if (virq >= 0)
+		virq_unmask_and_init(vm, virq + VM_LOCAL_VIRQ_NR);
 
-	if (vm->vmid == 0)
+	if (vm_is_hvm(vm))
 		spin_unlock(&hvm_irq_lock);
 
 	return (virq >= 0 ? virq + VM_LOCAL_VIRQ_NR : -1);
@@ -730,7 +751,6 @@ void virqs_init(void)
 {
 	register_hook(irq_exit_from_guest,
 			MINOS_HOOK_TYPE_EXIT_FROM_GUEST);
-
 	register_hook(irq_enter_to_guest,
 			MINOS_HOOK_TYPE_ENTER_TO_GUEST);
 
