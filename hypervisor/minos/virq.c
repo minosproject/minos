@@ -104,7 +104,7 @@ static int send_virq(struct vcpu *vcpu, struct virq_desc *desc)
 	int ret;
 	struct vm *vm = vcpu->vm;
 
-	if (!desc || !desc->enable) {
+	if (!desc->enable) {
 		pr_error("virq %d is not enabled\n", desc->vno);
 		return -EINVAL;
 	}

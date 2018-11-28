@@ -73,7 +73,14 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 	vmcs->host_index++;
 	dsb();
 
-	send_virq_to_vm(vm0, vcpu->vmcs_irq);
+	if (send_virq_to_vm(vm0, vcpu->vmcs_irq)) {
+		pr_error("vmcs failed to send virq for vm-%d\n",
+				vcpu->vm->vmid);
+		vmcs->host_index--;
+		vmcs->trap_ret = -EPERM;
+		vmcs->trap_result = 0;
+		return -EFAULT;
+	}
 
 	/*
 	 * if vcpu's pcpu is equal the vm0_vcpu0's pcpu
