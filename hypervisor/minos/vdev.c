@@ -40,9 +40,6 @@ void vdev_release(struct vdev *vdev)
 
 	if (vdev->hvm_paddr)
 		destroy_hvm_iomem_map(vdev->hvm_paddr, vdev->mem_size);
-
-	if (vdev->list.next != NULL)
-		list_del(&vdev->list);
 }
 
 static void vdev_deinit(struct vdev *vdev)

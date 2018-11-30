@@ -27,6 +27,7 @@
 #include <minos/vmodule.h>
 #include <minos/virq.h>
 #include <minos/vmm.h>
+#include <minos/vdev.h>
 
 extern unsigned char __vm_start;
 extern unsigned char __vm_end;
@@ -356,18 +357,26 @@ int vcpu_reset(struct vcpu *vcpu)
 void destroy_vm(struct vm *vm)
 {
 	int i;
+	struct vdev *vdev, *n;
 	struct vcpu *vcpu;
 
 	if (!vm)
 		return;
 
 	/*
-	 * 1 : do hooks for each modules
-	 * 2 : release the vcpu allocated to this vm
-	 * 3 : free the memory for this VM
-	 * 4 : update the vmid bitmap
-	 * 5 : do vmodule deinit
+	 * 1 : release the vdev
+	 * 2 : do hooks for each modules
+	 * 3 : release the vcpu allocated to this vm
+	 * 4 : free the memory for this VM
+	 * 5 : update the vmid bitmap
+	 * 6 : do vmodule deinit
 	 */
+	list_for_each_entry_safe(vdev, n, &vm->vdev_list, list) {
+		list_del(&vdev->list);
+		if (vdev->deinit)
+			vdev->deinit(vdev);
+	}
+
 	do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_DESTROY_VM);
 
 	if (vm->vcpus) {
