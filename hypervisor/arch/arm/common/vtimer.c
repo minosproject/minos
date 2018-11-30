@@ -77,6 +77,7 @@ static void vtimer_state_save(struct vcpu *vcpu, void *context)
 
 	if ((vtimer->cnt_ctl & CNT_CTL_ENABLE) &&
 		!(vtimer->cnt_ctl & CNT_CTL_IMASK)) {
+
 		mod_timer(&vtimer->timer, ticks_to_ns(vtimer->cnt_cval +
 				c->offset - boot_tick));
 	}
@@ -90,7 +91,7 @@ static void vtimer_state_init(struct vcpu *vcpu, void *context)
 	struct vtimer_context *c = (struct vtimer_context *)context;
 
 	if (get_vcpu_id(vcpu) == 0)
-		vcpu->vm->time_offset = NOW();
+		vcpu->vm->time_offset = get_sys_ticks();
 
 	memset(c, 0, sizeof(struct vtimer_context));
 	c->offset = vcpu->vm->time_offset;
@@ -129,6 +130,7 @@ static void vtimer_handle_cntp_ctl(gp_regs *regs,
 	struct vtimer *vtimer;
 	struct vtimer_context *c = (struct vtimer_context *)
 		get_vmodule_data_by_id(current_vcpu, vtimer_vmodule_id);
+	unsigned long ns;
 
 	get_access_vtimer(vtimer, c, access);
 
@@ -142,11 +144,12 @@ static void vtimer_handle_cntp_ctl(gp_regs *regs,
 			v |= vtimer->cnt_ctl & CNT_CTL_ISTATUS;
 		vtimer->cnt_ctl = v;
 
-		if ((vtimer->cnt_ctl & CNT_CTL_ENABLE) && (vtimer->cnt_cval != 0)) {
-			mod_timer(&vtimer->timer, vtimer->cnt_cval + c->offset);
-		} else {
+		if ((vtimer->cnt_ctl & CNT_CTL_ENABLE) &&
+				(vtimer->cnt_cval != 0)) {
+			ns = ticks_to_ns(vtimer->cnt_cval + c->offset);
+			mod_timer(&vtimer->timer, ns);
+		} else
 			del_timer(&vtimer->timer);
-		}
 	}
 }
 
@@ -160,18 +163,19 @@ static void vtimer_handle_cntp_tval(gp_regs *regs,
 		get_vmodule_data_by_id(current_vcpu, vtimer_vmodule_id);
 
 	get_access_vtimer(vtimer, c, access);
-	now = NOW() - c->offset;
+	now = get_sys_ticks() - c->offset;
 
 	if (read) {
-		ticks = ns_to_ticks(vtimer->cnt_cval - now) & 0xffffffff;
+		ticks = (vtimer->cnt_cval - now) & 0xffffffff;
 		*value = ticks;
 	} else {
 		unsigned long v = *value;
 
-		vtimer->cnt_cval = now + ticks_to_ns(v);
+		vtimer->cnt_cval = get_sys_ticks() + v;
 		if (vtimer->cnt_ctl & CNT_CTL_ENABLE) {
 			vtimer->cnt_ctl &= ~CNT_CTL_ISTATUS;
-			mod_timer(&vtimer->timer, vtimer->cnt_cval + c->offset);
+			ticks = ticks_to_ns(vtimer->cnt_cval + c->offset);
+			mod_timer(&vtimer->timer, ticks);
 		}
 	}
 }
@@ -182,16 +186,18 @@ static void vtimer_handle_cntp_cval(gp_regs *regs,
 	struct vtimer *vtimer;
 	struct vtimer_context *c = (struct vtimer_context *)
 		get_vmodule_data_by_id(current_vcpu, vtimer_vmodule_id);
+	unsigned long ns;
 
 	get_access_vtimer(vtimer, c, access);
 
 	if (read) {
-		*value = ns_to_ticks(vtimer->cnt_cval);
+		*value = vtimer->cnt_cval;
 	} else {
 		vtimer->cnt_cval = ticks_to_ns(*value);
 		if (vtimer->cnt_ctl & CNT_CTL_ENABLE) {
 			vtimer->cnt_ctl &= ~CNT_CTL_ISTATUS;
-			mod_timer(&vtimer->timer, vtimer->cnt_cval + c->offset);
+			ns = ticks_to_ns(vtimer->cnt_cval + c->offset);
+			mod_timer(&vtimer->timer, ns);
 		}
 	}
 }
