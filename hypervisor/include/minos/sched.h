@@ -65,6 +65,7 @@ int local_sched_init(void);
 void sched_new(void);
 void pcpu_resched(int pcpu_id);
 int sched_reset_vcpu(struct vcpu *vcpu);
+int sched_can_idle(struct pcpu *pcpu);
 
 static inline void set_vcpu_ready(struct vcpu *vcpu)
 {

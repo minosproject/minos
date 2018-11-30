@@ -20,6 +20,7 @@ struct sched_class {
 	void (*sched)(struct pcpu *, struct vcpu *, struct vcpu *);
 	int (*sched_vcpu)(struct pcpu *, struct vcpu *);
 	unsigned long (*tick_handler)(struct pcpu *);
+	int (*can_idle)(struct pcpu *);
 };
 
 struct sched_class *get_sched_class(char *name);

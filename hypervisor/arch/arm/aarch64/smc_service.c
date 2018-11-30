@@ -25,7 +25,7 @@ static int std_smc_handler(gp_regs *c,
 {
 	int ret;
 
-	pr_info("psci function id 0x%x\n", id);
+	pr_debug("psci function id 0x%x\n", id);
 
 	switch (id) {
 	case PSCI_0_2_FN_PSCI_VERSION:

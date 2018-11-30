@@ -34,14 +34,36 @@ void system_shutdown(void)
 	panic("cant not shutdown system now\n");
 }
 
+int pcpu_can_idle(struct pcpu *pcpu)
+{
+	if (!sched_can_idle(pcpu))
+		return 0;
+
+	if (need_resched)
+		return 0;
+
+	return 1;
+}
+
 void cpu_idle()
 {
+	unsigned long flags;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
 	while (1) {
 		sched();
-		pcpu->state = PCPU_STATE_IDLE;
-		wfi();
-		pcpu->state = PCPU_STATE_RUNNING;
+
+		/*
+		 * need to check whether the pcpu can go to idle
+		 * state to avoid the interrupt happend before wfi
+		 */
+		local_irq_save(flags);
+		if (pcpu_can_idle(pcpu)) {
+			pcpu->state = PCPU_STATE_IDLE;
+			wfi();
+			dsb();
+			pcpu->state = PCPU_STATE_RUNNING;
+		}
+		local_irq_restore(flags);
 	}
 }

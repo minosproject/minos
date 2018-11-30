@@ -164,6 +164,9 @@ void sched(void)
 	struct vcpu *vcpu, *current = current_vcpu;
 	struct pcpu *pcpu;
 
+	if (in_interrupt)
+		panic("sched in interrupt\n");
+
 	pcpu = get_cpu_var(pcpu);
 
 	local_irq_save(flags);
@@ -227,18 +230,26 @@ void set_vcpu_state(struct vcpu *vcpu, int state)
 	if (a && b) {
 		pcpu->nr_running_vcpus--;
 		if (pcpu->nr_running_vcpus == 1) {
-			pr_info("disable sched_timer\n");
+			pr_debug("disable sched_timer\n");
 			sched_tick_disable();
 		}
 	} else if ((!a) && (!b)) {
 		pcpu->nr_running_vcpus++;
 		if (pcpu->nr_running_vcpus == 2) {
-			pr_info("enable sched_timer\n");
+			pr_debug("enable sched_timer\n");
 			sched_tick_enable(pcpu->sched_class->sched_interval);
 		}
 	}
 
 	local_irq_restore(flags);
+}
+
+int sched_can_idle(struct pcpu *pcpu)
+{
+	if (pcpu->sched_class->can_idle)
+		return pcpu->sched_class->can_idle(pcpu);
+
+	return 0;
 }
 
 int sched_reset_vcpu(struct vcpu *vcpu)

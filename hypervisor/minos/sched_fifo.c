@@ -221,6 +221,16 @@ static unsigned long fifo_tick_handler(struct pcpu *pcpu)
 	return MILLISECS(50);
 }
 
+static int fifo_can_idle(struct pcpu *pcpu)
+{
+	struct fifo_pcpu_data *pd = pcpu->sched_data;
+
+	if (is_list_empty(&pd->ready_list))
+		return 1;
+
+	return 0;
+}
+
 static struct sched_class sched_fifo = {
 	.name			= "fifo",
 	.flags			= 0,
@@ -236,6 +246,7 @@ static struct sched_class sched_fifo = {
 	.sched			= fifo_sched,
 	.sched_vcpu		= fifo_sched_vcpu,
 	.tick_handler		= fifo_tick_handler,
+	.can_idle		= fifo_can_idle,
 };
 
 static int sched_fifo_init(void)
