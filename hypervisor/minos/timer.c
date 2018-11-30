@@ -122,13 +122,12 @@ static int __mod_timer(struct timer_list *timer)
 	return 0;
 }
 
-static void smp_mod_timer(void *data)
-{
-	__mod_timer((struct timer_list *)data);
-}
-
 int mod_timer(struct timer_list *timer, unsigned long expires)
 {
+	struct timers *timers = timer->timers;
+	unsigned long flags;
+	int cpu = smp_processor_id();
+
 	/* timer's expires smaller or equal than current */
 	if ((timer_pending(timer)) && (timer->expires <= expires))
 		return 0;
@@ -136,11 +135,20 @@ int mod_timer(struct timer_list *timer, unsigned long expires)
 	expires = slack_expires(expires);
 	timer->expires = expires;
 
-	if (timer->cpu == smp_processor_id())
-		__mod_timer(timer);
-	else
-		smp_function_call(timer->cpu, smp_mod_timer,
-				(void *)timer, 0);
+	/*
+	 * if the timer is not on the current cpu's
+	 * timers, need to migrate it to the current
+	 * cpu's timers list
+	 */
+	if (timer->cpu != cpu) {
+		spin_lock_irqsave(&timers->lock, flags);
+		detach_timer(timers, timer);
+		timer->cpu = cpu;
+		timer->timers = &get_per_cpu(timers, cpu);
+		spin_unlock_irqrestore(&timers->lock, flags);
+	}
+
+	__mod_timer(timer);
 
 	return 0;
 }
