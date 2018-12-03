@@ -131,6 +131,7 @@ void switch_to_vcpu(struct vcpu *current, struct vcpu *next)
 
 void kick_vcpu(struct vcpu *vcpu)
 {
+	unsigned long flags;
 	struct vcpu *current = current_vcpu;
 
 	/*
@@ -142,6 +143,9 @@ void kick_vcpu(struct vcpu *vcpu)
 	if ((vcpu == current) || vcpu->is_idle)
 		return;
 
+
+	spin_lock_irqsave(&vcpu->idle_lock, flags);
+
 	if (vcpu->state == VCPU_STAT_SUSPEND) {
 		if (vcpu->affinity != current->affinity) {
 			vcpu->resched = 1;
@@ -149,6 +153,8 @@ void kick_vcpu(struct vcpu *vcpu)
 		} else
 			set_vcpu_state(vcpu, VCPU_STAT_READY);
 	}
+
+	spin_unlock_irqrestore(&vcpu->idle_lock, flags);
 }
 
 void sched_new(void)
@@ -221,7 +227,7 @@ void set_vcpu_state(struct vcpu *vcpu, int state)
 	state = vcpu->state;
 	a = (old_state == VCPU_STAT_READY) ||
 		(old_state == VCPU_STAT_RUNNING);
-	b = (state == VCPU_STAT_SUSPEND) || (state == VCPU_STAT_IDLE);
+	b = (state == VCPU_STAT_SUSPEND) || (state == VCPU_STAT_STOPED);
 
 	/*
 	 * if the vcpu's state from ready/running to suspended

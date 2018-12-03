@@ -28,7 +28,7 @@
 #define VCPU_STAT_MUTEX		(0x0020u)
 #define VCPU_STAT_FLAG		(0x0040u)
 #define VCPU_STAT_MULTI		(0x0080u)
-#define VCPU_STAT_IDLE		(0x0100u)
+#define VCPU_STAT_STOPED	(0x0100u)
 
 #define VCPU_STAT_PEND_OK	(0x0u)
 #define VCPU_STAT_PEND_TO	(0x01u)
@@ -68,6 +68,8 @@ struct vcpu {
 	struct list_head list;
 	char name[VCPU_NAME_SIZE];
 	void *sched_data;
+
+	spinlock_t idle_lock;
 
 	void **vmodule_context;
 	void *arch_data;

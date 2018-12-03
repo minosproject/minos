@@ -93,7 +93,7 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 		return -ENOENT;
 	}
 
-	if (vcpu->state != VCPU_STAT_IDLE)
+	if (vcpu->state != VCPU_STAT_STOPED)
 		return -EINVAL;
 
 	os->ops->vcpu_power_on(vcpu, entry);
@@ -122,14 +122,15 @@ void vcpu_idle(void)
 	unsigned long flags;
 
 	if (vcpu_can_idle(vcpu)) {
-		local_irq_save(flags);
-		if (!vcpu_can_idle(vcpu))
-			goto out;
+		spin_lock_irqsave(&vcpu->idle_lock, flags);
+		if (!vcpu_can_idle(vcpu)) {
+			spin_unlock_irqrestore(&vcpu->idle_lock, flags);
+			return;
+		}
 
 		set_vcpu_suspend(vcpu);
+		spin_unlock_irqrestore(&vcpu->idle_lock, flags);
 		sched();
-out:
-		local_irq_restore(flags);
 	}
 }
 
@@ -270,7 +271,7 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 	vcpu->vm = vm;
 
 	vcpu->affinity = vm->vcpu_affinity[vcpu_id];
-	vcpu->state = VCPU_STAT_IDLE;
+	vcpu->state = VCPU_STAT_STOPED;
 	vcpu->is_idle = 0;
 
 	init_list(&vcpu->list);
@@ -281,6 +282,7 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 
 	vcpu_virq_struct_init(vcpu);
 	vm->vcpus[vcpu_id] = vcpu;
+	spin_lock_init(&vcpu->idle_lock);
 
 	vcpu->next = NULL;
 	if (vcpu_id != 0)
@@ -453,14 +455,17 @@ void vcpu_power_off_call(void *data)
 		return;
 	}
 
-	set_vcpu_state(vcpu, VCPU_STAT_IDLE);
+	set_vcpu_state(vcpu, VCPU_STAT_STOPED);
 
 	/*
+	 * *********** Note ****************
 	 * if the vcpu is the current running vcpu
-	 * need to resched another vcpu
+	 * need to resched another vcpu, since the vcpu
+	 * may in el2 and el2/el0, force to sched to the
+	 * new vcpu
 	 */
 	if (vcpu == current_vcpu)
-		need_resched = 1;
+		sched_new();
 
 	pr_info("power off vcpu-%d-%d done\n", get_vmid(vcpu),
 			get_vcpu_id(vcpu));
@@ -479,7 +484,7 @@ int vcpu_power_off(struct vcpu *vcpu, int timeout)
 		return smp_function_call(vcpu->affinity,
 				vcpu_power_off_call, (void *)vcpu, 1);
 	} else {
-		set_vcpu_state(vcpu, VCPU_STAT_IDLE);
+		set_vcpu_state(vcpu, VCPU_STAT_STOPED);
 		pr_info("power off vcpu-%d-%d done\n", get_vmid(vcpu),
 				get_vcpu_id(vcpu));
 	}
