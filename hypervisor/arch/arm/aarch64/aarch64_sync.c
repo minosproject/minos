@@ -502,8 +502,7 @@ void sync_from_current_EL_handler(gp_regs *data)
 	if (ec != NULL)
 		ec->handler(data, esr_value);
 
-	dump_stack(data, NULL);
-	while (1);
+	__panic(data, "system hang due to sync error in EL2\n");
 }
 
 static int aarch64_sync_init(void)

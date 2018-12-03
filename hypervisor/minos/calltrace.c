@@ -45,7 +45,7 @@ static void panic_other_cpu(void *data)
 		cpu_relax();
 }
 
-void panic(char *fmt, ...)
+void __panic(gp_regs *regs, char *fmt, ...)
 {
 	int cpu;
 	va_list arg;
@@ -60,7 +60,7 @@ void panic(char *fmt, ...)
 	buffer[printed + 1] = 0;
 
 	pr_fatal("[Panic] : %s", buffer);
-	dump_stack(NULL, NULL);
+	dump_stack(regs, NULL);
 
 	/* inform other cpu to do panic */
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
