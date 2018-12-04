@@ -255,6 +255,11 @@ static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
 	context->vpidr = 0x410fc050;	/* arm fvp */
 }
 
+static void aarch64_system_state_resume(struct vcpu *vcpu, void *c)
+{
+	aarch64_system_state_init(vcpu, c);
+}
+
 static void aarch64_system_state_save(struct vcpu *vcpu, void *c)
 {
 	struct aarch64_system_context *context =
@@ -335,6 +340,7 @@ static int aarch64_system_init(struct vmodule *vmodule)
 	vmodule->state_init = aarch64_system_state_init;
 	vmodule->state_save = aarch64_system_state_save;
 	vmodule->state_restore = aarch64_system_state_restore;
+	vmodule->state_resume = aarch64_system_state_resume;
 
 	return 0;
 }

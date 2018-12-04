@@ -23,10 +23,13 @@
 
 static void linux_vcpu_init(struct vcpu *vcpu)
 {
-	gp_regs *regs = (gp_regs *)vcpu->stack_base;
+	gp_regs *regs;
 
 	/* fill the dtb address to x0 */
 	if (get_vcpu_id(vcpu) == 0) {
+		arch_init_vcpu(vcpu, (void *)vcpu->vm->entry_point);
+		regs = (gp_regs *)vcpu->stack_base;
+
 		if (vm_is_64bit(vcpu->vm))
 			regs->x0 = vcpu->vm->setup_data;
 		else {
@@ -41,7 +44,10 @@ static void linux_vcpu_init(struct vcpu *vcpu)
 
 static void linux_vcpu_power_on(struct vcpu *vcpu, unsigned long entry)
 {
-	gp_regs *regs = (gp_regs *)vcpu->stack_base;
+	gp_regs *regs;
+
+	arch_init_vcpu(vcpu, (void *)entry);
+	regs = (gp_regs *)vcpu->stack_base;
 
 	regs->elr_elx = entry;
 	regs->x0 = 0;

@@ -9,6 +9,7 @@ struct platform {
 	int (*cpu_off)(unsigned long cpu);
 	void (*system_reboot)(int mode, const char *cmd);
 	void (*system_shutdown)(void);
+	int (*system_suspend)(void);
 	int (*time_init)(void);
 };
 

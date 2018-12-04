@@ -90,6 +90,7 @@ void destroy_vm(struct vm *vm);
 int vm_power_up(int vmid);
 int vm_reset(int vmid, void *args);
 int vm_power_off(int vmid, void *arg);
+int vm_suspend(int vmid);
 
 static inline struct vm *get_vm_by_id(uint32_t vmid)
 {

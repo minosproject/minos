@@ -218,6 +218,32 @@ void save_vcpu_vmodule_state(struct vcpu *vcpu)
 	}
 }
 
+void suspend_vcpu_vmodule_state(struct vcpu *vcpu)
+{
+	struct vmodule *vmodule;
+	void *context;
+
+	list_for_each_entry(vmodule, &vmodule_list, list) {
+		if (vmodule->state_suspend) {
+			context = get_vmodule_data_by_id(vcpu, vmodule->id);
+			vmodule->state_suspend(vcpu, context);
+		}
+	}
+}
+
+void resume_vcpu_vmodule_state(struct vcpu *vcpu)
+{
+	struct vmodule *vmodule;
+	void *context;
+
+	list_for_each_entry(vmodule, &vmodule_list, list) {
+		if (vmodule->state_resume) {
+			context = get_vmodule_data_by_id(vcpu, vmodule->id);
+			vmodule->state_resume(vcpu, context);
+		}
+	}
+}
+
 int vmodules_init(void)
 {
 	int32_t i;

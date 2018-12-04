@@ -47,7 +47,7 @@ static int unknown_handler(gp_regs *reg, uint32_t esr_value)
 
 static int wfi_wfe_handler(gp_regs *reg, uint32_t esr_value)
 {
-	vcpu_idle();
+	vcpu_idle(current_vcpu);
 
 	return 0;
 }

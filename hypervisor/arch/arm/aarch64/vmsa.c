@@ -174,6 +174,11 @@ static void vmsa_state_restore(struct vcpu *vcpu, void *context)
 	flush_local_tlb_guest();
 }
 
+static void vmsa_state_resume(struct vcpu *vcpu, void *context)
+{
+	vmsa_state_init(vcpu, context);
+}
+
 static int vmsa_vmodule_init(struct vmodule *vmodule)
 {
 	vmodule->context_size = sizeof(struct vmsa_context);
@@ -181,6 +186,7 @@ static int vmsa_vmodule_init(struct vmodule *vmodule)
 	vmodule->state_init = vmsa_state_init;
 	vmodule->state_save = vmsa_state_save;
 	vmodule->state_restore = vmsa_state_restore;
+	vmodule->state_resume = vmsa_state_resume;
 
 	return 0;
 }

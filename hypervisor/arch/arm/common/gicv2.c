@@ -348,6 +348,11 @@ static void gicv2_state_init(struct vcpu *vcpu, void *context)
 	c->hcr = 1;
 }
 
+static void gicv2_state_resume(struct vcpu *vcpu, void *context)
+{
+	gicv2_state_init(vcpu, context);
+}
+
 static int gicv2_is_aliased(unsigned long base, unsigned long size)
 {
 	uint32_t val_low, val_high;
@@ -465,6 +470,7 @@ static int gicv2_vmodule_init(struct vmodule *vmodule)
 	vmodule->state_init = gicv2_state_init;
 	vmodule->state_save = gicv2_state_save;
 	vmodule->state_restore = gicv2_state_restore;
+	vmodule->state_resume = gicv2_state_resume;
 
 	return 0;
 }

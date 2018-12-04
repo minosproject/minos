@@ -63,7 +63,7 @@ static void fifo_set_vcpu_state(struct pcpu *pcpu,
 		list_add(&pd->ready_list, &td->fifo_list);
 	else if (state == VCPU_STAT_SUSPEND)
 		list_add_tail(&pd->sleep_list, &td->fifo_list);
-	else if (state == VCPU_STAT_STOPED)
+	else if (state == VCPU_STAT_STOPPED)
 		td->fifo_list.next = NULL;
 	else
 		panic("unsupport vcpu state for fifo sched\n");
@@ -105,7 +105,7 @@ static int fifo_add_vcpu(struct pcpu *pcpu, struct vcpu *vcpu)
 
 	local_irq_save(flags);
 	td->fifo_list.next = NULL;
-	vcpu->state = VCPU_STAT_STOPED;
+	vcpu->state = VCPU_STAT_STOPPED;
 	local_irq_restore(flags);
 
 	return 0;

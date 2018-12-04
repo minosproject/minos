@@ -455,6 +455,9 @@ static int vcpu_handle_common_trap(struct vm *vm, int trap_reason,
 	case VMTRAP_REASON_WDT_TIMEOUT:
 		mvm_queue_push(&vm->queue, trap_reason, NULL, 0);
 		break;
+	case VMTRAP_REASON_VM_SUSPEND:
+		pr_info("vm-%d is suspend\n", vm->vmid);
+		break;
 
 	default:
 		break;

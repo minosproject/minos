@@ -667,6 +667,11 @@ static void gicv3_state_init(struct vcpu *vcpu, void *context)
 	c->ich_hcr_el2 = GICH_HCR_EN;
 }
 
+static void gicv3_state_resume(struct vcpu *vcpu, void *context)
+{
+	gicv3_state_init(vcpu, context);
+}
+
 static int gicv3_vmodule_init(struct vmodule *vmodule)
 {
 	vmodule->context_size = sizeof(struct gicv3_context);
@@ -674,6 +679,7 @@ static int gicv3_vmodule_init(struct vmodule *vmodule)
 	vmodule->state_init = gicv3_state_init;
 	vmodule->state_save = gicv3_state_save;
 	vmodule->state_restore = gicv3_state_restore;
+	vmodule->state_resume = gicv3_state_resume;
 
 	return 0;
 }

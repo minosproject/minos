@@ -34,6 +34,16 @@ void system_shutdown(void)
 	panic("cant not shutdown system now\n");
 }
 
+int system_suspend(void)
+{
+	if (platform->system_suspend)
+		platform->system_suspend();
+
+	wfi();
+
+	return 0;
+}
+
 int pcpu_can_idle(struct pcpu *pcpu)
 {
 	if (!sched_can_idle(pcpu))

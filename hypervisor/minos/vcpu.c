@@ -93,11 +93,14 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 		return -ENOENT;
 	}
 
-	if (vcpu->state != VCPU_STAT_STOPED)
+	if (vcpu->state == VCPU_STAT_STOPPED) {
+		pr_info("vcpu power on from vm suspend 0x%p\n", entry);
+		os->ops->vcpu_power_on(vcpu, entry);
+		vcpu_online(vcpu);
+	} else {
+		pr_error("vcpu_power_on : invalid vcpu state\n");
 		return -EINVAL;
-
-	os->ops->vcpu_power_on(vcpu, entry);
-	vcpu_online(vcpu);
+	}
 
 	return 0;
 }
@@ -116,9 +119,8 @@ int vcpu_can_idle(struct vcpu *vcpu)
 	return 1;
 }
 
-void vcpu_idle(void)
+void vcpu_idle(struct vcpu *vcpu)
 {
-	struct vcpu *vcpu = current_vcpu;
 	unsigned long flags;
 
 	if (vcpu_can_idle(vcpu)) {
@@ -134,14 +136,27 @@ void vcpu_idle(void)
 	}
 }
 
-int vcpu_suspend(gp_regs *c, uint32_t state, unsigned long entry)
+int vcpu_suspend(struct vcpu *vcpu, gp_regs *c,
+		uint32_t state, unsigned long entry)
 {
 	/*
 	 * just call vcpu idle to put vcpu to suspend state
 	 * and ignore the wake up entry, since the vcpu will
 	 * not really powered off
 	 */
-	vcpu_idle();
+	vcpu_idle(vcpu);
+
+	return 0;
+}
+
+int vcpu_off(struct vcpu *vcpu)
+{
+	/*
+	 * force set the vcpu to suspend state then sched
+	 * out
+	 */
+	set_vcpu_state(vcpu, VCPU_STAT_STOPPED);
+	sched();
 
 	return 0;
 }
@@ -271,7 +286,7 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 	vcpu->vm = vm;
 
 	vcpu->affinity = vm->vcpu_affinity[vcpu_id];
-	vcpu->state = VCPU_STAT_STOPED;
+	vcpu->state = VCPU_STAT_STOPPED;
 	vcpu->is_idle = 0;
 
 	init_list(&vcpu->list);
@@ -299,7 +314,6 @@ int vm_vcpus_init(struct vm *vm)
 		return -EINVAL;
 
 	vm_for_each_vcpu(vm, vcpu) {
-		arch_init_vcpu(vcpu, (void *)vm->entry_point);
 		pr_info("vm-%d vcpu-%d affnity to pcpu-%d\n",
 				vm->vmid, vcpu->vcpu_id, vcpu->affinity);
 
@@ -455,7 +469,7 @@ void vcpu_power_off_call(void *data)
 		return;
 	}
 
-	set_vcpu_state(vcpu, VCPU_STAT_STOPED);
+	set_vcpu_state(vcpu, VCPU_STAT_STOPPED);
 
 	/*
 	 * *********** Note ****************
@@ -484,7 +498,7 @@ int vcpu_power_off(struct vcpu *vcpu, int timeout)
 		return smp_function_call(vcpu->affinity,
 				vcpu_power_off_call, (void *)vcpu, 1);
 	} else {
-		set_vcpu_state(vcpu, VCPU_STAT_STOPED);
+		set_vcpu_state(vcpu, VCPU_STAT_STOPPED);
 		pr_info("power off vcpu-%d-%d done\n", get_vmid(vcpu),
 				get_vcpu_id(vcpu));
 	}

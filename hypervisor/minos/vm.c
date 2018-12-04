@@ -245,3 +245,76 @@ int vm_reset(int vmid, void *args)
 
 	return __vm_reset(vm, args);
 }
+
+static int vm_resume(struct vm *vm)
+{
+	struct vcpu *vcpu;
+
+	pr_info("vm-%d resumed\n", vm->vmid);
+
+	vm_for_each_vcpu(vm, vcpu) {
+		if (get_vcpu_id(vcpu) == 0)
+			continue;
+
+		resume_vcpu_vmodule_state(vcpu);
+	}
+
+	do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_RESUME_VM);
+
+	return 0;
+}
+
+static int __vm_suspend(struct vm *vm)
+{
+	struct vcpu *vcpu = current_vcpu;
+
+	pr_info("suspend vm-%d\n", vm->vmid);
+	if (get_vcpu_id(vcpu) != 0) {
+		pr_error("vm suspend can only called by vcpu0\n");
+		return -EPERM;
+	}
+
+	vm_for_each_vcpu(vm, vcpu) {
+		if (get_vcpu_id(vcpu) == 0)
+			continue;
+
+		if (vcpu->state != VCPU_STAT_STOPPED) {
+			pr_error("vcpu-%d is not suspend vm suspend fail\n",
+					get_vcpu_id(vcpu));
+			return -EINVAL;
+		}
+
+		suspend_vcpu_vmodule_state(vcpu);
+	}
+
+	vm->state = VM_STAT_SUSPEND;
+	trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
+			VMTRAP_REASON_VM_SUSPEND, 0, NULL);
+
+	/* call the hooks for suspend */
+	do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_SUSPEND_VM);
+
+	set_vcpu_suspend(current_vcpu);
+	sched();
+
+	/* vm is resumed */
+	vm->state = VM_STAT_ONLINE;
+	vm_resume(vm);
+
+	return 0;
+}
+
+int vm_suspend(int vmid)
+{
+	struct vm *vm = get_vm_by_id(vmid);
+
+	if (vm == NULL) {
+		pr_error("unknown vm called vm suspend\n");
+		return -EINVAL;
+	}
+
+	if (vm_is_hvm(vm))
+		return system_suspend();
+
+	return __vm_suspend(vm);
+}

@@ -28,7 +28,7 @@
 #define VCPU_STAT_MUTEX		(0x0020u)
 #define VCPU_STAT_FLAG		(0x0040u)
 #define VCPU_STAT_MULTI		(0x0080u)
-#define VCPU_STAT_STOPED	(0x0100u)
+#define VCPU_STAT_STOPPED	(0x0100u)
 
 #define VCPU_STAT_PEND_OK	(0x0u)
 #define VCPU_STAT_PEND_TO	(0x01u)
@@ -106,11 +106,12 @@ struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id);
 struct vcpu *create_idle_vcpu(void);
 int vm_vcpus_init(struct vm *vm);
 
-void vcpu_idle(void);
+void vcpu_idle(struct vcpu *vcpu);
 int vcpu_reset(struct vcpu *vcpu);
-int vcpu_suspend(gp_regs *c, uint32_t state, unsigned long entry);
+int vcpu_suspend(struct vcpu *vcpu, gp_regs *c,
+		uint32_t state, unsigned long entry);
+int vcpu_off(struct vcpu *vcpu);
 void vcpu_online(struct vcpu *vcpu);
-void vcpu_offline(struct vcpu *vcpu);
 int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 		unsigned long entry, unsigned long unsed);
 int vcpu_power_off(struct vcpu *vcpu, int timeout);

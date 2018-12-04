@@ -4,5 +4,6 @@
 void cpu_idle(void);
 void system_reboot(void);
 void system_shutdown(void);
+int system_suspend(void);
 
 #endif

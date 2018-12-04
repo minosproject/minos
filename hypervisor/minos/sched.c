@@ -227,7 +227,7 @@ void set_vcpu_state(struct vcpu *vcpu, int state)
 	state = vcpu->state;
 	a = (old_state == VCPU_STAT_READY) ||
 		(old_state == VCPU_STAT_RUNNING);
-	b = (state == VCPU_STAT_SUSPEND) || (state == VCPU_STAT_STOPED);
+	b = (state == VCPU_STAT_SUSPEND) || (state == VCPU_STAT_STOPPED);
 
 	/*
 	 * if the vcpu's state from ready/running to suspended

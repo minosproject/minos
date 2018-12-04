@@ -29,11 +29,12 @@ static int std_smc_handler(gp_regs *c,
 
 	switch (id) {
 	case PSCI_0_2_FN_PSCI_VERSION:
-		SVC_RET1(c, PSCI_VERSION(0, 2));
+		SVC_RET1(c, PSCI_VERSION(1, 0));
 		break;
 
 	case PSCI_0_2_FN64_CPU_ON:
 	case PSCI_0_2_FN_CPU_ON:
+		pr_info("request vcpu on\n");
 		ret = vcpu_power_on(current_vcpu,
 				args[0], args[1], args[2]);
 		if (ret)
@@ -41,18 +42,30 @@ static int std_smc_handler(gp_regs *c,
 		break;
 
 	case PSCI_0_2_FN_CPU_OFF:
+		/* virtual vcpu only support freeze mode */
+		pr_info("request vcpu off\n");
+		ret = vcpu_off(current_vcpu);
+		if (ret)
+			SVC_RET1(c, PSCI_RET_INTERNAL_FAILURE);
 		break;
 	case PSCI_0_2_FN64_CPU_SUSPEND:
 		/*
 		 * only can be called by vcpu self
 		 */
-		ret = vcpu_suspend(c, (uint32_t)args[0], args[1]);
+		ret = vcpu_suspend(current_vcpu, c,
+				(uint32_t)args[0], args[1]);
 		if (ret)
 			SVC_RET1(c, PSCI_RET_DENIED);
 		break;
 
 	case PSCI_0_2_FN_MIGRATE_INFO_TYPE:
 		SVC_RET1(c, PSCI_0_2_TOS_MP);
+		break;
+
+	case PSCI_0_2_FN_AFFINITY_INFO:
+	case PSCI_0_2_FN64_AFFINITY_INFO:
+		/* all spi irq will send to vm0 do nothing */
+		SVC_RET1(c, PSCI_0_2_AFFINITY_LEVEL_OFF);
 		break;
 
 	case PSCI_0_2_FN_SYSTEM_OFF:
@@ -62,6 +75,26 @@ static int std_smc_handler(gp_regs *c,
 
 	case PSCI_0_2_FN_SYSTEM_RESET:
 		vm_reset(get_vmid(current_vcpu), NULL);
+		break;
+
+	case PSCI_1_0_FN_SYSTEM_SUSPEND:
+	case PSCI_1_0_FN64_SYSTEM_SUSPEND:
+		/* only can be called by vcpu0 itself */
+		vm_suspend(current_vm->vmid);
+		break;
+
+	case PSCI_1_0_FN_PSCI_FEATURES:
+		switch (args[0]) {
+		case ARM_SMCCC_VERSION_FUNC_ID:
+		case PSCI_0_2_FN64_CPU_SUSPEND:
+		case PSCI_1_0_FN_SYSTEM_SUSPEND:
+		case PSCI_1_0_FN64_SYSTEM_SUSPEND:
+			SVC_RET1(c, PSCI_RET_SUCCESS);
+			break;
+		default:
+			SVC_RET1(c, PSCI_RET_NOT_SUPPORTED);
+			break;
+		}
 		break;
 
 	default:
