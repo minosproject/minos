@@ -38,7 +38,11 @@ struct irqtag;
 #define MAX_HVM_VIRQ		(HVM_SPI_VIRQ_NR + VM_LOCAL_VIRQ_NR)
 #define MAX_GVM_VIRQ		(GVM_SPI_VIRQ_NR + VM_LOCAL_VIRQ_NR)
 
-#define VIRQ_FLAGS_CAN_WAKEUP	(1 << 0)
+#define VIRQS_PENDING		(1 << 0)
+#define VIRQS_ENABLED		(1 << 1)
+#define VIRQS_SUSPEND		(1 << 2)
+#define VIRQS_HW		(1 << 3)
+#define VIRQS_CAN_WAKEUP	(1 << 4)
 
 enum virq_domain_type {
 	VIRQ_DOMAIN_SGI = 0,
@@ -48,21 +52,17 @@ enum virq_domain_type {
 	VIRQ_DOMAIN_MAX,
 };
 
-/* virq_desc use 32 bytes */
 struct virq_desc {
 	uint8_t id;
 	uint8_t state;
-	uint8_t pending;
-	uint8_t hw;
-	uint8_t enable;
 	uint8_t pr;
-	uint8_t vcpu_id;
+	uint8_t src;
 	uint8_t type;
-	uint8_t flags;
-	uint8_t src;	/* for sgi interrupt indicate which cpu trigger*/
+	uint8_t vcpu_id;
 	uint16_t vmid;
 	uint16_t vno;
 	uint16_t hno;
+	unsigned long flags;
 	struct list_head list;
 } __packed__;
 
@@ -77,6 +77,81 @@ struct virq_struct {
 	DECLARE_BITMAP(irq_bitmap, VCPU_MAX_ACTIVE_VIRQS);
 	struct virq_desc local_desc[VM_LOCAL_VIRQ_NR];
 };
+
+static void inline virq_set_enable(struct virq_desc *d)
+{
+	d->flags |= VIRQS_ENABLED;
+}
+
+static void inline virq_clear_enable(struct virq_desc *d)
+{
+	d->flags &= ~VIRQS_ENABLED;
+}
+
+static int inline virq_is_enabled(struct virq_desc *d)
+{
+	return (d->flags & VIRQS_ENABLED);
+}
+
+static void inline virq_set_wakeup(struct virq_desc *d)
+{
+	d->flags |= VIRQS_CAN_WAKEUP;
+}
+
+static void inline virq_clear_wakeup(struct virq_desc *d)
+{
+	d->flags &= ~VIRQS_CAN_WAKEUP;
+}
+
+static int inline virq_can_wakeup(struct virq_desc *d)
+{
+	return (d->flags & VIRQS_CAN_WAKEUP);
+}
+
+static void inline virq_set_suspend(struct virq_desc *d)
+{
+	d->flags |= VIRQS_SUSPEND;
+}
+
+static void inline virq_clear_suspend(struct virq_desc *d)
+{
+	d->flags &= ~VIRQS_SUSPEND;
+}
+
+static int inline virq_is_suspend(struct virq_desc *d)
+{
+	return (d->flags & VIRQS_SUSPEND);
+}
+
+static void inline virq_set_hw(struct virq_desc *d)
+{
+	d->flags |= VIRQS_HW;
+}
+
+static void inline virq_clear_hw(struct virq_desc *d)
+{
+	d->flags &= ~VIRQS_HW;
+}
+
+static int inline virq_is_hw(struct virq_desc *d)
+{
+	return (d->flags & VIRQS_HW);
+}
+
+static void inline virq_set_pending(struct virq_desc *d)
+{
+	d->flags |= VIRQS_PENDING;
+}
+
+static void inline virq_clear_pending(struct virq_desc *d)
+{
+	d->flags &= ~VIRQS_PENDING;
+}
+
+static int inline virq_is_pending(struct virq_desc *d)
+{
+	return (d->flags & VIRQS_PENDING);
+}
 
 int virq_enable(struct vcpu *vcpu, uint32_t virq);
 int virq_disable(struct vcpu *vcpu, uint32_t virq);

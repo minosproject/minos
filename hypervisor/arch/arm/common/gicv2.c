@@ -200,7 +200,7 @@ static int gicv2_send_virq(struct virq_desc *virq)
 		return -EINVAL;
 	}
 
-	if (virq->hw)
+	if (virq_is_hw(virq))
 		pid = virq->hno;
 	else {
 		if (virq->vno < 16)
@@ -213,7 +213,7 @@ static int gicv2_send_virq(struct virq_desc *virq)
 	gich_lr->pr = virq->pr;
 	gich_lr->grp1 = 0;
 	gich_lr->state = 1;
-	gich_lr->hw = virq->hw;
+	gich_lr->hw = !!virq_is_hw(virq);
 
 	writel_gich(val, GICH_LR + virq->id * 4);
 	isb();
@@ -228,7 +228,7 @@ static int gicv2_update_virq(struct virq_desc *desc, int action)
 
 	switch (action) {
 	case VIRQ_ACTION_REMOVE:
-		if (desc->hw)
+		if (virq_is_hw(desc))
 			gicv2_clear_pending(desc->hno);
 
 	case VIRQ_ACTION_CLEAR:

@@ -281,7 +281,7 @@ static int gicv3_send_virq(struct virq_desc *virq)
 	lr->p_intid = virq->hno;
 	lr->priority = virq->pr;
 	lr->group = 1;
-	lr->hw = virq->hw;
+	lr->hw = !!virq_is_hw(virq);
 	lr->state = 1;
 
 	gicv3_write_lr(virq->id, value);
@@ -305,7 +305,7 @@ static int gicv3_update_virq(struct virq_desc *desc, int action)
 		 */
 
 	case VIRQ_ACTION_REMOVE:
-		if (desc->hw)
+		if (virq_is_hw(desc))
 			gicv3_clear_pending(desc->hno);
 
 	case VIRQ_ACTION_CLEAR:
