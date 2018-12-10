@@ -49,6 +49,9 @@ static inline unsigned long arch_guest_tt_description(unsigned long flags)
 	m_type = flags & VM_TYPE_MASK;
 	rw = flags & VM_RW_MASK;
 
+	if (m_type == VM_NONE)
+		m_type = VM_NORMAL;
+
 	if (d_type == VM_DES_TABLE)
 		return (uint64_t)TT_S2_ATTR_TABLE;
 
@@ -98,6 +101,9 @@ static inline unsigned long arch_host_tt_description(unsigned long flags)
 	d_type = flags & VM_DES_MASK;
 	m_type = flags & VM_TYPE_MASK;
 	rw = flags & VM_RW_MASK;
+
+	if (m_type == VM_NONE)
+		m_type = VM_NORMAL;
 
 	if (d_type == VM_DES_TABLE)
 		return (uint64_t)TT_S1_ATTR_TABLE;
@@ -161,21 +167,24 @@ static inline int get_mapping_type(int lvl, unsigned long addr)
 {
 	unsigned long type = addr & 0x03;
 
+	if (type == TT_S1_ATTR_FAULT)
+		return VM_DES_FAULT;
+
 	if (lvl == PTE) {
 		if (type != TT_S1_ATTR_PAGE)
 			return VM_DES_FAULT;
 		else
 			return VM_DES_PAGE;
 	} else if (lvl == PMD) {
-		if (type == TT_S1_ATTR_PAGE)
-			return VM_DES_FAULT;
+		if (type == TT_S1_ATTR_TABLE)
+			return VM_DES_TABLE;
 		else if (type == TT_S1_ATTR_BLOCK)
 			return VM_DES_BLOCK;
 		else
 			return VM_DES_TABLE;
 	} else if (lvl == PUD) {
-		if (type == TT_S1_ATTR_PAGE)
-			return VM_DES_FAULT;
+		if (type == TT_S1_ATTR_TABLE)
+			return VM_DES_TABLE;
 		else if (type == TT_S1_ATTR_BLOCK)
 			return VM_DES_BLOCK;
 		else
@@ -184,7 +193,7 @@ static inline int get_mapping_type(int lvl, unsigned long addr)
 		if (type != TT_S1_ATTR_TABLE)
 			return VM_DES_FAULT;
 		else
-			return VM_DES_PAGE;
+			return VM_DES_TABLE;
 	}
 
 	return VM_DES_FAULT;

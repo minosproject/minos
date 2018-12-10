@@ -295,7 +295,7 @@ static int __destroy_mem_mapping(struct mapping_struct *info)
 
 			if (type == VM_DES_TABLE) {
 				lvl++;
-				table = (unsigned long *)des;
+				table = (unsigned long *)(des & ~PAGE_MASK);
 				attr = attr->next;
 				if ((lvl > PTE) || (attr == NULL)) {
 					pr_error("mapping error on 0x%x\n", vir);
