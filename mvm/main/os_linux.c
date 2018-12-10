@@ -345,7 +345,7 @@ static int linux_setup_env(struct vm *vm, char *cmdline)
 	if (cmdline && (strlen(cmdline) > 0))
 		arg = cmdline;
 	else {
-		if (!(vm->flags & MVM_FLAGS_NO_BOOTIMAGE))
+		if (!(vm->flags & VM_FLAGS_NO_BOOTIMAGE))
 			arg = (char *)hdr->cmdline;
 	}
 
@@ -354,8 +354,8 @@ static int linux_setup_env(struct vm *vm, char *cmdline)
 	fdt_setup_memory(vbase, vm->mem_start, vm->mem_size, vm->bit64);
 	fdt_set_gic(vbase, vm->vm_config->gic_type);
 
-	if (!(vm->flags & (MVM_FLAGS_NO_RAMDISK))) {
-		if (vm->flags & MVM_FLAGS_NO_BOOTIMAGE) {
+	if (!(vm->flags & (VM_FLAGS_NO_RAMDISK))) {
+		if (vm->flags & VM_FLAGS_NO_BOOTIMAGE) {
 			struct stat stbuf;
 			if (fstat(vm->rfd, &stbuf) != 0)
 				return -EINVAL;
@@ -412,7 +412,7 @@ static int linux_load_bootimage(struct vm *vm)
 	tmp += (hdr->kernel_size + hdr->page_size - 1) / hdr->page_size;
 
 	/* load the ramdisk image */
-	if (vm->flags & (MVM_FLAGS_NO_RAMDISK))
+	if (vm->flags & (VM_FLAGS_NO_RAMDISK))
 		goto load_dtb;
 
 	load_offset = hdr->ramdisk_addr - vm->mem_start;
@@ -489,7 +489,7 @@ static int linux_load_images(struct vm *vm)
 		return -EIO;
 	}
 
-	if (vm->flags & MVM_FLAGS_NO_RAMDISK)
+	if (vm->flags & VM_FLAGS_NO_RAMDISK)
 		return 0;
 
 	ret = load_spare_image(vm->rfd, base + 0x3000000);
@@ -503,7 +503,7 @@ static int linux_load_images(struct vm *vm)
 
 static int linux_load_image(struct vm *vm)
 {
-	if (vm->flags & MVM_FLAGS_NO_BOOTIMAGE)
+	if (vm->flags & VM_FLAGS_NO_BOOTIMAGE)
 		return linux_load_images(vm);
 	else
 		return linux_load_bootimage(vm);
@@ -550,7 +550,7 @@ static int linux_early_init(struct vm *vm)
 {
 	int ret = 0;
 
-	if (vm->flags & MVM_FLAGS_NO_BOOTIMAGE)
+	if (vm->flags & VM_FLAGS_NO_BOOTIMAGE)
 		ret = linux_parse_image(vm);
 	else
 		ret = linux_parse_bootimage(vm);

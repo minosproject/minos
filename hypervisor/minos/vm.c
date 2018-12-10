@@ -260,6 +260,8 @@ static int vm_resume(struct vm *vm)
 	}
 
 	do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_RESUME_VM);
+	trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
+			VMTRAP_REASON_VM_RESUMED, 0, NULL);
 
 	return 0;
 }

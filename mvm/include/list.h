@@ -9,7 +9,7 @@ struct list_head{
 	struct list_head *next, *pre;
 };
 
-#define LIST_HEAD(list)	\
+#define __LIST_HEAD(list)	\
 struct list_head list = {	\
 	.next = &list,	\
 	.pre  = &list,	\

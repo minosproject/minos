@@ -61,6 +61,7 @@
 #include <vdev.h>
 #include <mevent.h>
 #include <barrier.h>
+#include <list.h>
 
 struct vm *mvm_vm = NULL;
 static struct vm_config *global_config = NULL;
@@ -456,9 +457,13 @@ static int vcpu_handle_common_trap(struct vm *vm, int trap_reason,
 		mvm_queue_push(&vm->queue, trap_reason, NULL, 0);
 		break;
 	case VMTRAP_REASON_VM_SUSPEND:
+		vm->state = VM_STAT_SUSPEND;
 		pr_info("vm-%d is suspend\n", vm->vmid);
 		break;
-
+	case VMTRAP_REASON_VM_RESUMED:
+		vm->state = VM_STAT_RUNNING;
+		pr_info("vm-%d is resumed\n", vm->vmid);
+		break;
 	default:
 		break;
 	}
@@ -691,8 +696,8 @@ static int mvm_main_loop(void)
 		}
 	}
 
-	ret = pthread_create(&vcpu_thread, NULL, mevent_dispatch,
-			(void *)(unsigned long)(vm->vmid));
+	ret = pthread_create(&vcpu_thread, NULL,
+			mevent_dispatch, (void *)vm);
 	if (ret) {
 		pr_err("create mevent thread failed\n");
 		return ret;
@@ -719,7 +724,7 @@ static int mvm_main_loop(void)
 
 static int mvm_open_images(struct vm *vm, struct vm_config *config)
 {
-	if (config->flags & MVM_FLAGS_NO_BOOTIMAGE) {
+	if (config->flags & VM_FLAGS_NO_BOOTIMAGE) {
 		vm->kfd = open(config->kernel_image, O_RDONLY | O_NONBLOCK);
 		if (vm->kfd < 0) {
 			pr_err("can not open the kernel image file %s\n",
@@ -734,11 +739,11 @@ static int mvm_open_images(struct vm *vm, struct vm_config *config)
 			return -ENOENT;
 		}
 
-		if (!(config->flags & MVM_FLAGS_NO_RAMDISK)) {
+		if (!(config->flags & VM_FLAGS_NO_RAMDISK)) {
 			vm->rfd = open(config->ramdisk_image,
 					O_RDONLY | O_NONBLOCK);
 			if (vm->rfd < 0)
-				config->flags |= MVM_FLAGS_NO_RAMDISK;
+				config->flags |= VM_FLAGS_NO_RAMDISK;
 		}
 	} else {
 		/* read the image to get the entry and other args */
@@ -906,7 +911,7 @@ static int check_vm_config(struct vm_config *config)
 {
 	/* default will use bootimage as the vm image */
 	if (config->bootimage_path[0] == 0) {
-		config->flags |= MVM_FLAGS_NO_BOOTIMAGE;
+		config->flags |= VM_FLAGS_NO_BOOTIMAGE;
 		if ((config->kernel_image[0] == 0) ||
 				config->dtb_image[0] == 0) {
 			pr_err("no bootimage and kernel image\n");
@@ -914,7 +919,7 @@ static int check_vm_config(struct vm_config *config)
 		}
 
 		if (config->ramdisk_image[0] == 0)
-			config->flags |= MVM_FLAGS_NO_RAMDISK;
+			config->flags |= VM_FLAGS_NO_RAMDISK;
 	}
 
 	if (config->vm_info.nr_vcpus > VM_MAX_VCPUS) {
@@ -1004,7 +1009,7 @@ int main(int argc, char **argv)
 			vm_info->bit64 = ret == 64 ? 1 : 0;
 			break;
 		case 'r':
-			global_config->flags |= MVM_FLAGS_NO_RAMDISK;
+			global_config->flags |= VM_FLAGS_NO_RAMDISK;
 			break;
 		case 'v':
 			verbose = 1;
@@ -1033,7 +1038,7 @@ int main(int argc, char **argv)
 			print_usage();
 			return 0;
 		case '3':
-			global_config->flags |= MVM_FLAGS_HAS_EARLYPRINTK;
+			global_config->flags |= VM_FLAGS_HAS_EARLYPRINTK;
 			break;
 		case '2':
 			global_config->gic_type = 2;

@@ -11,7 +11,6 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/ioctl.h>
-#include <list.h>
 #include <sys/uio.h>
 #include <linux/netlink.h>
 
@@ -20,121 +19,12 @@
 #include <vmcs.h>
 #include <barrier.h>
 #include <mvm_queue.h>
+#include <debug.h>
+#include <list.h>
+#include <os.h>
+#include <vm.h>
 
-#define MAXCOMLEN	(19)
-
-/*
- * MVM_FLAGS_NO_RAMDISK - used for linux to indicate
- * that the system has no ramdisk image
- */
-#define MVM_FLAGS_NO_RAMDISK		(1 << 0)
-#define MVM_FLAGS_NO_BOOTIMAGE		(1 << 1)
-#define MVM_FLAGS_HAS_EARLYPRINTK	(1 << 2)
-
-#define DEFINE_OS(os) \
-	static void *os_##os __section("mvm_os") __used = &os;
-
-extern void *__start_mvm_os;
-extern void *__stop_mvm_os;
-
-extern int verbose;
-
-#define pr_debug(...)	\
-	do {			\
-		if (verbose)	\
-			printf("[DEBUG] " __VA_ARGS__); \
-	} while (0)
-
-#define pr_err(...)	printf("[ERROR] " __VA_ARGS__)
-#define pr_info(...)	printf("[INFO ] " __VA_ARGS__)
-#define pr_warn(...)	printf("[WARN ] " __VA_ARGS__)
-
-struct vm;
-
-struct vm_os {
-	char *name;
-	int (*early_init)(struct vm *vm);
-	int (*load_image)(struct vm *vm);
-	int (*setup_vm_env)(struct vm *vm, char *cmdline);
-};
-
-#define OS_TYPE_LINUX		(1 << 0)
-
-struct vm_info {
-	char name[32];
-	char os_type[32];
-	int32_t nr_vcpus;
-	int32_t bit64;
-	uint64_t mem_size;
-	uint64_t mem_start;
-	uint64_t entry;
-	uint64_t setup_data;
-	uint64_t mmap_base;
-};
-
-#define VM_MAX_DEVICES	(10)
-
-struct device_info {
-	int nr_device;
-	int nr_virtio_dev;
-	char *device_args[VM_MAX_DEVICES];
-};
-
-struct vm_config {
-	unsigned long flags;
-	int gic_type;
-	struct vm_info vm_info;
-	struct device_info device_info;
-	char bootimage_path[256];
-	char cmdline[256];
-	char kernel_image[256];
-	char dtb_image[256];
-	char ramdisk_image[256];
-};
-
-/*
- * vmid	 : vmid allocated by hypervisor
- * flags : some flags of this vm
- * os	 : the os of this vm
- */
-struct vm {
-	int vmid;
-	int vm_fd;
-	int image_fd;
-	int kfd;
-	int dfd;
-	int rfd;
-	unsigned long flags;
-	struct vm_os *os;
-	void *os_data;
-	void *mmap;
-
-	/* information of the vm */
-	char name[32];
-	char os_type[32];
-	int32_t nr_vcpus;
-	int bit64;
-	uint64_t mem_size;
-	uint64_t mem_start;
-	uint64_t entry;
-	uint64_t setup_data;
-	uint64_t hvm_paddr;
-
-	struct vm_config *vm_config;
-	struct mvm_queue queue;
-
-	void *vmcs;
-	int *eventfds;
-	int *epfds;
-	int *irqs;
-
-	struct list_head vdev_list;
-};
-
-extern struct vm *mvm_vm;
-
-#define gpa_to_hvm_va(gpa) \
-	(unsigned long)(mvm_vm->mmap + ((gpa) - mvm_vm->mem_start))
+#define MAXCOMLEN			(19)
 
 #define PAGE_SIZE			(4096)
 
@@ -153,15 +43,6 @@ extern struct vm *mvm_vm;
 
 #define VM_MAX_VCPUS			(8)
 
-#define VMCS_SIZE(nr) 	BALIGN(nr * sizeof(struct vmcs), PAGE_SIZE)
-
-void *map_vm_memory(struct vm *vm);
-
-static inline void send_virq_to_vm(int virq)
-{
-	ioctl(mvm_vm->vm_fd, IOCTL_SEND_VIRQ, (long)virq);
-}
-
-void *hvm_map_iomem(void *base, size_t size);
+#define VMCS_SIZE(nr)			BALIGN(nr * sizeof(struct vmcs), PAGE_SIZE)
 
 #endif

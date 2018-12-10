@@ -43,6 +43,7 @@
 #include <string.h>
 
 #include "mevent.h"
+#include <vm.h>
 
 #define	MEVENT_MAX	64
 
@@ -293,11 +294,11 @@ void *mevent_dispatch(void *data)
 	struct epoll_event eventlist[MEVENT_MAX];
 	struct mevent *pipev;
 	int ret;
-	int vmid;
+	struct vm *vm;
 
-	vmid = (int)(unsigned long)data;
+	vm = (struct vm *)data;
 	mevent_tid = pthread_self();
-	mevent_set_name(vmid);
+	mevent_set_name(vm->vmid);
 
 	/*
 	 * Open the pipe that will be used for other threads to force
@@ -323,6 +324,9 @@ void *mevent_dispatch(void *data)
 		ret = epoll_wait(epoll_fd, eventlist, MEVENT_MAX, -1);
 		if (ret == -1 && errno != EINTR)
 			perror("Error return from epoll_wait");
+
+		if (vm->state == VM_STAT_SUSPEND)
+			continue;
 
 		/*
 		 * Handle reported events
