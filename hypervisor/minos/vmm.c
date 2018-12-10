@@ -269,6 +269,26 @@ out:
 	return ret;
 }
 
+void *map_vm_mem(unsigned long gva, size_t size)
+{
+	unsigned long pa;
+
+	/* assume the memory is continuously */
+	pa = guest_va_to_pa(gva, 1);
+	if (create_host_mapping(pa, pa, size, 0))
+		return NULL;
+
+	return (void *)pa;
+}
+
+void unmap_vm_mem(unsigned long gva, size_t size)
+{
+	unsigned long pa;
+
+	pa = guest_va_to_pa(gva, 1);
+	destroy_host_mapping(pa, size);
+}
+
 int vm_mmap(struct vm *vm, unsigned long offset, unsigned long size)
 {
 	unsigned long vir, phy, value;
@@ -491,20 +511,6 @@ int vm_mm_init(struct vm *vm)
 
 int vmm_init(void)
 {
-	struct memory_region *region;
-
-	/* map vm0 normal memory to host memory space */
-	list_for_each_entry(region, &mem_list, list) {
-		if (region->type != MEM_TYPE_NORMAL)
-			continue;
-
-		if (region->vmid != 0)
-			continue;
-
-		create_host_mapping(region->phy_base, region->phy_base,
-				region->size, region->type);
-	}
-
 	return 0;
 }
 

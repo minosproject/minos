@@ -71,7 +71,9 @@ void *vm_alloc_pages(struct vm *vm, int pages);
 
 unsigned long create_hvm_iomem_map(unsigned long phy, uint32_t size);
 void destroy_hvm_iomem_map(unsigned long vir, uint32_t size);
-
 int create_early_pmd_mapping(unsigned long vir, unsigned long phy);
+
+void *map_vm_mem(unsigned long gva, size_t size);
+void unmap_vm_mem(unsigned long gva, size_t size);
 
 #endif

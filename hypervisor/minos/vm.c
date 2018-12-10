@@ -113,9 +113,10 @@ int create_new_vm(struct vm_info *info)
 	struct vm *vm;
 	struct vmtag vme;
 	size_t size;
-	struct vm_info *vm_info = (struct vm_info *)
-			guest_va_to_pa((unsigned long)info, 1);
+	struct vm_info *vm_info;
 
+	vm_info = (struct vm_info *)map_vm_mem((unsigned long)info,
+			sizeof(struct vm_info));
 	if (!vm_info)
 		return VMID_INVALID;
 
@@ -131,16 +132,16 @@ int create_new_vm(struct vm_info *info)
 		vm_info->mem_start = GVM_NORMAL_MEM_START;
 
 	if (vm_info->mem_start < GVM_NORMAL_MEM_START)
-		return -EINVAL;
+		goto unmap_info;
 
 	if ((vm_info->mem_start + size) >= GVM_NORMAL_MEM_END)
-		return -EINVAL;
+		goto unmap_info;
 
 	if (!has_enough_memory(size))
-		return -ENOMEM;
+		goto unmap_info;
 
 	if (vm_info->nr_vcpus > NR_CPUS)
-		return -EINVAL;
+		goto unmap_info;
 
 	memset(&vme, 0, sizeof(struct vmtag));
 	vminfo_to_vmtag(vm_info, &vme);
@@ -165,11 +166,14 @@ int create_new_vm(struct vm_info *info)
 		goto release_vm;
 
 	dsb();
+	unmap_vm_mem((unsigned long)info, sizeof(struct vm_info));
 
 	return (vm->vmid);
 
 release_vm:
 	destroy_vm(vm);
+unmap_info:
+	unmap_vm_mem((unsigned long)info, sizeof(struct vm_info));
 
 	return -ENOMEM;
 }
