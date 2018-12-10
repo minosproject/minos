@@ -436,4 +436,5 @@ void hvm_dtb_init(struct vm *vm)
 
 	fdt_pack(dtb);
 	flush_dcache_range((unsigned long)dtb, MAX_DTB_SIZE);
+	destroy_host_mapping((unsigned long)dtb, MAX_DTB_SIZE);
 }
