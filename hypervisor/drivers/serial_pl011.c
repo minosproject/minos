@@ -1,17 +1,17 @@
 /*
- * Copyright (C) 2018 Min Le (lemin9538@gmail.com)
+ * copyright (c) 2018 min le (lemin9538@gmail.com)
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
+ * this program is free software; you can redistribute it and/or modify
+ * it under the terms of the gnu general public license version 2 as
+ * published by the free software foundation.
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * this program is distributed in the hope that it will be useful,
+ * but without any warranty; without even the implied warranty of
+ * merchantability or fitness for a particular purpose.  see the
+ * gnu general public license for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ * you should have received a copy of the gnu general public license
+ * along with this program.  if not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <minos/errno.h>
@@ -22,12 +22,22 @@
 
 static void *base = NULL;
 
-int pl011_init(void *addr)
+int pl011_init(void *addr, int clock, int baudrate)
 {
+	unsigned int temp;
+	unsigned int divider;
+	unsigned int remainder;
+	unsigned int fraction;
+
 	if (!addr)
 		return -EINVAL;
 
 	base = addr;
+	temp = 16 * baudrate;
+	divider = clock / temp;
+	remainder = clock % temp;
+	temp = (8 * remainder) / baudrate;
+	fraction = (temp >> 1) + (temp & 1);
 
 	iowrite32(0x0, base + UARTCR);
 	iowrite32(0x0, base + UARTECR);
@@ -35,8 +45,9 @@ int pl011_init(void *addr)
 		  PL011_LCR_ONE_STOP_BIT | \
 		  PL011_LCR_PARITY_DISABLE | \
 		  PL011_LCR_BREAK_DISABLE, base + UARTLCR_H);
-	iowrite32(PL011_IBRD_DIV_38400, base + UARTIBRD);
-	iowrite32(PL011_FBRD_DIV_38400, base + UARTFBRD);
+
+	iowrite32(divider, base + UARTIBRD);
+	iowrite32(fraction, base + UARTFBRD);
 
 	iowrite32(0X0, base + UARTIMSC);
 	iowrite32(PL011_ICR_CLR_ALL_IRQS, base + UARTICR);

@@ -15,14 +15,19 @@
  */
 
 #include <config/config.h>
+#include <drivers/serial.h>
 
-extern int mvebu_serial_probe(void *addr);
-extern void serial_mvebu_putc(char ch);
-extern char serial_mvebu_getc(void);
+int bcm283x_mu_putc(char c);
+char bcm283x_mu_getc(void);
+int bcm283x_mu_init(void *base, int clk, int baud);
 
-extern int pl011_init(void *addr);
-extern void serial_pl011_putc(char ch);
-extern char serial_pl011_getc(void);
+int mvebu_serial_probe(void *addr);
+void serial_mvebu_putc(char ch);
+char serial_mvebu_getc(void);
+
+int pl011_init(void *addr, int clock, int baud);
+void serial_pl011_putc(char ch);
+char serial_pl011_getc(void);
 
 int serial_init(void)
 {
@@ -31,19 +36,28 @@ int serial_init(void)
 #endif
 
 #ifdef CONFIG_PLATFORM_FVP
-	return  pl011_init((void *)0x1c090000);
+	return  pl011_init((void *)0x1c090000, 24000000, 115200);
 #endif
+
+#ifdef CONFIG_PLATFORM_RASPBERRY3
+	return bcm283x_mu_init((void *)0x3f215040, 250000000, 115200);
+#endif
+
 	return 0;
 }
 
 void serial_putc(char ch)
 {
 #ifdef CONFIG_PLATFORM_ARMADA
-	return serial_mvebu_putc(ch);
+	serial_mvebu_putc(ch);
 #endif
 
 #ifdef CONFIG_PLATFORM_FVP
-	return serial_pl011_putc(ch);
+	serial_pl011_putc(ch);
+#endif
+
+#ifdef CONFIG_PLATFORM_RASPBERRY3
+	bcm283x_mu_putc(ch);
 #endif
 }
 
@@ -55,6 +69,10 @@ char serial_getc(void)
 
 #ifdef CONFIG_PLATFORM_FVP
 	return serial_pl011_getc();
+#endif
+
+#ifdef CONFIG_PLATFORM_RASPBERRY3
+	return bcm283x_mu_getc();
 #endif
 	return 0;
 }
