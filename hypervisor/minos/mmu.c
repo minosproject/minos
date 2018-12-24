@@ -428,6 +428,9 @@ int create_early_pmd_mapping(unsigned long vir, unsigned long phy)
 	extern unsigned char __el2_ttb0_pgd;
 	pgd_t *pgdp = (pgd_t *)&__el2_ttb0_pgd;
 
+	vir = vir & PMD_MASK;
+	phy = phy & PMD_MASK;
+
 	/*
 	 * create the early mapping for hypervisor
 	 * will map phy to phy mapping, the pages needed
