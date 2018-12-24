@@ -63,8 +63,6 @@ void platform_early_init(void)
 	struct platform **pp;
 	struct platform *p;
 
-	log_init();
-
 	pstart =(unsigned long)&__platform_start;
 	pend = (unsigned long)&__platform_end;
 	count = (pend - pstart) / sizeof(struct platform *);
