@@ -30,6 +30,28 @@ extern int el2_stage1_init(void);
 extern int of_init(void *setup_data);
 extern void hvm_dtb_init(struct vm *vm);
 
+void arch_set_virq_flag(void)
+{
+	uint64_t hcr_el2;
+
+	dsb();
+	hcr_el2 = read_sysreg(HCR_EL2);
+	hcr_el2 |= HCR_EL2_VI;
+	write_sysreg(hcr_el2, HCR_EL2);
+	dsb();
+}
+
+void arch_clear_virq_flag(void)
+{
+	uint64_t hcr_el2;
+
+	dsb();
+	hcr_el2 = read_sysreg(HCR_EL2);
+	hcr_el2 &= ~HCR_EL2_VI;
+	write_sysreg(hcr_el2, HCR_EL2);
+	dsb();
+}
+
 static void dump_register(gp_regs *regs)
 {
 	unsigned long spsr;

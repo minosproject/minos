@@ -69,6 +69,7 @@ struct vm {
 	int virq_same_page;
 	struct virq_desc *vspi_desc;
 	unsigned long *vspi_map;
+	void *inc_pdata;
 
 	void *vmcs;
 	void *hvm_vmcs;

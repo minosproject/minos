@@ -76,7 +76,7 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 	struct vcpu *vcpu;
 	struct os *os = caller->vm->os;
 
-	cpuid = affinity_to_vcpuid(affinity);
+	cpuid = affinity_to_cpuid(affinity);
 
 	/*
 	 * resched the pcpu since it may have in the

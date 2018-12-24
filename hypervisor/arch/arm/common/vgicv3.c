@@ -583,6 +583,7 @@ int vgicv3_create_vm(void *item, void *arg)
 	vgicv3_dev->vdev.write = vgic_mmio_write;
 	vgicv3_dev->vdev.deinit = vgic_deinit;
 	vgicv3_dev->vdev.reset = vgic_reset;
+	vm->inc_pdata = vgicv3_dev;
 
 	return 0;
 

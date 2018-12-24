@@ -74,7 +74,7 @@ static int gicv2_nr_lines;
 
 static DEFINE_PER_CPU(uint8_t, gic_cpu_id);
 
-extern int vigcv2_init(uint64_t *data, int len);
+extern int vgicv2_init(uint64_t *data, int len);
 
 /* Maximum cpu interface per GIC */
 #define NR_GIC_CPU_IF 8
@@ -189,7 +189,7 @@ static int gicv2_set_irq_affinity(uint32_t irq, uint32_t pcpu)
 	return 0;
 }
 
-static int gicv2_send_virq(struct virq_desc *virq)
+static int gicv2_send_virq(struct vcpu *vcpu, struct virq_desc *virq)
 {
 	uint32_t val;
 	uint32_t pid = 0;
@@ -221,7 +221,8 @@ static int gicv2_send_virq(struct virq_desc *virq)
 	return 0;
 }
 
-static int gicv2_update_virq(struct virq_desc *desc, int action)
+static int gicv2_update_virq(struct vcpu *vcpu,
+		struct virq_desc *desc, int action)
 {
 	if (!desc || desc->id >= gicv2_nr_lrs)
 		return -EINVAL;
@@ -295,7 +296,7 @@ static void gicv2_unmask_irq_cpu(uint32_t irq, int cpu)
 	pr_warn("not support unmask irq_percpu\n");
 }
 
-int gicv2_get_virq_state(struct virq_desc *virq)
+int gicv2_get_virq_state(struct vcpu *vcpu, struct virq_desc *virq)
 {
 	uint32_t value;
 
@@ -525,7 +526,7 @@ static int gicv2_init(int node)
 
 	spin_unlock(&gicv2_lock);
 
-	vigcv2_init(array, len);
+	vgicv2_init(array, len);
 	register_vcpu_vmodule("gicv2", gicv2_vmodule_init);
 
 	return 0;

@@ -329,7 +329,7 @@ static struct irq_domain *get_irq_domain(uint32_t irq)
 	return NULL;
 }
 
-static struct irq_desc *get_irq_desc(uint32_t irq)
+struct irq_desc *get_irq_desc(uint32_t irq)
 {
 	struct irq_domain *domain;
 
@@ -358,22 +358,22 @@ static struct irq_desc *get_irq_desc_cpu(uint32_t irq, int cpu)
 	return NULL;
 }
 
-void irq_update_virq(struct virq_desc *virq, int action)
+void irq_update_virq(struct vcpu *vcpu, struct virq_desc *virq, int action)
 {
 	if (irq_chip->update_virq)
-		irq_chip->update_virq(virq, action);
+		irq_chip->update_virq(vcpu, virq, action);
 }
 
-void irq_send_virq(struct virq_desc *virq)
+void irq_send_virq(struct vcpu *vcpu, struct virq_desc *virq)
 {
 	if (irq_chip->send_virq)
-		irq_chip->send_virq(virq);
+		irq_chip->send_virq(vcpu, virq);
 }
 
-int irq_get_virq_state(struct virq_desc *virq)
+int irq_get_virq_state(struct vcpu *vcpu, struct virq_desc *virq)
 {
 	if (irq_chip->get_virq_state)
-		return irq_chip->get_virq_state(virq);
+		return irq_chip->get_virq_state(vcpu, virq);
 
 	return 0;
 }
@@ -462,29 +462,31 @@ int do_irq_handler(void)
 	struct irq_domain *d;
 	int ret = 0;
 
-	irq = irq_chip->get_pending_irq();
+	while (1) {
+		irq = irq_chip->get_pending_irq();
+		if (irq == BAD_IRQ)
+			return 0;
 
-	d = get_irq_domain(irq);
-	if (!d) {
-		ret = -ENOENT;
-		goto error;
+		d = get_irq_domain(irq);
+		if (!d) {
+			ret = -ENOENT;
+			goto error;
+		}
+
+		irq_chip->irq_eoi(irq);
+
+		irq_desc = d->ops->get_irq_desc(d, irq);
+		if (!irq_desc) {
+			pr_error("irq is not actived %d\n", irq);
+			ret = -EINVAL;
+			goto error;
+		}
+
+		if (d->ops->irq_handler(d, irq_desc))
+			pr_warn("handing %d irq failed\n", irq);
 	}
 
-	/*
-	 * TBD - here we need deactive the irq
-	 * for arm write the ICC_EOIR1_EL1 register
-	 * to drop the priority
-	 */
-	irq_chip->irq_eoi(irq);
-
-	irq_desc = d->ops->get_irq_desc(d, irq);
-	if (!irq_desc) {
-		pr_error("irq is not actived %d\n", irq);
-		ret = -EINVAL;
-		goto error;
-	}
-
-	return d->ops->irq_handler(d, irq_desc);
+	return 0;
 
 error:
 	do_bad_int(irq);

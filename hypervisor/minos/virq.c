@@ -343,26 +343,60 @@ void clear_pending_virq(struct vcpu *vcpu, uint32_t irq)
 	struct virq_struct *virq_struct = vcpu->virq_struct;
 
 	desc = get_virq_desc(vcpu, irq);
-	if (!desc || desc->state != VIRQ_STATE_PENDING)
+	if (!desc || desc->state != VIRQ_STATE_ACTIVE)
 		return;
 
 	/*
 	 * this function can only called by the current
 	 * running vcpu and excuted on the related pcpu
+	 *
+	 * check wether the virq is pending agagin, if yes
+	 * do not delete it from the pending list, instead
+	 * of add it to the tail of the pending list
+	 *
 	 */
 	spin_lock_irqsave(&virq_struct->lock, flags);
-	irq_update_virq(desc, VIRQ_ACTION_REMOVE);
 	if (desc->list.next != NULL)
 		list_del(&desc->list);
 
-	desc->id = VIRQ_INVALID_ID;
-	desc->state = VIRQ_STATE_INACTIVE;
-	clear_bit(desc->id, virq_struct->irq_bitmap);
+	if (virq_is_pending(desc)) {
+		list_add_tail(&virq_struct->pending_list, &desc->list);
+		desc->state = VIRQ_STATE_PENDING;
+		goto out;
+	}
 
+	desc->state = VIRQ_STATE_INACTIVE;
+	irq_update_virq(vcpu, desc, VIRQ_ACTION_CLEAR);
+out:
 	spin_unlock_irqrestore(&virq_struct->lock, flags);
 }
 
-static int irq_enter_to_guest(void *item, void *data)
+uint32_t get_pending_virq(struct vcpu *vcpu)
+{
+	unsigned long flags;
+	struct virq_desc *desc;
+	struct virq_struct *virq_struct = vcpu->virq_struct;
+
+	spin_lock_irqsave(&virq_struct->lock, flags);
+	if (is_list_empty(&virq_struct->pending_list)) {
+		spin_unlock_irqrestore(&virq_struct->lock, flags);
+		return BAD_IRQ;
+	}
+
+	/* get the pending virq and delete it from pending list */
+	desc = list_first_entry(&virq_struct->pending_list,
+			struct virq_desc, list);
+	list_del(&desc->list);
+	desc->list.next = NULL;
+	desc->state = VIRQ_STATE_ACTIVE;
+	virq_clear_pending(desc);
+
+	spin_unlock_irqrestore(&virq_struct->lock, flags);
+
+	return desc->vno;
+}
+
+static int __used irq_enter_to_guest(void *item, void *data)
 {
 	/*
 	 * here we send the real virq to the vcpu
@@ -381,8 +415,9 @@ static int irq_enter_to_guest(void *item, void *data)
 			pr_error("virq is not request %d %d\n", virq->vno, virq->id);
 			virq->state = 0;
 			if (virq->id != VIRQ_INVALID_ID)
-				irq_update_virq(virq, VIRQ_ACTION_CLEAR);
+				irq_update_virq(vcpu, virq, VIRQ_ACTION_CLEAR);
 			list_del(&virq->list);
+			virq->list.next = NULL;
 			continue;
 		}
 
@@ -401,7 +436,7 @@ static int irq_enter_to_guest(void *item, void *data)
 		set_bit(id, virq_struct->irq_bitmap);
 
 __do_send_virq:
-		irq_send_virq(virq);
+		irq_send_virq(vcpu, virq);
 		virq->state = VIRQ_STATE_PENDING;
 		virq_clear_pending(virq);
 		dsb();
@@ -414,7 +449,7 @@ __do_send_virq:
 	return 0;
 }
 
-static int irq_exit_from_guest(void *item, void *data)
+static int __used irq_exit_from_guest(void *item, void *data)
 {
 	/*
 	 * here we update the states of the irq state
@@ -432,7 +467,7 @@ static int irq_exit_from_guest(void *item, void *data)
 
 	list_for_each_entry_safe(virq, n, &virq_struct->active_list, list) {
 
-		status = irq_get_virq_state(virq);
+		status = irq_get_virq_state(vcpu, virq);
 
 		/*
 		 * the virq has been handled by the VCPU, if
@@ -442,7 +477,7 @@ static int irq_exit_from_guest(void *item, void *data)
 		 */
 		if (status == VIRQ_STATE_INACTIVE) {
 			if (!virq_is_pending(virq)) {
-				irq_update_virq(virq, VIRQ_ACTION_CLEAR);
+				irq_update_virq(vcpu, virq, VIRQ_ACTION_CLEAR);
 				clear_bit(virq->id, virq_struct->irq_bitmap);
 				virq->state = VIRQ_STATE_INACTIVE;
 				list_del(&virq->list);
@@ -450,7 +485,7 @@ static int irq_exit_from_guest(void *item, void *data)
 				virq->list.next = NULL;
 				virq_struct->active_count--;
 			} else {
-				irq_update_virq(virq, VIRQ_ACTION_CLEAR);
+				irq_update_virq(vcpu, virq, VIRQ_ACTION_CLEAR);
 				list_del(&virq->list);
 				list_add_tail(&virq_struct->pending_list, &virq->list);
 			}
@@ -749,10 +784,12 @@ static int virq_destroy_vm(void *item, void *data)
 
 void virqs_init(void)
 {
+#ifndef CONFIG_LEGACY_INT_VIRT
 	register_hook(irq_exit_from_guest,
 			MINOS_HOOK_TYPE_EXIT_FROM_GUEST);
 	register_hook(irq_enter_to_guest,
 			MINOS_HOOK_TYPE_ENTER_TO_GUEST);
+#endif
 
 	register_hook(virq_create_vm, MINOS_HOOK_TYPE_CREATE_VM);
 	register_hook(virq_destroy_vm, MINOS_HOOK_TYPE_DESTROY_VM);

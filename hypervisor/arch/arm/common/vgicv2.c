@@ -50,10 +50,20 @@ struct vgicv2_info {
 	unsigned long gicv_size;
 };
 
+struct vgicc {
+	struct vdev vdev;
+	uint32_t gicc_ctlr;
+	uint32_t gicc_pmr;
+	uint32_t gicc_bpr;
+};
+
 static struct vgicv2_info vgicv2_info;
 
 #define vdev_to_vgicv2(vdev) \
 	(struct vgicv2_dev *)container_of(vdev, struct vgicv2_dev, vdev)
+
+#define vdev_to_vgicc(vdev) \
+	(struct vgicc *)container_of(vdev, struct vgicc, vdev);
 
 static uint32_t vgicv2_get_virq_type(struct vcpu *vcpu, uint32_t offset)
 {
@@ -355,6 +365,100 @@ static void vgicv2_deinit(struct vdev *vdev)
 	free(dev);
 }
 
+static int vgicc_read(struct vdev *vdev, gp_regs *reg,
+		unsigned long address, unsigned long *value)
+{
+	unsigned long offset = address - VGICV2_GICC_GVM_BASE;
+	struct vgicc *vgicc = vdev_to_vgicc(vdev);
+
+	switch (offset) {
+	case GICC_CTLR:
+		*value = vgicc->gicc_ctlr;
+		break;
+	case GICC_PMR:
+		*value = vgicc->gicc_pmr;
+		break;
+	case GICC_BPR:
+		*value = vgicc->gicc_bpr;
+		break;
+	case GICC_IAR:
+		/* get the pending irq number */
+		*value = get_pending_virq(current_vcpu);
+		break;
+	case GICC_RPR:
+		/* TBD - now fix to 0xa0 */
+		*value = 0xa0;
+		break;
+	case GICC_HPPIR:
+		/* TBD - now fix to 0xa0 */
+		*value = 0xa0;
+		break;
+	case GICC_IIDR:
+		*value = 0x43b | (0x2 << 16);
+		break;
+	}
+
+	return 0;
+}
+
+static int vgicc_write(struct vdev *vdev, gp_regs *reg,
+		unsigned long address, unsigned long *value)
+{
+	unsigned long offset = address - VGICV2_GICC_GVM_BASE;
+	struct vgicc *vgicc = vdev_to_vgicc(vdev);
+
+	switch (offset) {
+	case GICC_CTLR:
+		vgicc->gicc_ctlr = *value;
+		break;
+	case GICC_PMR:
+		vgicc->gicc_pmr = *value;
+		break;
+	case GICC_BPR:
+		vgicc->gicc_bpr = *value;
+		break;
+	case GICC_EOIR:
+		clear_pending_virq(current_vcpu, *value);
+		break;
+	case GICC_DIR:
+		/* if the virq is hw to deactive it TBD */
+		break;
+	}
+
+	return 0;
+}
+
+static void vgicc_reset(struct vdev *vdev)
+{
+}
+
+static void vgicc_deinit(struct vdev *vdev)
+{
+	vdev_release(vdev);
+	free(vdev);
+}
+
+static int vgicv2_create_vgicc(struct vm *vm,
+		unsigned long base, size_t size)
+{
+	struct vgicc *vgicc;
+
+	vgicc = zalloc(sizeof(struct vdev));
+	if (!vgicc) {
+		pr_error("no memory for vgicv2 vgicc\n");
+		return -ENOMEM;
+	}
+
+	host_vdev_init(vm, &vgicc->vdev, base, size);
+	vdev_set_name(&vgicc->vdev, "vgicv2_vgicc");
+	vgicc->vdev.read = vgicc_read;
+	vgicc->vdev.write = vgicc_write;
+	vgicc->vdev.reset = vgicc_reset;
+	vgicc->vdev.deinit = vgicc_deinit;
+
+	return 0;
+}
+
 int vgicv2_create_vm(void *item, void *arg)
 {
 	struct vm *vm = (struct vm *)item;
@@ -386,6 +490,7 @@ int vgicv2_create_vm(void *item, void *arg)
 	dev->vdev.write = vgicv2_mmio_write;
 	dev->vdev.deinit = vgicv2_deinit;
 	dev->vdev.reset = vgicv2_reset;
+	vm->inc_pdata = dev;
 
 	/* map the gicc memory for guest */
 	if (vm_is_native(vm)) {
@@ -396,13 +501,21 @@ int vgicv2_create_vm(void *item, void *arg)
 		size = VGICV2_GICC_GVM_SIZE;
 	}
 
-	create_guest_mapping(vm, base, vgicv2_info.gicv_base,
-			size, VM_IO);
+	/*
+	 * if the gicc base is seted indicate that
+	 * platform has a hardware gicv2, otherwise
+	 * we need to emulated the trap.
+	 */
+	if (vgicv2_info.gicc_base != 0)
+		create_guest_mapping(vm, base,
+				vgicv2_info.gicv_base, size, VM_IO);
+	else
+		vgicv2_create_vgicc(vm, base, size);
 
 	return 0;
 }
 
-int vigcv2_init(uint64_t *data, int len)
+int vgicv2_init(uint64_t *data, int len)
 {
 	int i;
 	unsigned long *value = (unsigned long *)&vgicv2_info;

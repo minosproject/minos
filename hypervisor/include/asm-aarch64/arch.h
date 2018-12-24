@@ -112,7 +112,7 @@ static inline void arch_restore_irqflags(unsigned long flags)
 #define read_sysreg(name)     read_sysreg64(name)
 #define write_sysreg(v, name) write_sysreg64(v, name)
 
-static inline int affinity_to_vcpuid(unsigned long affinity)
+static inline int affinity_to_cpuid(unsigned long affinity)
 {
 	int aff0, aff1;
 
@@ -291,5 +291,7 @@ void arch_dump_stack(gp_regs *regs, unsigned long *sp);
 unsigned long arch_get_fp(void);
 unsigned long arch_get_lr(void);
 void arch_hvm_init(struct vm *vm);
+void arch_set_virq_flag(void);
+void arch_clear_virq_flag(void);
 
 #endif

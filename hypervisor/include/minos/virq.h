@@ -3,6 +3,7 @@
 
 #include <minos/vcpu.h>
 #include <minos/cpumask.h>
+#include <config/config.h>
 
 struct irqtag;
 
@@ -24,7 +25,12 @@ struct irqtag;
 #define VM_PPI_VIRQ_NR		(16)
 #define VM_LOCAL_VIRQ_NR	(VM_SGI_VIRQ_NR + VM_PPI_VIRQ_NR)
 
+#ifndef CONFIG_HVM_SPI_VIRQ_NR
 #define HVM_SPI_VIRQ_NR		(384)
+#else
+#define HVM_SPI_VIRQ_NR		CONFIG_HVM_SPI_VIRQ_NR
+#endif
+
 #define HVM_SPI_VIRQ_BASE	(VM_LOCAL_VIRQ_NR)
 
 #define GVM_SPI_VIRQ_NR		(64)
@@ -178,6 +184,7 @@ int vcpu_has_irq(struct vcpu *vcpu);
 int alloc_vm_virq(struct vm *vm);
 void release_vm_virq(struct vm *vm, int virq);
 int virq_unmask_and_init(struct vm *vm, uint32_t virq);
+uint32_t get_pending_virq(struct vcpu *vcpu);
 
 static inline int alloc_hvm_virq(void)
 {

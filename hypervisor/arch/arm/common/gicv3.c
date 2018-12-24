@@ -267,7 +267,7 @@ static void gicv3_write_lr(int lr, uint64_t val)
 	isb();
 }
 
-static int gicv3_send_virq(struct virq_desc *virq)
+static int gicv3_send_virq(struct vcpu *vcpu, struct virq_desc *virq)
 {
 	uint64_t value = 0;
 	struct gic_lr *lr = (struct gic_lr *)&value;
@@ -289,7 +289,8 @@ static int gicv3_send_virq(struct virq_desc *virq)
 	return 0;
 }
 
-static int gicv3_update_virq(struct virq_desc *desc, int action)
+static int gicv3_update_virq(struct vcpu *vcpu,
+		struct virq_desc *desc, int action)
 {
 	if (!desc || desc->id >= gicv3_nr_lr)
 		return -EINVAL;
@@ -433,7 +434,7 @@ static void gicv3_wakeup_gicr(void)
 			& GICR_WAKER_CHILDREN_ASLEEP) != 0);
 }
 
-static int gicv3_get_virq_state(struct virq_desc *virq)
+static int gicv3_get_virq_state(struct vcpu *vcpu, struct virq_desc *virq)
 {
 	uint64_t value;
 
