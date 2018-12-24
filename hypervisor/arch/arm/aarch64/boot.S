@@ -52,42 +52,59 @@ do_start:
 	bl	smp_processor_id		// cpuid save to x19
 	mov	x19, x0
 
-	ldr	x1, =el2_vectors
-	msr	VBAR_EL2, x1
-
+#ifdef CONFIG_GIC_V3
 	mov	x0, #15
 	msr	ICC_SRE_EL2, x0
 	isb
 
 	msr	ICC_SRE_EL1, x0
 	isb
+#endif
 
 	msr	VTTBR_EL2, xzr
 	isb
 
-	// neither EL3 nor EL2 trap floating point or accesses to CPACR
+	/*
+	 * neither EL3 nor EL2 trap floating point or
+	 * accesses to CPACR
+	 */
 	msr	CPTR_EL2, xzr
+
+	/* using current EL stack register */
+	msr	spsel, #1
+	dsb	sy
 
 	/* each idle task will have 16k stack */
 	ldr	x0, =__el2_stack_end
 	sub	x0, x0, x19, lsl #IDLE_VCPU_STATCK_SHIFT
 	mov	sp, x0
 
+	ldr	x1, =el2_vectors
+	msr	VBAR_EL2, x1
+
 	/* invalid the dcache and flush the tlb */
 	bl	inv_dcache_all
+	isb
+	dsb	sy
 	tlbi	alle2
 	isb
+	dsb	sy
 
 	ldr	x1, =SCTLR_EL2_VALUE
 	msr	SCTLR_EL2, x1
+	dsb	sy
+	isb
 
 	/* setup the el2 page table */
 	ldr	x1, = __el2_ttb0_pgd
 	msr	TTBR0_EL2, x1
+	dsb	sy
+	isb
 
-	mov	x1, #0xff44
-	movk	x1, #4, lsl #16
+	ldr	x1, =0xff440c0400
 	msr	MAIR_EL2, x1
+	isb
+	dsb	sy
 
 	/* get the physical address range */
 	mrs	x0, ID_AA64MMFR0_EL1
@@ -107,122 +124,45 @@ do_start:
 	msr	TCR_EL2, x1
 	isb
 
+	/* idle vcpu is in EL2 */
 	mov	x1, #0x1c9
 	msr	spsr_el2, x1
 	isb
 
 	cbnz	x19, secondary_start_up
 
-	/*
-	 * map the code memory VA->PA, if need to using
-	 * dcache need to enable the MMU, first clear
-	 * the page table
-	 */
-	mov	x1, #0
-	mov	x2, #4096
-	ldr	x20, = __el2_ttb0_pgd
-	mov	x0, x20
-	bl	memset
-	ldr	x21, = __el2_ttb0_pud
-	mov	x0, x21
-	mov	x1, #0
-	mov	x2, #4096
-	bl	memset
-	ldr	x23, = __el2_ttb0_pmd_code
-	mov	x0, x23
-	mov	x1, #0
-	mov	x2, #4096
-	bl	memset
-	ldr	x24, = __el2_ttb0_pmd_io
-	mov	x0, x24
-	mov	x1, #0
-	mov	x2, #4096
-	bl	memset
-
-	ldr	x7, =0x1fffff
-	ldr	x8, =0xffffffffffe00000
-
-	mov	x0, x20
-	mov	x1, x21
-	ldr	x2, = CONFIG_MINOS_START_ADDRESS
-	ldr	x3, = CONFIG_MINOS_START_ADDRESS
-	ldr	x4, = CONFIG_MINOS_RAM_SIZE
-	add	x6, x2, x4
-	add	x6, x6, x7
-	and	x2, x2, x8
-	and	x3, x3, x8
-	and	x6, x6, x8
-	sub	x4, x6, x2	//get the real size in 2M align
-	bl	buid_l0_table
-
-	mov	x0, x21
-	mov	x1, x23
-	bl	build_l1_table
-
-	mov	x0, 0
-	mov	x5, #(TT_S1_ATTR_BLOCK | \
-		(1 << TT_S1_ATTR_MATTR_LSB) | \
-		TT_S1_ATTR_NS | \
-		TT_S1_ATTR_AP_RW_ANY | \
-		TT_S1_ATTR_SH_INNER | \
-		TT_S1_ATTR_AF | \
-		TT_S1_ATTR_nG)
-	bl	build_l2_table
-	dsb	ish
-
-	/* map the uart io space for early uart print */
-	ldr	x2, = CONFIG_UART_BASE
-	ldr	x3, = CONFIG_UART_BASE
-	ldr	x4, = CONFIG_UART_IO_SIZE
-	add	x6, x2, x4
-	add	x6, x6, x7
-	and	x2, x2, x8
-	and	x3, x3, x8
-	and	x6, x6, x8
-	sub	x4, x6, x2	//get the real size in 2M align
-
-	mov	x0, x21
-	mov	x1, x24
-	bl	build_l1_table
-
-	mov	x0, 0
-	mov	x5, #(TT_S1_ATTR_BLOCK | \
-		(2 << TT_S1_ATTR_MATTR_LSB) | \
-		TT_S1_ATTR_NS | \
-		TT_S1_ATTR_AP_RW_ANY | \
-		TT_S1_ATTR_AF | \
-		TT_S1_ATTR_nG)
-	bl	build_l2_table
-	dsb	ish
-
-	/* enable the mmu and disable the aligment check */
-	mrs	x1, SCTLR_EL2
-	orr	x1, x1, #SCTLR_ELx_M
-	bic	x1, x1, #SCTLR_ELx_A
-	bic	x1, x1, #SCTLR_ELx_SA
-	msr	SCTLR_EL2, x1
-	isb
-
-	dsb	ish
-	ic	ialluis
-	dsb	ish
-	isb
-
-	/* enable the dcache and the icache */
-	mrs	x1, SCTLR_EL2
-	orr	x1, x1, #SCTLR_ELx_C
-	orr	x1, x1, #SCTLR_ELx_I
-	msr	SCTLR_EL2, x1
-	dsb	sy
-	isb
-
 	ldr	x0, =__bss_start
 	mov	x1, #0
 	ldr	x2, =__bss_end
 	sub	x2, x2, x0
 	bl	memset
+	dsb	sy
 
-	/* init the uart */
+	/* map the boot memory when booting */
+	bl	map_boot_mem
+
+	ldr	x28, =mmu_on
+
+	/* enable the mmu and disable the aligment check */
+	mrs	x1, SCTLR_EL2
+	orr	x1, x1, #SCTLR_ELx_M
+	orr	x1, x1, #SCTLR_ELx_C
+	orr	x1, x1, #SCTLR_ELx_I
+	bic	x1, x1, #SCTLR_ELx_SA
+	bic	x1, x1, #SCTLR_ELx_A
+	dsb	sy
+	msr	SCTLR_EL2, x1
+	isb
+	br	x28
+
+mmu_on:
+	dsb	sy
+	isb
+	tlbi	alle2
+	dsb sy
+	isb
+
+	/* init the uart for hypervisor */
 	bl	serial_init
 	dsb	sy
 
@@ -233,20 +173,23 @@ do_start:
 secondary_start_up:
 	ldr	x1, =SCTLR_EL2_VALUE
 	msr	SCTLR_EL2, x1
-	dsb	sy
 	isb
+	dsb	sy
 
 	/* enable the dcache and the icache */
 	mrs	x1, SCTLR_EL2
 	orr	x1, x1, #SCTLR_ELx_C
 	orr	x1, x1, #SCTLR_ELx_I
-	bic	x1, x1, #SCTLR_ELx_A
-	bic	x1, x1, #SCTLR_ELx_SA
 	orr	x1, x1, #SCTLR_ELx_M
+	bic	x1, x1, #SCTLR_ELx_SA
+	bic	x1, x1, #SCTLR_ELx_A
+	dsb	sy
 	msr	SCTLR_EL2, x1
-	dsb	ish
+	isb
+
+	dsb	sy
 	ic	ialluis
-	dsb	ish
+	dsb	sy
 	isb
 
 	ldr	x1, =__smp_affinity_id
@@ -262,62 +205,3 @@ secondary_start_up:
 	/* here wait for boot cpu finish tht init work */
 	bl	boot_secondary
 	nop
-
-buid_l0_table:
-	/*
-	 * x0 : l0 table base
-	 * x1 : l1 table base
-	 * x2 : the virtual address
-	 * x3 : the physical address
-	 * x4 : map size
-	 * only map one entry (512G) at boot time
-	 */
-	ubfx	x11, x2, #39, #9
-	orr	x12, x1, #TT_S1_ATTR_TABLE
-	str	x12, [x0, x11, lsl #3]
-	ret
-
-build_l1_table:
-	/*
-	 * x0 : l1 table base
-	 * x1 : l2 table base
-	 * x2 : the virtual address
-	 * x3 : the physical address
-	 * x4 : map size
-	 * only map one entry (4G) at boot time
-	 */
-	ubfx	x11, x2, #30, #9
-	orr	x12, x1, #TT_S1_ATTR_TABLE
-	str	x12, [x0, x11, lsl #3]
-	ret
-
-build_l2_table:
-	/*
-	 * x0 - 0
-	 * x1 - level 2 table address
-	 * x2 - the virtual address
-	 * x3 - the physical address
-	 * x4 - the size
-	 * x5 - the entry attribute
-	 * 1G region, assume all the minos memory
-	 * are in the same 1G region, other CASE
-	 * TBD and get the index in the page table
-	 * map as 2M block
-	 */
-	and	x11, x2, #0x3fffffff
-	ubfx	x11, x11, #21, #17
-	add	x1, x1, x11, lsl #3	// the base address in the page table
-
-	bic	x3, x3, #0x1fffff
-	bic	x3, x3, #0xffff000000000000
-
-	orr	x3, x3, x5
-loop:
-	cbz	x4, exit_loop
-	str	x3, [x1]
-	sub	x4, x4, #0x200000
-	add	x1, x1, #8
-	add	x3, x3, #0x200000
-	b loop
-exit_loop:
-	ret

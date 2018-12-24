@@ -29,11 +29,10 @@
 #define __VM_DESC_HOST_TABLE	(TT_S1_ATTR_TABLE)
 #define __VM_DESC_HOST_BLOCK	\
 		(TT_S1_ATTR_BLOCK | \
-		(1 << TT_S1_ATTR_MATTR_LSB) | \
+		(4 << TT_S1_ATTR_MATTR_LSB) | \
 		TT_S1_ATTR_NS | \
 		TT_S1_ATTR_SH_INNER | \
-		TT_S1_ATTR_AF | \
-		TT_S1_ATTR_nG)
+		TT_S1_ATTR_AF)
 
 typedef unsigned long __pgd_t;
 typedef unsigned long __pud_t;
@@ -111,38 +110,34 @@ static inline unsigned long arch_host_tt_description(unsigned long flags)
 	if (d_type == VM_DES_BLOCK) {
 		if (m_type == VM_NORMAL) {
 			attr = TT_S1_ATTR_BLOCK | \
-			       (1 << TT_S1_ATTR_MATTR_LSB) | \
+			       (4 << TT_S1_ATTR_MATTR_LSB) | \
 			       TT_S1_ATTR_NS | \
 			       TT_S1_ATTR_SH_INNER | \
-			       TT_S1_ATTR_AF | \
-			       TT_S1_ATTR_nG;
+			       TT_S1_ATTR_AF;
 		} else {
 			attr = TT_S1_ATTR_BLOCK | \
-			       (2 << TT_S1_ATTR_MATTR_LSB) | \
+			       (0 << TT_S1_ATTR_MATTR_LSB) | \
 			       TT_S1_ATTR_NS | \
-			       TT_S1_ATTR_AP_RW_PL1 | \
 			       TT_S1_ATTR_AF | \
-			       TT_S1_ATTR_XN | \
-			       TT_S1_ATTR_nG;
+			       TT_S1_ATTR_PXN | \
+			       TT_S1_ATTR_UXN;
 		}
 	}
 
 	if (d_type == VM_DES_PAGE) {
 		if (m_type == VM_NORMAL) {
 			attr = TT_S1_ATTR_PAGE | \
-			       (1 << TT_S1_ATTR_MATTR_LSB) | \
+			       (4 << TT_S1_ATTR_MATTR_LSB) | \
 			       TT_S1_ATTR_NS | \
 			       TT_S1_ATTR_SH_INNER | \
-			       TT_S1_ATTR_AF | \
-			       TT_S1_ATTR_nG;
+			       TT_S1_ATTR_AF;
 		} else {
 			attr = TT_S1_ATTR_PAGE | \
-			       (2 << TT_S1_ATTR_MATTR_LSB) | \
+			       (0 << TT_S1_ATTR_MATTR_LSB) | \
 			       TT_S1_ATTR_NS | \
-			       TT_S1_ATTR_AP_RW_PL1 | \
 			       TT_S1_ATTR_AF | \
-			       TT_S1_ATTR_XN | \
-			       TT_S1_ATTR_nG;
+			       TT_S1_ATTR_PXN | \
+			       TT_S1_ATTR_UXN;
 		}
 	}
 

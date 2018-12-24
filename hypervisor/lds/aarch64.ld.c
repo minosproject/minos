@@ -213,23 +213,21 @@ SECTIONS
 		. = . + 0x1000;
 	}
 
-	/* 4K level1 can map 512GB memory */
+	/*
+	 * 4K level1 can map 512GB memory, for now
+	 * in hypervisor, just map max to 4GB when boot
+	 */
 	.el2_ttb0_pud : {
 		. = ALIGN(4096);
 		__el2_ttb0_pud = .;
 		. = . + 0x1000;
 	}
 
-	.el2_ttb0_pmd_code : {
+	/* max map 4GB pmd when booting */
+	.el2_ttb0_pmd : {
 		. = ALIGN(4096);
-		__el2_ttb0_pmd_code = .;
-		. = . + 0x1000;
-	}
-
-	.el2_ttb0_pmd_io : {
-		. = ALIGN(4096);
-		__el2_ttb0_pmd_io = .;
-		. = . + 0x1000;
+		__el2_ttb0_pmd = .;
+		. = . + 0x4000;
 	}
 
 	__symbols_start = .;

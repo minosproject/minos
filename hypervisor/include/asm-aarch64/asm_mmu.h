@@ -168,4 +168,22 @@
 #define TT_S1_MAIR_WB_RA			0b1110
 #define TT_S1_MAIR_WB_RWA			0b1111
 
+/*
+ * Memory types
+ */
+#define MT_DEVICE_NGNRNE	0
+#define MT_DEVICE_NGNRE		1
+#define MT_DEVICE_GRE		2
+#define MT_NORMAL_NC		3
+#define MT_NORMAL		4
+
+/* 0xff440c0400 MAIR_EL2 value
+#define MEMORY_ATTRIBUTES \
+	((0x00 << (MT_DEVICE_NGNRNE * 8)) |	\
+	(0x04 << (MT_DEVICE_NGNRE * 8))   |	\
+	(0x0c << (MT_DEVICE_GRE * 8))     |	\
+	(0x44 << (MT_NORMAL_NC * 8))      |	\
+	UL(0xff) << (MT_NORMAL * 8))
+*/
+
 #endif

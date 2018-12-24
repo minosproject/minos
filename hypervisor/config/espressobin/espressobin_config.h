@@ -39,4 +39,6 @@
 #define IDLE_VCPU_STATCK_SIZE		(8 * 1024)
 #define IDLE_VCPU_STATCK_SHIFT		(13)
 
+#define CONFIG_GIC_V3
+
 #endif
