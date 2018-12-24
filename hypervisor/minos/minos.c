@@ -125,13 +125,15 @@ void irq_exit(gp_regs *reg)
 
 void boot_main(void *setup_data)
 {
-	/* get the platform and init the serial */
-	platform_early_init();
+	percpus_init();
 
 	pr_info("Starting Minos ...\n");
 
 	if (smp_processor_id() != 0)
 		panic("boot_main : cpu is not cpu0");
+
+	/* get the platform and init the serial */
+	platform_early_init();
 
 	/*
 	 * at the early stage when the memory mangement
@@ -147,8 +149,6 @@ void boot_main(void *setup_data)
 	mm_init();
 
 	hooks_init();
-
-	percpus_init();
 
 	arch_init();
 	arch_init_percpu();
