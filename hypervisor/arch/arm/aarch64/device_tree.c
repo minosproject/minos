@@ -24,6 +24,7 @@
 #define MAX_DTB_SIZE	(MEM_BLOCK_SIZE)
 
 static void *dtb = NULL;
+unsigned long smp_holding_address[CONFIG_NR_CPUS];
 
 static void *of_getprop(char *path, char *attr, int *len)
 {
@@ -202,6 +203,65 @@ int of_get_interrupt_regs(int node, uint64_t *array, int *array_len)
 	return 0;
 }
 
+static int arch_spin_table_init(void)
+{
+	int offset, node, i, len;
+	char name[16];
+	const void *data;
+	uint32_t *tmp;
+
+	/*
+	 * if the smp cpu boot using spin table
+	 * get the spin table address and these
+	 * address must mapped to the hypervisor
+	 * address space
+	 */
+	memset(smp_holding_address, 0, sizeof(unsigned long) * CONFIG_NR_CPUS);
+
+	offset = of_get_node_by_name(0, "cpus", 0);
+	if (offset <= 0) {
+		pr_error("can not find cpus node in dtb\n");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < CONFIG_NR_CPUS; i++) {
+		sprintf(name, "cpu@%d", i);
+		node = of_get_node_by_name(offset, name, 0);
+		if (node <= 0) {
+			pr_error("can not find %d\n", name);
+			continue;
+		}
+
+		/* get the enable methold content */
+		data = fdt_getprop(dtb, node, "enable-method", &len);
+		if (!data || len <= 0)
+			continue;
+
+		if (strncmp("spin-table", (char *)data, 10))
+			continue;
+
+		/* read the holding address */
+		data = fdt_getprop(dtb, node, "cpu-release-addr", &len);
+		if (!data || len <= sizeof(uint32_t))
+			continue;
+
+		len = len / sizeof(uint32_t);
+		tmp = (uint32_t *)data;
+		if (len == 1)
+			smp_holding_address[i] = fdt32_to_cpu(tmp[0]);
+		else {
+			smp_holding_address[i] =
+				((unsigned long)fdt32_to_cpu(tmp[0]) << 32) |
+				fdt32_to_cpu(tmp[1]);
+		}
+
+		pr_info("%s using spin-table relase addr 0x%p\n",
+				name, smp_holding_address[i]);
+	}
+
+	return 0;
+}
+
 int of_init(void *setup_data)
 {
 	unsigned long base;
@@ -227,6 +287,8 @@ int of_init(void *setup_data)
 		dtb = NULL;
 		return -EINVAL;
 	}
+
+	arch_spin_table_init();
 
 	return 0;
 }
@@ -256,12 +318,21 @@ static int fdt_setup_minos(struct vm *vm)
 
 	fdt_setprop(dtb, node, "compatible", "minos,hypervisor", 17);
 
+#ifdef CONFIG_PLATFORM_RASPBERRY3
+	/* for RASPBERRY3 not have gic interrupt controller */
+	for (i = 0; i < vspi_nr; i++) {
+		*array++ = cpu_to_fdt32(i / 32);
+		*array++ = cpu_to_fdt32(i % 32);
+		size += (2 * sizeof(uint32_t));
+	}
+#else
 	for (i = 0; i < vspi_nr; i++) {
 		*array++ = cpu_to_fdt32(0);
 		*array++ = cpu_to_fdt32(i);
 		*array++ = cpu_to_fdt32(4);
 		size += (3 * sizeof(uint32_t));
 	}
+#endif
 
 	i = fdt_setprop(dtb, node, "interrupts", (void *)tmp, size);
 	if (i)
@@ -433,6 +504,9 @@ void hvm_dtb_init(struct vm *vm)
 	fdt_setup_cpu(vm);
 	fdt_setup_memory(vm);
 	fdt_setup_timer(vm);
+
+	if (platform->setup_hvm)
+		platform->setup_hvm(vm, dtb);
 
 	fdt_pack(dtb);
 	flush_dcache_range((unsigned long)dtb, MAX_DTB_SIZE);

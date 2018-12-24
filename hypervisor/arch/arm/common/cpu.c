@@ -16,8 +16,13 @@
 
 #include <minos/minos.h>
 #include <config/config.h>
-#include <asm/psci.h>
 #include <minos/arch.h>
+#include <asm/of.h>
+#include <asm/psci.h>
+#include <minos/vmm.h>
+
+extern unsigned char __smp_affinity_id;
+extern unsigned long smp_holding_address[CONFIG_NR_CPUS];
 
 static inline unsigned long psci_fn(uint32_t id, unsigned long a1,
 		unsigned long a2, unsigned long a3)
@@ -43,4 +48,23 @@ void psci_system_reboot(int mode, const char *cmd)
 void psci_system_shutdown(void)
 {
 	psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
+}
+
+int spin_table_cpu_on(unsigned long affinity, unsigned long entry)
+{
+	int cpu = affinity_to_cpuid(affinity);
+
+	if (smp_holding_address[cpu] != 0) {
+		io_remap(smp_holding_address[cpu], smp_holding_address[cpu],
+				sizeof(uint64_t));
+		*(unsigned long *)smp_holding_address[cpu] = entry;
+
+		/* flush the cache and send signal to other cpu */
+		flush_dcache_range(smp_holding_address[cpu], sizeof(uint64_t));
+		sev();
+		io_unmap(smp_holding_address[cpu], sizeof(uint64_t));
+		return 0;
+	}
+
+	return -EINVAL;
 }

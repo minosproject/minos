@@ -3,6 +3,8 @@
 
 #include <minos/compiler.h>
 
+struct vm;
+
 struct platform {
 	char *name;
 	int (*cpu_on)(unsigned long cpu, unsigned long entry);
@@ -11,6 +13,7 @@ struct platform {
 	void (*system_shutdown)(void);
 	int (*system_suspend)(void);
 	int (*time_init)(void);
+	int (*setup_hvm)(struct vm *vm, void *data);
 };
 
 extern struct platform *platform;

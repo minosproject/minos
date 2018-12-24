@@ -15,7 +15,7 @@
  */
 
 #include <minos/minos.h>
-#include <asm/psci.h>
+#include <asm/cpu.h>
 #include <asm/vtimer.h>
 #include <asm/io.h>
 #include <minos/vmm.h>

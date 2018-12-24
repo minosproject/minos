@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <asm/psci.h>
+#include <asm/cpu.h>
 #include <minos/platform.h>
 
 static struct platform platform_espressobin = {
