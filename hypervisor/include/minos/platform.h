@@ -14,6 +14,7 @@ struct platform {
 	int (*system_suspend)(void);
 	int (*time_init)(void);
 	int (*setup_hvm)(struct vm *vm, void *data);
+	int (*platform_init)(void);
 };
 
 extern struct platform *platform;

@@ -24,6 +24,9 @@
 #include <minos/sched.h>
 #include <minos/virq.h>
 
+static uint32_t __hw_virtual_irq;
+static uint32_t	__hw_phy_irq;
+
 int vtimer_vmodule_id = INVAILD_MODULE_ID;
 
 #define get_access_vtimer(vtimer, c, access)		\
@@ -101,7 +104,10 @@ static void vtimer_state_init(struct vcpu *vcpu, void *context)
 	init_timer_on_cpu(&vtimer->timer, vcpu->affinity);
 	vtimer->timer.function = virt_timer_expire_function;
 	vtimer->timer.data = (unsigned long)vtimer;
-	vtimer->virq = 27;
+	if(vm_is_native(vcpu->vm))
+		vtimer->virq = __hw_virtual_irq;
+	else
+		vtimer->virq = 27;
 	vtimer->cnt_ctl = 0;
 	vtimer->cnt_cval = 0;
 
@@ -110,7 +116,10 @@ static void vtimer_state_init(struct vcpu *vcpu, void *context)
 	init_timer_on_cpu(&vtimer->timer, vcpu->affinity);
 	vtimer->timer.function = phys_timer_expire_function;
 	vtimer->timer.data = (unsigned long)vtimer;
-	vtimer->virq = 30;
+	if (vm_is_native(vcpu->vm))
+		vtimer->virq = __hw_phy_irq;
+	else
+		vtimer->virq = 30;
 	vtimer->cnt_ctl = 0;
 	vtimer->cnt_cval = 0;
 }
@@ -268,5 +277,11 @@ static int vtimer_vmodule_init(struct vmodule *vmodule)
 	return 0;
 }
 
-MINOS_MODULE_DECLARE(armv8_vtimer, "armv8-vtimer",
-		(void *)vtimer_vmodule_init);
+int arch_vtimer_init(uint32_t virtual_irq, uint32_t phy_irq)
+{
+	__hw_virtual_irq = virtual_irq;
+	__hw_phy_irq = phy_irq;
+	register_vcpu_vmodule("vtimer_module", vtimer_vmodule_init);
+
+	return 0;
+}

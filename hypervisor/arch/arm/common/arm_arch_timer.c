@@ -49,6 +49,7 @@ uint32_t cpu_khz = 0;
 uint64_t boot_tick = 0;
 
 extern unsigned long sched_tick_handler(unsigned long data);
+extern int arch_vtimer_init(uint32_t virtual_irq, uint32_t phy_irq);
 
 void arch_enable_timer(unsigned long expires)
 {
@@ -101,13 +102,24 @@ static int timers_arch_init(void)
 	int ret, len;
 	unsigned long hz = 0;
 	struct armv8_timer_info *info;
+	uint32_t tmp[TIMER_MAX * 3];
 
 	memset((void *)timer_info, 0, sizeof(timer_info));
-	ret = of_get_u32_array("/timer", "interrupts",
-			(uint32_t *)timer_info, &len);
+	memset((void *)tmp, 0, sizeof(uint32_t) * 3 * TIMER_MAX);
+
+	ret = of_get_u32_array("/timer", "interrupts", tmp, &len);
 	if (ret || (len == 0))
 		panic("no arm gen timer found in dtb\n");
 
+#ifdef CONFIG_PLATFORM_RASPBERRY3
+	for (len = 0; len < TIMER_MAX; len++) {
+		info = &timer_info[len];
+		info->irq = tmp[len] + 16;
+		pr_info("rasbberry %d timer int is %d\n", len, info->irq);
+	}
+#else
+	memcpy((void *)&timer_info, (void *)tmp,
+			sizeof(struct armv8_timer_info) * TIMER_MAX);
 	for (len = 0; len < TIMER_MAX; len++) {
 		info = &timer_info[len];
 		if ((info->type != 1) || (info->irq == 0)) {
@@ -119,6 +131,7 @@ static int timers_arch_init(void)
 		pr_info("timer %d int is %d flags-0x%x\n",
 				len, info->irq, info->flags);
 	}
+#endif
 
 	len = 0;
 	ret = of_get_u32_array("/timer", "clock-frequency",
@@ -136,6 +149,9 @@ static int timers_arch_init(void)
 
 	if (platform->time_init)
 		platform->time_init();
+
+	arch_vtimer_init(timer_info[VIRT_TIMER].irq,
+			timer_info[NONSEC_PHY_TIMER].irq);
 
 	return 0;
 }
@@ -195,7 +211,7 @@ static int virtual_timer_irq_handler(uint32_t irq, void *data)
 	 */
 	if (vcpu->is_idle) {
 		write_sysreg32(0, CNTV_CTL_EL0);
-		return -ENOENT;
+		return 0;
 	}
 
 	value = read_sysreg32(CNTV_CTL_EL0);
