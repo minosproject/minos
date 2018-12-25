@@ -129,7 +129,7 @@ void print_symbol(unsigned long addr)
 			symbol_right - symbol_left);
 }
 
-static int allsymbols_init(void)
+int allsymbols_init(void)
 {
 	int *tmp;
 	unsigned long *symbols_base;
@@ -141,9 +141,5 @@ static int allsymbols_init(void)
 	allsyms_offset = (unsigned int *)(*symbols_base++);
 	allsyms_names = (char *)(*symbols_base);
 
-	pr_info("find %d symbols\n", allsyms_count);
-
 	return 0;
 }
-
-early_initcall(allsymbols_init);

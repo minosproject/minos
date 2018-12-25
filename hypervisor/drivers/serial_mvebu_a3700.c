@@ -6,8 +6,9 @@
 
 #include <minos/minos.h>
 #include <asm/io.h>
+#include <config/config.h>
 
-static void *base = (void *)0xd0012000;
+static void *base = (void *)CONFIG_UART_BASE;
 
 /*
  * Register offset

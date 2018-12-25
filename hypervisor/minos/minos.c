@@ -35,6 +35,7 @@ extern void sched_tick_enable(unsigned long exp);
 extern void vmm_init(void);
 extern void bootmem_init(void);
 extern void platform_early_init(void);
+extern int allsymbols_init(void);
 
 struct list_head hook_lists[MINOS_HOOK_TYPE_UNKNOWN];
 struct platform *platform = NULL;
@@ -125,6 +126,7 @@ void irq_exit(gp_regs *reg)
 
 void boot_main(void *setup_data)
 {
+	allsymbols_init();
 	percpus_init();
 
 	pr_info("Starting Minos ...\n");

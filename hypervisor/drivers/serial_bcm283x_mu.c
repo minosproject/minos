@@ -18,6 +18,7 @@
 #include <asm/io.h>
 #include <minos/mmu.h>
 #include <minos/init.h>
+#include <config/config.h>
 
 #define AUX_MU_IO	0x00
 #define AUX_MU_IER	0x04
@@ -35,7 +36,7 @@
 #define BCM283X_MU_LSR_TX_EMPTY		(1 << 5)
 #define BCM283X_MU_LSR_RX_READY		(1 << 0)
 
-static void *serial_base;
+static void *serial_base = (void *)CONFIG_UART_BASE;
 
 static inline void __bcm283x_mu_putc(char c)
 {

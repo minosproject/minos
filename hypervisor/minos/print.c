@@ -23,15 +23,12 @@
 #include <drivers/serial.h>
 #include <minos/smp.h>
 
-static DEFINE_SPIN_LOCK(printk_lock);
-
-static char buffer[1024];
-
 int level_print(char *fmt, ...)
 {
 	char ch;
 	va_list arg;
 	int printed, i;
+	char buffer[1024];
 
 	ch = fmt[4];
 	if (is_digit(ch)) {
@@ -52,16 +49,12 @@ int level_print(char *fmt, ...)
 	 * TBD need to check the length of fmt
 	 * in case of buffer overflow
 	 */
-	spin_lock(&printk_lock);
-
 	va_start(arg, fmt);
 	printed = vsprintf(buffer, fmt, arg);
 	va_end(arg);
 
 	for(i = 0; i < printed; i++)
 		serial_putc(buffer[i]);
-
-	spin_unlock(&printk_lock);
 
 	return printed;
 }

@@ -19,8 +19,9 @@
 #include <drivers/pl011.h>
 #include <minos/mmu.h>
 #include <minos/init.h>
+#include <config/config.h>
 
-static void *base = NULL;
+static void *base = (void *)CONFIG_UART_BASE;
 
 int pl011_init(void *addr, int clock, int baudrate)
 {
