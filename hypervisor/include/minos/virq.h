@@ -19,7 +19,8 @@ struct irqtag;
 #define VIRQ_ACTION_ADD		(0x1)
 #define VIRQ_ACTION_CLEAR	(0x2)
 
-#define VIRQ_AFFINITY_ANY	(0xffff)
+#define VIRQ_AFFINITY_VM_ANY	(0xffff)
+#define VIRQ_AFFINITY_VCPU_ANY	(0xff)
 
 #define VM_SGI_VIRQ_NR		(16)
 #define VM_PPI_VIRQ_NR		(16)

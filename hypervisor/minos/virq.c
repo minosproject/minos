@@ -152,8 +152,8 @@ static int guest_irq_handler(uint32_t irq, void *data)
 	}
 
 	/* send the virq to the guest */
-	if ((desc->vmid == VIRQ_AFFINITY_ANY) &&
-			(desc->vcpu_id == VIRQ_AFFINITY_ANY))
+	if ((desc->vmid == VIRQ_AFFINITY_VM_ANY) &&
+			(desc->vcpu_id == VIRQ_AFFINITY_VCPU_ANY))
 		vcpu = current_vcpu;
 	else
 		vcpu = get_vcpu_by_id(desc->vmid, desc->vcpu_id);
@@ -592,8 +592,10 @@ void vcpu_virq_struct_init(struct vcpu *vcpu)
 		desc = &virq_struct->local_desc[i];
 		virq_clear_hw(desc);
 		virq_set_enable(desc);
-		desc->vcpu_id = vcpu->vcpu_id;
-		desc->vmid = vcpu->vm->vmid;
+
+		/* this is just for ppi or sgi */
+		desc->vcpu_id = VIRQ_AFFINITY_VCPU_ANY;
+		desc->vmid = VIRQ_AFFINITY_VM_ANY;
 		desc->vno = i;
 		desc->hno = 0;
 		desc->id = VIRQ_INVALID_ID;
@@ -621,6 +623,8 @@ static void vm_config_virq(struct vm *vm)
 				desc->hno = irqtag->hno;
 			}
 
+			request_irq_percpu(desc->hno, guest_irq_handler,
+					IRQ_FLAGS_VCPU, c->name, (void *)desc);
 			continue;
 		}
 
