@@ -1,6 +1,8 @@
 #ifndef _MINOS_PRINT_H_
 #define _MINOS_PRINT_H_
 
+#include <config/config.h>
+
 void log_init(void);
 
 int level_print(char *fmt, ...);

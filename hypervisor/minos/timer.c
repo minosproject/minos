@@ -98,7 +98,7 @@ static int __mod_timer(struct timer_list *timer)
 	unsigned long flags;
 	struct timers *timers = timer->timers;
 
-	pr_debug("modify timer to 0x%x\n", expires);
+	pr_debug("modify timer to 0x%x\n", timer->expires);
 
 	spin_lock_irqsave(&timers->lock, flags);
 
