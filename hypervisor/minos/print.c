@@ -23,6 +23,8 @@
 #include <drivers/serial.h>
 #include <minos/smp.h>
 
+static DEFINE_SPIN_LOCK(print_lock);
+
 int level_print(char *fmt, ...)
 {
 	char ch;
@@ -53,8 +55,10 @@ int level_print(char *fmt, ...)
 	printed = vsprintf(buffer, fmt, arg);
 	va_end(arg);
 
+	spin_lock(&print_lock);
 	for(i = 0; i < printed; i++)
 		serial_putc(buffer[i]);
+	spin_unlock(&print_lock);
 
 	return printed;
 }
