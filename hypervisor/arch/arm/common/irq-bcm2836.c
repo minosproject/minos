@@ -115,12 +115,10 @@ static uint32_t bcm2836_get_pending(void)
 		 */
 		mailbox0 = bcm2836_base + LOCAL_MAILBOX0_CLR0 + 16 * cpu;
 		mbox_val = readl_relaxed(mailbox0);
-		irq = __ffs(mbox_val);
-		if (irq == 0)
+		if (mbox_val == 0)
 			return BAD_IRQ;
-		else
-			irq -= 1;
 
+		irq = __ffs(mbox_val);
 		writel_relaxed(1 << irq, mailbox0);
 		dsb();
 
@@ -141,7 +139,7 @@ static uint32_t bcm2836_get_pending(void)
 		 * 26	: AXI outstanding interrupt
 		 * 27	: Local timer interrupt
 		 */
-		irq = __ffs(stat) + 15;
+		irq = __ffs(stat) + 16;
 		return irq;
 	}
 
@@ -334,12 +332,18 @@ static int bcm2836_set_irq_type(uint32_t irq, uint32_t type)
 
 static void bcm2836_dir_irq(uint32_t irq)
 {
-
+	if (irq >= 32)
+		bcm2835_unmask_irq(irq);
 }
 
 static void bcm2836_eoi_irq(uint32_t irq)
 {
-	/* */
+	/*
+	 * here disable the spi irq since bcm2835 is all
+	 * level trigger, disable it to avoid irq streaming
+	 */
+	if (irq >= 32)
+		bcm2835_mask_irq(irq);
 }
 
 static int bcm2836_irq_enter_to_guest(void *item, void *data)
@@ -419,6 +423,8 @@ static int bcm2836_irq_init(int node)
 {
 	void *base;
 	int b;
+
+	pr_info("boardcom bcm2836 l1 interrupt init\n");
 
 	bcm2836_base = (void *)0x40000000;
 	io_remap(0x40000000, 0x40000000, 0x100);

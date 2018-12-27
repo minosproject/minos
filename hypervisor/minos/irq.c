@@ -562,13 +562,16 @@ int irq_init(void)
 {
 	extern unsigned char __irqchip_start;
 	extern unsigned char __irqchip_end;
-	int node;
+	int node = 0;
+#ifndef CONFIG_PLATFORM_RASPBERRY3
 	const char *name;
+#endif
 	unsigned long s, e;
 
 	s = (unsigned long)&__irqchip_start;
 	e = (unsigned long)&__irqchip_end;
 
+#ifndef CONFIG_PLATFORM_RASPBERRY3
 	node = of_get_node_by_name(0, "interrupt-controller", 0);
 	if (node < 0)
 		panic("can not find irqchip node in dts\n");
@@ -578,6 +581,10 @@ int irq_init(void)
 		panic("can not get the irqchip's name\n");
 
 	irq_chip = (struct irq_chip *)get_module_pdata(s, e, name);
+#else
+	irq_chip = (struct irq_chip *)get_module_pdata(s, e,
+			"brcm,bcm2836-l1-intc");
+#endif
 	if (!irq_chip)
 		panic("can not find the irqchip for system\n");
 

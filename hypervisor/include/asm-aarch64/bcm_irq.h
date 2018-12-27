@@ -84,6 +84,7 @@
 #define BCM2835_IRQ_DISABLE2		0x220
 #define BCM2835_IRQ_DISABLE_BASIC	0x224
 #define BCM2835_IRQ_ACK			0x228
+#define BCM2836_IRQ_ACK			0x22c
 
 /* Put the bank and irq (32 bits) into the hwirq */
 #define MAKE_HWIRQ(b, n)	(((b + 32) << 5) | (n))

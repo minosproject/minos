@@ -41,6 +41,7 @@ struct bcm2836_virq {
 
 extern int vgicv2_create_vm(void *item, void *arg);
 static int bcm2836_clear_spi(struct vcpu *vcpu, uint32_t virq);
+static int bcm2836_clear_ppi(struct vcpu *vcpu, uint32_t virq);
 
 static void bcm2836_virq_deinit(struct vdev *vdev)
 {
@@ -117,6 +118,11 @@ static int bcm2835_virq_write(struct vdev *vdev, gp_regs *reg,
 		bcm2836_clear_spi(vcpu, irq);
 		clear_pending_virq(vcpu, irq);
 		break;
+	case BCM2836_IRQ_ACK:
+		irq = *value;
+		bcm2836_clear_ppi(vcpu, irq);
+		clear_pending_virq(vcpu, irq + 16);
+		break;
 	default:
 		pr_warn("unsupport action for bcm2836 virq\n");
 		break;
@@ -128,11 +134,15 @@ static int bcm2835_virq_write(struct vdev *vdev, gp_regs *reg,
 static int inline bcm2836_send_vsgi(struct vcpu *vcpu, struct vdev *vdev,
 		unsigned long offset, unsigned long *value)
 {
+	int sgi;
 	struct vcpu *target;
 	struct vm *vm = vcpu->vm;
 	int cpu = (offset - LOCAL_MAILBOX0_SET0) / 16;
-	int sgi = __ffs((uint32_t)*value);
 
+	if (*value == 0)
+		return -EINVAL;
+
+	sgi = __ffs((uint32_t)*value);
 	pr_info("send vsgi %d %d\n", cpu, sgi);
 
 	if ((cpu > vm->vcpu_nr) || (sgi >= 16))
@@ -149,13 +159,17 @@ static int inline bcm2836_clear_vsgi(struct vcpu *vcpu, struct vdev *vdev,
 		unsigned long offset, unsigned long *value)
 {
 	uint32_t v;
-	int sgi = __ffs((uint32_t)*value);
+	int sgi;
 	int cpu = (offset - LOCAL_MAILBOX0_CLR0) / 16;
 	void *base;
 	struct vcpu *target;
 	struct vm *vm = vcpu->vm;
 	struct bcm2836_virq *dev = vdev_to_bcm_virq(vdev);
 
+	if (*value == 0)
+		return -EINVAL;
+
+	sgi = __ffs((uint32_t)*value);
 	pr_info("clear vsgi %d %d\n", cpu, sgi);
 
 	if ((cpu > vm->vcpu_nr) || (sgi >= 16))
@@ -384,6 +398,23 @@ static int bcm2836_clear_spi(struct vcpu *vcpu, uint32_t virq)
 		v = readl_relaxed(base) & ~BIT(8);
 		writel_relaxed(v, base);
 	}
+
+	return 0;
+}
+
+static int bcm2836_clear_ppi(struct vcpu *vcpu, uint32_t virq)
+{
+	uint32_t v;
+	void *base;
+	struct vm *vm = vcpu->vm;
+	struct bcm2836_virq *dev = (struct bcm2836_virq *)vm->inc_pdata;
+
+	if (virq > LOCAL_IRQ_PMU_FAST)
+		return -EINVAL;
+
+	base = dev->iomem + LOCAL_IRQ_PENDING0 + (vcpu->vcpu_id * 4);
+	v = readl_relaxed(base) & ~BIT(virq);
+	writel_relaxed(v, base);
 
 	return 0;
 }
