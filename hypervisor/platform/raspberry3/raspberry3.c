@@ -25,7 +25,7 @@
 #include <asm/of.h>
 #include <asm/cpu.h>
 
-static int raspberry3_setup_vm(struct vm *vm, void *dtb)
+static int raspberry3_setup_hvm(struct vm *vm, void *dtb)
 {
 	int i, offset, node;
 	char name[16];
@@ -59,6 +59,23 @@ static int raspberry3_setup_vm(struct vm *vm, void *dtb)
 				2 * sizeof(uint32_t));
 	}
 
+	/*
+	 * redirect the bcm2835 interrupt controller's iomem
+	 * to 0x40000200
+	 */
+	node = fdt_path_offset(dtb, "/soc/interrupt-controller@7e00b200");
+	if (node <= 0) {
+		pr_warn("can not find interrupt-controller@7e00b200\n");
+		return -ENOENT;
+	}
+
+	tmp[0] = cpu_to_fdt32(0x40000200);
+	tmp[1] = cpu_to_fdt32(0x200);
+	fdt_setprop(dtb, node, "reg", (void *)tmp, 2 * sizeof(uint32_t));
+	fdt_set_name(dtb, node, "interrupt-controller@40000200");
+
+	pr_info("raspberry3 setup vm done\n");
+
 	return 0;
 }
 
@@ -77,6 +94,6 @@ static struct platform platform_raspberry3 = {
 	.cpu_on		 = spin_table_cpu_on,
 	.system_reboot	 = raspberry3_system_reboot,
 	.system_shutdown = raspberry3_system_shutdown,
-	.setup_hvm	 = raspberry3_setup_vm,
+	.setup_hvm	 = raspberry3_setup_hvm,
 };
 DEFINE_PLATFORM(platform_raspberry3);
