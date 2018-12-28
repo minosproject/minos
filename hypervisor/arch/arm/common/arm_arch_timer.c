@@ -115,7 +115,7 @@ static int timers_arch_init(void)
 	for (len = 0; len < TIMER_MAX; len++) {
 		info = &timer_info[len];
 		info->irq = tmp[len] + 16;
-		pr_info("rasbberry %d timer int is %d\n", len, info->irq);
+		pr_info("raspberry %d timer int is %d\n", len, info->irq);
 	}
 #else
 	memcpy((void *)&timer_info, (void *)tmp,

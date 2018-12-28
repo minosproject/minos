@@ -383,6 +383,7 @@ static int bcm2836_irq_enter_to_guest(void *item, void *data)
 		 * add it to active list
 		 */
 		bcm2836_send_virq(vcpu, virq);
+		virq_clear_pending(virq);
 		list_del(&virq->list);
 		list_add_tail(&virq_struct->active_list, &virq->list);
 	}
