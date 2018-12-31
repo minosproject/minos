@@ -185,7 +185,7 @@ uint32_t virq_get_state(struct vcpu *vcpu, uint32_t virq)
 	if (!desc)
 		return 0;
 
-	return virq_is_enabled(desc);
+	return !!virq_is_enabled(desc);
 }
 
 uint32_t virq_get_affinity(struct vcpu *vcpu, uint32_t virq)
