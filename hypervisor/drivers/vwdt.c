@@ -269,7 +269,7 @@ static int vwdt_create_vm(void *item, void *arg)
 	host_vdev_init(vm, &dev->vdev, SP805_IOMEM_BASE,
 			SP805_IOMEM_SIZE);
 	vdev_set_name(&dev->vdev, "vwdt");
-	virq_unmask_and_init(vm, SP805_IRQ);
+	virq_mask_and_enable(vm, SP805_IRQ);
 
 	dev->access_lock = 1;
 	dev->vdev.read = vwdt_mmio_read;

@@ -24,6 +24,7 @@
 #include <minos/vm.h>
 #include <asm/of.h>
 #include <asm/cpu.h>
+#include <minos/virq.h>
 
 static int raspberry3_setup_hvm(struct vm *vm, void *dtb)
 {
@@ -73,6 +74,10 @@ static int raspberry3_setup_hvm(struct vm *vm, void *dtb)
 	tmp[1] = cpu_to_fdt32(0x200);
 	fdt_setprop(dtb, node, "reg", (void *)tmp, 2 * sizeof(uint32_t));
 	fdt_set_name(dtb, node, "interrupt-controller@40000200");
+
+	/* mask 40 - 52 virq for hvm which is internal use */
+	for (i = 40; i <= 52; i++)
+		virq_mask_and_disable(vm, i);
 
 	pr_info("raspberry3 setup vm done\n");
 

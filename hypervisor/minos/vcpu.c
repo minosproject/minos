@@ -94,7 +94,8 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 	}
 
 	if (vcpu->state == VCPU_STAT_STOPPED) {
-		pr_info("vcpu power on from vm suspend 0x%p\n", entry);
+		pr_info("vcpu-%d of vm-%d power on from vm suspend 0x%p\n",
+				vcpu->vcpu_id, vcpu->vm->vmid, entry);
 		os->ops->vcpu_power_on(vcpu, entry);
 		vcpu_online(vcpu);
 	} else {

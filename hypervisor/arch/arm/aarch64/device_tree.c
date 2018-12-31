@@ -320,6 +320,7 @@ static int fdt_setup_minos(struct vm *vm)
 
 #ifdef CONFIG_PLATFORM_RASPBERRY3
 	/* for RASPBERRY3 not have gic interrupt controller */
+	pr_info("register %d vspi to hvm\n", vspi_nr);
 	for (i = 0; i < vspi_nr; i++) {
 		*array++ = cpu_to_fdt32(i / 32);
 		*array++ = cpu_to_fdt32(i % 32);

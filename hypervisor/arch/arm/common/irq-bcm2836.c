@@ -70,12 +70,12 @@ static uint32_t armctrl_translate_bank(int bank)
 {
 	uint32_t stat = readl_relaxed(intc.pending[bank]);
 
-	return MAKE_HWIRQ(bank, __ffs(stat) - 1);
+	return MAKE_HWIRQ(bank, __ffs(stat));
 }
 
 static uint32_t armctrl_translate_shortcut(int bank, u32 stat)
 {
-	return MAKE_HWIRQ(bank, shortcuts[__ffs(stat >> SHORTCUT_SHIFT) - 1]);
+	return MAKE_HWIRQ(bank, shortcuts[__ffs(stat >> SHORTCUT_SHIFT)]);
 }
 
 static uint32_t bcm2835_get_pending(void)
@@ -85,7 +85,7 @@ static uint32_t bcm2835_get_pending(void)
 	if (stat == 0)
 		return BAD_IRQ;
 	else if (stat & BANK0_HWIRQ_MASK)
-		return MAKE_HWIRQ(0, __ffs(stat & BANK0_HWIRQ_MASK) - 1);
+		return MAKE_HWIRQ(0, __ffs(stat & BANK0_HWIRQ_MASK));
 	else if (stat & SHORTCUT1_MASK)
 		return armctrl_translate_shortcut(1, stat & SHORTCUT1_MASK);
 	else if (stat & SHORTCUT2_MASK)
@@ -105,6 +105,7 @@ static uint32_t bcm2836_get_pending(void)
 	uint32_t irq;
 
 	stat = readl_relaxed(bcm2836_base + LOCAL_IRQ_PENDING0 + 4 * cpu);
+
 	if (stat & BIT(LOCAL_IRQ_MAILBOX0)) {
 		void *mailbox0;
 		uint32_t mbox_val;
@@ -298,7 +299,7 @@ static int bcm2836_update_virq(struct vcpu *vcpu,
 	switch (action) {
 	case VIRQ_ACTION_CLEAR:
 		/* enable the hardware irq when disable in hyp */
-		if (virq_is_hw(desc))
+		if ((desc->vno >= 32) && (virq_is_hw(desc)))
 			bcm2836_unmask_irq(desc->hno);
 		break;
 	}
@@ -338,10 +339,6 @@ static void bcm2836_dir_irq(uint32_t irq)
 
 static void bcm2836_eoi_irq(uint32_t irq)
 {
-	/*
-	 * here disable the spi irq since bcm2835 is all
-	 * level trigger, disable it to avoid irq streaming
-	 */
 	if (irq >= 32)
 		bcm2835_mask_irq(irq);
 }
@@ -353,10 +350,17 @@ static int bcm2836_irq_enter_to_guest(void *item, void *data)
 	struct vcpu *vcpu = (struct vcpu *)item;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
 
+	/*
+	 * if there is no pending virq for this vcpu
+	 * clear the virq state in HCR_EL2 then just return
+	 * else inject the virq
+	 */
+	spin_lock_irqsave(&virq_struct->lock, flags);
+
 	if (is_list_empty(&virq_struct->pending_list) &&
 			is_list_empty(&virq_struct->active_list)) {
 		arch_clear_virq_flag();
-		return 0;
+		goto out;
 	}
 
 	arch_set_virq_flag();
@@ -366,15 +370,21 @@ static int bcm2836_irq_enter_to_guest(void *item, void *data)
 	 * irq here
 	 */
 	if (!vm_is_native(vcpu->vm))
-		return 0;
+		goto out;
 
-	spin_lock_irqsave(&virq_struct->lock, flags);
-
+	/*
+	 * just inject one virq the time since when the
+	 * virq is handled, the vm will trap to hypervisor
+	 * again, actually here can inject all virq to the
+	 * guest, but it is hard to judge whether all virq
+	 * has been handled by guest vm TBD
+	 */
 	list_for_each_entry_safe(virq, n, &virq_struct->pending_list, list) {
 		if (!virq_is_pending(virq)) {
 			pr_error("virq is not request %d\n", virq->vno);
 			list_del(&virq->list);
 			virq->list.next = NULL;
+			continue;
 		}
 
 		/*
@@ -384,10 +394,13 @@ static int bcm2836_irq_enter_to_guest(void *item, void *data)
 		 */
 		bcm2836_send_virq(vcpu, virq);
 		virq_clear_pending(virq);
+		virq->state = VIRQ_STATE_ACTIVE;
 		list_del(&virq->list);
 		list_add_tail(&virq_struct->active_list, &virq->list);
+		break;
 	}
 
+out:
 	spin_unlock_irqrestore(&virq_struct->lock, flags);
 
 	return 0;
@@ -447,9 +460,15 @@ static int bcm2836_irq_init(int node)
 	irq_alloc_sgi(0, 16);
 	irq_alloc_ppi(16, 16);
 
+	/* enable mailbox0 interrupt for each core */
+	writel_relaxed(1, bcm2836_base + LOCAL_MAILBOX_INT_CONTROL0);
+	writel_relaxed(1, bcm2836_base + LOCAL_MAILBOX_INT_CONTROL0 + 0x4);
+	writel_relaxed(1, bcm2836_base + LOCAL_MAILBOX_INT_CONTROL0 + 0x8);
+	writel_relaxed(1, bcm2836_base + LOCAL_MAILBOX_INT_CONTROL0 + 0xc);
+
 	/* init the bcm2835 interrupt controller for spi */
-	base = intc.base = (void *)0x7e00b200;
-	io_remap(0x7e00b200, 0x7e00b200, 0x100);
+	base = intc.base = (void *)0x3f00b200;
+	io_remap(0x3f00b200, 0x3f00b200, 0x100);
 
 	for (b = 0; b < NR_BANKS; b++) {
 		intc.pending[b] = base + reg_pending[b];
@@ -460,7 +479,7 @@ static int bcm2836_irq_init(int node)
 	irq_alloc_spi(32, 96);
 
 	/* init the virq device callback */
-	bcm_virq_init(0x40000000, 0x100, 0x7e00b200, 0x1000);
+	bcm_virq_init(0x40000000, 0x100, 0x3f00b200, 0x1000);
 
 	register_hook(bcm2836_irq_enter_to_guest,
 			MINOS_HOOK_TYPE_ENTER_TO_GUEST);

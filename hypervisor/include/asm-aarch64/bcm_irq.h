@@ -68,10 +68,11 @@
 #define BCM2836_INC_BASE		0x40000000
 #define BCM2835_INC_OFFSET		0x200
 
-/* max support 16 cpus */
+/* max support 8 cpus */
 #define BCM2836_RELEASE_ADDR		0x40000180
 #define BCM2836_RELEASE_OFFSET		0x180
-#define BCM2836_RELEASE_OFFSET_END	0x1ff
+#define BCM2836_RELEASE_OFFSET_END	0x1bf
+#define BCM2836_IRQ_ACK			0x1c0
 
 #define BCM2835_IRQ_BASIC_PENDING	0x200
 #define BCM2835_IRQ_PENDING1		0x204
@@ -84,10 +85,9 @@
 #define BCM2835_IRQ_DISABLE2		0x220
 #define BCM2835_IRQ_DISABLE_BASIC	0x224
 #define BCM2835_IRQ_ACK			0x228
-#define BCM2836_IRQ_ACK			0x22c
 
 /* Put the bank and irq (32 bits) into the hwirq */
-#define MAKE_HWIRQ(b, n)	(((b + 32) << 5) | (n))
+#define MAKE_HWIRQ(b, n)	(((b + 1) << 5) | (n))
 #define HWIRQ_BANK(i)		((i >> 5) - 1)
 #define HWIRQ_BIT(i)		BIT(i & 0x1f)
 

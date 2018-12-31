@@ -54,7 +54,7 @@
 
 /* no hardware gicv2 or gicv3 */
 #define CONFIG_LEGACY_INT_VIRT
-#define CONFIG_HVM_SPI_VIRQ_NR		(128)
+#define CONFIG_HVM_SPI_VIRQ_NR		(96)
 #define CONFIG_SMPBOOT_SPIN_TABLE
 
 #endif

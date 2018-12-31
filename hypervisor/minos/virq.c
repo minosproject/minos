@@ -343,7 +343,7 @@ void clear_pending_virq(struct vcpu *vcpu, uint32_t irq)
 	struct virq_struct *virq_struct = vcpu->virq_struct;
 
 	desc = get_virq_desc(vcpu, irq);
-	if (!desc || desc->state != VIRQ_STATE_ACTIVE)
+	if ((!desc) || (desc->state != VIRQ_STATE_ACTIVE))
 		return;
 
 	/*
@@ -356,8 +356,10 @@ void clear_pending_virq(struct vcpu *vcpu, uint32_t irq)
 	 *
 	 */
 	spin_lock_irqsave(&virq_struct->lock, flags);
-	if (desc->list.next != NULL)
+	if (desc->list.next != NULL) {
 		list_del(&desc->list);
+		desc->list.next = NULL;
+	}
 
 	if (virq_is_pending(desc)) {
 		list_add_tail(&virq_struct->pending_list, &desc->list);
@@ -366,8 +368,8 @@ void clear_pending_virq(struct vcpu *vcpu, uint32_t irq)
 	}
 
 	desc->state = VIRQ_STATE_INACTIVE;
-	irq_update_virq(vcpu, desc, VIRQ_ACTION_CLEAR);
 out:
+	irq_update_virq(vcpu, desc, VIRQ_ACTION_CLEAR);
 	spin_unlock_irqrestore(&virq_struct->lock, flags);
 }
 
@@ -387,7 +389,7 @@ uint32_t get_pending_virq(struct vcpu *vcpu)
 	desc = list_first_entry(&virq_struct->pending_list,
 			struct virq_desc, list);
 	list_del(&desc->list);
-	desc->list.next = NULL;
+	list_add_tail(&virq_struct->active_list, &desc->list);
 	desc->state = VIRQ_STATE_ACTIVE;
 	virq_clear_pending(desc);
 
@@ -534,7 +536,7 @@ void vcpu_virq_struct_reset(struct vcpu *vcpu)
 	}
 }
 
-int virq_unmask_and_init(struct vm *vm, uint32_t virq)
+int virq_mask_and_enable(struct vm *vm, uint32_t virq)
 {
 	struct virq_desc *desc;
 	uint32_t bit = virq - VM_LOCAL_VIRQ_NR;
@@ -544,7 +546,7 @@ int virq_unmask_and_init(struct vm *vm, uint32_t virq)
 		return 0;
 
 	if (virq >= MAX_GVM_VIRQ) {
-		pr_error("virq_unmask_and_init: invaild virq-%d\n", virq);
+		pr_error("virq_mask_and_enable: invaild virq-%d\n", virq);
 		return -EINVAL;
 	}
 
@@ -561,6 +563,30 @@ int virq_unmask_and_init(struct vm *vm, uint32_t virq)
 	desc->id = VIRQ_INVALID_ID;
 	desc->state = VIRQ_STATE_INACTIVE;
 	desc->list.next = NULL;
+
+	return 0;
+}
+
+int virq_mask_and_disable(struct vm *vm, uint32_t virq)
+{
+	struct virq_desc *desc;
+	uint32_t bit = virq - VM_LOCAL_VIRQ_NR;
+
+	/* do not handle the ppi and sgi */
+	if (virq < VM_LOCAL_VIRQ_NR)
+		return 0;
+
+	if (virq >= MAX_GVM_VIRQ) {
+		pr_error("virq_mask_and_disable: invaild virq-%d\n", virq);
+		return -EINVAL;
+	}
+
+	if (test_bit(bit, vm->vspi_map))
+		pr_warn("may dupilicate usage of virq %d\n", virq);
+
+	set_bit(bit, vm->vspi_map);
+	desc = &vm->vspi_desc[bit];
+	virq_clear_enable(desc);
 
 	return 0;
 }
@@ -631,7 +657,7 @@ static void vm_config_virq(struct vm *vm)
 		if (vm->vmid != irqtag->vmid)
 			continue;
 
-		if (irqtag->vno >= vm->vspi_nr)
+		if (irqtag->vno >= (vm->vspi_nr + 32))
 			continue;
 
 		desc = &vm->vspi_desc[VIRQ_SPI_OFFSET(irqtag->vno)];
@@ -671,7 +697,7 @@ int alloc_vm_virq(struct vm *vm)
 		virq = -1;
 
 	if (virq >= 0)
-		virq_unmask_and_init(vm, virq + VM_LOCAL_VIRQ_NR);
+		virq_mask_and_enable(vm, virq + VM_LOCAL_VIRQ_NR);
 
 	if (vm_is_hvm(vm))
 		spin_unlock(&hvm_irq_lock);

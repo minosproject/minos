@@ -10,7 +10,7 @@
 	{
 		"hno": 33,
 		"vno": 33,
-		"vmid": 1,
+		"vmid": 0,
 		"vcpu_id": 0,
 		"name": "ARM_MAILBOX"
 	},

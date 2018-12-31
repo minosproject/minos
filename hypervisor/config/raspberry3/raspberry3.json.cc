@@ -15,7 +15,7 @@
 			"vcpu1_affinity": 1,
 			"vcpu2_affinity": 2,
 			"vcpu3_affinity": 3,
-			"cmdline": "",
+			"cmdline": "8250.nr_uarts=1 dwc_otg.lpm_enable=0 net.ifnames=0 earlycon=uart8250,mmio32,0x3f215040 console=ttyS0,115200 cmd=64M root=/dev/mmcblk0p2 rw rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait noinitrd",
 			"bit64": 1
 		}
 	],

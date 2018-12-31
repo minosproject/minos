@@ -40,6 +40,12 @@ extern int allsymbols_init(void);
 struct list_head hook_lists[MINOS_HOOK_TYPE_UNKNOWN];
 struct platform *platform = NULL;
 
+static void platform_init(void)
+{
+	if (platform && platform->platform_init)
+		platform->platform_init();
+}
+
 static void hooks_init(void)
 {
 	int i;
@@ -156,6 +162,7 @@ void boot_main(void *setup_data)
 	arch_init_percpu();
 
 	pcpus_init();
+	platform_init();
 	irq_init();
 	smp_init();
 	softirq_init();

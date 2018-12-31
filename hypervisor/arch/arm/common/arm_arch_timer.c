@@ -28,6 +28,7 @@
 #include <asm/of.h>
 #include <asm/processer.h>
 #include <minos/platform.h>
+#include <minos/gvm.h>
 
 enum timer_type {
 	SEC_PHY_TIMER,
@@ -101,8 +102,10 @@ static int timers_arch_init(void)
 {
 	int ret, len;
 	unsigned long hz = 0;
-	struct armv8_timer_info *info;
 	uint32_t tmp[TIMER_MAX * 3];
+#ifndef CONFIG_PLATFORM_RASPBERRY3
+	struct armv8_timer_info *info;
+#endif
 
 	memset((void *)timer_info, 0, sizeof(timer_info));
 	memset((void *)tmp, 0, sizeof(uint32_t) * 3 * TIMER_MAX);
@@ -112,11 +115,10 @@ static int timers_arch_init(void)
 		panic("no arm gen timer found in dtb\n");
 
 #ifdef CONFIG_PLATFORM_RASPBERRY3
-	for (len = 0; len < TIMER_MAX; len++) {
-		info = &timer_info[len];
-		info->irq = tmp[len] + 16;
-		pr_info("raspberry %d timer int is %d\n", len, info->irq);
-	}
+	timer_info[0].irq = 16;
+	timer_info[1].irq = 17;
+	timer_info[2].irq = 19;
+	timer_info[3].irq = 18;
 #else
 	memcpy((void *)&timer_info, (void *)tmp,
 			sizeof(struct armv8_timer_info) * TIMER_MAX);
@@ -225,6 +227,9 @@ static int virtual_timer_irq_handler(uint32_t irq, void *data)
 	value = value | CNT_CTL_IMASK;
 	write_sysreg32(value, CNTV_CTL_EL0);
 	dsb();
+
+	if (!vm_is_native(vcpu->vm))
+		irq = GVM_VIRT_TIMER_INT;
 
 	return send_virq_to_vcpu(vcpu, irq);
 }
