@@ -387,6 +387,16 @@ static int bcm2836_irq_enter_to_guest(void *item, void *data)
 			continue;
 		}
 
+#if 0
+		/*
+		 * virq is not enabled this time, need to
+		 * send it later, but this will infence the idle
+		 * condition jugement TBD
+		 */
+		if (!virq_is_enabled(virq))
+			continue;
+#endif
+
 		/*
 		 * update the bcm_virq interrupt status and
 		 * delete the virq from the virq list then
@@ -397,7 +407,6 @@ static int bcm2836_irq_enter_to_guest(void *item, void *data)
 		virq->state = VIRQ_STATE_ACTIVE;
 		list_del(&virq->list);
 		list_add_tail(&virq_struct->active_list, &virq->list);
-		break;
 	}
 
 out:

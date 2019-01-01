@@ -104,11 +104,6 @@ static int send_virq(struct vcpu *vcpu, struct virq_desc *desc)
 	int ret;
 	struct vm *vm = vcpu->vm;
 
-	if (!virq_is_enabled(desc)) {
-		pr_error("virq %d is not enabled\n", desc->vno);
-		return -EINVAL;
-	}
-
 	/* do not send irq to vm if not online or suspend state */
 	if ((vm->state == VM_STAT_OFFLINE) ||
 			(vm->state == VM_STAT_REBOOT)) {
@@ -422,6 +417,16 @@ static int __used irq_enter_to_guest(void *item, void *data)
 			virq->list.next = NULL;
 			continue;
 		}
+
+#if 0
+		/*
+		 * virq is not enabled this time, need to
+		 * send it later, but this will infence the idle
+		 * condition jugement TBD
+		 */
+		if (!virq_is_enabled(virq))
+			continue;
+#endif
 
 		if (virq->id != VIRQ_INVALID_ID)
 			goto __do_send_virq;
