@@ -2,9 +2,16 @@
 
 Minos is a lightweight open source Type 1 Hypervisor for mobile and embedded systems that runs directly in bare metal environments. Minos implements a complete virtualization framework that can run multiple VMs (Linux or RTOS) on one hardware platform. Minos provides CPU virtualization; interrupt virtualization; memory virtualization; Timer virtual; and the virtualization of some common peripherals.
 
-Minos provides an application "mvm" running on VM0 to support the management of the Guest VM. At the same time, mvm provides a viviro-based paravirtualization solution that supports virtio-console, virtio-blk, virtio-net and other devices. Minos can support both 64bit and 32bit guest VM, but VM0 must use 64bit.
+Minos provides an application "mvm" running on VM0 to support the management of the Guest VM. At the same time, mvm provides a virtio-based paravirtualization solution that supports virtio-console, virtio-blk, virtio-net and other devices. Minos can support both 64bit and 32bit guest VM, but VM0 must use 64bit.
 
-Minos is suitable for mobile and embedded platforms and currently only supports the ARMv8-A architecture. Marvell's Esspressobin development board is supported, and the hardware platform of the ARMv8-A + GICV3/GICV2 combination can theoretically be supported. The software debugging platform supports ARM's official Fix Virtual Platform (FVP), and developers can use ARM DS5 tools for simulation and debugging.
+Minos is suitable for mobile and embedded platforms and currently only supports the ARMv8-A architecture. Marvell's Esspressobin and Raspberry Pi 3 are supported, and the hardware platform of the ARMv8-A + GICV3/GICV2 combination can theoretically be supported. The software debugging platform supports ARM's official Fix Virtual Platform (FVP), and developers can use ARM DS5 tools for simulation and debugging.
+
+Below is the board that Minos has been supported:
+
+- [x] Marvell's Esspressobin development board
+- [x] Raspberry Pi 3 Model B+ / Raspberry Pi 3 Model A+ / Raspberry Pi 3 Model B
+- [x] ARMv8 Fixed Virtual Platforms
+
 
 # Download Source Code And Tools for Minos
 
@@ -56,6 +63,92 @@ Minos is suitable for mobile and embedded platforms and currently only supports 
         # git clone https://github.com/ARM-software/arm-trusted-firmware.git
 
 	Will be used when testing Minos on the ARM FVP
+
+# Run Minos on Raspberry Pi 3 Model B+
+
+Minos has been tested on Raspberry Pi 3 Model b+, Raspberry Pi 3 and 3 Model A+ are supported too. These boards use Broadcom's bcm28737 chip, which does not use GICv2 or GICv3 interrupt controllers that support interrupt virtualization. In order to implement interrupt virtualization on this chip and minimize Guest VM code modifications, the following method was adopted:
+
+> * Implement virtual bcm2836-armctrl-ic and bcm2836-l1-intc interrupt controller for Host VM (VM0)
+> * Extended the vGICv2 for the Guest VM
+
+1. Install operating system images for 3B+
+
+	Until now, there is no 64-bit operating system that fully supports 3B+ has been officially released on the Internet, including Debian or Ubuntu, but many netizens have provided their own versions.
+Download the image and using dd to flash it to the SD card
+
+        # wget http://leyunxi.com/static/debian-arm64-rpi3bplus.img
+        # sudo dd bs=2M if=debian-arm64-rpi3bplus.img of=/dev/sdX
+
+	After above commands when plug in the SD card to Ubuntu system again, the two partition will be mounted automaticlly, **the boot partition will be mount at /media/zac/6A99-E637, and the rootfs partition will be mounted at /media/zac/711a5ddf-1ff4-4d5a-ad95-8b9b69953513, the system used may not be the same. The following commands which modify the file on theses partitions, need to adjust the path according to the actual situation**.
+
+2. Compile u-boot for 3B+
+
+        # git clone https://github.com/u-boot/u-boot.git && cd u-boot
+        # export CROSS_COMPILE=aarch64-linux-gnu-
+        # make rpi_3_defconfig
+        # make -j8
+        # cp u-boot.bin /media/zac/6A99-E637/kernel8.img
+
+3. Compile Linux Kernel
+
+	The kernel using rpi-4.20.y branch from Raspberry offical git, and integrated the necessary Minos patches for bcm2837.
+
+        # git clone https://github.com/minos-project/linux-raspberry.git && cd linux-raspberry
+        # git checkout -b minos-rpi-4.20-y origin/minos-rpi-4.20-y
+        # make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- bcmrpi3_defconfig
+        # make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image -j8
+        # make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules dtbs -j8
+        # sudo make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_install INSTALL_MOD_PATH=/media/zac/711a5ddf-1ff4-4d5a-ad95-8b9b69953513
+        # cp arch/arm64/boot/Image /media/zac/6A99-E637
+        # cp arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dtb /media/zac/6A99-E637
+
+	After above commands Raspberry kernel images and kernel moudules will be updated to 4.20
+
+4. Compile Minos
+
+        # git clone https://github.com/minos-project/minos-hypervisor.git && cd minos-hypervisor
+        # make PLATFORM=raspberry3
+        # cp hypervisor/out/minos.bin /media/zac/6A99-E637  (Minos hypervisor binary)
+        # sudo cp mvm/mvm /media/zac/711a5ddf-1ff4-4d5a-ad95-8b9b69953513/home/jiangxianxu  (Minos tools for VM0)
+
+5. Copy Guest VM boot.img to rootfs
+
+        # git clone https://github.com/minos-project/minos-samples.git && cd minos-samples
+        # sudo cp gvm-aarch32/boot.img /media/zac/711a5ddf-1ff4-4d5a-ad95-8b9b69953513/home/jiangxianxu/boot32.img
+        # sudo cp gvm-aarch64/boot.img /media/zac/711a5ddf-1ff4-4d5a-ad95-8b9b69953513/home/jiangxianxu/boot64.img
+
+	The minos-sample provides the dts/dtb file of the Guest VM and the created Guest VM boot.img file.
+
+6. Modify Raspberry config.txt for Minos
+
+        arm_control=0x200
+        #dtoverlay=pi3-miniuart-bt
+        enable_uart=1
+        kernel=kernel8.img
+
+6. Boot system with Minos support
+
+	Boot the Raspberry to the u-boot commandline environment, execute the following command to start the system
+
+        fatload mmc 0:1 0x28000000 minos.bin
+        fatload mmc 0:1 0x03e00000 bcm2837-rpi-3-b-plus.dtb
+        fatload mmc 0:1 0x00080000 Image
+        booti 0x28000000 - 0x03e00000
+
+	The Debian login username name is **jiangxianxu**, and the password is **linux**, if need to connect to the wifi network please modify ssid and psk in /etc/wpa_supplicant/wpa_supplicant.conf. After connected to the network can use below command to login into the system
+
+        # ssh -p 1314 jiangxianxu@xxx.xxx.xxx.xxx
+
+7. Create new guest VM
+
+	Below commands are used to create 2 VMS, one is 64bit and another is 32bit.
+
+        # cd /home/jiangxianxu
+        # sudo chmod 777 mvm
+        # ./mvm -c 2 -m 96M -i boot64.img -n elinux64 -t linux -b 64 -v -r -d --gicv2 --eralyprintk -V virtio_console,@pty: -V virtio_blk,/home/jiangxianxu/sd.img -V virtio_net,tap0 -C "console=hvc0 loglevel=8 consolelog=9 root=/dev/vda2 rw"   (64bit VM with virtio_console; virtio_net and virtio_blk devices)
+        # ./mvm -c 2 -m 96M -i boot32.img -n elinux32 -t linux -b 32 -v -d --gicv2 --earlyprintk -V virtio_console,@pty: -C "console=hvc0 loglevel=8 consolelog=9"   (32bit VM with virtio console device)
+
+![Run Minos on Raspberry 3 B+](http://leyunxi.com/static/raspberry3_virtualization.png)
 
 # Run Minos on Marvell Esspressobin
 
@@ -222,11 +315,11 @@ Another way is to use the VM management tool mvm provided by Minos. Currently mv
 
 For example, the following command is used to create a Linux virtual machine with 2 vcpu, 84M memory, bootimage as boot.img, and 64-bit with virtio-console device and virtio-net device. Below command will use ramdisk in boot.img as the rootfs instead of block device.
 
-        # ./mvm -c 2 -m 84M -i boot.img -n elinux -t linux -b 64 -v -d -C "console=hvc0 loglevel=8 consolelog=9 loglevel=8 consolelog=9" -V virtio_console,@pty: -V virtio_net,tap0
+        # ./mvm -c 2 -m 84M -i boot.img -n elinux -t linux -b 64 -v -d -C "console=hvc0 loglevel=8 consolelog=9" -V virtio_console,@pty: -V virtio_net,tap0
 
 Now Minos also support using virtio block device as the root device, below command will create a linux vm using virtio-blk device as root device instead of ramdisk
 
-        # ./mvm -c 1 -m 64M -i boot.img -n linux -t linux -v -r -d -V virtio_console,@pty: -V virtio_blk,~/minos-workspace/sd.img -V virtio_net,tap0 -C "console=hvc0 loglevel=8 consolelog=9 root=/dev/vda2 rw"
+        # ./mvm -c 1 -m 64M -i boot.img -n linux -t linux -b 64 -v -r -d -V virtio_console,@pty: -V virtio_blk,~/minos-workspace/sd.img -V virtio_net,tap0 -C "console=hvc0 loglevel=8 consolelog=9 root=/dev/vda2 rw"
 
 If the creation is successful, the following log output will be generated.
 
