@@ -133,14 +133,26 @@ static inline uint64_t cpuid_to_affinity(int cpuid)
 {
 	int aff0, aff1;
 
+#ifdef CONFIG_MPIDR_SHIFT
+	if (cpuid < CONFIG_NR_CPUS_CLUSTER0)
+		return (cpuid << MPIDR_EL1_AFF1_LSB);
+	else {
+		aff0 = cpuid - CONFIG_NR_CPUS_CLUSTER0;
+		aff1 = 1;
+
+		return (aff1 << MPIDR_EL1_AFF2_LSB) |
+				(aff0 << MPIDR_EL1_AFF1_LSB);
+	}
+#else
 	if (cpuid < CONFIG_NR_CPUS_CLUSTER0)
 		return cpuid;
 	else {
 		aff0 = cpuid - CONFIG_NR_CPUS_CLUSTER0;
 		aff1 = 1;
 
-		return (aff1 << 8) + aff0;
+		return (aff1 << MPIDR_EL1_AFF1_LSB) + aff0;
 	}
+#endif
 }
 
 static inline void flush_all_tlb_host(void)

@@ -26,8 +26,13 @@
 
 func smp_processor_id
 	mrs 	x0, MPIDR_EL1
+#ifdef CONFIG_MPIDR_SHIFT
+	ubfx    x1, x0, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
+	ubfx    x2, x0, #MPIDR_EL1_AFF2_LSB, #MPIDR_EL1_AFF_WIDTH
+#else
 	ubfx    x1, x0, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
 	ubfx    x2, x0, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
+#endif
 	mov	x3, #CONFIG_NR_CPUS_CLUSTER0
 	mul	x2, x2, x3
 	add	x0, x2, x1
