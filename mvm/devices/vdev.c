@@ -37,10 +37,10 @@
 #include <sys/mman.h>
 #include <libfdt/libfdt.h>
 
-void *hv_create_guest_device(struct vm *vm)
+void *hv_create_guest_device(struct vm *vm, size_t size)
 {
 	int ret;
-	void *iomem = 0;
+	unsigned long iomem = size;
 
 	ret = ioctl(vm->vm_fd, IOCTL_CREATE_GUEST_DEVICE, &iomem);
 	if (ret) {
@@ -48,7 +48,7 @@ void *hv_create_guest_device(struct vm *vm)
 		return NULL;
 	}
 
-	return iomem;
+	return (void *)iomem;
 }
 
 void *vdev_map_iomem(void *base, size_t size)

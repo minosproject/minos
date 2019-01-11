@@ -102,4 +102,9 @@ static inline void send_virq_to_vm(int virq)
 	ioctl(mvm_vm->vm_fd, IOCTL_SEND_VIRQ, (long)virq);
 }
 
+static inline int request_virq(unsigned long flags)
+{
+	return ioctl(mvm_vm->vm_fd, IOCTL_REQUEST_VIRQ, flags);
+}
+
 #endif

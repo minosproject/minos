@@ -992,7 +992,7 @@ struct vdev_ops virtio_console_ops = {
 	.deinit		= virtio_console_deinit,
 	.reset		= virtio_console_reset,
 	.setup		= virtio_console_setup,
-	.handle_event	= virtio_console_event,
+	.event		= virtio_console_event,
 };
 
 DEFINE_VDEV_TYPE(virtio_console_ops);

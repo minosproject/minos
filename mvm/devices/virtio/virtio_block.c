@@ -449,7 +449,7 @@ struct vdev_ops virtio_blk_ops = {
 	.init		= virtio_blk_init,
 	.deinit		= virtio_blk_deinit,
 	.reset		= virtio_blk_reset,
-	.handle_event	= virtio_blk_event,
+	.event		= virtio_blk_event,
 };
 
 DEFINE_VDEV_TYPE(virtio_blk_ops);

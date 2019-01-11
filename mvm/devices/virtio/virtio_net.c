@@ -1095,6 +1095,6 @@ struct vdev_ops virtio_net_ops = {
 	.init		= virtio_net_init,
 	.deinit		= virtio_net_deinit,
 	.reset		= virtio_net_reset,
-	.handle_event	= virtio_net_event,
+	.event		= virtio_net_event,
 };
 DEFINE_VDEV_TYPE(virtio_net_ops);

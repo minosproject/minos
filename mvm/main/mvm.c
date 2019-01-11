@@ -56,6 +56,7 @@
 #include <pthread.h>
 #include <sys/eventfd.h>
 #include <sys/prctl.h>
+#include <time.h>
 
 #include <mvm.h>
 #include <vdev.h>
@@ -436,7 +437,7 @@ static int vcpu_handle_mmio(struct vm *vm, int trap_reason,
 		size = vdev->iomem_size;
 		if ((trap_data >= base) && (trap_data < base + size)) {
 			pthread_mutex_lock(&vdev->lock);
-			ret = vdev->ops->handle_event(vdev, trap_reason,
+			ret = vdev->ops->event(vdev, trap_reason,
 					trap_data, trap_result);
 			pthread_mutex_unlock(&vdev->lock);
 
@@ -463,6 +464,9 @@ static int vcpu_handle_common_trap(struct vm *vm, int trap_reason,
 	case VMTRAP_REASON_VM_RESUMED:
 		vm->state = VM_STAT_RUNNING;
 		pr_info("vm-%d is resumed\n", vm->vmid);
+		break;
+	case VMTRAP_REASON_GET_TIME:
+		*trap_result = (unsigned long)time(NULL);
 		break;
 	default:
 		break;
