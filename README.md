@@ -22,10 +22,10 @@ Below is the board that Minos has been supported:
 
 2. Install aarch64 gcc cross compilation tool
 
-        # wget https://releases.linaro.org/components/toolchain/binaries/latest/aarch64-linux-gnu/gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu.tar.xz
-        # tar xjf gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu.tar.xz
-        # sudo mv gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu /opt
-        # echo "export PATH=/opt/gcc-linaro-7.3.1-2018.05-x86_64_aarch64-linux-gnu/bin:$PATH" >> ~/.bashrc
+        # wget https://releases.linaro.org/components/toolchain/binaries/7.2-2017.11/aarch64-linux-gnu/gcc-linaro-7.2.1-2017.11-x86_64_aarch64-linux-gnu.tar.xz
+        # tar xjf gcc-linaro-7.2.1-2017.11-x86_64_aarch64-linux-gnu.tar.xz
+        # sudo mv gcc-linaro-7.2.1-2017.11-x86_64_aarch64-linux-gnu /opt
+        # echo "export PATH=/opt/gcc-linaro-7.2.1-2017.11-x86_64_aarch64-linux-gnu/bin:$PATH" >> ~/.bashrc
         # source ~/.bashrc
 
 3. Install abootimg android image tool
