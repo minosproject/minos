@@ -77,7 +77,7 @@ static int raspberry3_setup_hvm(struct vm *vm, void *dtb)
 
 	/* mask 40 - 52 virq for hvm which is internal use */
 	for (i = 40; i <= 52; i++)
-		virq_mask_and_disable(vm, i);
+		virq_mask_and_disable(vm, i, 0);
 
 	pr_info("raspberry3 setup vm done\n");
 

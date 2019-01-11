@@ -541,7 +541,13 @@ void vcpu_virq_struct_reset(struct vcpu *vcpu)
 	}
 }
 
-int virq_mask_and_enable(struct vm *vm, uint32_t virq)
+static void update_virq_cap(struct virq_desc *desc, unsigned long flags)
+{
+	if (flags & VIRQF_CAN_WAKEUP)
+		virq_set_wakeup(desc);
+}
+
+int virq_mask_and_enable(struct vm *vm, uint32_t virq, unsigned long flags)
 {
 	struct virq_desc *desc;
 	uint32_t bit = virq - VM_LOCAL_VIRQ_NR;
@@ -569,10 +575,12 @@ int virq_mask_and_enable(struct vm *vm, uint32_t virq)
 	desc->state = VIRQ_STATE_INACTIVE;
 	desc->list.next = NULL;
 
+	update_virq_cap(desc, flags);
+
 	return 0;
 }
 
-int virq_mask_and_disable(struct vm *vm, uint32_t virq)
+int virq_mask_and_disable(struct vm *vm, uint32_t virq, unsigned long flags)
 {
 	struct virq_desc *desc;
 	uint32_t bit = virq - VM_LOCAL_VIRQ_NR;
@@ -592,6 +600,8 @@ int virq_mask_and_disable(struct vm *vm, uint32_t virq)
 	set_bit(bit, vm->vspi_map);
 	desc = &vm->vspi_desc[bit];
 	virq_clear_enable(desc);
+
+	update_virq_cap(desc, flags);
 
 	return 0;
 }
@@ -702,7 +712,7 @@ int alloc_vm_virq(struct vm *vm)
 		virq = -1;
 
 	if (virq >= 0)
-		virq_mask_and_enable(vm, virq + VM_LOCAL_VIRQ_NR);
+		virq_mask_and_enable(vm, virq + VM_LOCAL_VIRQ_NR, 0);
 
 	if (vm_is_hvm(vm))
 		spin_unlock(&hvm_irq_lock);

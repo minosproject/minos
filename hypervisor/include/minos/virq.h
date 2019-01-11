@@ -51,6 +51,8 @@ struct irqtag;
 #define VIRQS_HW		(1 << 3)
 #define VIRQS_CAN_WAKEUP	(1 << 4)
 
+#define VIRQF_CAN_WAKEUP	(1 << 4)
+
 enum virq_domain_type {
 	VIRQ_DOMAIN_SGI = 0,
 	VIRQ_DOMAIN_PPI,
@@ -184,8 +186,8 @@ int vcpu_has_irq(struct vcpu *vcpu);
 
 int alloc_vm_virq(struct vm *vm);
 void release_vm_virq(struct vm *vm, int virq);
-int virq_mask_and_enable(struct vm *vm, uint32_t virq);
-int virq_mask_and_disable(struct vm *vm, uint32_t virq);
+int virq_mask_and_enable(struct vm *vm, uint32_t virq, unsigned long flags);
+int virq_mask_and_disable(struct vm *vm, uint32_t virq, unsigned long flags);
 uint32_t get_pending_virq(struct vcpu *vcpu);
 
 static inline int alloc_hvm_virq(void)
