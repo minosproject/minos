@@ -54,7 +54,7 @@
 
 #define CONFIG_GIC_V3
 
-/* for FVP_Base_RevC-2xAEMv8A
+/* for FVP_Base_RevC-2xAEMv8A */
 //#define CONFIG_MPIDR_SHIFT
 
 #endif
