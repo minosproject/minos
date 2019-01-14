@@ -63,7 +63,7 @@ typedef __pte_t pte_t;
 #define pmd_idx(vir)		((vir >> PMD_SHIFT) & (PAGE_MAPPING_COUNT - 1))
 #define ptd_idx(vir)		((vir >> PTE_SHIFT) & (PAGE_MAPPING_COUNT - 1))
 
-#ifdef ARCH_AARCH64
+#ifdef CONFIG_ARCH_AARCH64
 #define guest_pgd_idx(vir)	BUG()
 #define guest_pud_idx(vir)	((vir >> PUD_SHIFT) & ((PAGE_MAPPING_COUNT * 2) - 1))
 #define guest_pmd_idx(vir)	pmd_idx(vir)
@@ -80,7 +80,7 @@ typedef __pte_t pte_t;
 #define pmd_offset(ppmd, vir)	((pmd_t *)ppmd + pmd_idx(vir))
 #define pte_offset(ppte, vir)	((pte_t *)ppte + pte_idx(vir))
 
-#ifdef ARCH_AARCH64
+#ifdef CONFIG_ARCH_AARCH64
 #define guest_pgd_offset(ppgd, vir) 	((pgd_t *)ppgd)
 #else
 #define guest_pgd_offset(ppgd, vir) 	pgd_offset(ppgd, vir)

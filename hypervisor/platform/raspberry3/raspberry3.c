@@ -25,6 +25,7 @@
 #include <asm/of.h>
 #include <asm/cpu.h>
 #include <minos/virq.h>
+#include <minos/platform.h>
 
 static int raspberry3_setup_hvm(struct vm *vm, void *dtb)
 {

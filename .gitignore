@@ -68,9 +68,9 @@ Module.symvers
 #
 # Generated include files
 #
-include/config
-include/generated
-arch/*/include/generated
+hypervisor/include/config/
+hypervisor/include/generated
+hypervisor/arch/*/include/generated
 
 # stgit generated dirs
 patches-*
@@ -110,7 +110,7 @@ all.config
 
 # Kdevelop4
 *.kdev4
-
-arch/arm64/configs/bya8665_spm_l_debug_defconfig
-arch/arm64/configs/bya8665_spm_l_defconfig
-drivers/misc/mediatek/mach/mt6735/bya8665_spm_l/dct/dct/codegen.dws
+*.lds
+allsymbols.S
+tmp.minos.symbols
+*.dtb

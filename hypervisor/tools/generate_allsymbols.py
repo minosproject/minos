@@ -11,7 +11,7 @@ if __name__ == "__main__":
     input_name = argv[1]
     output_name = argv[2]
     symbols = "#include <config/config.h>\n"
-    symbols += "#ifdef ARCH_AARCH64\n"
+    symbols += "#ifdef CONFIG_ARCH_AARCH64\n"
     symbols += "#define PTR .quad\n"
     symbols += "#define ALGN .align 8\n"
     symbols += "#else\n"

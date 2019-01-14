@@ -4,19 +4,13 @@
 #include <minos/types.h>
 #include <minos/string.h>
 #include <minos/print.h>
-#include <minos/mm.h>
 #include <minos/list.h>
 #include <minos/spinlock.h>
 #include <minos/smp.h>
-#include <minos/varlist.h>
 #include <config/config.h>
 #include <minos/errno.h>
 #include <minos/init.h>
-#include <minos/device_id.h>
 #include <minos/arch.h>
-#include <minos/calltrace.h>
-#include <minos/preempt.h>
-#include <minos/platform.h>
 #include <minos/calltrace.h>
 
 struct vcpu;

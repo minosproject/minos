@@ -4,7 +4,7 @@
 #include <config/config.h>
 #include <minos/types.h>
 
-extern int smp_processor_id();
+extern int smp_processor_id(void);
 extern unsigned long percpu_offset[];
 
 void percpus_init(void);

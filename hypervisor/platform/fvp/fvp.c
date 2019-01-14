@@ -19,6 +19,7 @@
 #include <asm/vtimer.h>
 #include <asm/io.h>
 #include <minos/vmm.h>
+#include <minos/platform.h>
 
 static int fvp_time_init(void)
 {

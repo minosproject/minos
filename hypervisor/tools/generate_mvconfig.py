@@ -1,222 +1,39 @@
 import sys
 import os
-import json
-
-
-def parse_mem_sectype(data):
-    d = data['sectype']
-    if d is 'S':
-        value = '0'
-    elif d is 'N':
-        value = '1'
-    else:
-        value = '2'
-
-    return ".sectype = " + value + ",\n"
-
-
-def parse_vcpu_affinity(data):
-    nr = data['nr_vcpu']
-    nr = int(nr)
-
-    c = ".vcpu_affinity = {"
-    for i in range(0, nr):
-        key = "vcpu" + str(i) +"_affinity"
-        if key in data.keys():
-            c += str(data[key])
-        else:
-            c += '0'
-
-        if i != (nr - 1):
-            c += ', '
-
-    c += '},\n'
-
-    return c
-
-
-patten = [
-    {
-        'struct_name': "vmtag",
-        'member_name': 'vmtags',
-        'json_name': 'vmtags',
-        'type' : 'ARRAY',
-        'static': True,
-        'members': [
-            {'name': 'vmid', 'type': 'NUM', 'data': None},
-            {'name': 'name', 'type': 'STRING', 'data': None},
-            {'name': 'type', 'type': 'STRING', 'data': None},
-            {'name': 'nr_vcpu', 'type': 'NUM', 'data': None},
-            {'name': 'entry', 'type': 'HEX_STRING', 'data': None},
-            {'name': 'setup_data', 'type': 'HEX_STRING', 'data': None},
-            {'name': 'cmdline', 'type': 'STRING', 'data': None},
-            {'name': 'vcpu_affinity', 'type': 'FUNCTION', 'data': parse_vcpu_affinity},
-            {'name': 'bit64', 'type': "NUM", 'data': None}
-        ]
-    },
-    {
-        'struct_name': 'irqtag',
-        'member_name': 'irqtags',
-        'type': 'ARRAY',
-        'static': True,
-        'json_name': 'irqtags',
-        'members': [
-            {'name': 'vno', 'type': 'NUM', 'data': None},
-            {'name': 'hno', 'type': 'NUM', 'data': None},
-            {'name': 'vmid', 'type': 'NUM', 'data': None},
-            {'name': 'vcpu_id', 'type': 'NUM', 'data': None},
-            {'name': 'name', 'type': 'STRING', 'data': None}
-        ]
-    },
-    {
-        'struct_name': 'memtag',
-        'member_name': 'memtags',
-        'json_name': "memtags",
-        'type' : 'ARRAY',
-        'static': True,
-        'members' : [
-            {'name': 'mem_base', 'type': 'HEX_STRING', 'data': None},
-            {'name': 'mem_end', 'type': 'HEX_STRING', 'data': None},
-            {'name': 'enable', 'type': 'NUM', 'data': None},
-            {'name': 'type', 'type': 'NUM', 'data': None},
-            {'name': 'vmid', 'type': 'NUM', 'data': None},
-            {'name': 'name', 'type': 'STRING', 'data': None},
-        ]
-    },
-    {
-        'struct_name': "virt_config",
-        'member_name': "virt_config",
-        'json_name': None,
-        'type': "NORMAL",
-        'static': False,
-        'members': [
-            {'name': 'version', 'type': 'STRING', 'data': None},
-            {'name': 'platform', 'type': "STRING", 'data': None},
-            {'name': 'vmtags', 'type': "CONFIG", 'data': 0},
-            {'name': 'irqtags', 'type': "CONFIG", 'data': 1},
-            {'name': "memtags", 'type': "CONFIG", 'data': 2},
-            {'name': 'nr_vmtag', 'type': "GET_STRUCT_SIZE", 'data': 0},
-            {'name': 'nr_irqtag', 'type': "GET_STRUCT_SIZE", 'data': 1},
-            {'name': "nr_memtag", 'type': "GET_STRUCT_SIZE", 'data': 2}
-        ]
-    }
-
-]
-
-
-def parse_data(source, t, arg):
-    if t == 'NUM':
-        if type(source) is int:
-            value = source
-        elif type(source) is str:
-            value = int(source)
-        else:
-            value = 0
-        value = str(value)
-    elif t == 'STRING':
-        if (type(source)) is str:
-            value = "\"" + source + "\""
-        else:
-            value = "\"" + str(source) + "\""
-    elif t == "HEX_STRING":
-        if (type(source)) is str:
-            value = source
-        else:
-            value = "0x0"
-    elif t == 'SIZE_IN_XB':
-        v = int(source[:-2])
-        if source[-2] is 'K':
-            v = v * 1024
-        elif source[-2] is 'M':
-            v = v * 1024 * 1024
-        elif source[-2] is 'G':
-            v = v * 1024 * 1024 * 1024
-        else:
-            v = 0
-        value = str(v)
-    else:
-        prinf("unsupport type")
-        return ""
-
-    return value
-
-
-def parse_one_member(member_items, data):
-    c = ''
-    for m in member_items:
-        if m['type'] is 'FUNCTION':
-            value = m['data'](data)
-        elif m['type'] is 'GET_STRUCT_SIZE':
-            index = m['data']
-            index = int(index)
-            value = "sizeof(" + patten[index]['member_name'] + ') / sizeof(struct ' + patten[index]['struct_name'] + ')'
-        elif m['type'] is 'CONFIG':
-            index = m['data']
-            index = int(index)
-            value = patten[index]['member_name']
-            if patten[index]['type'] is 'NORMAL':
-                value = '&' + value
-        else:
-            d = data[m['name']]
-            value = parse_data(d, m['type'], m['data'])
-
-        if m['type'] is 'FUNCTION':
-            c += "                " + value
-        else:
-            c += "                ." + m['name'] + " = " + value + ',\n'
-
-
-    return c
-
-
-def parse_struct(struct, jdata):
-    c = ""
-    if struct['static']:
-        c += 'static '
-
-    c += "struct " + struct['struct_name'] + ' __section(\".__config\") ' + struct['member_name']
-
-    if struct['type'] is 'ARRAY':
-        c += '[] '
-
-    c += ' = {\n'
-
-    if struct['type'] == "ARRAY":
-        for data in jdata:
-            s = '        {\n'
-            s += parse_one_member(struct['members'], data)
-            s += '        },\n'
-            c += s
-    else:
-            c += parse_one_member(struct['members'], jdata)
-
-    #if struct['type'] == "ARRAY":
-    #    c += '        { }\n'
-
-    c += '};\n\n'
-
-    return c
-
-
-def generate_mvconfig(json_data):
-    content = "#include <minos/compiler.h>\n\n"
-    content += "#include <minos/virt.h>\n"
-
-    for struct in patten:
-        if struct['json_name']:
-            jdata = json_data[struct['json_name']]
-        else:
-            jdata = json_data
-        print("Parsing " + struct['struct_name'] + " ...")
-        content += parse_struct(struct, jdata)
-
-    return content
 
 
 """
-arg[0] is the tools name
-arg[1] is the input file
-arg[2] is the output file
+the default config for the hypervisor, user
+can override them in the xxx_defconfig file
+if the item did not mentioned in the xxx_defconfig
+file, these config will use the config
+
+format:
+key:[value, keep_default]
+
+"""
+default_config = {
+    'CONFIG_IDLE_VCPU_STACK_SIZE': ['8K', 1],
+    'CONFIG_IDLE_VCPU_STACK_SHIFT': ['13', 1],
+    'CONFIG_MAX_VM': ['64', 1],
+    'CONFIG_MINOS_RESCHED_IRQ': ['7', 1],
+    'CONFIG_MAX_SLAB_BLOCKS': ['10', 1],
+    'CONFIG_PLATFORM_ADDRESS_RANGE': ['40', 1],
+    'CONFIG_SCHED_INTERVAL': ['50', 1],
+    'CONFIG_LOG_LEVEL': ['3', 1],
+    'CONFIG_MINOS_START_ADDRESS': ['0x0', 1],
+    'CONFIG_BOOTMEM_SIZE': ['64K', 1],
+}
+
+
+def parse_line(s):
+    return [i.strip('\r\n') for i in s.split('=') if i]
+
+
+"""
+arg[0] the tools name
+arg[1] the input config file
+arg[1] the directory the generated file stored to
 """
 if __name__ == "__main__":
     argv = sys.argv
@@ -225,16 +42,82 @@ if __name__ == "__main__":
         exit()
 
     input_name = argv[1]
-    output_name = argv[2]
+    output_dir = argv[2]
+
+    output_conf_file = output_dir + "/auto.conf"
+    output_h_file = output_dir + "/config.h"
+
+    configs = []
 
     with open(input_name, 'r') as fd:
-        mvconfig = json.load(fd)
-        content = generate_mvconfig(mvconfig)
+        for line in fd:
+            if not line:
+                continue
+            if line[0] == '#' or line[0] == ' ' or line[0] == '':
+                continue
+            if line[0] == '\r' or line[0] == '\n':
+                continue
+
+            item = parse_line(line)
+            configs.append(item)
+
+            # check whether need to change the default config
+            if item[0] in default_config.keys():
+                default_config[item[0]][1] = 0
+
         fd.close()
 
-    with open(output_name, 'w') as fd:
-        fd.write(content)
-        fd.close()
+    print("")
+    for key in default_config.keys():
+        if default_config[key][1]:
+            print(key + " Using default [" + default_config[key][0] + "]")
+            configs.append([key, default_config[key][0]])
 
-    print("generate the config file success")
-    exit()
+    a_str = ''
+
+    with open(output_conf_file, 'w') as afd:
+        for item in configs:
+            if len(item) != 2:
+                print("Error config item" + item)
+                continue
+
+            last_char = item[1][-1]
+            a_str += item[0] + '='
+            if last_char == 'M' or last_char == 'm':
+                num = int(item[1][:-1]) * 1024 * 1024
+                a_str += hex(num)
+            elif last_char == 'K' or last_char == 'k':
+                num = int(item[1][:-1]) * 1024
+                a_str += hex(num)
+            else:
+                a_str += item[1]
+            a_str += '\r\n'
+        afd.write(a_str)
+        afd.close()
+
+    h_str = '#ifndef __MINOS_CONFIG__\r\n'
+    h_str += "#define __MINOS_CONFIG__\r\n\r\n"
+    with open(output_h_file, 'w') as hfd:
+        for item in configs:
+            if len(item) != 2:
+                print("Error config item" + item)
+                continue
+
+            last_char = item[1][-1]
+            h_str += '#define ' + item[0] + ' '
+            if item[1] == 'y':
+                h_str += '1'
+            elif last_char == 'M' or last_char == 'm':
+                num = int(item[1][:-1]) * 1024 * 1024
+                h_str += hex(num)
+            elif last_char == 'K' or last_char == 'k':
+                num = int(item[1][:-1]) * 1024
+                h_str += hex(num)
+            else:
+                h_str += item[1]
+            h_str += '\r\n'
+        h_str += '\r\n#endif'
+        hfd.write(h_str)
+        hfd.close()
+
+        exit()
