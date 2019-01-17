@@ -145,8 +145,8 @@ Download the image and using dd to flash it to the SD card
 
         # cd /home/jiangxianxu
         # sudo chmod 777 mvm
-        # ./mvm -c 2 -m 96M -i boot64.img -n elinux64 -t linux -b 64 -v -r -d --gicv2 --eralyprintk -V virtio_console,@pty: -V virtio_blk,/home/jiangxianxu/sd.img -V virtio_net,tap0 -C "console=hvc0 loglevel=8 consolelog=9 root=/dev/vda2 rw"   (64bit VM with virtio_console; virtio_net and virtio_blk devices)
-        # ./mvm -c 2 -m 96M -i boot32.img -n elinux32 -t linux -b 32 -v -d --gicv2 --earlyprintk -V virtio_console,@pty: -C "console=hvc0 loglevel=8 consolelog=9"   (32bit VM with virtio console device)
+        # sudo ./mvm -c 2 -m 96M -i boot64.img -n elinux64 -t linux -b 64 -v -r -d --gicv2 --earlyprintk -V virtio_console,@pty: -V virtio_blk,/home/jiangxianxu/sd.img -V virtio_net,tap0 -C "console=hvc0 loglevel=8 consolelog=9 root=/dev/vda2 rw"   (64bit VM with virtio_console; virtio_net and virtio_blk devices)
+        # sudo ./mvm -c 2 -m 96M -i boot32.img -n elinux32 -t linux -b 32 -v -d --gicv2 --earlyprintk -V virtio_console,@pty: -C "console=hvc0 loglevel=8 consolelog=9"   (32bit VM with virtio console device)
 
 ![Run Minos on Raspberry 3 B+](http://leyunxi.com/static/raspberry3_virtualization.png)
 
