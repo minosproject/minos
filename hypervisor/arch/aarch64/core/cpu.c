@@ -17,7 +17,7 @@
 #include <minos/minos.h>
 #include <config/config.h>
 #include <minos/arch.h>
-#include <asm/of.h>
+#include <minos/of.h>
 #include <asm/psci.h>
 #include <minos/vmm.h>
 

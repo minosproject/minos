@@ -3,7 +3,7 @@ VERSION = 0
 PATCHLEVEL = 2
 SUBLEVEL = 1
 EXTRAVERSION = -rc0
-NAME =
+NAME = unstable
 
 PHONY := _all
 _all:
@@ -134,6 +134,7 @@ CHECKFLAGS     := -D__minos__ -Dminos -D__STDC__ -Dunix -D__unix__ \
 MINOSINCLUDE    := \
 		-I$(srctree)/arch/$(SRCARCH)/include \
 		-I$(objtree)/include \
+		-I$(srctree)/../include
 
 MBUILD_AFLAGS   := -D__ASSEMBLY__
 MBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
@@ -164,7 +165,7 @@ PHONY += all
 _all: all
 
 core-y		:= core/
-drivers-y	:= drivers/ vdevs/ platform/
+drivers-y	:= drivers/ virt/ platform/
 external-y	:= external/
 libs-y		:=
 
@@ -243,9 +244,10 @@ $(minos-dirs):
 	$(Q)$(MAKE) $(build)=$@
 
 define filechk_version.h
-	(echo \#define LINUX_VERSION_CODE $(shell                         \
+	(echo \#define MINOS_VERSION_CODE $(shell                         \
 	expr $(VERSION) \* 65536 + 0$(PATCHLEVEL) \* 256 + 0$(SUBLEVEL)) > $@; \
-	echo '#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))' >> $@;)
+	echo '#define MINOS_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))' >> $@; \
+	echo '#define MINOS_VERSION_STR "v$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION) $(NAME)"' >> $@;)
 endef
 
 $(version_h) : Makefile
@@ -287,7 +289,7 @@ distclean: clean
 	$(Q) cp configs/$@ $(srctree)/.config
 # Generate include/config/config.h and include/config/auto.conf
 	$(Q) echo "  PYTHON  include/config/config.h"
-	$(Q) echo "  PYTHON  include/config/auto.con"
+	$(Q) echo "  PYTHON  include/config/auto.conf"
 	$(Q) python $(srctree)/tools/generate_mvconfig.py $(srctree)/.config $(srctree)/include/config
 
 endif

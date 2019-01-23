@@ -5,8 +5,11 @@
 #include <minos/list.h>
 #include <asm/arch.h>
 #include <minos/virq.h>
+#include <minos/device_id.h>
 
 #define VDEV_NAME_SIZE	(15)
+
+typedef void *(*vdev_init_t)(struct vm *vm, struct device_node *node);
 
 struct vdev {
 	char name[VDEV_NAME_SIZE];

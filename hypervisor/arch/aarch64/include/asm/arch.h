@@ -305,5 +305,9 @@ unsigned long arch_get_lr(void);
 void arch_hvm_init(struct vm *vm);
 void arch_set_virq_flag(void);
 void arch_clear_virq_flag(void);
+void arch_smp_init(phy_addr_t *smp_h_addr);
+int __arch_init(void);
+int arch_early_init(void *data);
+void arch_init_vcpu(struct vcpu *vcpu, void *entry);
 
 #endif

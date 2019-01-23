@@ -25,20 +25,7 @@ extern unsigned char __vmodule_start;
 extern unsigned char __vmodule_end;
 
 static int vmodule_class_nr = 0;
-static DEFINE_SPIN_LOCK(vmodule_lock);
 static LIST_HEAD(vmodule_list);
-
-int get_vmodule_id(char *type)
-{
-	struct vmodule *vmodule;
-
-	list_for_each_entry(vmodule, &vmodule_list, list) {
-		if (strcmp(vmodule->type, type) == 0)
-			return vmodule->id;
-	}
-
-	return INVAILD_MODULE_ID;
-}
 
 static struct vmodule *create_vmodule(struct module_id *id)
 {
@@ -54,7 +41,6 @@ static struct vmodule *create_vmodule(struct module_id *id)
 
 	memset((char *)vmodule, 0, sizeof(struct vmodule));
 	strncpy(vmodule->name, id->name, 31);
-	strncpy(vmodule->type, id->type, 31);
 	init_list(&vmodule->list);
 	vmodule->id = vmodule_class_nr;
 	vmodule_class_nr++;
@@ -76,7 +62,7 @@ int register_vcpu_vmodule(char *name, vmodule_init_fn fn)
 
 	memset(&mid, 0, sizeof(struct module_id));
 	mid.data = fn;
-	strncpy(mid.type, "vmodule", 7);
+	mid.comp = NULL;
 	strncpy(mid.name, name, strlen(name) > 31 ? 31 : strlen(name));
 
 	vmodule = create_vmodule(&mid);
@@ -84,17 +70,6 @@ int register_vcpu_vmodule(char *name, vmodule_init_fn fn)
 		pr_error("create vmodule %s failed\n", name);
 
 	return 0;
-}
-
-void *get_vmodule_data_by_name(struct vcpu *vcpu, char *name)
-{
-	uint32_t id;
-
-	id = get_vmodule_id(name);
-	if (id == INVAILD_MODULE_ID)
-		return NULL;
-
-	return vcpu->vmodule_context[id];
 }
 
 void *get_vmodule_data_by_id(struct vcpu *vcpu, int id)
@@ -168,28 +143,6 @@ int vcpu_vmodules_reset(struct vcpu *vcpu)
 	}
 
 	return 0;
-}
-
-void *get_vmodule_pdata(char *name, char *type)
-{
-	struct list_head *list;
-	void *pdata = NULL;
-	struct vmodule *vmodule;
-
-	spin_lock(&vmodule_lock);
-
-	list_for_each(&vmodule_list, list) {
-		vmodule = list_entry(list, struct vmodule, list);
-		if ((strcmp(vmodule->type, type) == 0) &&
-			(strcmp(vmodule->name, name) == 0)) {
-			pdata = vmodule->pdata;
-			break;
-		}
-	}
-
-	spin_unlock(&vmodule_lock);
-
-	return pdata;
 }
 
 void restore_vcpu_vmodule_state(struct vcpu *vcpu)

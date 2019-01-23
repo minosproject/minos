@@ -24,6 +24,7 @@
 
 extern unsigned char __smp_affinity_id;
 uint64_t *smp_affinity_id;
+phy_addr_t smp_holding_address[CONFIG_NR_CPUS];
 
 struct smp_call {
 	smp_function fn;
@@ -159,6 +160,9 @@ void smp_init(void)
 		cd = &get_per_cpu(smp_call_data, i);
 		memset(cd, 0, sizeof(struct smp_call_data));
 	}
+
+	memset(smp_holding_address, 0, sizeof(phy_addr_t) * CONFIG_NR_CPUS);
+	arch_smp_init(smp_holding_address);
 
 	request_irq_percpu(SMP_FUNCTION_CALL_IRQ,
 			smp_function_call_handler, 0,

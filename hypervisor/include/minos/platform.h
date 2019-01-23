@@ -15,6 +15,7 @@ struct platform {
 	int (*time_init)(void);
 	int (*setup_hvm)(struct vm *vm, void *data);
 	int (*platform_init)(void);
+	void (*parse_mem_info)(void);
 };
 
 extern struct platform *platform;
@@ -22,5 +23,7 @@ extern struct platform *platform;
 #define DEFINE_PLATFORM(pl)	\
 	static struct platform *__platform__##pl __used \
 		__section(".__platform") = &pl
+
+int platform_set_to(char *name);
 
 #endif

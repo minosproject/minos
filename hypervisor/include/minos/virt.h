@@ -6,50 +6,6 @@
 #include <minos/vcpu.h>
 #include <minos/vmodule.h>
 
-struct vmtag {
-	uint32_t vmid;
-	char *name;
-	char *type;
-	int nr_vcpu;
-	unsigned long entry;
-	int bit64;
-	unsigned long setup_data;
-	uint8_t vcpu_affinity[4];
-	char *cmdline;
-};
-
-struct irqtag {
-	uint16_t vno;
-	uint16_t hno;
-	uint16_t vmid;
-	uint16_t vcpu_id;
-	char *name;
-};
-
-struct memtag {
-	unsigned long mem_base;
-	unsigned long mem_end;
-	uint16_t enable;
-	uint16_t type;
-	uint32_t vmid;
-	char *name;
-};
-
-struct virt_config {
-	char *version;
-	char *platform;
-
-	size_t nr_vmtag;
-	size_t nr_irqtag;
-	size_t nr_memtag;
-
-	struct vmtag *vmtags;
-	struct irqtag *irqtags;
-	struct memtag *memtags;
-};
-
-extern struct virt_config *mv_config;
-
 static inline int taken_from_guest(gp_regs *regs)
 {
 	return arch_taken_from_guest(regs);

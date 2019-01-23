@@ -101,8 +101,8 @@ struct mm_struct;
 
 struct mapping_struct {
 	unsigned long table_base;
-	unsigned long vir_base;
-	unsigned long phy_base;
+	vir_addr_t vir_base;
+	phy_addr_t phy_base;
 	size_t size;
 	int lvl;
 	unsigned long flags;

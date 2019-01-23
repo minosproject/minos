@@ -24,6 +24,7 @@
 #include <minos/vdev.h>
 #include <minos/virq.h>
 #include <minos/virtio_mmio.h>
+#include <minos/resource.h>
 
 #define vdev_to_virtio(vd) \
 	container_of(vd, struct virtio_device, vdev)
@@ -141,24 +142,12 @@ static int virtio_mmio_write(struct vdev *vdev, gp_regs *regs,
 	return 0;
 }
 
-static inline void virtio_device_init(struct vm *vm,
-		struct virtio_device *dev)
-{
-	void *base = dev->vdev.iomem;
-
-	iowrite32(dev->gvm_irq, base + VIRTIO_MMIO_GVM_IRQ);
-}
-
 void release_virtio_dev(struct vm *vm, struct virtio_device *dev)
 {
 	if (!dev)
 		return;
 
 	vdev_release(&dev->vdev);
-
-	if (dev->gvm_irq)
-		release_gvm_virq(vm, dev->gvm_irq);
-
 	free(dev);
 }
 
@@ -174,31 +163,46 @@ static void virtio_dev_reset(struct vdev *vdev)
 	pr_info("virtio device reset\n");
 }
 
-int create_virtio_device(struct vm *vm, unsigned long base)
+static void *virtio_create_device(struct vm *vm, struct device_node *node)
 {
 	int ret;
+	uint32_t irq;
 	unsigned long offset = 0;
 	struct vdev *vdev;
 	struct virtio_device *virtio_dev = NULL;
 	struct mm_struct *mm = &vm->mm;
+	uint64_t base, size;
+	unsigned long flags;
 
-	if (!mm->virtio_mmio_iomem || !base)
-		return -EINVAL;
+	pr_info("create virtio-mmio device for vm-%d\n", vm->vmid);
+
+	if (!mm->virtio_mmio_iomem)
+		return NULL;
+
+	ret = translate_device_address(node, &base, &size);
+	if (ret || (size == 0))
+		return NULL;
+
+	ret = get_device_irq_index(vm, node, &irq, &flags, 0);
+	if (ret)
+		return NULL;
 
 	if (base >= (mm->virtio_mmio_gbase + mm->virtio_mmio_size)) {
 		pr_error("invalid virtio mmio range 0x%x\n", base);
-		return -EINVAL;
+		return NULL;
 	}
 
 	virtio_dev = malloc(sizeof(struct virtio_device));
 	if (!virtio_dev)
-		return -ENOMEM;
+		return NULL;
 
 	memset(virtio_dev, 0, sizeof(struct virtio_device));
 	vdev = &virtio_dev->vdev;
 	ret = host_vdev_init(vm, vdev, base, VIRTIO_DEVICE_IOMEM_SIZE);
 	if (ret)
 		goto out;
+
+	request_virq(vm, irq, 0);
 
 	/* set up the iomem base of the vdev */
 	offset = base - mm->virtio_mmio_gbase;
@@ -209,17 +213,13 @@ int create_virtio_device(struct vm *vm, unsigned long base)
 	vdev->deinit = virtio_dev_deinit;
 	vdev->reset = virtio_dev_reset;
 
-	virtio_dev->gvm_irq = alloc_gvm_virq(vm);
-	if (virtio_dev->gvm_irq <= 0)
-		goto out;
-
-	virtio_device_init(vm, virtio_dev);
-	return 0;
+	return vdev;
 
 out:
 	release_virtio_dev(vm, virtio_dev);
-	return -EFAULT;
+	return NULL;
 }
+VDEV_DECLARE(virtio_mmio, virtio_match_table, virtio_create_device);
 
 int virtio_mmio_init(struct vm *vm, size_t size,
 		unsigned long *gbase, unsigned long *hbase)

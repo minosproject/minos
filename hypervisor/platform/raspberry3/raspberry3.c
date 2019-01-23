@@ -22,7 +22,7 @@
 #include <asm/bcm_irq.h>
 #include <libfdt/libfdt.h>
 #include <minos/vm.h>
-#include <asm/of.h>
+#include <minos/of.h>
 #include <asm/cpu.h>
 #include <minos/virq.h>
 #include <minos/platform.h>
@@ -35,7 +35,7 @@ static int raspberry3_setup_hvm(struct vm *vm, void *dtb)
 	uint64_t dtb_addr = 0;
 	uint32_t *tmp = (uint32_t *)&dtb_addr;
 
-	offset = of_get_node_by_name(0, "cpus", 0);
+	offset = of_get_node_by_name(dtb, 0, "cpus");
 	if (offset < 0) {
 		pr_error("can not find vcpus node for hvm\n");
 		return -ENOENT;
@@ -78,28 +78,36 @@ static int raspberry3_setup_hvm(struct vm *vm, void *dtb)
 
 	/* mask 40 - 52 virq for hvm which is internal use */
 	for (i = 40; i <= 52; i++)
-		virq_mask_and_disable(vm, i, 0);
+		request_virq(vm, i, 0);
 
 	pr_info("raspberry3 setup vm done\n");
 
 	return 0;
 }
 
-void raspberry3_system_reboot(int mode, const char *cmd)
+static void raspberry3_system_reboot(int mode, const char *cmd)
 {
 
 }
 
-void raspberry3_system_shutdown(void)
+static void raspberry3_system_shutdown(void)
 {
 
+}
+
+static void raspberry3_parse_mem_info(void)
+{
+	/* memory start at 0x3b400000 may has been used
+	 * by other hardware, need to resve it ? */
+	//split_memory_region(0x3b400000, 60 * 1024 * 1024, 0);
 }
 
 static struct platform platform_raspberry3 = {
-	.name 		 = "raspberry3",
+	.name 		 = "raspberrypi,3-model-b-plus",
 	.cpu_on		 = spin_table_cpu_on,
 	.system_reboot	 = raspberry3_system_reboot,
 	.system_shutdown = raspberry3_system_shutdown,
 	.setup_hvm	 = raspberry3_setup_hvm,
+	.parse_mem_info  = raspberry3_parse_mem_info,
 };
 DEFINE_PLATFORM(platform_raspberry3);

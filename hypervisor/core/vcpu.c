@@ -21,7 +21,6 @@
 #include <minos/mm.h>
 #include <minos/bitmap.h>
 #include <minos/os.h>
-#include <minos/virt.h>
 #include <minos/vm.h>
 #include <minos/vcpu.h>
 #include <minos/vmodule.h>
@@ -38,6 +37,7 @@ static int total_vms = 0;
 DEFINE_SPIN_LOCK(vms_lock);
 static DECLARE_BITMAP(vmid_bitmap, CONFIG_MAX_VM);
 
+static LIST_HEAD(vmtag_list);
 LIST_HEAD(vm_list);
 
 static int alloc_new_vmid(void)
@@ -162,9 +162,40 @@ int vcpu_off(struct vcpu *vcpu)
 	return 0;
 }
 
+static int vm_check_vcpu_affinity(int vmid, uint32_t *aff, int nr)
+{
+	int i;
+	uint64_t mask = 0;
+
+	/* for hvm fix the affinity to liner */
+	if (vmid == 0) {
+		for (i = 0; i < nr; i++)
+			aff[i] = i;
+		return 0;
+	}
+
+	for (i = 0; i < nr; i++) {
+		if (aff[i] >= VM_MAX_VCPU)
+			return -EINVAL;
+
+		if (mask & (1 << aff[i]))
+			return -EINVAL;
+		else
+			mask |= (1 << aff[i]);
+	}
+
+	return 0;
+}
+
 static struct vm *__create_vm(struct vmtag *vme)
 {
 	struct vm *vm;
+
+	if (vm_check_vcpu_affinity(vme->vmid, vme->vcpu_affinity,
+				vme->nr_vcpu)) {
+		pr_error("vcpu affinit for vm no incorrect\n");
+		return NULL;
+	}
 
 	vm = (struct vm *)malloc(sizeof(struct vm));
 	if (!vm)
@@ -182,18 +213,15 @@ static struct vm *__create_vm(struct vmtag *vme)
 
 	vm->vmid = vme->vmid;
 	strncpy(vm->name, vme->name,
-		MIN(strlen(vme->name), MINOS_VM_NAME_SIZE - 1));
-	strncpy(vm->os_type, vme->type,
-		MIN(strlen(vme->type), OS_TYPE_SIZE - 1));
+		MIN(strlen((char *)vme->name), VM_NAME_SIZE - 1));
 	vm->vcpu_nr = vme->nr_vcpu;
 	vm->entry_point = vme->entry;
-	vm->setup_data = vme->setup_data;
+	vm->setup_data = (void *)vme->setup_data;
 	vm->state = VM_STAT_OFFLINE;
 	init_list(&vm->vdev_list);
 	memcpy(vm->vcpu_affinity, vme->vcpu_affinity,
 			sizeof(uint8_t) * VM_MAX_VCPU);
-	if (vme->bit64)
-		vm->flags |= VM_FLAGS_64BIT;
+	vm->flags |= vme->flags;
 
 	vms[vme->vmid] = vm;
 	total_vms++;
@@ -202,7 +230,7 @@ static struct vm *__create_vm(struct vmtag *vme)
 	list_add_tail(&vm_list, &vm->vm_list);
 	spin_unlock(&vms_lock);
 
-	vm->os = get_vm_os(vm->os_type);
+	vm->os = get_vm_os((char *)vme->os_type);
 
 	return vm;
 }
@@ -553,61 +581,10 @@ struct vm *create_vm(struct vmtag *vme)
 		goto release_vm;
 	}
 
-	do_hooks(vm, NULL, MINOS_HOOK_TYPE_CREATE_VM_VDEV);
-
 	return vm;
 
 release_vm:
 	destroy_vm(vm);
 
 	return NULL;
-}
-
-int create_static_vms(void)
-{
-	struct vm *vm;
-	int i, count = 0;
-	struct vmtag *vmtags = mv_config->vmtags;
-
-	if (mv_config->nr_vmtag == 0) {
-		pr_error("no VM is found\n");
-		return -ENOENT;
-	}
-
-	pr_info("found %d VMs config\n", mv_config->nr_vmtag);
-
-	for (i = 0; i < mv_config->nr_vmtag; i++) {
-		vm = create_vm(&vmtags[i]);
-		if (!vm) {
-			pr_error("create %d VM:%s failed\n", vmtags[i].name);
-			continue;
-		}
-
-		count++;
-	}
-
-	return count;
-}
-
-int static_vms_init(void)
-{
-	struct vm *vm;
-
-	for_each_vm(vm) {
-		/*
-		 * - map the vm's memory
-		 * - create the vcpu for vm's each vcpu
-		 * - init the vmodule state for each vcpu
-		 * - prepare the vcpu for bootup
-		 */
-		vm_mm_init(vm);
-
-		if (vm->vmid == 0)
-			arch_hvm_init(vm);
-
-		vm_vcpus_init(vm);
-		vm->state = VM_STAT_ONLINE;
-	}
-
-	return 0;
 }

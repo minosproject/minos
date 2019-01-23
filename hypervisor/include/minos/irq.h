@@ -73,12 +73,11 @@ struct irq_chip {
 	int (*irq_set_affinity)(uint32_t irq, uint32_t pcpu);
 	int (*irq_set_type)(uint32_t irq, unsigned int flow_type);
 	int (*irq_set_priority)(uint32_t irq, uint32_t pr);
+	void (*irq_clear_pending)(uint32_t irq);
+	int (*irq_xlate)(struct device_node *node, uint32_t *intspec,
+			unsigned int intsize, uint32_t *hwirq, unsigned long *f);
 	void (*send_sgi)(uint32_t irq, enum sgi_mode mode, cpumask_t *mask);
-	int (*send_virq)(struct vcpu *vcpu, struct virq_desc *virq);
-	int (*get_virq_state)(struct vcpu *vcpu, struct virq_desc *virq);
-	int (*update_virq)(struct vcpu *vcpu, struct virq_desc *virq, int action);
-	int (*get_virq_nr)(void);
-	int (*init)(int node);
+	int (*init)(struct device_node *node);
 	int (*secondary_init)(void);
 };
 
@@ -139,13 +138,13 @@ int irq_alloc_special(uint32_t start, uint32_t cnt);
 void __irq_enable(uint32_t irq, int enable);
 void send_sgi(uint32_t sgi, int cpu);
 
-void irq_update_virq(struct vcpu *vcpu, struct virq_desc *virq, int action);
-int irq_get_virq_state(struct vcpu *vcpu, struct virq_desc *virq);
-void irq_send_virq(struct vcpu *vcpu, struct virq_desc *virq);
-
 void irq_set_affinity(uint32_t irq, int cpu);
 void irq_set_type(uint32_t irq, int type);
 int irq_get_virq_nr(void);
+void irq_clear_pending(uint32_t irq);
+
+int irq_xlate(struct device_node *node, uint32_t *intspec,
+		unsigned int intsize, uint32_t *hwirq, unsigned long *f);
 
 struct irq_desc *get_irq_desc(uint32_t irq);
 

@@ -19,8 +19,9 @@
 #include <asm/io.h>
 #include <minos/irq.h>
 #include <minos/timer.h>
-#include <minos/gvm.h>
+#include <common/gvm.h>
 #include <minos/time.h>
+#include <minos/resource.h>
 
 #define SP805_WDT_LOAD		0x00
 #define SP805_WDT_VALUE		0x04
@@ -251,25 +252,32 @@ static void vwdt_deinit(struct vdev *vdev)
 	free(dev);
 }
 
-static int vwdt_create_vm(void *item, void *arg)
+static void *vwdt_init(struct vm *vm, struct device_node *node)
 {
-	struct vm *vm = (struct vm *)item;
+	int ret;
+	uint32_t irq;
 	struct vwdt_dev *dev;
 	struct vcpu *vcpu = get_vcpu_in_vm(vm, 0);
-
-	if (vm_is_hvm(vm))
-		return 0;
+	uint64_t base, size;
+	unsigned long flags;
 
 	pr_info("create virtual watchdog for vm-%d\n", vm->vmid);
 
+	ret = translate_device_address(node, &base, &size);
+	if (ret || (size == 0))
+		return NULL;
+
+	ret = get_device_irq_index(vm, node, &irq, &flags, 0);
+	if (ret)
+		return NULL;
+
 	dev = zalloc(sizeof(struct vwdt_dev));
 	if (!dev)
-		return -ENOMEM;
+		return NULL;
 
-	host_vdev_init(vm, &dev->vdev, SP805_IOMEM_BASE,
-			SP805_IOMEM_SIZE);
+	host_vdev_init(vm, &dev->vdev, base, size);
 	vdev_set_name(&dev->vdev, "vwdt");
-	virq_mask_and_enable(vm, SP805_IRQ, 0);
+	request_virq(vm, irq, 0);
 
 	dev->access_lock = 1;
 	dev->vdev.read = vwdt_mmio_read;
@@ -281,13 +289,6 @@ static int vwdt_create_vm(void *item, void *arg)
 	dev->wdt_timer.function = vwdt_timer_expire;
 	dev->wdt_timer.data = (unsigned long)dev;
 
-	return 0;
+	return NULL;
 }
-
-int vwdt_init(void)
-{
-	return register_hook(vwdt_create_vm,
-			MINOS_HOOK_TYPE_CREATE_VM_VDEV);
-}
-
-module_initcall(vwdt_init);
+VDEV_DECLARE(sp805_wdt, sp805_match_table, vwdt_init);

@@ -231,8 +231,8 @@ static int create_table_entry(struct mm_struct *mm,
 	return ret;
 }
 
-int create_mem_mapping(struct mm_struct *mm, unsigned long addr,
-		unsigned long phy, size_t size, unsigned long flags)
+int create_mem_mapping(struct mm_struct *mm, vir_addr_t addr,
+		phy_addr_t phy, size_t size, unsigned long flags)
 {
 	int ret;
 	struct mapping_struct map_info;
@@ -421,7 +421,7 @@ unsigned long alloc_guest_pmd(struct mm_struct *mm, unsigned long phy)
  * create pmd mapping mapping 2m mem each time
  * used to early mapping
  */
-int create_early_pmd_mapping(unsigned long vir, unsigned long phy)
+int create_early_pmd_mapping(vir_addr_t vir, phy_addr_t phy)
 {
 	pud_t *pudp;
 	pmd_t *pmdp;

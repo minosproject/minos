@@ -25,10 +25,11 @@
 #include <minos/vmodule.h>
 #include <minos/irq.h>
 #include <minos/virq.h>
-#include <asm/of.h>
+#include <minos/of.h>
 #include <asm/processer.h>
 #include <minos/platform.h>
-#include <minos/gvm.h>
+#include <minos/resource.h>
+#include <common/gvm.h>
 
 enum timer_type {
 	SEC_PHY_TIMER,
@@ -38,10 +39,16 @@ enum timer_type {
 	TIMER_MAX,
 };
 
+static char *timer_name[TIMER_MAX] = {
+	"sec_phy_timer",
+	"nonsec_phy_timer",
+	"virt_timer",
+	"hypervisor_timer"
+};
+
 struct armv8_timer_info {
-	uint32_t type;
 	uint32_t irq;
-	uint32_t flags;
+	unsigned long flags;
 };
 
 static struct armv8_timer_info timer_info[TIMER_MAX];
@@ -100,46 +107,39 @@ void udelay(unsigned long us)
 
 static int timers_arch_init(void)
 {
-	int ret, len;
-	unsigned long hz = 0;
-	uint32_t tmp[TIMER_MAX * 3];
-#ifndef CONFIG_PLATFORM_RASPBERRY3
+	int i, ret;
 	struct armv8_timer_info *info;
+	struct device_node *node = NULL;
+	char *comp[3] = {
+		"arm,armv8-timer",
+		"arm,armv7-timer",
+		NULL,
+	};
+
+#ifdef CONFIG_DEVICE_TREE
+	node = of_find_node_by_compatible(hv_node, comp);
 #endif
+	if (!node) {
+		pr_error("can not find arm-arch-timer\n");
+		return -EINVAL;
+	}
 
-	memset((void *)timer_info, 0, sizeof(timer_info));
-	memset((void *)tmp, 0, sizeof(uint32_t) * 3 * TIMER_MAX);
-
-	ret = of_get_u32_array("/timer", "interrupts", tmp, &len);
-	if (ret || (len == 0))
-		panic("no arm gen timer found in dtb\n");
-
-#ifdef CONFIG_PLATFORM_RASPBERRY3
-	timer_info[0].irq = 16;
-	timer_info[1].irq = 17;
-	timer_info[2].irq = 19;
-	timer_info[3].irq = 18;
-#else
-	memcpy((void *)&timer_info, (void *)tmp,
-			sizeof(struct armv8_timer_info) * TIMER_MAX);
-	for (len = 0; len < TIMER_MAX; len++) {
-		info = &timer_info[len];
-		if ((info->type != 1) || (info->irq == 0)) {
-			pr_warn("timer int not a ppi %d\n", info->irq);
-			continue;
+	for (i = 0; i < TIMER_MAX; i++) {
+		info = &timer_info[i];
+		ret = get_device_irq_index(NULL, node,
+				&info->irq, &info->flags, i);
+		if (ret) {
+			pr_error("error found in arm timer config\n");
+			return -ENOENT;
 		}
 
-		info->irq += 16;
-		pr_info("timer %d int is %d flags-0x%x\n",
-				len, info->irq, info->flags);
+		pr_info("%s : irq-%d flags-0x%x\n", timer_name[i],
+				info->irq, info->flags);
 	}
-#endif
 
-	len = 0;
-	ret = of_get_u32_array("/timer", "clock-frequency",
-			(uint32_t *)&hz, &len);
-	if ((ret == 0) || (len > 0)) {
-		cpu_khz = hz / 1000;
+	ret = of_get_u32_array(node, "clock-frequency", &cpu_khz, 1);
+	if (cpu_khz > 0) {
+		cpu_khz = cpu_khz / 1000;
 		pr_info("get timer clock freq from dt %d\n", cpu_khz);
 	} else {
 		cpu_khz = read_sysreg32(CNTFRQ_EL0) / 1000;
@@ -147,7 +147,7 @@ static int timers_arch_init(void)
 	}
 
 	boot_tick = read_sysreg64(CNTPCT_EL0);
-	pr_info("boot_tick:0x%x cpu_khz:%d\n", boot_tick, cpu_khz);
+	pr_info("boot ticks is :0x%x\n", boot_tick);
 
 	if (platform->time_init)
 		platform->time_init();
@@ -270,5 +270,5 @@ static int timers_init(void)
 	return 0;
 }
 
-module_initcall_percpu(timers_init);
-arch_initcall(timers_arch_init);
+subsys_initcall_percpu(timers_init);
+subsys_initcall(timers_arch_init);

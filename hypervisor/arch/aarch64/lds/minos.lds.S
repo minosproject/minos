@@ -79,11 +79,17 @@ SECTIONS
 
 	. = ALIGN(8);
 
-	__mmuchip_start = .;
-	.__mmuchip : {
-		*(.__mmuchip)
+	__virqchip_start = .;
+	.__virqchip : {
+		*(.__virqchip)
 	}
-	__mmuchip_end = .;
+	__virqchip_end = .;
+
+	__vdev_start = .;
+	.__vdev : {
+		*(.__vdev)
+	}
+	__vdev_end = .;
 
 	. = ALIGN(8);
 
@@ -238,6 +244,9 @@ SECTIONS
 
 	.rodata : {
 		*(.rodata)
+	}
+	.rodata.str1.8 : {
+		*(.rodata.str1.8)
 	}
 
 	__code_end = .;

@@ -21,7 +21,7 @@
 #include <minos/device_id.h>
 #include <minos/sched.h>
 #include <minos/virq.h>
-#include <asm/of.h>
+#include <minos/of.h>
 
 DEFINE_PER_CPU(struct irq_desc **, sgi_irqs);
 DEFINE_PER_CPU(struct irq_desc **, ppi_irqs);
@@ -358,26 +358,6 @@ static struct irq_desc *get_irq_desc_cpu(uint32_t irq, int cpu)
 	return NULL;
 }
 
-void irq_update_virq(struct vcpu *vcpu, struct virq_desc *virq, int action)
-{
-	if (irq_chip->update_virq)
-		irq_chip->update_virq(vcpu, virq, action);
-}
-
-void irq_send_virq(struct vcpu *vcpu, struct virq_desc *virq)
-{
-	if (irq_chip->send_virq)
-		irq_chip->send_virq(vcpu, virq);
-}
-
-int irq_get_virq_state(struct vcpu *vcpu, struct virq_desc *virq)
-{
-	if (irq_chip->get_virq_state)
-		return irq_chip->get_virq_state(vcpu, virq);
-
-	return 0;
-}
-
 void __irq_enable(uint32_t irq, int enable)
 {
 	struct irq_desc *irq_desc;
@@ -386,13 +366,25 @@ void __irq_enable(uint32_t irq, int enable)
 	if (!irq_desc)
 		return;
 
+	/*
+	 * some irq controller will directly call its
+	 * own function to enable or disable the hw irq
+	 * which do not set the bit, so here force to excute
+	 * the action
+	 */
 	if (enable) {
-		if (!test_and_set_bit(IRQ_FLAGS_MASKED_BIT, &irq_desc->flags))
-			irq_chip->irq_unmask(irq);
-	} else {
-		if (test_and_clear_bit(IRQ_FLAGS_MASKED_BIT, &irq_desc->flags))
-			irq_chip->irq_mask(irq);
-	}
+		irq_chip->irq_unmask(irq);
+		irq_desc->flags &= ~IRQ_FLAGS_MASKED;
+	 } else {
+		irq_chip->irq_mask(irq);
+		irq_desc->flags |= IRQ_FLAGS_MASKED;
+	 }
+}
+
+void irq_clear_pending(uint32_t irq)
+{
+	if (irq_chip->irq_clear_pending)
+		irq_chip->irq_clear_pending(irq);
 }
 
 void irq_set_affinity(uint32_t irq, int cpu)
@@ -437,14 +429,6 @@ void irq_set_type(uint32_t irq, int type)
 
 out:
 	spin_unlock(&irq_desc->lock);
-}
-
-int irq_get_virq_nr(void)
-{
-	if (irq_chip->get_virq_nr)
-		return irq_chip->get_virq_nr();
-
-	return 16;
 }
 
 static int do_bad_int(uint32_t irq)
@@ -512,17 +496,29 @@ int request_irq_percpu(uint32_t irq, irq_handle_t handler,
 		irq_desc->handler = handler;
 		irq_desc->pdata = data;
 		irq_desc->name = name;
-
-		/* call irq_chip->unmask_irq_cpu to enable the irq */
-		if (!test_and_set_bit(IRQ_FLAGS_MASKED_BIT, &irq_desc->flags))
-			irq_chip->irq_unmask_cpu(irq, i);
-
 		irq_desc->flags |= flags;
+
+		/* enable the irq here */
+		irq_chip->irq_unmask_cpu(irq, i);
+		irq_desc->flags &= ~IRQ_FLAGS_MASKED;
+
 		spin_unlock_irqrestore(&irq_desc->lock, flag);
 	}
 
 	return 0;
 }
+
+int irq_xlate(struct device_node *node, uint32_t *intspec,
+		unsigned int intsize, uint32_t *hwirq, unsigned long *f)
+{
+	if (irq_chip && irq_chip->irq_xlate)
+		return irq_chip->irq_xlate(node, intspec, intsize, hwirq, f);
+	else
+		pr_warn("WARN - no xlate function for the irqchip\n");
+
+	return -ENOENT;
+}
+
 
 int request_irq(uint32_t irq, irq_handle_t handler,
 		unsigned long flags, char *name, void *data)
@@ -545,11 +541,12 @@ int request_irq(uint32_t irq, irq_handle_t handler,
 	irq_desc->handler = handler;
 	irq_desc->pdata = data;
 	irq_desc->name = name;
-
-	if (!test_and_set_bit(IRQ_FLAGS_MASKED_BIT, &irq_desc->flags))
-			irq_chip->irq_unmask(irq);
-
 	irq_desc->flags |= flags;
+
+	/* enable the hw irq and set the mask bit */
+	irq_chip->irq_unmask(irq);
+	irq_desc->flags &= ~IRQ_FLAGS_MASKED;
+
 	spin_unlock_irqrestore(&irq_desc->lock, flag);
 
 	if (type)
@@ -558,49 +555,54 @@ int request_irq(uint32_t irq, irq_handle_t handler,
 	return 0;
 }
 
-int irq_init(void)
+static void *irqchip_init(struct device_node *node, void *arg)
 {
 	extern unsigned char __irqchip_start;
 	extern unsigned char __irqchip_end;
-	int node = 0;
-#ifndef CONFIG_PLATFORM_RASPBERRY3
-	const char *name;
-#endif
-	unsigned long s, e;
+	void *s, *e;
+	struct irq_chip *chip;
 
-	s = (unsigned long)&__irqchip_start;
-	e = (unsigned long)&__irqchip_end;
+	if (node->class != DT_CLASS_IRQCHIP)
+		return NULL;
 
-#ifndef CONFIG_PLATFORM_RASPBERRY3
-	node = of_get_node_by_name(0, "interrupt-controller", 0);
-	if (node < 0)
-		panic("can not find irqchip node in dts\n");
+	s = (void *)&__irqchip_start;
+	e = (void *)&__irqchip_end;
 
-	name = of_get_compatible(node);
-	if (!name)
-		panic("can not get the irqchip's name\n");
+	chip = (struct irq_chip *)of_device_node_match(node, s, e);
+	if (!chip)
+		return NULL;
 
-	irq_chip = (struct irq_chip *)get_module_pdata(s, e, name);
-#else
-	irq_chip = (struct irq_chip *)get_module_pdata(s, e,
-			"brcm,bcm2836-l1-intc");
-#endif
-	if (!irq_chip)
-		panic("can not find the irqchip for system\n");
+	irq_chip = chip;
+	if (chip->init)
+		chip->init(node);
 
+	return node;
+}
+
+static void of_irq_init(void)
+{
+	of_iterate_all_node(hv_node, irqchip_init, NULL);
+}
+
+int irq_init(void)
+{
 	register_irq_domain(IRQ_DOMAIN_SPI, &spi_domain_ops);
 	register_irq_domain(IRQ_DOMAIN_SGI, &local_domain_ops);
 	register_irq_domain(IRQ_DOMAIN_PPI, &local_domain_ops);
 	register_irq_domain(IRQ_DOMAIN_SPECIAL, &spi_domain_ops);
+
+#ifdef CONFIG_DEVICE_TREE
+	of_irq_init();
+#endif
+
+	if (!irq_chip)
+		panic("can not find the irqchip for system\n");
 
 	/*
 	 * now init the irqchip, and in the irq chip
 	 * the chip driver need to alloc the irq it
 	 * need used in the ssystem
 	 */
-	if (irq_chip->init)
-		irq_chip->init(node);
-
 	if (!irq_chip->get_pending_irq)
 		panic("No function to get irq nr\n");
 

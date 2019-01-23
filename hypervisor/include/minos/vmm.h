@@ -53,7 +53,7 @@ int create_guest_mapping(struct vm *vm, unsigned long vir,
 		unsigned long phy, size_t size, unsigned long flags);
 
 static inline int
-io_remap(unsigned long vir, unsigned long phy, size_t size)
+io_remap(vir_addr_t vir, phy_addr_t phy, size_t size)
 {
 	return create_host_mapping(vir, phy, size, VM_IO);
 }
@@ -75,5 +75,7 @@ int create_early_pmd_mapping(unsigned long vir, unsigned long phy);
 
 void *map_vm_mem(unsigned long gva, size_t size);
 void unmap_vm_mem(unsigned long gva, size_t size);
+
+phy_addr_t get_vm_memblock_address(struct vm *vm, unsigned long a);
 
 #endif

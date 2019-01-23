@@ -303,6 +303,8 @@
 #define AHCI_P_DEVSLP_DM	0x0e000000
 #define AHCI_P_DEVSLP_DM_SHIFT	25
 
+#define MAXPHYS	0
+
 /* Just to be sure, if building as module. */
 #if MAXPHYS < 512 * 1024
 #undef MAXPHYS

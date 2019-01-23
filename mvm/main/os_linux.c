@@ -351,7 +351,8 @@ static int linux_setup_env(struct vm *vm, char *cmdline)
 
 	fdt_setup_commandline(vbase, arg);
 	fdt_setup_cpu(vbase, vm->nr_vcpus);
-	fdt_setup_memory(vbase, vm->mem_start, vm->mem_size, vm->bit64);
+	fdt_setup_memory(vbase, vm->mem_start, vm->mem_size,
+			!!vm->flags & VM_FLAGS_64BIT);
 	fdt_set_gic(vbase, vm->vm_config->gic_type);
 
 	if (!(vm->flags & (VM_FLAGS_NO_RAMDISK))) {

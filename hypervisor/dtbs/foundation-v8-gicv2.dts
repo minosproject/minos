@@ -133,7 +133,7 @@
 
 	memory@80000000 {
 		device_type = "memory";
-		reg = <0x0 0x80000000 0x0 0x4000000>;
+		reg = <0x0 0x80000000 0x0 0x8000000>;
 	};
 
 	interrupt-controller@2f000000 {

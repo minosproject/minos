@@ -27,6 +27,7 @@
 #include <minos/softirq.h>
 #include <minos/virt.h>
 #include <minos/platform.h>
+#include <config/version.h>
 
 extern void softirq_init(void);
 extern void init_timers(void);
@@ -35,17 +36,10 @@ extern void cpu_idle(void);
 extern void sched_tick_enable(unsigned long exp);
 extern void vmm_init(void);
 extern void bootmem_init(void);
-extern void platform_early_init(void);
 extern int allsymbols_init(void);
+extern void platform_init(void);
 
 struct list_head hook_lists[MINOS_HOOK_TYPE_UNKNOWN];
-struct platform *platform = NULL;
-
-static void platform_init(void)
-{
-	if (platform && platform->platform_init)
-		platform->platform_init();
-}
 
 static void hooks_init(void)
 {
@@ -88,29 +82,6 @@ int do_hooks(void *item, void *context, enum hook_type type)
 	return err;
 }
 
-void *get_module_pdata(unsigned long s, unsigned long e, const char *name)
-{
-	int i, count;
-	struct module_id *module;
-
-	if (e <= s)
-		return NULL;
-
-	count = (e - s) / sizeof(struct module_id);
-	if (count == 0)
-		return NULL;
-
-	for (i = 0; i < count; i++) {
-		module = (struct module_id *)s;
-		if (!strcmp(module->name, name))
-			return module->data;
-
-		s += sizeof(struct module_id);
-	}
-
-	return NULL;
-}
-
 void irq_enter(gp_regs *regs)
 {
 	if (taken_from_guest(regs))
@@ -136,13 +107,10 @@ void boot_main(void *setup_data)
 	allsymbols_init();
 	percpus_init();
 
-	pr_info("Starting Minos ...\n");
+	pr_info("Starting Minos %s\n", MINOS_VERSION_STR);
 
 	if (smp_processor_id() != 0)
 		panic("boot_main : cpu is not cpu0");
-
-	/* get the platform and init the serial */
-	platform_early_init();
 
 	/*
 	 * at the early stage when the memory mangement

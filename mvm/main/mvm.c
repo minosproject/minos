@@ -101,17 +101,18 @@ void *map_vm_memory(struct vm *vm)
 static int create_new_vm(struct vm *vm)
 {
 	int fd, vmid = -1;
-	struct vm_info info;
+	struct vmtag info;
 
 	strcpy(info.name, vm->name);
 	strcpy(info.os_type, vm->os_type);
-	info.nr_vcpus = vm->nr_vcpus;
-	info.bit64 = vm->bit64;
+	info.nr_vcpu = vm->nr_vcpus;
 	info.mem_size = vm->mem_size;
-	info.mem_start = vm->mem_start;
-	info.entry = vm->entry;
-	info.setup_data = vm->setup_data;
+	info.mem_base = vm->mem_start;
+	info.entry = (void *)vm->entry;
+	info.setup_data = (void *)vm->setup_data;
 	info.mmap_base = 0;
+	info.flags = vm->flags;
+	info.vmid = vm->vmid;
 
 	fd = open("/dev/mvm/mvm0", O_RDWR | O_NONBLOCK);
 	if (fd < 0) {
@@ -122,12 +123,13 @@ static int create_new_vm(struct vm *vm)
 	pr_info("create new vm *\n");
 	pr_info("        -name       : %s\n", info.name);
 	pr_info("        -os_type    : %s\n", info.os_type);
-	pr_info("        -nr_vcpus   : %d\n", info.nr_vcpus);
-	pr_info("        -bit64      : %d\n", info.bit64);
+	pr_info("        -nr_vcpu    : %d\n", info.nr_vcpu);
+	pr_info("        -bit64      : %d\n",
+			!!vm->flags & VM_FLAGS_64BIT);
 	pr_info("        -mem_size   : 0x%lx\n", info.mem_size);
-	pr_info("        -mem_start  : 0x%lx\n", info.mem_start);
-	pr_info("        -entry      : 0x%lx\n", info.entry);
-	pr_info("        -setup_data : 0x%lx\n", info.setup_data);
+	pr_info("        -mem_base  : 0x%lx\n", info.mem_base);
+	pr_info("        -entry      : 0x%p\n", info.entry);
+	pr_info("        -setup_data : 0x%p\n", info.setup_data);
 
 	vmid = ioctl(fd, IOCTL_CREATE_VM, &info);
 	if (vmid <= 0) {
@@ -265,7 +267,7 @@ void print_usage(void)
 	fprintf(stderr, "    -c <vcpu_count>            (set the vcpu numbers of the vm)\n");
 	fprintf(stderr, "    -m <mem_size_in_MB>        (set the memsize of the vm - 2M align)\n");
 	fprintf(stderr, "    -i <boot or kernel image>  (the kernel or bootimage to use)\n");
-	fprintf(stderr, "    -s <mem_start>             (set the membase of the vm if not a boot.img)\n");
+	fprintf(stderr, "    -s <mem_base>             (set the membase of the vm if not a boot.img)\n");
 	fprintf(stderr, "    -n <vm name>               (the name of the vm)\n");
 	fprintf(stderr, "    -t <vm type>               (the os type of the vm )\n");
 	fprintf(stderr, "    -b <32 or 64>              (32bit or 64 bit )\n");
@@ -378,12 +380,19 @@ static struct vm_os *get_vm_os(char *os_type)
 	return default_os;
 }
 
+static int vm_create_host_vdev(struct vm *vm)
+{
+	return ioctl(vm->vm_fd, IOCTL_CREATE_HOST_VDEV, NULL);
+}
+
 static int vm_vdev_init(struct vm *vm, struct vm_config *config)
 {
 	int i, ret;
 	char *tmp, *pos;
 	char *type = NULL, *arg = NULL;
 	struct device_info *info = &config->device_info;
+
+	vdev_subsystem_init();
 
 	/* init the virtio framework */
 	ret = virtio_mmio_init(vm, info->nr_virtio_dev);
@@ -728,7 +737,7 @@ static int mvm_main_loop(void)
 
 static int mvm_open_images(struct vm *vm, struct vm_config *config)
 {
-	if (config->flags & VM_FLAGS_NO_BOOTIMAGE) {
+	if (vm->flags & VM_FLAGS_NO_BOOTIMAGE) {
 		vm->kfd = open(config->kernel_image, O_RDONLY | O_NONBLOCK);
 		if (vm->kfd < 0) {
 			pr_err("can not open the kernel image file %s\n",
@@ -743,11 +752,11 @@ static int mvm_open_images(struct vm *vm, struct vm_config *config)
 			return -ENOENT;
 		}
 
-		if (!(config->flags & VM_FLAGS_NO_RAMDISK)) {
+		if (!(vm->flags & VM_FLAGS_NO_RAMDISK)) {
 			vm->rfd = open(config->ramdisk_image,
 					O_RDONLY | O_NONBLOCK);
 			if (vm->rfd < 0)
-				config->flags |= VM_FLAGS_NO_RAMDISK;
+				vm->flags |= VM_FLAGS_NO_RAMDISK;
 		}
 	} else {
 		/* read the image to get the entry and other args */
@@ -768,7 +777,7 @@ static int mvm_main(struct vm_config *config)
 	int ret;
 	struct vm *vm;
 	struct vm_os *os;
-	struct vm_info *vm_info = &config->vm_info;
+	struct vmtag *vmtag = &config->vmtag;
 
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
@@ -777,30 +786,29 @@ static int mvm_main(struct vm_config *config)
 	if (!vm)
 		return -ENOMEM;
 
-	os = get_vm_os(vm_info->os_type);
+	os = get_vm_os(vmtag->os_type);
 	if (!os)
 		return -EINVAL;
+
+	/* udpate the vm from vmtag */
+	vm->os = os;
+	vm->flags = vmtag->flags;
+	vm->vmid = -1;
+	vm->vm_fd = -1;
+	vm->entry = (uint64_t)vmtag->entry;
+	vm->mem_start = vmtag->mem_base;
+	vm->mem_size = vmtag->mem_size;
+	vm->nr_vcpus = vmtag->nr_vcpu;
+	strcpy(vm->name, vmtag->name);
+	strcpy(vm->os_type, vmtag->os_type);
+	init_list(&vm->vdev_list);
+	vm->vm_config = config;
 
 	ret = mvm_open_images(vm, config);
 	if (ret) {
 		free(vm);
 		return ret;
 	}
-
-	/* udpate the vm from vm_info */
-	vm->os = os;
-	vm->bit64 = vm_info->bit64;
-	vm->flags = config->flags;
-	vm->vmid = 0;
-	vm->vm_fd = -1;
-	vm->entry = vm_info->entry;
-	vm->mem_start = vm_info->mem_start;
-	vm->mem_size = vm_info->mem_size;
-	vm->nr_vcpus = vm_info->nr_vcpus;
-	strcpy(vm->name, vm_info->name);
-	strcpy(vm->os_type, vm_info->os_type);
-	init_list(&vm->vdev_list);
-	vm->vm_config = config;
 
 	ret = os->early_init(vm);
 	if (ret) {
@@ -834,6 +842,14 @@ static int mvm_main(struct vm_config *config)
 	if (ret)
 		return ret;
 
+	ret = vm_create_host_vdev(vm);
+	if (ret)
+		pr_warn("failed to create some host virtual devices\n");
+
+	/* free the global config */
+	//free_vm_config(global_config);
+	//global_config = NULL;
+
 	mvm_main_loop();
 
 release_vm:
@@ -845,7 +861,7 @@ static struct option options[] = {
 	{"vcpu_number", required_argument, NULL, 'c'},
 	{"mem_size",	required_argument, NULL, 'm'},
 	{"image",	required_argument, NULL, 'i'},
-	{"mem_start",	required_argument, NULL, 's'},
+	{"mem_base",	required_argument, NULL, 's'},
 	{"name",	required_argument, NULL, 'n'},
 	{"os_type",	required_argument, NULL, 't'},
 	{"bit",		required_argument, NULL, 'b'},
@@ -915,7 +931,7 @@ static int check_vm_config(struct vm_config *config)
 {
 	/* default will use bootimage as the vm image */
 	if (config->bootimage_path[0] == 0) {
-		config->flags |= VM_FLAGS_NO_BOOTIMAGE;
+		config->vmtag.flags |= VM_FLAGS_NO_BOOTIMAGE;
 		if ((config->kernel_image[0] == 0) ||
 				config->dtb_image[0] == 0) {
 			pr_err("no bootimage and kernel image\n");
@@ -923,18 +939,18 @@ static int check_vm_config(struct vm_config *config)
 		}
 
 		if (config->ramdisk_image[0] == 0)
-			config->flags |= VM_FLAGS_NO_RAMDISK;
+			config->vmtag.flags |= VM_FLAGS_NO_RAMDISK;
 	}
 
-	if (config->vm_info.nr_vcpus > VM_MAX_VCPUS) {
+	if (config->vmtag.nr_vcpu > VM_MAX_VCPUS) {
 		pr_warn("support max %d vcpus\n", VM_MAX_VCPUS);
-		config->vm_info.nr_vcpus = VM_MAX_VCPUS;
+		config->vmtag.nr_vcpu = VM_MAX_VCPUS;
 	}
 
-	if (config->vm_info.name[0] == 0)
-		strcpy(config->vm_info.name, "unknown");
-	if (config->vm_info.os_type[0] == 0)
-		strcpy(config->vm_info.os_type, "unknown");
+	if (config->vmtag.name[0] == 0)
+		strcpy(config->vmtag.name, "unknown");
+	if (config->vmtag.os_type[0] == 0)
+		strcpy(config->vmtag.os_type, "unknown");
 
 	return 0;
 }
@@ -959,7 +975,7 @@ int main(int argc, char **argv)
 {
 	int ret, opt, idx;
 	int run_as_daemon = 0;
-	struct vm_info *vm_info;
+	struct vmtag *vmtag;
 	struct device_info *device_info;
 	static char *optstr = "K:R:S:c:C:m:i:s:n:D:V:t:b:rv?hd0123";
 
@@ -967,17 +983,17 @@ int main(int argc, char **argv)
 	if (!global_config)
 		return -ENOMEM;
 
-	vm_info = &global_config->vm_info;
+	vmtag = &global_config->vmtag;
 	device_info = &global_config->device_info;
-	vm_info->bit64 = 1;
+	vmtag->flags = VM_FLAGS_64BIT | VM_FLAGS_DYNAMIC_AFF;
 
 	while ((opt = getopt_long(argc, argv, optstr, options, &idx)) != -1) {
 		switch(opt) {
 		case 'c':
-			vm_info->nr_vcpus = atoi(optarg);
+			vmtag->nr_vcpu = atoi(optarg);
 			break;
 		case 'm':
-			ret = parse_vm_memsize(optarg, &vm_info->mem_size);
+			ret = parse_vm_memsize(optarg, &vmtag->mem_size);
 			if (ret)
 				print_usage();
 			break;
@@ -991,7 +1007,7 @@ int main(int argc, char **argv)
 			strcpy(global_config->bootimage_path, optarg);
 			break;
 		case 's':
-			ret = parse_vm_membase(optarg, &vm_info->mem_start);
+			ret = parse_vm_membase(optarg, &vmtag->mem_base);
 			if (ret) {
 				print_usage();
 				ret = -EINVAL;
@@ -999,10 +1015,10 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 'n':
-			strncpy(vm_info->name, optarg, 31);
+			strncpy(vmtag->name, optarg, VM_NAME_SIZE - 1);
 			break;
 		case 't':
-			strncpy(vm_info->os_type, optarg, 31);
+			strncpy(vmtag->os_type, optarg, VM_TYPE_SIZE - 1);
 			break;
 		case 'b':
 			ret = atoi(optarg);
@@ -1010,10 +1026,11 @@ int main(int argc, char **argv)
 				free(global_config);
 				print_usage();
 			}
-			vm_info->bit64 = ret == 64 ? 1 : 0;
+			if (ret == 32)
+				vmtag->flags &= ~VM_FLAGS_64BIT;
 			break;
 		case 'r':
-			global_config->flags |= VM_FLAGS_NO_RAMDISK;
+			vmtag->flags |= VM_FLAGS_NO_RAMDISK;
 			break;
 		case 'v':
 			verbose = 1;
@@ -1042,7 +1059,7 @@ int main(int argc, char **argv)
 			print_usage();
 			return 0;
 		case '3':
-			global_config->flags |= VM_FLAGS_HAS_EARLYPRINTK;
+			vmtag->flags |= VM_FLAGS_HAS_EARLYPRINTK;
 			break;
 		case '2':
 			global_config->gic_type = 2;

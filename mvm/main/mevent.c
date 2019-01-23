@@ -130,7 +130,7 @@ mevent_kq_filter(struct mevent *mevp)
 }
 
 static void
-mevent_destroy()
+mevent_destroy(void)
 {
 	struct mevent *mevp, *tmpp;
 	struct epoll_event ee;

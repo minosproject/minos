@@ -24,7 +24,8 @@
 #include <minos/sched.h>
 #include <minos/virq.h>
 #include <minos/vdev.h>
-#include <asm/of.h>
+#include <minos/of.h>
+#include <minos/virq_chip.h>
 #include <asm/bcm_irq.h>
 
 struct bcm2836_virq {
@@ -42,6 +43,10 @@ struct bcm2836_virq {
 extern int vgicv2_create_vm(void *item, void *arg);
 static int bcm2836_clear_spi(struct vcpu *vcpu, uint32_t virq);
 static int bcm2836_clear_ppi(struct vcpu *vcpu, uint32_t virq);
+
+extern int bcm2836_xlate_irq(struct device_node *node,
+		uint32_t *intspec, unsigned int intsize,
+		uint32_t *hwirq, unsigned long *type);
 
 static void bcm2836_virq_deinit(struct vdev *vdev)
 {
@@ -268,8 +273,9 @@ static int bcm2836_inject_sgi(struct vcpu *vcpu, uint32_t virq)
 	void *base;
 	uint32_t v;
 	struct vm *vm = vcpu->vm;
-	struct bcm2836_virq *dev = (struct bcm2836_virq *)vm->inc_pdata;
+	struct bcm2836_virq *dev;
 
+	dev = (struct bcm2836_virq *)vm->virq_chip->inc_pdata;
 	base = dev->iomem + (LOCAL_MAILBOX0_CLR0 + vcpu->vcpu_id * 16);
 
 	/* set the read and clear register */
@@ -289,7 +295,7 @@ static int bcm2836_inject_ppi(struct vcpu *vcpu, uint32_t virq)
 	void *base;
 	uint32_t v;
 	struct vm *vm = vcpu->vm;
-	struct bcm2836_virq *dev = (struct bcm2836_virq *)vm->inc_pdata;
+	struct bcm2836_virq *dev;
 
 	virq = virq - 16;
 	if (virq == LOCAL_IRQ_GPU_FAST) {
@@ -297,6 +303,7 @@ static int bcm2836_inject_ppi(struct vcpu *vcpu, uint32_t virq)
 		return -EINVAL;
 	}
 
+	dev = (struct bcm2836_virq *)vm->virq_chip->inc_pdata;
 	base = dev->iomem + LOCAL_IRQ_PENDING0 + 4 * vcpu->vcpu_id;
 	v = readl_relaxed(base) | BIT(virq);
 	writel_relaxed(v, base);
@@ -395,8 +402,9 @@ static int bcm2836_clear_spi(struct vcpu *vcpu, uint32_t virq)
 	uint32_t v, p0, p1, p2;
 	void *base;
 	struct vm *vm = vcpu->vm;
-	struct bcm2836_virq *dev = (struct bcm2836_virq *)vm->inc_pdata;
+	struct bcm2836_virq *dev;
 
+	dev = (struct bcm2836_virq *)vm->virq_chip->inc_pdata;
 	if (bcm2836_get_spi_bank(dev, virq, &base, &bit, &bank)) {
 		pr_error("get irq bank failed %d\n", virq);
 		return -EINVAL;
@@ -423,11 +431,12 @@ static int bcm2836_clear_ppi(struct vcpu *vcpu, uint32_t virq)
 	uint32_t v;
 	void *base;
 	struct vm *vm = vcpu->vm;
-	struct bcm2836_virq *dev = (struct bcm2836_virq *)vm->inc_pdata;
+	struct bcm2836_virq *dev;
 
 	if (virq > LOCAL_IRQ_PMU_FAST)
 		return -EINVAL;
 
+	dev = (struct bcm2836_virq *)vm->virq_chip->inc_pdata;
 	base = dev->iomem + LOCAL_IRQ_PENDING0 + (vcpu->vcpu_id * 4);
 	v = readl_relaxed(base) & ~BIT(virq);
 	writel_relaxed(v, base);
@@ -441,8 +450,9 @@ static int bcm2836_inject_spi(struct vcpu *vcpu, uint32_t virq)
 	uint32_t v;
 	void *base;
 	struct vm *vm = vcpu->vm;
-	struct bcm2836_virq *dev = (struct bcm2836_virq *)vm->inc_pdata;
+	struct bcm2836_virq *dev;
 
+	dev = (struct bcm2836_virq *)vm->virq_chip->inc_pdata;
 	if (bcm2836_get_spi_bank(dev, virq, &base, &bit, &bank)) {
 		pr_info("get virq bank failed %d\n", virq);
 		return -EINVAL;
@@ -466,7 +476,7 @@ static int bcm2836_inject_spi(struct vcpu *vcpu, uint32_t virq)
 	return 0;
 }
 
-int bcm_virq_send_virq(struct vcpu *vcpu, uint32_t virq)
+int bcm2836_send_virq(struct vcpu *vcpu, uint32_t virq)
 {
 	/* convert the hypervisor virq to bcm irq number */
 	switch (virq) {
@@ -487,25 +497,95 @@ int bcm_virq_send_virq(struct vcpu *vcpu, uint32_t virq)
 	return 0;
 }
 
-static int bcm_virq_create_vm(void *item, void *arg)
+static int bcm2836_vm0_virq_data(uint32_t *array, int vspi_nr, int type)
 {
-	struct vm *vm = item;
+	int i, size = 0;
+
+	if (type & VM_FLAGS_SETUP_OF) {
+		for (i = 0; i < vspi_nr; i++) {
+			*array++ = cpu_to_of32(i / 32);
+			*array++ = cpu_to_of32(i % 32);
+			size += (2 * 4);
+		}
+	}
+
+	return size;
+}
+
+static int bcm2836_update_virq(struct vcpu *vcpu,
+		struct virq_desc *desc, int action)
+{
+	switch (action) {
+	case VIRQ_ACTION_CLEAR:
+		/* enable the hardware irq when disable in hyp */
+		if ((desc->vno >= 32) && (virq_is_hw(desc)))
+			irq_unmask(desc->hno);
+		break;
+	}
+	return 0;
+}
+
+static int bcm2836_enter_to_guest(struct vcpu *vcpu, void *data)
+{
+	struct virq_desc *virq, *n;
+	struct virq_struct *virq_struct = vcpu->virq_struct;
+
+	/*
+	 * just inject one virq the time since when the
+	 * virq is handled, the vm will trap to hypervisor
+	 * again, actually here can inject all virq to the
+	 * guest, but it is hard to judge whether all virq
+	 * has been handled by guest vm TBD
+	 */
+	list_for_each_entry_safe(virq, n, &virq_struct->pending_list, list) {
+		if (!virq_is_pending(virq)) {
+			pr_error("virq is not request %d\n", virq->vno);
+			list_del(&virq->list);
+			virq->list.next = NULL;
+			continue;
+		}
+
+#if 0
+		/*
+		 * virq is not enabled this time, need to
+		 * send it later, but this will infence the idle
+		 * condition jugement TBD
+		 */
+		if (!virq_is_enabled(virq))
+			continue;
+#endif
+
+		/*
+		 * update the virq interrupt status and
+		 * delete the virq from the virq list then
+		 * add it to active list
+		 */
+		bcm2836_send_virq(vcpu, virq->vno);
+		virq_clear_pending(virq);
+		virq->state = VIRQ_STATE_ACTIVE;
+		list_del(&virq->list);
+		list_add_tail(&virq_struct->active_list, &virq->list);
+	}
+
+	return 0;
+}
+
+static struct virq_chip *bcm2836_virqchip_init(struct vm *vm,
+		struct device_node *node)
+{
 	struct bcm2836_virq *bcm2836;
 	struct vdev *vdev;
 	void *base;
-
-	/* if the vm is not native using vgicv2 */
-	if (!vm_is_native(vm))
-		return vgicv2_create_vm(item, arg);
+	struct virq_chip *vc;
 
 	bcm2836 = zalloc(sizeof(struct bcm2836_virq));
 	if (!bcm2836)
-		return -ENOMEM;
+		return NULL;
 
 	bcm2836->iomem = get_io_page();
 	if (!bcm2836->iomem) {
 		free(bcm2836);
-		return -ENOMEM;
+		return NULL;
 	}
 
 	base = bcm2836->iomem + 0x200;
@@ -541,14 +621,19 @@ static int bcm_virq_create_vm(void *item, void *arg)
 	 */
 	create_guest_mapping(vm, BCM2836_INC_BASE, (unsigned long)bcm2836->iomem,
 			PAGE_SIZE, VM_IO | VM_RO);
-	vm->inc_pdata = bcm2836;
 
-	return 0;
-}
+	vc = alloc_virq_chip();
+	if (!vc)
+		return NULL;
 
-int bcm_virq_init(unsigned long l1_base, size_t l1_size,
-		unsigned long l2_base, size_t l2_size)
-{
-	return register_hook(bcm_virq_create_vm,
-			MINOS_HOOK_TYPE_CREATE_VM_VDEV);
+	vc->xlate = bcm2836_xlate_irq;
+	vc->exit_from_guest = NULL;
+	vc->enter_to_guest = bcm2836_enter_to_guest;
+	vc->vm0_virq_data = bcm2836_vm0_virq_data;
+	vc->update_virq = bcm2836_update_virq;
+	vc->inc_pdata = (void *)bcm2836;
+
+	return vc;
 }
+VIRQCHIP_DECLARE(bcm2836_virqchip, bcmirq_match_table,
+		bcm2836_virqchip_init);

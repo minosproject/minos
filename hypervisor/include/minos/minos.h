@@ -12,6 +12,7 @@
 #include <minos/init.h>
 #include <minos/arch.h>
 #include <minos/calltrace.h>
+#include <common/hypervisor.h>
 
 struct vcpu;
 
@@ -37,10 +38,6 @@ void irq_enter(gp_regs *regs);
 void irq_exit(gp_regs *regs);
 
 int do_hooks(void *item, void *context, enum hook_type type);
-
-void *get_module_pdata(unsigned long s,
-		unsigned long e, const char *name);
-
 int register_hook(hook_func_t fn, enum hook_type type);
 
 #endif

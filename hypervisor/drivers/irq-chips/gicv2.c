@@ -29,8 +29,7 @@
 #include <asm/arch.h>
 #include <minos/cpumask.h>
 #include <minos/irq.h>
-#include <minos/virq.h>
-#include <asm/of.h>
+#include <minos/resource.h>
 
 /*
  * LR register definitions are GIC v2 specific.
@@ -69,12 +68,14 @@ static DEFINE_SPIN_LOCK(gicv2_lock);
 static void *gicv2_dbase;
 static void *gicv2_cbase;
 static void *gicv2_hbase;
-static int gicv2_nr_lrs;
 static int gicv2_nr_lines;
 
 static DEFINE_PER_CPU(uint8_t, gic_cpu_id);
 
 extern int vgicv2_init(uint64_t *data, int len);
+extern int gic_xlate_irq(struct device_node *node,
+		uint32_t *intspec, unsigned int intsize,
+		uint32_t *hwirq, unsigned long *type);
 
 /* Maximum cpu interface per GIC */
 #define NR_GIC_CPU_IF 8
@@ -189,58 +190,6 @@ static int gicv2_set_irq_affinity(uint32_t irq, uint32_t pcpu)
 	return 0;
 }
 
-static int gicv2_send_virq(struct vcpu *vcpu, struct virq_desc *virq)
-{
-	uint32_t val;
-	uint32_t pid = 0;
-	struct gich_lr *gich_lr;
-
-	if (virq->id >= gicv2_nr_lrs) {
-		pr_error("invalid virq %d\n", virq->id);
-		return -EINVAL;
-	}
-
-	if (virq_is_hw(virq))
-		pid = virq->hno;
-	else {
-		if (virq->vno < 16)
-			pid = virq->src;
-	}
-
-	gich_lr = (struct gich_lr *)&val;
-	gich_lr->vid = virq->vno;
-	gich_lr->pid = pid;
-	gich_lr->pr = virq->pr;
-	gich_lr->grp1 = 0;
-	gich_lr->state = 1;
-	gich_lr->hw = !!virq_is_hw(virq);
-
-	writel_gich(val, GICH_LR + virq->id * 4);
-	isb();
-
-	return 0;
-}
-
-static int gicv2_update_virq(struct vcpu *vcpu,
-		struct virq_desc *desc, int action)
-{
-	if (!desc || desc->id >= gicv2_nr_lrs)
-		return -EINVAL;
-
-	switch (action) {
-	case VIRQ_ACTION_REMOVE:
-		if (virq_is_hw(desc))
-			gicv2_clear_pending(desc->hno);
-
-	case VIRQ_ACTION_CLEAR:
-		writel_gich(0, GICH_LR + desc->id * 4);
-		isb();
-		break;
-	}
-
-	return 0;
-}
-
 static void gicv2_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *mask)
 {
 	unsigned int cpu;
@@ -296,64 +245,6 @@ static void gicv2_unmask_irq_cpu(uint32_t irq, int cpu)
 	pr_warn("not support unmask irq_percpu\n");
 }
 
-int gicv2_get_virq_state(struct vcpu *vcpu, struct virq_desc *virq)
-{
-	uint32_t value;
-
-	if (virq->id >= gicv2_nr_lrs)
-		return 0;
-
-	value = readl_gich(GICH_LR + virq->id * 4);
-	isb();
-	value = (value >> 28) & 0x3;
-
-	return value;
-}
-
-static void gicv2_state_save(struct vcpu *vcpu, void *context)
-{
-	int i;
-	struct gicv2_context *c = (struct gicv2_context *)context;
-
-	dsb();
-
-	for (i = 0; i < gicv2_nr_lrs; i++)
-		c->lr[i] = readl_gich(GICH_LR + i * 4);
-
-	c->vmcr = readl_gich(GICH_VMCR);
-	c->apr = readl_gich(GICH_APR);
-	c->hcr = readl_gich(GICH_HCR);
-	writel_gich(0, GICH_HCR);
-	isb();
-}
-
-static void gicv2_state_restore(struct vcpu *vcpu, void *context)
-{
-	int i;
-	struct gicv2_context *c = (struct gicv2_context *)context;
-
-	for (i = 0; i < gicv2_nr_lrs; i++)
-		writel_gich(c->lr[i], GICH_LR + i * 4);
-
-	writel_gich(c->apr, GICH_APR);
-	writel_gich(c->vmcr, GICH_VMCR);
-	writel_gich(c->hcr, GICH_HCR);
-	isb();
-}
-
-static void gicv2_state_init(struct vcpu *vcpu, void *context)
-{
-	struct gicv2_context *c = (struct gicv2_context *)context;
-
-	memset(c, 0, sizeof(struct gicv2_context));
-	c->hcr = 1;
-}
-
-static void gicv2_state_resume(struct vcpu *vcpu, void *context)
-{
-	gicv2_state_init(vcpu, context);
-}
-
 static int gicv2_is_aliased(unsigned long base, unsigned long size)
 {
 	uint32_t val_low, val_high;
@@ -404,12 +295,7 @@ static void gicv2_cpu_init(void)
 
 static void gicv2_hyp_init(void)
 {
-	uint32_t vtr;
-	uint8_t nr_lrs;
 
-	vtr = readl_gich(GICH_VTR);
-	nr_lrs = (vtr & GICH_V2_VTR_NRLRGS) + 1;
-	gicv2_nr_lrs = nr_lrs;
 }
 
 static void gicv2_dist_init(void)
@@ -464,30 +350,17 @@ static void gicv2_dist_init(void)
 	dsb();
 }
 
-static int gicv2_vmodule_init(struct vmodule *vmodule)
+static int gicv2_init(struct device_node *node)
 {
-	vmodule->context_size = sizeof(struct gicv2_context);
-	vmodule->pdata = NULL;
-	vmodule->state_init = gicv2_state_init;
-	vmodule->state_save = gicv2_state_save;
-	vmodule->state_restore = gicv2_state_restore;
-	vmodule->state_resume = gicv2_state_resume;
-
-	return 0;
-}
-
-static int gicv2_init(int node)
-{
-	int ret, len;
-	uint64_t array[16];
+	uint64_t array[10];
 
 	pr_info("*** gicv2 init ***\n");
-
-	len = 16;
 	memset(array, 0, sizeof(array));
-	ret = of_get_interrupt_regs(node, array, &len);
-	if (ret || (len < 8))
-		panic("invaild gic-v2 infomation in dts\n");
+
+	translate_device_address_index(node, &array[0], &array[1], 0);
+	translate_device_address_index(node, &array[2], &array[3], 1);
+	translate_device_address_index(node, &array[4], &array[5], 2);
+	translate_device_address_index(node, &array[6], &array[7], 3);
 
 	pr_info("gicv2 information :\n"
 		"        gic_dist_addr=%p size=0x%x\n"
@@ -501,11 +374,11 @@ static int gicv2_init(int node)
 	gicv2_cbase = (void *)array[2];
 	gicv2_hbase = (void *)array[4];
 
-	io_remap((unsigned long)array[0], (unsigned long)array[0],
+	io_remap((vir_addr_t)array[0], (phy_addr_t)array[0],
 			(size_t)array[1]);
-	io_remap((unsigned long)array[2], (unsigned long)array[2],
+	io_remap((vir_addr_t)array[2], (phy_addr_t)array[2],
 			(size_t)array[3]);
-	io_remap((unsigned long)array[4], (unsigned long)array[4],
+	io_remap((vir_addr_t)array[4], (phy_addr_t)array[4],
 			(size_t)array[5]);
 
 	if (gicv2_is_aliased((unsigned long)array[2],
@@ -526,8 +399,9 @@ static int gicv2_init(int node)
 
 	spin_unlock(&gicv2_lock);
 
-	vgicv2_init(array, len);
-	register_vcpu_vmodule("gicv2", gicv2_vmodule_init);
+#ifdef CONFIG_VIRQCHIP_VGICV2
+	vgicv2_init(array, 8);
+#endif
 
 	return 0;
 }
@@ -544,11 +418,6 @@ static int gicv2_secondary_init(void)
 	return 0;
 }
 
-static int gicv2_get_virq_nr(void)
-{
-	return gicv2_nr_lrs;
-}
-
 static struct irq_chip gicv2_chip = {
 	.irq_mask 		= gicv2_mask_irq,
 	.irq_mask_cpu		= gicv2_mask_irq_cpu,
@@ -561,20 +430,9 @@ static struct irq_chip gicv2_chip = {
 	.send_sgi		= gicv2_send_sgi,
 	.get_pending_irq	= gicv2_read_irq,
 	.irq_set_priority	= gicv2_set_irq_priority,
-	.get_virq_state		= gicv2_get_virq_state,
-	.get_virq_nr		= gicv2_get_virq_nr,
-	.send_virq		= gicv2_send_virq,
-	.update_virq		= gicv2_update_virq,
+	.irq_xlate		= gic_xlate_irq,
 	.init			= gicv2_init,
 	.secondary_init		= gicv2_secondary_init,
 };
+IRQCHIP_DECLARE(gicv2_chip, gicv2_match_table, (void *)&gicv2_chip);
 
-IRQCHIP_DECLARE(gicv2_chip, "arm,gicv2", (void *)&gicv2_chip);
-IRQCHIP_DECLARE(gic_400, "arm,gic-400", (void *)&gicv2_chip);
-IRQCHIP_DECLARE(arm11mp_gic, "arm,arm11mp-gic", (void *)&gicv2_chip);
-IRQCHIP_DECLARE(arm1176jzf_dc_gic, "arm,arm1176jzf-devchip-gic", (void *)&gicv2_chip);
-IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", (void *)&gicv2_chip);
-IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", (void *)&gicv2_chip);
-IRQCHIP_DECLARE(cortex_a7_gic, "arm,cortex-a7-gic", (void *)&gicv2_chip);
-IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", (void *)&gicv2_chip);
-IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", (void *)&gicv2_chip);

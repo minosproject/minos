@@ -53,40 +53,6 @@ static void call_init_func(unsigned long fn_start, unsigned long fn_end)
 	}
 }
 
-void platform_early_init(void)
-{
-	int i, count;
-	extern unsigned char __platform_start;
-	extern unsigned char __platform_end;
-	unsigned long pstart;
-	unsigned long pend;
-	struct platform **pp;
-	struct platform *p;
-
-	pstart =(unsigned long)&__platform_start;
-	pend = (unsigned long)&__platform_end;
-	count = (pend - pstart) / sizeof(struct platform *);
-	pp = (struct platform **)pstart;
-
-	if (count == 0)
-		panic("no platform found for minos");
-
-	for (i = 0; i < count; i++) {
-		p = *pp;
-		if (strcmp(p->name, "fvp") == 0) {
-			platform = p;
-			break;
-		}
-
-		pp++;
-	}
-
-	if (platform == NULL)
-		panic("no platform found for minos\n");
-
-	pr_info("platform-%s\n", platform->name);
-}
-
 void early_init(void *setup_data)
 {
 	/* get the platform for the minos */

@@ -31,11 +31,11 @@ static void linux_vcpu_init(struct vcpu *vcpu)
 		regs = (gp_regs *)vcpu->stack_base;
 
 		if (vm_is_64bit(vcpu->vm))
-			regs->x0 = vcpu->vm->setup_data;
+			regs->x0 = (uint64_t)vcpu->vm->setup_data;
 		else {
 			regs->x0 = 0;
 			regs->x1 = 2272;		/* arm vexpress machine type */
-			regs->x2 = vcpu->vm->setup_data;
+			regs->x2 = (uint64_t)vcpu->vm->setup_data;
 		}
 
 		vcpu_online(vcpu);

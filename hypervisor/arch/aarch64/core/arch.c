@@ -24,11 +24,15 @@
 #include <minos/sched.h>
 #include <minos/calltrace.h>
 #include <minos/smp.h>
+#include <minos/of.h>
+#include <minos/platform.h>
 
 extern int el2_stage2_init(void);
 extern int el2_stage1_init(void);
-extern int of_init(void *setup_data);
-extern void hvm_dtb_init(struct vm *vm);
+extern void fdt_vm0_init(struct vm *vm);
+extern int fdt_early_init(void *setup_data);
+extern int fdt_init(void);
+extern int fdt_spin_table_init(phy_addr_t *smp_holding);
 
 void arch_set_virq_flag(void)
 {
@@ -184,19 +188,26 @@ int arch_early_init(void *setup_data)
 		panic("minos must run at EL2 mode\n");
 
 	el2_stage2_init();
-	of_init(setup_data);
 
+#ifdef CONFIG_DEVICE_TREE
+	fdt_early_init(setup_data);
+#endif
 	return 0;
 }
 
 int __arch_init(void)
 {
+#ifdef CONFIG_DEVICE_TREE
+	fdt_init();
+#endif
 	return 0;
 }
 
-void arch_hvm_init(struct vm *vm)
+void arch_smp_init(phy_addr_t *smp_h_addr)
 {
-	hvm_dtb_init(vm);
+#ifdef CONFIG_DEVICE_TREE
+	fdt_spin_table_init(smp_h_addr);
+#endif
 }
 
 static int aarch64_init_percpu(void)

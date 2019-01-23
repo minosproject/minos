@@ -15,14 +15,26 @@
  */
 
 #include <asm/cpu.h>
+#include <minos/mm.h>
+#include <minos/vmm.h>
 #include <minos/platform.h>
 
+static int espressobin_setup_vm0(struct vm *vm, void *dtb)
+{
+	/* create the pcie region for the vm0 */
+	create_guest_mapping(vm, 0xe8000000, 0xe8000000, 0x1000000, VM_IO);
+	create_guest_mapping(vm, 0xe9000000, 0xe9000000, 0x10000, VM_IO);
+
+	return 0;
+}
+
 static struct platform platform_espressobin = {
-	.name		 = "marvel_armada",
+	.name		 = "marvell,armada-3720-community",
 	.cpu_on		 = psci_cpu_on,
 	.cpu_off	 = psci_cpu_off,
 	.system_reboot	 = psci_system_reboot,
 	.system_shutdown = psci_system_shutdown,
+	.setup_hvm	 = espressobin_setup_vm0,
 };
 
 DEFINE_PLATFORM(platform_espressobin);

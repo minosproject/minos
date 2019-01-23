@@ -95,8 +95,8 @@ if __name__ == "__main__":
         afd.write(a_str)
         afd.close()
 
-    h_str = '#ifndef __MINOS_CONFIG__\r\n'
-    h_str += "#define __MINOS_CONFIG__\r\n\r\n"
+    h_str = '#ifndef __MINOS_CONFIG_H__\r\n'
+    h_str += "#define __MINOS_CONFIG_H__\r\n\r\n"
     with open(output_h_file, 'w') as hfd:
         for item in configs:
             if len(item) != 2:

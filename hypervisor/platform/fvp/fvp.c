@@ -20,6 +20,8 @@
 #include <asm/io.h>
 #include <minos/vmm.h>
 #include <minos/platform.h>
+#include <minos/vm.h>
+#include <libfdt/libfdt.h>
 
 static int fvp_time_init(void)
 {
@@ -30,11 +32,42 @@ static int fvp_time_init(void)
 	return 0;
 }
 
+static int inline fvp_setup_hvm_of(struct vm *vm, void *data)
+{
+	int node, len;
+	const void *val;
+
+	/* disable the armv7-timer-mem for fvp*/
+	node = fdt_path_offset(data, "/timer@2a810000");
+	if (node < 0)
+		return 0;
+
+	val = fdt_getprop(data, node, "compatible", &len);
+	if (!val || len <= 0)
+		return 0;
+
+	if (!strcmp((char *)val, "arm,armv7-timer-mem")) {
+		pr_info("delete the armv7 mem timer\n");
+		fdt_del_node(data, node);
+	}
+
+	return 0;
+}
+
+static int fvp_setup_hvm(struct vm *vm, void *data)
+{
+	if (vm->flags & VM_FLAGS_SETUP_OF)
+		return fvp_setup_hvm_of(vm, data);
+
+	return 0;
+}
+
 static struct platform platform_fvp = {
-	.name 		 = "fvp",
+	.name 		 = "arm,fvp-base",
 	.time_init 	 = fvp_time_init,
 	.cpu_on		 = psci_cpu_on,
 	.cpu_off	 = psci_cpu_off,
+	.setup_hvm	 = fvp_setup_hvm,
 	.system_reboot	 = psci_system_reboot,
 	.system_shutdown = psci_system_shutdown,
 };

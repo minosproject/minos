@@ -4,30 +4,10 @@
 #include <mvm_queue.h>
 #include <list.h>
 #include <sys/ioctl.h>
-#include <mvm_ioctl.h>
-
-/*
- * VM_FLAGS_NO_RAMDISK - used for linux to indicate
- * that the system has no ramdisk image
- */
-#define VM_FLAGS_NO_RAMDISK		(1 << 0)
-#define VM_FLAGS_NO_BOOTIMAGE		(1 << 1)
-#define VM_FLAGS_HAS_EARLYPRINTK	(1 << 2)
+#include <common/hypervisor.h>
 
 #define VM_STAT_RUNNING			0x0
 #define VM_STAT_SUSPEND			0x1
-
-struct vm_info {
-	char name[32];
-	char os_type[32];
-	int32_t nr_vcpus;
-	int32_t bit64;
-	uint64_t mem_size;
-	uint64_t mem_start;
-	uint64_t entry;
-	uint64_t setup_data;
-	uint64_t mmap_base;
-};
 
 #define VM_MAX_DEVICES	(10)
 
@@ -38,9 +18,8 @@ struct device_info {
 };
 
 struct vm_config {
-	unsigned long flags;
 	int gic_type;
-	struct vm_info vm_info;
+	struct vmtag vmtag;
 	struct device_info device_info;
 	char bootimage_path[256];
 	char cmdline[256];
@@ -71,7 +50,6 @@ struct vm {
 	char name[32];
 	char os_type[32];
 	int32_t nr_vcpus;
-	int bit64;
 	uint64_t mem_size;
 	uint64_t mem_start;
 	uint64_t entry;

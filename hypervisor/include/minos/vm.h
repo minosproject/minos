@@ -10,17 +10,12 @@
 #include <config/config.h>
 #include <minos/vmm.h>
 #include <minos/errno.h>
+#include <common/hypervisor.h>
 
 #define VM_MAX_VCPU		CONFIG_NR_CPUS
 
-#define MINOS_VM_NAME_SIZE	32
-#define OS_TYPE_SIZE		32
-
 #define VMID_HOST		(65535)
 #define VMID_INVALID		(-1)
-
-#define VM_FLAGS_64BIT		(1 << 0)
-#define VM_FLAGS_NATIVE		(1 << 1)
 
 #define VM_STAT_OFFLINE		(0)
 #define VM_STAT_ONLINE		(1)
@@ -29,21 +24,10 @@
 
 struct vcpu;
 struct os;
-struct vmtag;
+struct virq_chip;
 
 extern struct list_head vm_list;
-
-struct vm_info {
-	int8_t name[32];
-	int8_t os_type[32];
-	int32_t nr_vcpus;
-	int32_t bit64;
-	uint64_t mem_size;
-	uint64_t mem_start;
-	uint64_t entry;
-	uint64_t setup_data;
-	uint64_t mmap_base;
-};
+extern struct list_head mem_list;
 
 struct vm {
 	int vmid;
@@ -51,10 +35,9 @@ struct vm {
 	int state;
 	unsigned long flags;
 	uint8_t vcpu_affinity[VM_MAX_VCPU];
-	unsigned long entry_point;
-	unsigned long setup_data;
-	char name[MINOS_VM_NAME_SIZE];
-	char os_type[OS_TYPE_SIZE];
+	void *entry_point;
+	void *setup_data;
+	char name[VM_NAME_SIZE];
 	struct vcpu **vcpus;
 	struct list_head vcpu_list;
 	struct mm_struct mm;
@@ -69,10 +52,11 @@ struct vm {
 	int virq_same_page;
 	struct virq_desc *vspi_desc;
 	unsigned long *vspi_map;
-	void *inc_pdata;
+	struct virq_chip *virq_chip;
 
 	void *vmcs;
 	void *hvm_vmcs;
+	void *resource;
 } __align(sizeof(unsigned long));
 
 extern struct vm *vms[CONFIG_MAX_VM];
@@ -86,7 +70,7 @@ extern struct vm *vms[CONFIG_MAX_VM];
 void vm_mm_struct_init(struct vm *vm);
 
 struct vm *create_vm(struct vmtag *vme);
-int create_new_vm(struct vm_info *info);
+int create_new_vm(struct vmtag *tag);
 void destroy_vm(struct vm *vm);
 int vm_power_up(int vmid);
 int vm_reset(int vmid, void *args);
@@ -141,5 +125,8 @@ static inline void destroy_vm_mmap(int vmid)
 
 	vm_unmmap(vm);
 }
+
+int vm_create_host_vdev(struct vm *vm);
+int request_vm_virqs(struct vm *vm, int base, int nr);
 
 #endif

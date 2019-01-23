@@ -32,15 +32,15 @@ struct page {
 } __packed__;
 
 struct memory_region {
-	int type;
-	uint32_t vmid;
-	unsigned long phy_base;
-	unsigned long vir_base;
+	int vmid;
+	phy_addr_t phy_base;
+	vir_addr_t vir_base;
 	size_t size;
 	struct list_head list;
 };
 
-extern struct list_head mem_list;
+int add_memory_region(uint64_t base, uint64_t size, int vmid);
+int split_memory_region(vir_addr_t base, size_t size, int vmid);
 
 int mm_init(void);
 void *malloc(size_t size);

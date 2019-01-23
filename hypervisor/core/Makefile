@@ -25,7 +25,6 @@ obj-y += timer.o
 obj-y += vcpu.o
 obj-y += vdev.o
 obj-y += virq.o
-obj-y += virt.o
 obj-y += vm.o
 obj-y += vmcs.o
 obj-y += vmm.o

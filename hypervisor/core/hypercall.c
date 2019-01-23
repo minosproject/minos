@@ -37,7 +37,7 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 
 	switch (id) {
 	case HVC_VM_CREATE:
-		vmid = create_new_vm((struct vm_info *)args[0]);
+		vmid = create_new_vm((struct vmtag *)args[0]);
 		HVC_RET1(c, vmid);
 		break;
 
@@ -81,6 +81,12 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 		HVC_RET1(c, addr);
 		break;
 
+	case HVC_VM_REQUEST_VIRQ:
+		vmid = request_vm_virqs(get_vm_by_id((int)args[0]),
+				(int)args[1], (int)args[2]);
+		HVC_RET1(c, vmid);
+		break;
+
 	case HVC_VM_CREATE_VMCS_IRQ:
 		vmid = vm_create_vmcs_irq(vm, (int)args[1]);
 		HVC_RET1(c, vmid);
@@ -105,16 +111,17 @@ static int misc_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 	struct vm *vm = get_vm_by_id((int)args[0]);
 
 	switch (id) {
-	case HVC_MISC_CREATE_VIRTIO_DEVICE:
-		ret = create_virtio_device(vm, args[1]);
-		HVC_RET1(c, ret);
-		break;
 	case HVC_MISC_VIRTIO_MMIO_INIT:
 		ret = virtio_mmio_init(vm, args[1], &gbase, &hbase);
 		HVC_RET3(c, ret, gbase, hbase);
 		break;
 	case HVC_MISC_VIRTIO_MMIO_DEINIT:
 		ret = virtio_mmio_deinit(vm);
+		HVC_RET1(c, 0);
+		break;
+	case HVC_MISC_CREATE_HOST_VDEV:
+		ret = vm_create_host_vdev(vm);
+		HVC_RET1(c, ret);
 		break;
 	default:
 		break;

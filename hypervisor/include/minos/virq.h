@@ -52,6 +52,7 @@ struct irqtag;
 #define VIRQS_CAN_WAKEUP	(1 << 4)
 
 #define VIRQF_CAN_WAKEUP	(1 << 4)
+#define VIRQF_ENABLE		(1 << 5)
 
 enum virq_domain_type {
 	VIRQ_DOMAIN_SGI = 0,
@@ -76,14 +77,12 @@ struct virq_desc {
 } __packed__;
 
 struct virq_struct {
-	int active_virqs;
 	uint32_t active_count;
 	uint32_t pending_hirq;
 	uint32_t pending_virq;
 	spinlock_t lock;
 	struct list_head pending_list;
 	struct list_head active_list;
-	DECLARE_BITMAP(irq_bitmap, VCPU_MAX_ACTIVE_VIRQS);
 	struct virq_desc local_desc[VM_LOCAL_VIRQ_NR];
 };
 
@@ -178,6 +177,7 @@ uint32_t virq_get_type(struct vcpu *vcpu, uint32_t virq);
 uint32_t virq_get_affinity(struct vcpu *vcpu, uint32_t virq);
 uint32_t virq_get_pr(struct vcpu *vcpu, uint32_t virq);
 uint32_t virq_get_state(struct vcpu *vcpu, uint32_t virq);
+uint32_t get_pending_virq(struct vcpu *vcpu);
 
 int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq);
 int send_virq_to_vm(struct vm *vm, uint32_t virq);
@@ -186,9 +186,14 @@ int vcpu_has_irq(struct vcpu *vcpu);
 
 int alloc_vm_virq(struct vm *vm);
 void release_vm_virq(struct vm *vm, int virq);
-int virq_mask_and_enable(struct vm *vm, uint32_t virq, unsigned long flags);
-int virq_mask_and_disable(struct vm *vm, uint32_t virq, unsigned long flags);
-uint32_t get_pending_virq(struct vcpu *vcpu);
+
+int request_virq_affinity(struct vm *vm, uint32_t virq,
+		uint32_t hwirq, int affinity, unsigned long flags);
+int request_hw_virq(struct vm *vm, uint32_t virq, uint32_t hwirq,
+			unsigned long flags);
+int request_virq_pervcpu(struct vm *vm, uint32_t virq,
+			unsigned long flags);
+int request_virq(struct vm *vm, uint32_t virq, unsigned long flags);
 
 static inline int alloc_hvm_virq(void)
 {

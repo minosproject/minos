@@ -27,70 +27,11 @@ extern unsigned char __el2_ttb0_pmd_io;
 
 static struct mm_struct host_mm;
 
-LIST_HEAD(mem_list);
-static LIST_HEAD(shared_mem_list);
-
 static DEFINE_SPIN_LOCK(mmap_lock);
 static unsigned long hvm_normal_mmap_base = HVM_NORMAL_MMAP_START;
 static size_t hvm_normal_mmap_size = HVM_NORMAL_MMAP_SIZE;
 static unsigned long hvm_iomem_mmap_base = HVM_IO_MMAP_START;
 static size_t hvm_iomem_mmap_size = HVM_IO_MMAP_SIZE;
-
-int register_memory_region(struct memtag *res)
-{
-	struct memory_region *region;
-
-	if (res == NULL)
-		return -EINVAL;
-
-	if (!res->enable)
-		return -EAGAIN;
-
-	/* only parse the memory for guest */
-	if (res->vmid == VMID_HOST)
-		return -EINVAL;
-
-	region = (struct memory_region *)
-		malloc(sizeof(struct memory_region));
-	if (!region) {
-		pr_error("No memory for new memory region\n");
-		return -ENOMEM;
-	}
-
-	pr_info("MEM : 0x%x 0x%x %d %d %s\n", res->mem_base,
-			res->mem_end, res->type,
-			res->vmid, res->name);
-
-	memset(region, 0, sizeof(struct memory_region));
-
-	region->phy_base = res->mem_base;
-	region->vir_base = res->mem_base;
-	region->size = res->mem_end - res->mem_base + 1;
-	region->vmid = res->vmid;
-
-	init_list(&region->list);
-
-	/*
-	 * shared memory is for all vm to ipc purpose
-	 */
-	if (res->type == MEM_TYPE_SHARED) {
-		region->type = MEM_TYPE_NORMAL;
-		list_add(&shared_mem_list, &region->list);
-	} else {
-		region->type = res->type;
-		list_add_tail(&mem_list, &region->list);
-	}
-
-	/* adjust the virtual memory base of gvm */
-	if (region->vmid != 0) {
-		if (region->type == MEM_TYPE_IO)
-			region->vir_base = GVM_IOMEM_BASE(res->mem_base);
-		else
-			region->vir_base = GVM_MEM_BASE(res->mem_base);
-	}
-
-	return 0;
-}
 
 static unsigned long alloc_pgd(void)
 {
@@ -129,7 +70,7 @@ void *vm_alloc_pages(struct vm *vm, int pages)
 	return page_to_addr(page);
 }
 
-int create_host_mapping(unsigned long vir, unsigned long phy,
+int create_host_mapping(vir_addr_t vir, phy_addr_t phy,
 		size_t size, unsigned long flags)
 {
 	unsigned long vir_base, phy_base, tmp;
@@ -148,7 +89,7 @@ int create_host_mapping(unsigned long vir, unsigned long phy,
 			vir_base, phy_base, size, flags);
 }
 
-int destroy_host_mapping(unsigned long vir, size_t size)
+int destroy_host_mapping(vir_addr_t vir, size_t size)
 {
 	unsigned long end;
 
@@ -160,18 +101,20 @@ int destroy_host_mapping(unsigned long vir, size_t size)
 	return destroy_mem_mapping(&host_mm, vir, size, VM_HOST);
 }
 
-int create_guest_mapping(struct vm *vm, unsigned long vir,
-		unsigned long phy, size_t size, unsigned long flags)
+int create_guest_mapping(struct vm *vm, vir_addr_t vir,
+		phy_addr_t phy, size_t size, unsigned long flags)
 {
-	unsigned long vir_base, phy_base, tmp;
+	unsigned long tmp;
 
-	vir_base = ALIGN(vir, PAGE_SIZE);
-	phy_base = ALIGN(phy, PAGE_SIZE);
-	tmp = BALIGN(vir_base + size, SIZE_4K);
-	size = tmp - vir_base;
+	tmp = BALIGN(vir + size, PAGE_SIZE);
+	vir = ALIGN(vir, PAGE_SIZE);
+	phy = ALIGN(phy, PAGE_SIZE);
+	size = tmp - vir;
 
-	return create_mem_mapping(&vm->mm, vir_base,
-			phy_base, size, flags);
+	pr_debug("map 0x%x->0x%x size-0x%x vm-%d\n", vir,
+			phy, size, vm->vmid);
+
+	return create_mem_mapping(&vm->mm, vir, phy, size, flags);
 }
 
 static int __used destroy_guest_mapping(struct vm *vm,
@@ -399,7 +342,6 @@ int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size)
 	unsigned long base;
 	struct mm_struct *mm = &vm->mm;
 	struct mem_block *block;
-	struct memory_region *region;
 
 	base = ALIGN(start, MEM_BLOCK_SIZE);
 	if (base != start)
@@ -437,25 +379,31 @@ int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size)
 		base += MEM_BLOCK_SIZE;
 	}
 
-	/* any hardware IO space for this space */
-	list_for_each_entry(region, &mem_list, list) {
-		if ((region->vmid != vm->vmid) ||
-				(region->type != MEM_TYPE_IO))
-			continue;
-
-		pr_info("mapping 0x%x to vm-%d\n",
-				region->phy_base, vm->vmid);
-
-		create_guest_mapping(vm, region->phy_base, region->vir_base,
-				region->size, region->type);
-	}
-
 	return 0;
 
 free_vm_memory:
 	release_vm_memory(vm);
 
 	return -ENOMEM;
+}
+
+phy_addr_t get_vm_memblock_address(struct vm *vm, unsigned long a)
+{
+	struct mm_struct *mm = &vm->mm;
+	struct mem_block *block;
+	unsigned long base = 0;
+	unsigned long offset = a - mm->mem_base;
+
+	if ((a < mm->mem_base) || (a >= mm->mem_base + mm->mem_size))
+		return 0;
+
+	list_for_each_entry(block, &mm->block_list, list) {
+		if (offset == base)
+			return block->phy_base;
+		base += MEM_BLOCK_SIZE;
+	}
+
+	return 0;
 }
 
 void vm_mm_struct_init(struct vm *vm)
@@ -497,13 +445,8 @@ int vm_mm_init(struct vm *vm)
 		if (region->vmid != vm->vmid)
 			continue;
 
-		create_guest_mapping(vm, region->vir_base, region->phy_base,
-				region->size, region->type);
-	}
-
-	list_for_each_entry(region, &shared_mem_list, list) {
-		create_guest_mapping(vm, region->vir_base, region->phy_base,
-				region->size, region->type);
+		create_guest_mapping(vm, region->vir_base,
+				region->phy_base, region->size, 0);
 	}
 
 	return 0;

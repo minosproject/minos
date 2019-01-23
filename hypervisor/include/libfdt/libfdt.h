@@ -1957,4 +1957,9 @@ int fdt_overlay_apply(void *fdt, void *fdto);
 
 const char *fdt_strerror(int errval);
 
+static inline uint64_t fdt32_to_cpu64(fdt32_t high, fdt32_t low)
+{
+	return ((uint64_t)fdt32_to_cpu(high) << 32) | fdt32_to_cpu(low);
+}
+
 #endif /* LIBFDT_H */

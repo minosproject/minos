@@ -36,20 +36,10 @@
 #include <list.h>
 #include <sys/mman.h>
 #include <libfdt/libfdt.h>
+#include <common/gvm.h>
 
-void *hv_create_guest_device(struct vm *vm, size_t size)
-{
-	int ret;
-	unsigned long iomem = size;
-
-	ret = ioctl(vm->vm_fd, IOCTL_CREATE_GUEST_DEVICE, &iomem);
-	if (ret) {
-		pr_err("create guest device failed %d\n", ret);
-		return NULL;
-	}
-
-	return (void *)iomem;
-}
+static int vdev_irq_base;
+static int vdev_irq_count;
 
 void *vdev_map_iomem(void *base, size_t size)
 {
@@ -116,7 +106,7 @@ alloc_and_init_vdev(struct vm *vm, char *class, char *args)
 		strncpy(buf, class, PDEV_NAME_SIZE - 2);
 	else
 		strcpy(buf, class);
-	sprintf(pdev->name, "%s%2d", buf, vdev_id);
+	sprintf(pdev->name, "%s%d", buf, vdev_id);
 	pdev->id = vdev_id;
 	vdev_id++;
 
@@ -136,6 +126,45 @@ void release_vdev(struct vdev *vdev)
 
 	vdev->ops->deinit(vdev);
 	free(vdev);
+}
+
+static int __vdev_request_virq(struct vm *vm, int base, int nr)
+{
+	unsigned long arg[2];
+
+	/* request the virq from the hypervisor */
+	arg[0] = base;
+	arg[1] = nr;
+	return ioctl(vm->vm_fd, IOCTL_REQUEST_VIRQ, arg);
+}
+
+static int __vdev_alloc_and_request_irq(struct vm *vm, int nr, int request)
+{
+	int base = 0, ret = 0;
+
+	if (vdev_irq_count < nr)
+		return 0;
+
+	if (request)
+		ret = __vdev_request_virq(vm, vdev_irq_base, nr);
+
+	if (!ret) {
+		base = vdev_irq_base;
+		vdev_irq_base += nr;
+		vdev_irq_count -= nr;
+	}
+
+	return base;
+}
+
+int vdev_alloc_irq(struct vm *vm, int nr)
+{
+	return __vdev_alloc_and_request_irq(vm, nr, 0);
+}
+
+int vdev_alloc_and_request_irq(struct vm *vm, int nr)
+{
+	return __vdev_alloc_and_request_irq(vm, nr, 1);
 }
 
 int create_vdev(struct vm *vm, char *class, char *args)
@@ -174,6 +203,7 @@ static int dtb_add_virtio(struct vdev *vdev, void *dtb)
 	}
 
 	fdt_setprop(dtb, node, "compatible", "virtio,mmio", 12);
+	fdt_setprop(dtb, node, "virtual_device", "", 1);
 
 	/* setup the reg value */
 	args[0] = cpu_to_fdt32((unsigned long)addr);
@@ -190,7 +220,7 @@ static int dtb_add_virtio(struct vdev *vdev, void *dtb)
 				3 * sizeof(uint32_t));
 	}
 
-	pr_info("add vdev success addr-0x%p virq-%d\n",
+	pr_info("add vdev success addr-%p virq-%d\n",
 			vdev->guest_iomem, vdev->gvm_irq);
 	return 0;
 }
@@ -226,4 +256,12 @@ void vdev_setup_env(struct vm *vm, void *data, int os_type)
 	default:
 		break;
 	}
+}
+
+int vdev_subsystem_init(void)
+{
+	vdev_irq_base = GVM_IRQ_BASE;
+	vdev_irq_count = GVM_IRQ_COUNT;
+
+	return 0;
 }

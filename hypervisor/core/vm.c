@@ -24,21 +24,121 @@
 #include <minos/sched.h>
 #include <minos/vdev.h>
 #include <minos/pm.h>
+#include <minos/of.h>
+#include <minos/resource.h>
+#include <common/gvm.h>
 
-extern void get_vcpu_affinity(uint8_t *aff, int nr);
+static struct vmtag *vmtags = NULL;
+static int nr_static_vms;
 
-static inline void vminfo_to_vmtag(struct vm_info *info, struct vmtag *tag)
+extern void virqs_init(void);
+extern void fdt_vm0_init(struct vm *vm);
+
+static int e_base;
+static int f_base;
+static int e_base_current;
+static int f_base_current;
+static int e_nr;
+static int f_nr;
+DEFINE_SPIN_LOCK(affinity_lock);
+
+void get_vcpu_affinity(uint32_t *aff, int nr)
 {
-	tag->vmid = VMID_INVALID;
-	tag->name = (char *)info->name;
-	tag->type = (char *)info->os_type;
-	tag->nr_vcpu = info->nr_vcpus;
-	tag->entry = info->entry;
-	tag->setup_data = info->setup_data;
-	tag->bit64 = info->bit64;
+	int i, e, f, j = 0;
+
+	e = MIN(nr, e_nr);
+	f = nr - e;
+
+	spin_lock(&affinity_lock);
+
+	for (i = 0; i < e; i++) {
+		aff[j] = e_base_current;
+		e_base_current++;
+		if (e_base_current == NR_CPUS)
+			e_base_current = e_base;
+		j++;
+	}
+
+	for (i = 0; i < f; i++) {
+		if ( (f_base_current == 0) && ((f < f_nr) || (i == 0)) ) {
+			f_base_current++;
+			if (f_base_current == e_base)
+				f_base_current = f_base;
+		}
+
+		aff[j] = f_base_current;
+		j++;
+		f_base_current++;
+		if (f_base_current == e_base)
+			f_base_current = f_base;
+	}
+
+	spin_unlock(&affinity_lock);
+}
+
+static int vcpu_affinity_init(void)
+{
+	struct vm *vm0 = get_vm_by_id(0);
+
+	if (!vm0)
+		panic("vm0 is not created\n");
+
+	e_base_current = e_base = vm0->vcpu_nr;
+	e_nr =  NR_CPUS - vm0->vcpu_nr;
+	f_base_current = f_base = 0;
+	f_nr = vm0->vcpu_nr;
+
+	return 0;
+}
+device_initcall(vcpu_affinity_init);
+
+static int vmtag_check_and_config(struct vmtag *tag)
+{
+	size_t size;
+
+	/*
+	 * first check whether there are enough memory for
+	 * this vm and the vm's memory base need to be start
+	 * at 0x80000000 or higher, if the mem_base is 0,
+	 * then set it to default 0x80000000
+	 */
+	size = tag->mem_size;
+
+	if (tag->mem_base == 0)
+		tag->mem_base = GVM_NORMAL_MEM_START;
+
+	if (tag->mem_base < GVM_NORMAL_MEM_START)
+		return -EINVAL;
+
+	if ((tag->mem_base + size) >= GVM_NORMAL_MEM_END)
+		return -EINVAL;;
+
+	if (!has_enough_memory(size))
+		return -EINVAL;
+
+	if (tag->nr_vcpu > NR_CPUS)
+		return -EINVAL;
 
 	/* for the dynamic need to get the affinity dynamicly */
-	get_vcpu_affinity(tag->vcpu_affinity, tag->nr_vcpu);
+	if (tag->flags & VM_FLAGS_DYNAMIC_AFF)
+		get_vcpu_affinity(tag->vcpu_affinity, tag->nr_vcpu);
+
+	return 0;
+}
+
+int request_vm_virqs(struct vm *vm, int base, int nr)
+{
+	if (!vm || (base < GVM_IRQ_BASE) || (nr <= 0) ||
+			(base + nr >= GVM_IRQ_END))
+		return -EINVAL;
+
+	while (nr > 0) {
+		request_virq(vm, base, 0);
+		base++;
+		nr--;
+	}
+
+	return 0;
 }
 
 int vm_power_up(int vmid)
@@ -107,73 +207,49 @@ int vm_power_off(int vmid, void *arg)
 	return __vm_power_off(vm, arg);
 }
 
-int create_new_vm(struct vm_info *info)
+int create_new_vm(struct vmtag *tag)
 {
 	int ret;
 	struct vm *vm;
-	struct vmtag vme;
-	size_t size;
-	struct vm_info *vm_info;
+	struct vmtag *vmtag;
 
-	vm_info = (struct vm_info *)map_vm_mem((unsigned long)info,
-			sizeof(struct vm_info));
-	if (!vm_info)
+	vmtag = (struct vmtag *)map_vm_mem((unsigned long)tag,
+			sizeof(struct vmtag));
+	if (!vmtag)
 		return VMID_INVALID;
 
-	/*
-	 * first check whether there are enough memory for
-	 * this vm and the vm's memory base need to be start
-	 * at 0x80000000 or higher, if the mem_start is 0,
-	 * then set it to default 0x80000000
-	 */
-	size = vm_info->mem_size;
+	ret = vmtag_check_and_config(vmtag);
+	if (ret)
+		goto unmap_vmtag;
 
-	if (vm_info->mem_start == 0)
-		vm_info->mem_start = GVM_NORMAL_MEM_START;
-
-	if (vm_info->mem_start < GVM_NORMAL_MEM_START)
-		goto unmap_info;
-
-	if ((vm_info->mem_start + size) >= GVM_NORMAL_MEM_END)
-		goto unmap_info;
-
-	if (!has_enough_memory(size))
-		goto unmap_info;
-
-	if (vm_info->nr_vcpus > NR_CPUS)
-		goto unmap_info;
-
-	memset(&vme, 0, sizeof(struct vmtag));
-	vminfo_to_vmtag(vm_info, &vme);
-
-	vm = create_vm(&vme);
+	vm = create_vm(vmtag);
 	if (!vm)
-		return VMID_INVALID;
+		goto unmap_vmtag;
 
 	/*
 	 * allocate memory to this vm
 	 */
-	ret = vm_mmap_init(vm, size);
+	ret = vm_mmap_init(vm, vmtag->mem_size);
 	if (ret) {
 		pr_error("no more mmap space for vm\n");
 		goto release_vm;
 	}
 
-	vm_info->mmap_base = vm->mm.hvm_mmap_base;
+	vmtag->mmap_base = vm->mm.hvm_mmap_base;
 
-	ret = alloc_vm_memory(vm, vm_info->mem_start, size);
+	ret = alloc_vm_memory(vm, vmtag->mem_base, vmtag->mem_size);
 	if (ret)
 		goto release_vm;
 
 	dsb();
-	unmap_vm_mem((unsigned long)info, sizeof(struct vm_info));
+	unmap_vm_mem((unsigned long)tag, sizeof(struct vmtag));
 
 	return (vm->vmid);
 
 release_vm:
 	destroy_vm(vm);
-unmap_info:
-	unmap_vm_mem((unsigned long)info, sizeof(struct vm_info));
+unmap_vmtag:
+	unmap_vm_mem((unsigned long)tag, sizeof(struct vmtag));
 
 	return -ENOMEM;
 }
@@ -323,4 +399,101 @@ int vm_suspend(int vmid)
 		return system_suspend();
 
 	return __vm_suspend(vm);
+}
+
+void set_vmtags_to(struct vmtag *tags, int count)
+{
+	if (!tags || (count == 0))
+		panic("incorrect vmtags or count %d\n", count);
+
+	vmtags = tags;
+	nr_static_vms = count;
+}
+
+int vm_create_host_vdev(struct vm *vm)
+{
+	phy_addr_t addr;
+	int ret;
+
+	/*
+	 * map the memory of the vm's setup data to
+	 * the hypervisor's memory space, the setup
+	 * data must 2M algin
+	 */
+	addr = get_vm_memblock_address(vm, (unsigned long)vm->setup_data);
+	if (!addr)
+		return -ENOMEM;
+
+	ret = create_host_mapping(addr, addr, MEM_BLOCK_SIZE, VM_RO);
+	if (ret)
+		goto out;
+
+	ret = create_vm_resource_of(vm, (void *)addr);
+	destroy_host_mapping(addr, MEM_BLOCK_SIZE);
+
+out:
+	return ret;
+}
+
+static int vm_create_resource(struct vm *vm)
+{
+	if (of_data(vm->setup_data)) {
+		vm->flags |= VM_FLAGS_SETUP_OF;
+		return create_vm_resource_of(vm, vm->setup_data);
+	}
+
+	return -EINVAL;
+}
+
+static void setup_hvm(struct vm *vm)
+{
+	if (vm->flags & VM_FLAGS_SETUP_OF)
+		fdt_vm0_init(vm);
+}
+
+int virt_init(void)
+{
+	int i;
+	struct vm *vm;
+
+	if ((vmtags == NULL) || (nr_static_vms == 0))
+		panic("no vm config found\n");
+
+	vmodules_init();
+	virqs_init();
+
+	for (i = 0; i < nr_static_vms; i++) {
+		vm = create_vm(&vmtags[i]);
+		if (!vm)
+			pr_error("create %d VM:%s failed\n", vmtags[i].name);
+	}
+
+	/* check whether VM0 has been create correctly */
+	vm = get_vm_by_id(0);
+	if (!vm)
+		panic("vm0 has not been create correctly\n");
+
+	/*
+	 * parsing all the memory/irq and resource
+	 * from the setup data and create the resource
+	 * for the vm
+	 */
+	for_each_vm(vm) {
+		/*
+		 * - map the vm's memory
+		 * - create the vcpu for vm's each vcpu
+		 * - init the vmodule state for each vcpu
+		 * - prepare the vcpu for bootup
+		 */
+		vm_mm_init(vm);
+		vm_create_resource(vm);
+		vm_vcpus_init(vm);
+
+		if (vm->vmid == 0)
+			setup_hvm(vm);
+
+		vm->state = VM_STAT_ONLINE;
+	}
+
+	return 0;
 }

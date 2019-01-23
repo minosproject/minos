@@ -19,6 +19,7 @@
 #include <minos/sched.h>
 #include <minos/virq.h>
 #include <minos/virt.h>
+#include <minos/virq_chip.h>
 
 static DEFINE_SPIN_LOCK(hvm_irq_lock);
 
@@ -364,7 +365,7 @@ void clear_pending_virq(struct vcpu *vcpu, uint32_t irq)
 
 	desc->state = VIRQ_STATE_INACTIVE;
 out:
-	irq_update_virq(vcpu, desc, VIRQ_ACTION_CLEAR);
+	virqchip_update_virq(vcpu, desc, VIRQ_ACTION_CLEAR);
 	spin_unlock_irqrestore(&virq_struct->lock, flags);
 }
 
@@ -393,118 +394,6 @@ uint32_t get_pending_virq(struct vcpu *vcpu)
 	return desc->vno;
 }
 
-static int __used irq_enter_to_guest(void *item, void *data)
-{
-	/*
-	 * here we send the real virq to the vcpu
-	 * before it enter to guest
-	 */
-	int id = 0;
-	unsigned long flags;
-	struct virq_desc *virq, *n;
-	struct vcpu *vcpu = (struct vcpu *)item;
-	struct virq_struct *virq_struct = vcpu->virq_struct;
-
-	spin_lock_irqsave(&virq_struct->lock, flags);
-
-	list_for_each_entry_safe(virq, n, &virq_struct->pending_list, list) {
-		if (!virq_is_pending(virq)) {
-			pr_error("virq is not request %d %d\n", virq->vno, virq->id);
-			virq->state = 0;
-			if (virq->id != VIRQ_INVALID_ID)
-				irq_update_virq(vcpu, virq, VIRQ_ACTION_CLEAR);
-			list_del(&virq->list);
-			virq->list.next = NULL;
-			continue;
-		}
-
-#if 0
-		/*
-		 * virq is not enabled this time, need to
-		 * send it later, but this will infence the idle
-		 * condition jugement TBD
-		 */
-		if (!virq_is_enabled(virq))
-			continue;
-#endif
-
-		if (virq->id != VIRQ_INVALID_ID)
-			goto __do_send_virq;
-
-		/* allocate a id for the virq */
-		id = find_next_zero_bit(virq_struct->irq_bitmap,
-				virq_struct->active_virqs, id);
-		if (id == virq_struct->active_virqs) {
-			pr_warn("virq id is full can not send all virq\n");
-			break;
-		}
-
-		virq->id = id;
-		set_bit(id, virq_struct->irq_bitmap);
-
-__do_send_virq:
-		irq_send_virq(vcpu, virq);
-		virq->state = VIRQ_STATE_PENDING;
-		virq_clear_pending(virq);
-		dsb();
-		list_del(&virq->list);
-		list_add_tail(&virq_struct->active_list, &virq->list);
-	}
-
-	spin_unlock_irqrestore(&virq_struct->lock, flags);
-
-	return 0;
-}
-
-static int __used irq_exit_from_guest(void *item, void *data)
-{
-	/*
-	 * here we update the states of the irq state
-	 * which the vcpu is handles, since this is running
-	 * on percpu and hanlde per_vcpu's data so do not
-	 * need spinlock
-	 */
-	int status;
-	unsigned long flags;
-	struct virq_desc *virq, *n;
-	struct vcpu *vcpu = (struct vcpu *)item;
-	struct virq_struct *virq_struct = vcpu->virq_struct;
-
-	spin_lock_irqsave(&virq_struct->lock, flags);
-
-	list_for_each_entry_safe(virq, n, &virq_struct->active_list, list) {
-
-		status = irq_get_virq_state(vcpu, virq);
-
-		/*
-		 * the virq has been handled by the VCPU, if
-		 * the virq is not pending again, delete it
-		 * otherwise add the virq to the pending list
-		 * again
-		 */
-		if (status == VIRQ_STATE_INACTIVE) {
-			if (!virq_is_pending(virq)) {
-				irq_update_virq(vcpu, virq, VIRQ_ACTION_CLEAR);
-				clear_bit(virq->id, virq_struct->irq_bitmap);
-				virq->state = VIRQ_STATE_INACTIVE;
-				list_del(&virq->list);
-				virq->id = VIRQ_INVALID_ID;
-				virq->list.next = NULL;
-				virq_struct->active_count--;
-			} else {
-				irq_update_virq(vcpu, virq, VIRQ_ACTION_CLEAR);
-				list_del(&virq->list);
-				list_add_tail(&virq_struct->pending_list, &virq->list);
-			}
-		} else
-			virq->state = status;
-	}
-
-	spin_unlock_irqrestore(&virq_struct->lock, flags);
-
-	return 0;
-}
-
 int vcpu_has_irq(struct vcpu *vcpu)
 {
 	struct virq_struct *vs = vcpu->virq_struct;
@@ -529,9 +418,6 @@ void vcpu_virq_struct_reset(struct vcpu *vcpu)
 	virq_struct->pending_virq = 0;
 	virq_struct->pending_hirq = 0;
 
-	bitmap_clear(virq_struct->irq_bitmap,
-			0, VCPU_MAX_ACTIVE_VIRQS);
-
 	for (i = 0; i < VM_LOCAL_VIRQ_NR; i++) {
 		desc = &virq_struct->local_desc[i];
 		desc->id = VIRQ_INVALID_ID;
@@ -545,65 +431,12 @@ static void update_virq_cap(struct virq_desc *desc, unsigned long flags)
 {
 	if (flags & VIRQF_CAN_WAKEUP)
 		virq_set_wakeup(desc);
-}
 
-int virq_mask_and_enable(struct vm *vm, uint32_t virq, unsigned long flags)
-{
-	struct virq_desc *desc;
-	uint32_t bit = virq - VM_LOCAL_VIRQ_NR;
-
-	/* do not handle the ppi and sgi */
-	if (virq < VM_LOCAL_VIRQ_NR)
-		return 0;
-
-	if (virq >= MAX_GVM_VIRQ) {
-		pr_error("virq_mask_and_enable: invaild virq-%d\n", virq);
-		return -EINVAL;
+	if (flags & VIRQF_ENABLE) {
+		virq_set_enable(desc);
+		if (virq_is_hw(desc))
+			irq_unmask(desc->hno);
 	}
-
-	if (test_bit(bit, vm->vspi_map))
-		pr_warn("may dupilicate usage of virq %d\n", virq);
-
-	set_bit(bit, vm->vspi_map);
-	desc = &vm->vspi_desc[bit];
-	desc->vno = virq;
-	virq_set_enable(desc);
-	virq_clear_hw(desc);
-	desc->pr = 0xa0;
-	desc->vmid = vm->vmid;
-	desc->id = VIRQ_INVALID_ID;
-	desc->state = VIRQ_STATE_INACTIVE;
-	desc->list.next = NULL;
-
-	update_virq_cap(desc, flags);
-
-	return 0;
-}
-
-int virq_mask_and_disable(struct vm *vm, uint32_t virq, unsigned long flags)
-{
-	struct virq_desc *desc;
-	uint32_t bit = virq - VM_LOCAL_VIRQ_NR;
-
-	/* do not handle the ppi and sgi */
-	if (virq < VM_LOCAL_VIRQ_NR)
-		return 0;
-
-	if (virq >= MAX_GVM_VIRQ) {
-		pr_error("virq_mask_and_disable: invaild virq-%d\n", virq);
-		return -EINVAL;
-	}
-
-	if (test_bit(bit, vm->vspi_map))
-		pr_warn("may dupilicate usage of virq %d\n", virq);
-
-	set_bit(bit, vm->vspi_map);
-	desc = &vm->vspi_desc[bit];
-	virq_clear_enable(desc);
-
-	update_virq_cap(desc, flags);
-
-	return 0;
 }
 
 void vcpu_virq_struct_init(struct vcpu *vcpu)
@@ -615,8 +448,6 @@ void vcpu_virq_struct_init(struct vcpu *vcpu)
 	if (!virq_struct)
 		return;
 
-	virq_struct->active_virqs = irq_get_virq_nr();
-
 	virq_struct->active_count = 0;
 	spin_lock_init(&virq_struct->lock);
 	init_list(&virq_struct->pending_list);
@@ -624,10 +455,8 @@ void vcpu_virq_struct_init(struct vcpu *vcpu)
 	virq_struct->pending_virq = 0;
 	virq_struct->pending_hirq = 0;
 
-	bitmap_clear(virq_struct->irq_bitmap,
-			0, VCPU_MAX_ACTIVE_VIRQS);
 	memset(&virq_struct->local_desc, 0,
-			sizeof(struct virq_desc) * VM_LOCAL_VIRQ_NR);
+		sizeof(struct virq_desc) * VM_LOCAL_VIRQ_NR);
 
 	for (i = 0; i < VM_LOCAL_VIRQ_NR; i++) {
 		desc = &virq_struct->local_desc[i];
@@ -645,58 +474,120 @@ void vcpu_virq_struct_init(struct vcpu *vcpu)
 	}
 }
 
-static void vm_config_virq(struct vm *vm)
+static int __request_virq(struct vcpu *vcpu, struct virq_desc *desc,
+			uint32_t virq, uint32_t hwirq, unsigned long flags)
 {
-	int i, j;
-	struct irqtag *irqtag;
-	struct virq_desc *desc = NULL;
-	struct vcpu *c = NULL;
+	if (desc->vno && (desc->vno != virq))
+		pr_warn("virq-%d may has been requested\n", virq);
 
-	for (i = 0; i < mv_config->nr_irqtag; i++) {
-		irqtag = &mv_config->irqtags[i];
+	pr_debug("vm-%d request virq %d --> hwirq %d\n", virq, hwirq);
 
-		/* config local virq if local irq report as hw irq*/
-		if (irqtag->vno < VM_LOCAL_VIRQ_NR) {
-			for (j = 0; j < vm->vcpu_nr; j++) {
-				c = vm->vcpus[j];
-				desc = &c->virq_struct->local_desc[irqtag->vno];
-				virq_set_hw(desc);
-				desc->hno = irqtag->hno;
-			}
+	desc->vno = virq;
+	desc->hno = hwirq;
+	desc->vcpu_id = get_vcpu_id(vcpu);
+	desc->pr = 0xa0;
+	desc->vmid = get_vmid(vcpu);
+	desc->id = VIRQ_INVALID_ID;
+	desc->list.next = NULL;
+	desc->state = VIRQ_STATE_INACTIVE;
+	virq_clear_enable(desc);
+	if (virq >= VM_LOCAL_VIRQ_NR)
+		set_bit(VIRQ_SPI_OFFSET(virq), vcpu->vm->vspi_map);
 
-			request_irq_percpu(desc->hno, guest_irq_handler,
-					IRQ_FLAGS_VCPU, "PPI IRQ", (void *)desc);
+	/* if the virq affinity to a hwirq need to request
+	 * the hw irq */
+	if (hwirq) {
+		irq_set_affinity(hwirq, vcpu_affinity(vcpu));
+		virq_set_hw(desc);
+		request_irq(hwirq, guest_irq_handler, IRQ_FLAGS_VCPU,
+				vcpu->name, (void *)desc);
+		irq_mask(desc->hno);
+	} else
+		virq_clear_hw(desc);
+
+	update_virq_cap(desc, flags);
+
+	return 0;
+}
+
+int request_virq_affinity(struct vm *vm, uint32_t virq, uint32_t hwirq,
+			int affinity, unsigned long flags)
+{
+	struct vcpu *vcpu;
+	struct virq_desc *desc;
+
+	if (!vm)
+		return -EINVAL;
+
+	vcpu = get_vcpu_in_vm(vm, affinity);
+	if (!vcpu) {
+		pr_error("request virq fail no vcpu-%d in vm-%d\n",
+				affinity, vm->vmid);
+		return -EINVAL;
+	}
+
+	desc = get_virq_desc(vcpu, virq);
+	if (!desc) {
+		pr_error("virq-%d not exist vm-%d", virq, vm->vmid);
+		return -ENOENT;
+	}
+
+	return __request_virq(vcpu, desc, virq, hwirq, flags);
+}
+
+int request_hw_virq(struct vm *vm, uint32_t virq, uint32_t hwirq,
+			unsigned long flags)
+{
+	int max;
+
+	if (vm_is_hvm(vm))
+		max = MAX_HVM_VIRQ;
+	else
+		max = MAX_GVM_VIRQ;
+	if (virq >= max) {
+		pr_error("invaild virq-%d for vm-%d\n", virq, vm->vmid);
+		return -EINVAL;
+	}
+
+	return request_virq_affinity(vm, virq, hwirq, 0, flags);
+}
+
+int request_virq(struct vm *vm, uint32_t virq, unsigned long flags)
+{
+	return request_hw_virq(vm, virq, 0, flags);
+}
+
+int request_virq_pervcpu(struct vm *vm, uint32_t virq, unsigned long flags)
+{
+	int ret;
+	struct vcpu *vcpu;
+	struct virq_desc *desc;
+
+	if (virq >= VM_LOCAL_VIRQ_NR)
+		return -EINVAL;
+
+	vm_for_each_vcpu(vm, vcpu) {
+		desc = get_virq_desc(vcpu, virq);
+		if (!desc)
 			continue;
+
+		ret = __request_virq(vcpu, desc, virq, 0, flags);
+		if (ret) {
+			pr_error("request percpu virq-%d failed vm-%d\n",
+					virq, vm->vmid);
 		}
 
-		if (vm->vmid != irqtag->vmid)
-			continue;
-
-		if (irqtag->vno >= (vm->vspi_nr + 32))
-			continue;
-
-		desc = &vm->vspi_desc[VIRQ_SPI_OFFSET(irqtag->vno)];
-		virq_set_hw(desc);
-		virq_clear_enable(desc);
-		desc->vno = irqtag->vno;
-		desc->hno = irqtag->hno;
-		desc->vcpu_id = irqtag->vcpu_id;
-		desc->pr = 0xa0;
-		desc->vmid = vm->vmid;
-		desc->id = VIRQ_INVALID_ID;
-		desc->list.next = NULL;
-		desc->state = VIRQ_STATE_INACTIVE;
-		set_bit(VIRQ_SPI_OFFSET(desc->vno), vm->vspi_map);
-
-		c = get_vcpu_by_id(desc->vmid, desc->vcpu_id);
-		if (!c)
-			continue;
-
-		irq_set_affinity(desc->hno, c->affinity);
-		request_irq(desc->hno, guest_irq_handler,
-			    IRQ_FLAGS_VCPU, c->name, (void *)desc);
-		irq_mask(desc->hno);
+		/*
+		 * Fix me here may need to update the affinity for
+		 * thie virq if it is a ppi or sgi, if the ppi is
+		 * bind to the hw ppi, need to do this, otherwise
+		 * do not need to change it
+		 */
+		desc->vcpu_id = VIRQ_AFFINITY_VCPU_ANY;
+		desc->vmid = VIRQ_AFFINITY_VM_ANY;
 	}
+
+	return 0;
 }
 
 int alloc_vm_virq(struct vm *vm)
@@ -712,7 +603,7 @@ int alloc_vm_virq(struct vm *vm)
 		virq = -1;
 
 	if (virq >= 0)
-		virq_mask_and_enable(vm, virq + VM_LOCAL_VIRQ_NR, 0);
+		request_virq(vm, virq + VM_LOCAL_VIRQ_NR, VIRQF_ENABLE);
 
 	if (vm_is_hvm(vm))
 		spin_unlock(&hvm_irq_lock);
@@ -728,14 +619,14 @@ void release_vm_virq(struct vm *vm, int virq)
 	if (virq >= vm->vspi_nr)
 		return;
 
-	if (vm->vmid == 0)
+	if (vm_is_hvm(vm))
 		spin_lock(&hvm_irq_lock);
 
 	desc = &vm->vspi_desc[virq];
 	memset(desc, 0, sizeof(struct virq_desc));
 	clear_bit(virq, vm->vspi_map);
 
-	if (vm->vmid == 0)
+	if (vm_is_hvm(vm))
 		spin_unlock(&hvm_irq_lock);
 }
 
@@ -775,8 +666,6 @@ static int virq_create_vm(void *item, void *args)
 	memset(vm->vspi_map, 0, BITS_TO_LONGS(vspi_nr) *
 			sizeof(unsigned long));
 	vm->vspi_nr = vspi_nr;
-
-	vm_config_virq(vm);
 
 	return 0;
 }
@@ -829,13 +718,6 @@ static int virq_destroy_vm(void *item, void *data)
 
 void virqs_init(void)
 {
-#ifndef CONFIG_LEGACY_INT_VIRT
-	register_hook(irq_exit_from_guest,
-			MINOS_HOOK_TYPE_EXIT_FROM_GUEST);
-	register_hook(irq_enter_to_guest,
-			MINOS_HOOK_TYPE_ENTER_TO_GUEST);
-#endif
-
 	register_hook(virq_create_vm, MINOS_HOOK_TYPE_CREATE_VM);
 	register_hook(virq_destroy_vm, MINOS_HOOK_TYPE_DESTROY_VM);
 }

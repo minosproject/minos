@@ -26,7 +26,7 @@
 #include <minos/cpumask.h>
 #include <minos/irq.h>
 #include <minos/virq.h>
-#include <asm/of.h>
+#include <minos/of.h>
 #include <asm/bcm_irq.h>
 
 extern int bcm_virq_init(unsigned long l1_base, size_t l1_size,
@@ -53,6 +53,10 @@ struct armctrl_ic {
 static struct armctrl_ic intc;
 static void *bcm2836_base;
 
+extern int bcm2836_xlate_irq(struct device_node *node,
+		uint32_t *intspec, unsigned int intsize,
+		uint32_t *hwirq, unsigned long *type);
+
 static void bcm2835_mask_irq(uint32_t irq)
 {
 	writel_relaxed(HWIRQ_BIT(irq), intc.disable[HWIRQ_BANK(irq)]);
@@ -61,8 +65,7 @@ static void bcm2835_mask_irq(uint32_t irq)
 
 static void bcm2835_unmask_irq(uint32_t irq)
 {
-	writel_relaxed(HWIRQ_BIT(irq),
-			       intc.enable[HWIRQ_BANK(irq)]);
+	writel_relaxed(HWIRQ_BIT(irq), intc.enable[HWIRQ_BANK(irq)]);
 	dsb();
 }
 
@@ -249,18 +252,6 @@ static void bcm2836_unmask_irq_cpu(uint32_t irq, int cpu)
 	__bcm2836_unmask_irq(irq, cpu);
 }
 
-static int bcm2836_get_virq_state(struct vcpu *vcpu, struct virq_desc *virq)
-{
-	return 0;
-}
-
-static int bcm2836_get_virq_nr(void)
-{
-	/* support max 128 virqs */
-
-	return 128;
-}
-
 static void bcm2836_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *cpu)
 {
 	int c;
@@ -293,34 +284,6 @@ static void bcm2836_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *cpu)
 	}
 }
 
-static int bcm2836_update_virq(struct vcpu *vcpu,
-		struct virq_desc *desc, int action)
-{
-	switch (action) {
-	case VIRQ_ACTION_CLEAR:
-		/* enable the hardware irq when disable in hyp */
-		if ((desc->vno >= 32) && (virq_is_hw(desc)))
-			bcm2836_unmask_irq(desc->hno);
-		break;
-	}
-	return 0;
-}
-
-static int bcm2836_send_virq(struct vcpu *vcpu, struct virq_desc *virq)
-{
-	/*
-	 * if the hardware platform is bcm2836 such
-	 * as rpi3b/rpi3b+, the native vm is using the
-	 * original bcm2836 virq controller, but the
-	 * guest vm will use vgicv2, vgicv2 can send
-	 * the virq when the mmio emulated
-	 */
-	if (vm_is_native(vcpu->vm))
-		bcm_virq_send_virq(vcpu, virq->vno);
-
-	return 0;
-}
-
 static int bcm2836_set_irq_affinity(uint32_t irq, uint32_t pcpu)
 {
 	return 0;
@@ -341,78 +304,6 @@ static void bcm2836_eoi_irq(uint32_t irq)
 {
 	if (irq >= 32)
 		bcm2835_mask_irq(irq);
-}
-
-static int bcm2836_irq_enter_to_guest(void *item, void *data)
-{
-	unsigned long flags;
-	struct virq_desc *virq, *n;
-	struct vcpu *vcpu = (struct vcpu *)item;
-	struct virq_struct *virq_struct = vcpu->virq_struct;
-
-	/*
-	 * if there is no pending virq for this vcpu
-	 * clear the virq state in HCR_EL2 then just return
-	 * else inject the virq
-	 */
-	spin_lock_irqsave(&virq_struct->lock, flags);
-
-	if (is_list_empty(&virq_struct->pending_list) &&
-			is_list_empty(&virq_struct->active_list)) {
-		arch_clear_virq_flag();
-		goto out;
-	}
-
-	arch_set_virq_flag();
-
-	/*
-	 * for vgicv2 do not need to update the pending
-	 * irq here
-	 */
-	if (!vm_is_native(vcpu->vm))
-		goto out;
-
-	/*
-	 * just inject one virq the time since when the
-	 * virq is handled, the vm will trap to hypervisor
-	 * again, actually here can inject all virq to the
-	 * guest, but it is hard to judge whether all virq
-	 * has been handled by guest vm TBD
-	 */
-	list_for_each_entry_safe(virq, n, &virq_struct->pending_list, list) {
-		if (!virq_is_pending(virq)) {
-			pr_error("virq is not request %d\n", virq->vno);
-			list_del(&virq->list);
-			virq->list.next = NULL;
-			continue;
-		}
-
-#if 0
-		/*
-		 * virq is not enabled this time, need to
-		 * send it later, but this will infence the idle
-		 * condition jugement TBD
-		 */
-		if (!virq_is_enabled(virq))
-			continue;
-#endif
-
-		/*
-		 * update the bcm_virq interrupt status and
-		 * delete the virq from the virq list then
-		 * add it to active list
-		 */
-		bcm2836_send_virq(vcpu, virq);
-		virq_clear_pending(virq);
-		virq->state = VIRQ_STATE_ACTIVE;
-		list_del(&virq->list);
-		list_add_tail(&virq_struct->active_list, &virq->list);
-	}
-
-out:
-	spin_unlock_irqrestore(&virq_struct->lock, flags);
-
-	return 0;
 }
 
 int bcm2835_irq_handler(uint32_t irq, void *data)
@@ -442,7 +333,7 @@ int bcm2835_irq_handler(uint32_t irq, void *data)
 	return 0;
 }
 
-static int bcm2836_irq_init(int node)
+static int bcm2836_irq_init(struct device_node *node)
 {
 	void *base;
 	int b;
@@ -487,12 +378,6 @@ static int bcm2836_irq_init(int node)
 
 	irq_alloc_spi(32, 96);
 
-	/* init the virq device callback */
-	bcm_virq_init(0x40000000, 0x100, 0x3f00b200, 0x1000);
-
-	register_hook(bcm2836_irq_enter_to_guest,
-			MINOS_HOOK_TYPE_ENTER_TO_GUEST);
-
 	/*
 	 * request the irq handler for the bcm2835 inc
 	 * TBD - now the hardware irq only route to cpu0
@@ -517,15 +402,12 @@ static struct irq_chip bcm2836_irq_chip = {
 	.irq_set_type		= bcm2836_set_irq_type,
 	.get_pending_irq	= bcm2836_get_pending,
 	.irq_set_affinity 	= bcm2836_set_irq_affinity,
+	.irq_xlate		= bcm2836_xlate_irq,
 	.send_sgi		= bcm2836_send_sgi,
 	.irq_set_priority	= bcm2836_set_irq_priority,
-	.get_virq_state		= bcm2836_get_virq_state,
-	.send_virq		= bcm2836_send_virq,
-	.update_virq		= bcm2836_update_virq,
-	.get_virq_nr		= bcm2836_get_virq_nr,
 	.init			= bcm2836_irq_init,
 	.secondary_init		= bcm2836_secondary_init,
 };
 
-IRQCHIP_DECLARE(bcm2836_chip, "brcm,bcm2836-l1-intc",
+IRQCHIP_DECLARE(bcm2836_chip, bcmirq_match_table,
 		(void *)&bcm2836_irq_chip);

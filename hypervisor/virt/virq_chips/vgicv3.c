@@ -26,7 +26,9 @@
 #include <minos/sched.h>
 #include <minos/virq.h>
 #include <minos/vdev.h>
-#include <asm/of.h>
+#include <minos/resource.h>
+#include <minos/virq_chip.h>
+#include "vgic.h"
 
 #define vdev_to_vgic(vdev) \
 	(struct vgicv3_dev *)container_of(vdev, struct vgicv3_dev, vdev)
@@ -44,7 +46,13 @@ struct vgicv3_info {
 	unsigned long gicv_size;
 };
 
+static int gicv3_nr_lr = 0;
+static int gicv3_nr_pr = 0;
 static struct vgicv3_info vgicv3_info;
+
+extern int gic_xlate_irq(struct device_node *node,
+		uint32_t *intspec, unsigned int initsize,
+		uint32_t *hwirq, unsigned long *type);
 
 void vgicv3_send_sgi(struct vcpu *vcpu, unsigned long sgi_value)
 {
@@ -466,7 +474,7 @@ static void vgic_gicd_init(struct vm *vm, struct vgic_gicd *gicd,
 
 	typer |= vm->vcpu_nr << 5;
 	typer |= 9 << 19;
-	nr_spi = (vm->vspi_nr >> 5) - 1;
+	nr_spi = ((vm->vspi_nr + 32) >> 5) - 1;
 	typer |= nr_spi;
 	gicd->gicd_typer = typer;
 }
@@ -522,60 +530,222 @@ static void vgic_deinit(struct vdev *vdev)
 
 static void vgic_reset(struct vdev *vdev)
 {
+	struct virq_chip *vc = vdev->vm->virq_chip;
+
 	pr_info("vgic device reset\n");
+	bitmap_clear(vc->irq_bitmap, 0, MAX_NR_LRS);
 }
 
-int vgicv3_create_vm(void *item, void *arg)
+static int64_t gicv3_read_lr(int lr)
+{
+	switch (lr) {
+	case 0: return read_sysreg(ICH_LR0_EL2);
+	case 1: return read_sysreg(ICH_LR1_EL2);
+	case 2: return read_sysreg(ICH_LR2_EL2);
+	case 3: return read_sysreg(ICH_LR3_EL2);
+	case 4: return read_sysreg(ICH_LR4_EL2);
+	case 5: return read_sysreg(ICH_LR5_EL2);
+	case 6: return read_sysreg(ICH_LR6_EL2);
+	case 7: return read_sysreg(ICH_LR7_EL2);
+	case 8: return read_sysreg(ICH_LR8_EL2);
+	case 9: return read_sysreg(ICH_LR9_EL2);
+	case 10: return read_sysreg(ICH_LR10_EL2);
+	case 11: return read_sysreg(ICH_LR11_EL2);
+	case 12: return read_sysreg(ICH_LR12_EL2);
+	case 13: return read_sysreg(ICH_LR13_EL2);
+	case 14: return read_sysreg(ICH_LR14_EL2);
+	case 15: return read_sysreg(ICH_LR15_EL2);
+	default:
+		 return 0;
+	}
+}
+
+static void gicv3_write_lr(int lr, uint64_t val)
+{
+	switch ( lr )
+	{
+	case 0:
+		write_sysreg(val, ICH_LR0_EL2);
+		break;
+	case 1:
+		write_sysreg(val, ICH_LR1_EL2);
+		break;
+	case 2:
+		write_sysreg(val, ICH_LR2_EL2);
+		break;
+	case 3:
+		write_sysreg(val, ICH_LR3_EL2);
+		break;
+	case 4:
+		write_sysreg(val, ICH_LR4_EL2);
+		break;
+	case 5:
+		write_sysreg(val, ICH_LR5_EL2);
+		break;
+	case 6:
+		write_sysreg(val, ICH_LR6_EL2);
+		break;
+	case 7:
+		write_sysreg(val, ICH_LR7_EL2);
+		break;
+	case 8:
+		write_sysreg(val, ICH_LR8_EL2);
+		break;
+	case 9:
+		write_sysreg(val, ICH_LR9_EL2);
+		break;
+	case 10:
+		write_sysreg(val, ICH_LR10_EL2);
+		break;
+	case 11:
+		write_sysreg(val, ICH_LR11_EL2);
+		break;
+	case 12:
+		write_sysreg(val, ICH_LR12_EL2);
+		break;
+	case 13:
+		write_sysreg(val, ICH_LR13_EL2);
+		break;
+	case 14:
+		write_sysreg(val, ICH_LR14_EL2);
+		break;
+	case 15:
+		write_sysreg(val, ICH_LR15_EL2);
+		break;
+	default:
+		return;
+	}
+
+	isb();
+}
+
+static int gicv3_send_virq(struct vcpu *vcpu, struct virq_desc *virq)
+{
+	uint64_t value = 0;
+	struct gic_lr *lr = (struct gic_lr *)&value;
+
+	if (virq->id >= gicv3_nr_lr) {
+		pr_error("invalid virq id %d\n", virq->id);
+		return -EINVAL;
+	}
+
+	lr->v_intid = virq->vno;
+	lr->p_intid = virq->hno;
+	lr->priority = virq->pr;
+	lr->group = 1;
+	lr->hw = !!virq_is_hw(virq);
+	lr->state = 1;
+
+	gicv3_write_lr(virq->id, value);
+
+	return 0;
+}
+
+static int gicv3_update_virq(struct vcpu *vcpu,
+		struct virq_desc *desc, int action)
+{
+	if (!desc || desc->id >= gicv3_nr_lr)
+		return -EINVAL;
+
+	switch (action) {
+		/*
+		 * wether need to update the context value?
+		 * TBD, since the context has not been saved
+		 * so do not need to update it.
+		 *
+		 * 2: if the virq is attached to a physical irq
+		 *    need to update the GICR register ?
+		 */
+
+	case VIRQ_ACTION_REMOVE:
+		if (virq_is_hw(desc))
+			irq_clear_pending(desc->hno);
+
+	case VIRQ_ACTION_CLEAR:
+		gicv3_write_lr(desc->id, 0);
+		break;
+
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static int gicv3_get_virq_state(struct vcpu *vcpu, struct virq_desc *virq)
+{
+	uint64_t value;
+
+	if (virq->id >= gicv3_nr_lr)
+		return 0;
+
+	value = gicv3_read_lr(virq->id);
+	isb();
+	value = (value >> 62) & 0x03;
+
+	return ((int)value);
+}
+
+static void vgicv3_init_virqchip(struct virq_chip *vc,
+		struct vgicv3_dev *dev, unsigned long flags)
+{
+	if (flags & VIRQCHIP_F_HW_VIRT) {
+		vc->nr_lrs = gicv3_nr_lr;
+		vc->exit_from_guest = vgic_irq_exit_from_guest;
+		vc->enter_to_guest = vgic_irq_enter_to_guest;
+		vc->xlate = gic_xlate_irq;
+		vc->send_virq = gicv3_send_virq;
+		vc->update_virq = gicv3_update_virq;
+		vc->get_virq_state = gicv3_get_virq_state;
+		vc->vm0_virq_data = gic_vm0_virq_data;
+		vc->flags = flags;
+	} else {
+		pr_warn("***WARN***vgicv3 currently only" \
+				"support hard virt mode\n");
+	}
+}
+
+struct virq_chip *vgicv3_virqchip_init(struct vm *vm,
+		struct device_node *node)
 {
 	int i, ret = 0;
 	struct vgic_gicr *gicr;
-	struct vm *vm = (struct vm *)item;
 	struct vgicv3_dev *vgicv3_dev;
 	struct vcpu *vcpu;
-	struct vgicv3_info *info = &vgicv3_info;
-	unsigned long size;
+	uint64_t gicd_base, gicd_size, gicr_base, gicr_size;
+	unsigned long size, flags = 0;
+	struct virq_chip *vc;
+
+	pr_info("create vgicv3 for vm-%d\n", vm->vmid);
+
+	ret = translate_device_address_index(node, &gicd_base,
+			&gicd_size, 0);
+	ret += translate_device_address_index(node, &gicr_base,
+			&gicr_size, 1);
+	if (ret || (gicd_size == 0) || (gicr_size == 0))
+		return NULL;
+
+	pr_error("vgicv3 address 0x%x 0x%x 0x%x 0x%x\n",
+				gicd_base, gicd_size,
+				gicr_base, gicr_size);
 
 	vgicv3_dev = zalloc(sizeof(struct vgicv3_dev));
 	if (!vgicv3_dev)
-		return -ENOMEM;
+		return NULL;
 
-	/*
-	 * for host vm, get the gic's iomem space from
-	 * the dtb but for gvm, emulator the system of
-	 * arm FVP
-	 */
-	if (vm_is_native(vm)) {
-		size = info->gicr_base + info->gicr_size -
-			info->gicd_base;
-		host_vdev_init(vm, &vgicv3_dev->vdev,
-				info->gicd_base, size);
-	} else
-		host_vdev_init(vm, &vgicv3_dev->vdev,
-				GVM_VGIC_IOMEM_BASE,
-				GVM_VGIC_IOMEM_SIZE);
-
+	size = gicr_base + gicr_size - gicd_base;
+	host_vdev_init(vm, &vgicv3_dev->vdev, gicd_base, size);
 	vdev_set_name(&vgicv3_dev->vdev, "vgic");
 
-	if (vm_is_native(vm))
-		vgic_gicd_init(vm, &vgicv3_dev->gicd,
-				info->gicd_base, info->gicd_size);
-	else
-		vgic_gicd_init(vm, &vgicv3_dev->gicd, GVM_VGICD_IOMEM_BASE,
-				GVM_VGICD_IOMEM_SIZE);
+	vgic_gicd_init(vm, &vgicv3_dev->gicd, gicd_base, gicd_size);
 
 	for (i = 0; i < vm->vcpu_nr; i++) {
 		vcpu = vm->vcpus[i];
 		gicr = malloc(sizeof(struct vgic_gicr));
-		if (!gicr) {
-			ret = -ENOMEM;
+		if (!gicr)
 			goto release_gic;
-		}
 
-		if (vm_is_native(vm))
-			vgic_gicr_init(vcpu, gicr, info->gicr_base);
-		else
-			vgic_gicr_init(vcpu, gicr, GVM_VGICR_IOMEM_BASE);
-
+		vgic_gicr_init(vcpu, gicr, gicr_base);
 		vgicv3_dev->gicr[i] = gicr;
 	}
 
@@ -583,18 +753,202 @@ int vgicv3_create_vm(void *item, void *arg)
 	vgicv3_dev->vdev.write = vgic_mmio_write;
 	vgicv3_dev->vdev.deinit = vgic_deinit;
 	vgicv3_dev->vdev.reset = vgic_reset;
-	vm->inc_pdata = vgicv3_dev;
 
-	return 0;
+	vc = alloc_virq_chip();
+	if (!vc)
+		return NULL;
+	if (vgicv3_info.gicd_base != 0)
+		flags |= VIRQCHIP_F_HW_VIRT;
+
+	vgicv3_init_virqchip(vc, vgicv3_dev, flags);
+
+	return vc;
 
 release_gic:
 	vm_release_gic(vgicv3_dev);
-	return ret;
+	return NULL;
+}
+VIRQCHIP_DECLARE(vgicv3_chip, gicv3_match_table, vgicv3_virqchip_init);
+
+static void gicv3_save_lrs(struct gicv3_context *c, uint32_t count)
+{
+	if (count > 16)
+		panic("Unsupport LR count\n");
+
+	switch (count) {
+	case 16:
+		c->ich_lr15_el2 = read_sysreg(ICH_LR15_EL2);
+	case 15:
+		c->ich_lr14_el2 = read_sysreg(ICH_LR14_EL2);
+	case 14:
+		c->ich_lr13_el2 = read_sysreg(ICH_LR13_EL2);
+	case 13:
+		c->ich_lr12_el2 = read_sysreg(ICH_LR12_EL2);
+	case 12:
+		c->ich_lr11_el2 = read_sysreg(ICH_LR11_EL2);
+	case 11:
+		c->ich_lr10_el2 = read_sysreg(ICH_LR10_EL2);
+	case 10:
+		c->ich_lr9_el2 = read_sysreg(ICH_LR9_EL2);
+	case 9:
+		c->ich_lr8_el2 = read_sysreg(ICH_LR8_EL2);
+	case 8:
+		c->ich_lr7_el2 = read_sysreg(ICH_LR7_EL2);
+	case 7:
+		c->ich_lr6_el2 = read_sysreg(ICH_LR6_EL2);
+	case 6:
+		c->ich_lr5_el2 = read_sysreg(ICH_LR5_EL2);
+	case 5:
+		c->ich_lr4_el2 = read_sysreg(ICH_LR4_EL2);
+	case 4:
+		c->ich_lr3_el2 = read_sysreg(ICH_LR3_EL2);
+	case 3:
+		c->ich_lr2_el2 = read_sysreg(ICH_LR2_EL2);
+	case 2:
+		c->ich_lr1_el2 = read_sysreg(ICH_LR1_EL2);
+	case 1:
+		c->ich_lr0_el2 = read_sysreg(ICH_LR0_EL2);
+		break;
+	default:
+		break;
+	}
+}
+
+static void gicv3_save_aprn(struct gicv3_context *c, uint32_t count)
+{
+	switch (count) {
+	case 7:
+		c->ich_ap0r2_el2 = read_sysreg32(ICH_AP0R2_EL2);
+		c->ich_ap1r2_el2 = read_sysreg32(ICH_AP1R2_EL2);
+	case 6:
+		c->ich_ap0r1_el2 = read_sysreg32(ICH_AP0R1_EL2);
+		c->ich_ap1r1_el2 = read_sysreg32(ICH_AP1R1_EL2);
+	case 5:
+		c->ich_ap0r0_el2 = read_sysreg32(ICH_AP0R0_EL2);
+		c->ich_ap1r0_el2 = read_sysreg32(ICH_AP1R0_EL2);
+		break;
+	default:
+		panic("Unsupport aprn count\n");
+	}
+}
+
+static void gicv3_state_save(struct vcpu *vcpu, void *context)
+{
+	struct gicv3_context *c = (struct gicv3_context *)context;
+
+	dsb();
+	gicv3_save_lrs(c, gicv3_nr_lr);
+	gicv3_save_aprn(c, gicv3_nr_pr);
+	c->icc_sre_el1 = read_sysreg32(ICC_SRE_EL1);
+	c->ich_vmcr_el2 = read_sysreg32(ICH_VMCR_EL2);
+	c->ich_hcr_el2 = read_sysreg32(ICH_HCR_EL2);
+}
+
+static void gicv3_restore_aprn(struct gicv3_context *c, uint32_t count)
+{
+	switch (count) {
+	case 7:
+		write_sysreg32(c->ich_ap0r2_el2, ICH_AP0R2_EL2);
+		write_sysreg32(c->ich_ap1r2_el2, ICH_AP1R2_EL2);
+	case 6:
+		write_sysreg32(c->ich_ap0r1_el2, ICH_AP0R1_EL2);
+		write_sysreg32(c->ich_ap1r1_el2, ICH_AP1R1_EL2);
+	case 5:
+		write_sysreg32(c->ich_ap0r0_el2, ICH_AP0R0_EL2);
+		write_sysreg32(c->ich_ap1r0_el2, ICH_AP1R0_EL2);
+		break;
+	default:
+		panic("Unsupport aprn count");
+	}
+}
+
+static void gicv3_restore_lrs(struct gicv3_context *c, uint32_t count)
+{
+	if (count > 16)
+		panic("Unsupport LR count");
+
+	switch (count) {
+	case 16:
+		write_sysreg(c->ich_lr15_el2, ICH_LR15_EL2);
+	case 15:
+		write_sysreg(c->ich_lr14_el2, ICH_LR14_EL2);
+	case 14:
+		write_sysreg(c->ich_lr13_el2, ICH_LR13_EL2);
+	case 13:
+		write_sysreg(c->ich_lr12_el2, ICH_LR12_EL2);
+	case 12:
+		write_sysreg(c->ich_lr11_el2, ICH_LR11_EL2);
+	case 11:
+		write_sysreg(c->ich_lr10_el2, ICH_LR10_EL2);
+	case 10:
+		write_sysreg(c->ich_lr9_el2, ICH_LR9_EL2);
+	case 9:
+		write_sysreg(c->ich_lr8_el2, ICH_LR8_EL2);
+	case 8:
+		write_sysreg(c->ich_lr7_el2, ICH_LR7_EL2);
+	case 7:
+		write_sysreg(c->ich_lr6_el2, ICH_LR6_EL2);
+	case 6:
+		write_sysreg(c->ich_lr5_el2, ICH_LR5_EL2);
+	case 5:
+		write_sysreg(c->ich_lr4_el2, ICH_LR4_EL2);
+	case 4:
+		write_sysreg(c->ich_lr3_el2, ICH_LR3_EL2);
+	case 3:
+		write_sysreg(c->ich_lr2_el2, ICH_LR2_EL2);
+	case 2:
+		write_sysreg(c->ich_lr1_el2, ICH_LR1_EL2);
+	case 1:
+		write_sysreg(c->ich_lr0_el2, ICH_LR0_EL2);
+		break;
+	default:
+		break;
+	}
+}
+
+static void gicv3_state_restore(struct vcpu *vcpu, void *context)
+{
+	struct gicv3_context *c = (struct gicv3_context *)context;
+
+	gicv3_restore_lrs(c, gicv3_nr_lr);
+	gicv3_restore_aprn(c, gicv3_nr_pr);
+	write_sysreg32(c->icc_sre_el1, ICC_SRE_EL1);
+	write_sysreg32(c->ich_vmcr_el2, ICH_VMCR_EL2);
+	write_sysreg32(c->ich_hcr_el2, ICH_HCR_EL2);
+	dsb();
+}
+
+static void gicv3_state_init(struct vcpu *vcpu, void *context)
+{
+	struct gicv3_context *c = (struct gicv3_context *)context;
+
+	memset((char *)c, 0, sizeof(struct gicv3_context));
+	c->icc_sre_el1 = 0x7;
+	c->ich_vmcr_el2 = GICH_VMCR_VENG1 | (0xff << 24);
+	c->ich_hcr_el2 = GICH_HCR_EN;
+}
+
+static void gicv3_state_resume(struct vcpu *vcpu, void *context)
+{
+	gicv3_state_init(vcpu, context);
+}
+
+static int gicv3_vmodule_init(struct vmodule *vmodule)
+{
+	vmodule->context_size = sizeof(struct gicv3_context);
+	vmodule->pdata = NULL;
+	vmodule->state_init = gicv3_state_init;
+	vmodule->state_save = gicv3_state_save;
+	vmodule->state_restore = gicv3_state_restore;
+	vmodule->state_resume = gicv3_state_resume;
+
+	return 0;
 }
 
 int vgicv3_init(uint64_t *data, int len)
 {
 	int i;
+	uint32_t val;
 	unsigned long *value = (unsigned long *)&vgicv3_info;
 
 	for (i = 0; i < len; i++)
@@ -604,6 +958,11 @@ int vgicv3_init(uint64_t *data, int len)
 		vgicv3_info.gicd_size == 0 || vgicv3_info.gicr_size == 0)
 		panic("invalid gicv3 register base from irqchip\n");
 
-	return register_hook(vgicv3_create_vm,
-			MINOS_HOOK_TYPE_CREATE_VM_VDEV);
+	val = read_sysreg32(ICH_VTR_EL2);
+	gicv3_nr_lr = (val & 0x3f) + 1;
+	gicv3_nr_pr = ((val >> 29) & 0x7) + 1;
+
+	register_vcpu_vmodule("gicv3-vmodule", gicv3_vmodule_init);
+
+	return 0;
 }

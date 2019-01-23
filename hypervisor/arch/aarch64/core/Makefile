@@ -8,7 +8,6 @@ obj-y += bitops.o
 obj-y += boot.o
 obj-y += cache.o
 obj-y += cpu.o
-obj-y += device_tree.o
 obj-y += el2_vector.o
 obj-y += memchr.o
 obj-y += memcmp.o

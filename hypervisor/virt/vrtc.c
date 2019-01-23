@@ -19,8 +19,9 @@
 #include <asm/io.h>
 #include <minos/irq.h>
 #include <minos/timer.h>
-#include <minos/gvm.h>
+#include <common/gvm.h>
 #include <minos/time.h>
+#include <minos/resource.h>
 
 #define	RTC_DR		0x00		/* Data read register */
 #define	RTC_MR		0x04		/* Match register */
@@ -240,25 +241,32 @@ static void vrtc_deinit(struct vdev *vdev)
 	free(dev);
 }
 
-static int vrtc_create_vm(void *item, void *arg)
+static void *vrtc_init(struct vm *vm, struct device_node *node)
 {
-	struct vm *vm = (struct vm *)item;
+	int ret;
+	uint32_t irq;
 	struct vrtc_dev *dev;
 	struct vcpu *vcpu = get_vcpu_in_vm(vm, 0);
-
-	if (vm_is_hvm(vm))
-		return 0;
+	uint64_t base, size;
+	unsigned long flags;
 
 	pr_info("create virtual rtc for vm-%d\n", vm->vmid);
 
+	ret = translate_device_address(node, &base, &size);
+	if (ret || (size == 0))
+		return NULL;
+
+	ret = get_device_irq_index(vm, node, &irq, &flags, 0);
+	if (ret)
+		return NULL;
+
 	dev = zalloc(sizeof(struct vrtc_dev));
 	if (!dev)
-		return -ENOMEM;
+		return NULL;
 
-	host_vdev_init(vm, &dev->vdev, PL031_IOMEM_BASE,
-			PL031_IOMEM_SIZE);
+	host_vdev_init(vm, &dev->vdev, base, size);
 	vdev_set_name(&dev->vdev, "vrtc");
-	virq_mask_and_enable(vm, PL031_IRQ, VIRQF_CAN_WAKEUP);
+	request_virq(vm, irq, flags | VIRQF_CAN_WAKEUP);
 
 	dev->vdev.read = vrtc_mmio_read;
 	dev->vdev.write = vrtc_mmio_write;
@@ -269,12 +277,6 @@ static int vrtc_create_vm(void *item, void *arg)
 	dev->alarm_timer.function = vrtc_alarm_function;
 	dev->alarm_timer.data = (unsigned long)dev;
 
-	return 0;
+	return (void *)dev;
 }
-
-int vrtc_init(void)
-{
-	return register_hook(vrtc_create_vm,
-			MINOS_HOOK_TYPE_CREATE_VM_VDEV);
-}
-module_initcall(vrtc_init);
+VDEV_DECLARE(pl031_vrtc, pl031_match_table, vrtc_init);

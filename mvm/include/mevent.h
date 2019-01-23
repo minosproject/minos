@@ -36,7 +36,6 @@ enum ev_type {
 	EVF_SIGNAL		/* Not supported yet */
 };
 
-char *vmname;
 struct mevent;
 struct vm;
 

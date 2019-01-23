@@ -29,6 +29,8 @@ extern void *bootmem_start;
 extern void *bootmem_page_base;
 extern unsigned long bootmem_size;
 
+LIST_HEAD(mem_list);
+
 struct mem_section {
 	unsigned long phy_base;
 	int id;
@@ -190,21 +192,18 @@ static int add_memory_section(unsigned long mem_base, size_t size)
 
 static void parse_system_regions(void)
 {
-	int i;
-	struct memtag *tag;
-	size_t size = mv_config->nr_memtag;
-	struct memtag *memtags = mv_config->memtags;
+	struct memory_region *region;
 
-	for (i = 0; i < size; i++) {
-		tag = &memtags[i];
-		if (tag->vmid != VMID_HOST)
+	/* need to split the hypervisor's memory from the system
+	 * then just add host region to the mem section */
+	split_memory_region(CONFIG_MINOS_START_ADDRESS,
+			CONFIG_MINOS_RAM_SIZE, VMID_HOST);
+
+	list_for_each_entry(region, &mem_list, list) {
+		if (region->vmid != VMID_HOST)
 			continue;
 
-		if (tag->type != MEM_TYPE_NORMAL)
-			continue;
-
-		add_memory_section(tag->mem_base,
-				tag->mem_end - tag->mem_base + 1);
+		add_memory_section(region->vir_base, region->size);
 	}
 }
 
@@ -1165,15 +1164,105 @@ int has_enough_memory(size_t size)
 	return (free_blocks >= (size >> MEM_BLOCK_SHIFT));
 }
 
+int add_memory_region(uint64_t base, uint64_t size, int vmid)
+{
+	struct memory_region *region;
+
+	if (size == 0)
+		return -EINVAL;
+
+	region = alloc_boot_mem(sizeof(struct memory_region));
+	if (!region)
+		panic("no more boot memory\n");
+
+	memset((void *)region, 0, sizeof(struct memory_region));
+	region->vir_base = base;
+	region->phy_base = base;
+	region->size = size;
+	region->vmid = vmid;
+
+	pr_info("ADD MEM : 0x%x -> 0x%x 0x%x\n", region->vir_base,
+		region->phy_base, region->size);
+
+	init_list(&region->list);
+	list_add_tail(&mem_list, &region->list);
+
+	return 0;
+}
+
+int split_memory_region(vir_addr_t base, size_t size, int vmid)
+{
+	vir_addr_t start, end;
+	vir_addr_t new_end = base + size;
+	struct memory_region *region, *n, *tmp;
+
+	pr_info("SPLIT MEM 0x%x 0x%x vmid-%d\n", base, size, vmid);
+	if ((size == 0))
+		return -EINVAL;
+
+	/*
+	 * delete the memory for host, these region
+	 * usually for vms
+	 */
+	list_for_each_entry_safe(region, n, &mem_list, list) {
+		start = region->vir_base;
+		end = start + region->size;
+		if ((region->vmid != VMID_HOST) || (base > end) ||
+				(base < start))
+			continue;
+
+		/* beyond the address range */
+		if (new_end > end)
+			continue;
+
+		/* just delete this region from the list */
+		if ((base == start) && (new_end == end)) {
+			region->vmid = vmid;
+			return 0;
+		} else if ((base == start) && (new_end < end)) {
+			region->vir_base = region->phy_base = new_end;
+			region->size -= size;
+		} else if ((base > start) && (new_end < end)) {
+			n = alloc_boot_mem(sizeof(struct memory_region));
+			if (!n)
+				panic("no more boot memory\n");
+			init_list(&n->list);
+			n->vir_base = n->phy_base = new_end;
+			n->size = end - new_end;
+			n->vmid = region->vmid;
+			list_add_tail(&mem_list, &n->list);
+			region->size = base - start;
+		} else if ((base > start) && (end == new_end)) {
+			region->size = region->size - size;
+		} else {
+			pr_warn("incorrect memory region 0x%x 0x%x\n",
+					base, size);
+			return -EINVAL;
+		}
+
+		/* alloc a new memory region for vm memory */
+		tmp = alloc_boot_mem(sizeof(struct memory_region));
+		if (!tmp)
+			panic("no more boot memory\n");
+		init_list(&tmp->list);
+		tmp->vir_base = tmp->phy_base = base;
+		tmp->size = size;
+		tmp->vmid = vmid;
+		list_add_tail(&mem_list, &tmp->list);
+
+		return 0;
+	}
+
+	add_memory_region(base, size, vmid);
+	return 0;
+}
+
 int mm_init(void)
 {
-	size_t size;
-
 	pr_info("dynamic memory allocator init..\n");
 
 	nr_sections = 0;
-	size = sizeof(struct mem_section) * MAX_MEM_SECTIONS;
-	memset(mem_sections, 0, size);
+	memset(mem_sections, 0, sizeof(mem_sections));
 
 	/*
 	 * first need init the slab allocator then

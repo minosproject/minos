@@ -45,7 +45,6 @@ static size_t virtio_iomem_free;
 static int hv_create_virtio_device(struct vm *vm,
 		void **gbase, void **hbase)
 {
-	int ret;
 	void *__gbase, *__hbase;
 
 	if (virtio_iomem_free < VIRTIO_DEVICE_IOMEM_SIZE)
@@ -54,13 +53,6 @@ static int hv_create_virtio_device(struct vm *vm,
 	__gbase = virtio_guest_iobase + (virtio_iomem_size - virtio_iomem_free);
 	__hbase = virtio_host_iobase + (virtio_iomem_size - virtio_iomem_free);
 	virtio_iomem_free -= VIRTIO_DEVICE_IOMEM_SIZE;
-
-	ret = ioctl(vm->vm_fd, IOCTL_CREATE_VIRTIO_DEVICE,
-			(unsigned long)__gbase);
-	if (ret) {
-		pr_err("create virtio device failed %d\n", ret);
-		return ret;
-	}
 
 	*gbase = __gbase;
 	*hbase = __hbase;
@@ -113,6 +105,8 @@ int virtio_mmio_init(struct vm *vm, int nr_devs)
 	 */
 	size = nr_devs * VIRTIO_DEVICE_IOMEM_SIZE;
 	size = BALIGN(size, PAGE_SIZE);
+	if (size == 0)
+		return -EINVAL;
 
 	ret = hv_virtio_mmio_init(vm, size, &gbase, &hbase);
 	if (ret || !gbase || !hbase)
@@ -442,7 +436,11 @@ static int __virtio_vdev_init(struct vdev *vdev,
 	vdev->dev_type = VDEV_TYPE_VIRTIO;
 	vdev->iomem = hbase;
 	vdev->guest_iomem = gbase;
-	vdev->gvm_irq = ioread32(hbase + VIRTIO_MMIO_GVM_IRQ);
+	vdev->gvm_irq = vdev_alloc_irq(vdev->vm, 1);
+	if (!vdev->gvm_irq) {
+		pr_err("request virq for virtio device failed\n");
+		return -ENOENT;
+	}
 
 	pr_debug("vdev : irq-%d hpa-0x%p gva-0x%p\n", vdev->gvm_irq,
 			vdev->iomem, vdev->guest_iomem);

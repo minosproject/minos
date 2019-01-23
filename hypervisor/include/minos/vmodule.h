@@ -15,7 +15,6 @@
 
 struct vmodule {
 	char name[32];
-	char type[32];
 	int id;
 	struct list_head list;
 	uint32_t context_size;
@@ -35,7 +34,6 @@ typedef int (*vmodule_init_fn)(struct vmodule *);
 int vcpu_vmodules_init(struct vcpu *vcpu);
 int vcpu_vmodules_deinit(struct vcpu *vcpu);
 int vcpu_vmodules_reset(struct vcpu *vcpu);
-void *get_vmodule_data_by_name(struct vcpu *vcpu, char *name);
 void *get_vmodule_data_by_id(struct vcpu *vcpu, int id);
 void save_vcpu_vmodule_state(struct vcpu *vcpu);
 void restore_vcpu_vmodule_state(struct vcpu *vcpu);

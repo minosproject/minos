@@ -28,9 +28,9 @@ subdir-ym	:= $(sort $(subdir-y))
 subdir-ymn      := $(sort $(subdir-ym) $(subdir-))
 
 # remove the directly
-real-obj-y	= $(filter-out %/, $(obj-y))
-real-dep-y	:= $(addsuffix .d, $(real-obj-y))
-real-dep-y	:= $(addprefix $(obj)/., $(real-dep-y))
+#real-obj-y	= $(filter-out %/, $(obj-y))
+#real-dep-y	:= $(addsuffix .d, $(real-obj-y))
+#real-dep-y	:= $(addprefix $(obj)/., $(real-dep-y))
 
 # Add subdir path
 
@@ -39,10 +39,14 @@ subdir-ymn	:= $(addprefix $(obj)/,$(subdir-ymn))
 # build a list of files to remove, usually relative to the current
 # directory
 
-__clean-files	:= $(addprefix $(obj)/, $(real-obj-y))
+#__clean-files	:= $(addprefix $(obj)/, $(real-obj-y))
 __clean-files	+= $(obj)/built-in.o
 __clean-files	+= $(obj)/.built-in.o.d
-__clean-files	+= $(real-dep-y)
+#__clean-files	+= $(real-dep-y)
+__clean-files	+= $(wildcard $(obj)/*.o)
+__clean-files	+= $(wildcard $(obj)/.*.d)
+__clean-files	+= $(wildcard $(obj)/*.lds)
+__clean-files	+= $(wildcard $(obj)/*.dtb)
 
 __clean-dirs    :=
 

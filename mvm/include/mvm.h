@@ -10,11 +10,9 @@
 #include <inttypes.h>
 #include <string.h>
 #include <errno.h>
-#include <sys/ioctl.h>
 #include <sys/uio.h>
 #include <linux/netlink.h>
 
-#include <mvm_ioctl.h>
 #include <compiler.h>
 #include <vmcs.h>
 #include <barrier.h>
