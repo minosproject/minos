@@ -18,6 +18,19 @@
 		serial2 = "/smb/motherboard/iofpga@3,00000000/uart@0b0000";
 	};
 
+	vms {
+		vm0 {
+			device_type = "virtual_machine";
+			vmid = <0>;
+			vm_name = "fvp_linux_host";
+			type = "linux";
+			vcpus = <1>;
+			entry = <0x0 0x80080000>;
+			vcpu_affinity = <0 1>;
+			memory = <0x0 0x80000000 0x0 0x8000000>;
+		};
+	};
+
 	psci {
 		compatible = "arm,psci-1.0", "arm,psci-0.2", "arm,psci";
 		method = "smc";

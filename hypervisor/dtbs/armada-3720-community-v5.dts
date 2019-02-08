@@ -1,0 +1,647 @@
+/dts-v1/;
+
+/ {
+	model = "Marvell Armada 3720 Community Board";
+	compatible = "marvell,armada-3720-community", "marvell,armada3720", "marvell,armada3710";
+	interrupt-parent = <0x1>;
+	#address-cells = <0x2>;
+	#size-cells = <0x2>;
+
+	aliases {
+		ethernet0 = "/soc/internal-regs/ethernet@30000";
+		ethernet1 = "/soc/internal-regs/ethernet@40000";
+		serial0 = "/soc/internal-regs/serial@12000";
+		serial1 = "/soc/internal-regs/serial@12200";
+	};
+
+	vms {
+		vm0 {
+			device_type = "virtual_machine";
+			vmid = <0>;
+			vm_name = "espressobin_linux_host";
+			type = "linux";
+			vcpus = <1>;
+			entry = <0x0 0x280000>;
+			vcpu_affinity = <0>;
+			setup_data = <0x0 0xfe00000>;
+			memory = <0x0 0x0 0x0 0x10000000>;
+		};
+	};
+
+	opp_table0 {
+		compatible = "operating-points-v2";
+		opp-shared;
+		linux,phandle = <0x3>;
+		phandle = <0x3>;
+
+		opp@0 {
+			opp-hz = <0x0 0xbebc200>;
+			clock-latency-ns = <0xc350>;
+		};
+	};
+
+	reserved-memory {
+		#address-cells = <0x2>;
+		#size-cells = <0x2>;
+		ranges;
+
+		psci-area@4000000 {
+			reg = <0x0 0x4000000 0x0 0x200000>;
+			no-map;
+		};
+	};
+
+	cpus {
+		#address-cells = <0x1>;
+		#size-cells = <0x0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53", "arm,armv8";
+			reg = <0x0>;
+			clocks = <0x2 0x0>;
+			operating-points-v2 = <0x3>;
+			enable-method = "psci";
+		};
+
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53", "arm,armv8";
+			reg = <0x1>;
+			cks = <0x2 0x0>;
+			operating-points-v2 = <0x3>;
+			enable-method = "psci";
+		};
+	};
+
+	psci {
+		compatible = "arm,psci-0.2";
+		method = "smc";
+	};
+
+	timer {
+		compatible = "arm,armv8-timer";
+		interrupts = <0x1 0xd 0x304 0x1 0xe 0x304 0x1 0xb 0x304 0x1 0xa 0x304>;
+	};
+
+	soc {
+		compatible = "simple-bus";
+		#address-cells = <0x2>;
+		#size-cells = <0x2>;
+		ranges;
+
+		internal-regs {
+			#address-cells = <0x1>;
+			#size-cells = <0x1>;
+			compatible = "simple-bus";
+			ranges = <0x0 0x0 0xd0000000 0x2000000>;
+			dma-coherent;
+
+			i2c@11000 {
+				compatible = "marvell,armada-3700-i2c";
+				reg = <0x11000 0x80>;
+				#address-cells = <0x1>;
+				#size-cells = <0x0>;
+				interrupts = <0x0 0x1 0x4>;
+				mrvl,i2c-fast-mode;
+				clocks = <0x4 0xa>;
+				status = "okay";
+			};
+
+			i2c@11080 {
+				compatible = "marvell,armada-3700-i2c";
+				reg = <0x11080 0x80>;
+				#address-cells = <0x1>;
+				#size-cells = <0x0>;
+				interrupts = <0x0 0x2 0x4>;
+				mrvl,i2c-fast-mode;
+				clocks = <0x4 0x9>;
+				status = "okay";
+			};
+
+			avs@11500 {
+				compatible = "marvell,armada-3700-espressobin-avs";
+				reg = <0x11500 0x40>;
+				clocks = <0x4 0x10>;
+				status = "okay";
+			};
+
+			spi@10600 {
+				compatible = "marvell,armada-3700-spi";
+				#address-cells = <0x1>;
+				#size-cells = <0x0>;
+				reg = <0x10600 0xa00>;
+				clocks = <0x4 0x7>;
+				interrupts = <0x0 0x0 0x4>;
+				num-cs = <0x4>;
+				status = "disabled";
+			};
+
+			serial@12000 {
+				compatible = "marvell,armada-3700-uart";
+				reg = <0x12000 0x200>;
+				clocks = <0x5>;
+				interrupts = <0x0 0xb 0x4>;
+				interrupt-names = "irq_sum";
+				status = "okay";
+			};
+
+			serial@12200 {
+				compatible = "marvell,armada-3700-uart-ext";
+				reg = <0x12200 0x30 0x8a00 0x30>;
+				clocks = <0x5>;
+				interrupts = <0x0 0x1f 0x4 0x0 0x1e 0x4>;
+				interrupt-names = "irq_rx", "irq_tx";
+				status = "disabled";
+			};
+
+			watchdog-timer@8300 {
+				compatible = "marvell,armada-3700-wdt";
+				reg = <0xd064 0x4 0x8300 0x40>;
+				clocks = <0x5>;
+			};
+
+			cpu-pm-clk@14018 {
+				compatible = "marvell,armada-37xx-cpu-pm-clk";
+				reg = <0x14018 0x1c>;
+				#clock-cells = <0x1>;
+				clocks = <0x4 0x10>;
+				linux,phandle = <0x2>;
+				phandle = <0x2>;
+			};
+
+			ethernet@30000 {
+				compatible = "marvell,armada3700-neta";
+				reg = <0x30000 0x4000>;
+				interrupts = <0x0 0x2a 0x4>;
+				mac-address = [00 50 43 01 02 03];
+				clocks = <0x6 0x8>;
+				status = "okay";
+				pinctrl-names = "default";
+				pinctrl-0 = <0x7 0x8>;
+				phy-mode = "rgmii-id";
+				buffer-manager = <0x9>;
+				bm,pool-long = <0x1>;
+				bm,pool-short = <0x3>;
+				linux,phandle = <0x19>;
+				phandle = <0x19>;
+
+				fixed-link {
+					speed = <0x3e8>;
+					full-duplex;
+				};
+			};
+
+			mdio@32004 {
+				#address-cells = <0x1>;
+				#size-cells = <0x0>;
+				compatible = "marvell,orion-mdio";
+				reg = <0x32004 0x4>;
+				linux,phandle = <0x1a>;
+				phandle = <0x1a>;
+
+				switch@0 {
+					compatible = "marvell,mv88e6085";
+					reg = <0x1>;
+
+					mdio@0 {
+						#address-cells = <0x1>;
+						#size-cells = <0x0>;
+
+						phy1@1 {
+							reg = <0x11>;
+							linux,phandle = <0x1b>;
+							phandle = <0x1b>;
+						};
+
+						phy2@2 {
+							reg = <0x12>;
+							linux,phandle = <0x1c>;
+							phandle = <0x1c>;
+						};
+
+						phy3@3 {
+							reg = <0x13>;
+							linux,phandle = <0x1d>;
+							phandle = <0x1d>;
+						};
+					};
+				};
+			};
+
+			ethernet@40000 {
+				compatible = "marvell,armada3700-neta";
+				reg = <0x40000 0x4000>;
+				interrupts = <0x0 0x2d 0x4>;
+				mac-address = [00 50 43 01 02 33];
+				clocks = <0x6 0x7>;
+				status = "disabled";
+			};
+
+			nb-periph-clk@13000 {
+				compatible = "marvell,armada-3700-periph-clock-nb";
+				reg = <0x13000 0x100>;
+				clocks = <0xa 0x0 0xa 0x1 0xa 0x2 0xa 0x3 0x5>;
+				#clock-cells = <0x1>;
+				linux,phandle = <0x4>;
+				phandle = <0x4>;
+			};
+
+			sb-periph-clk@18000 {
+				compatible = "marvell,armada-3700-periph-clock-sb";
+				reg = <0x18000 0x100>;
+				clocks = <0xa 0x0 0xa 0x1 0xa 0x2 0xa 0x3 0x5>;
+				#clock-cells = <0x1>;
+				linux,phandle = <0x6>;
+				phandle = <0x6>;
+			};
+
+			tbg@13200 {
+				compatible = "marvell,armada-3700-tbg-clock";
+				reg = <0x13200 0x100>;
+				clocks = <0x5>;
+				#clock-cells = <0x1>;
+				linux,phandle = <0xa>;
+				phandle = <0xa>;
+			};
+
+			pinctrl@13800 {
+				compatible = "marvell,armada3710-nb-pinctrl", "syscon", "simple-mfd";
+				reg = <0x13800 0x100 0x13c00 0x20>;
+				linux,phandle = <0xb>;
+				phandle = <0xb>;
+
+				gpio {
+					#gpio-cells = <0x2>;
+					gpio-ranges = <0xb 0x0 0x0 0x24>;
+					gpio-controller;
+					interrupts = <0x0 0x33 0x4 0x0 0x34 0x4 0x0 0x35 0x4 0x0 0x36 0x4 0x0 0x37 0x4 0x0 0x38 0x4 0x0 0x39 0x4 0x0 0x3a 0x4 0x0 0x98 0x4 0x0 0x99 0x4 0x0 0x9a 0x4 0x0 0x9b 0x4>;
+					linux,phandle = <0x10>;
+					phandle = <0x10>;
+				};
+
+				xtal-clk {
+					compatible = "marvell,armada-3700-xtal-clock";
+					clock-output-names = "xtal";
+					#clock-cells = <0x0>;
+					linux,phandle = <0x5>;
+					phandle = <0x5>;
+				};
+
+				spi-quad-pins {
+					groups = "spi_quad";
+					function = "spi";
+				};
+
+				i2c1-pins {
+					groups = "i2c1";
+					function = "i2c";
+				};
+
+				i2c2-pins {
+					groups = "i2c2";
+					function = "i2c";
+				};
+
+				uart1-pins {
+					groups = "uart1";
+					function = "uart";
+				};
+
+				uart2-pins {
+					groups = "uart2";
+					function = "uart";
+				};
+
+				mmc-pins {
+					groups = "emmc_nb";
+					function = "emmc";
+					linux,phandle = <0x13>;
+					phandle = <0x13>;
+				};
+			};
+
+			pinctrl@18800 {
+				compatible = "marvell,armada3710-sb-pinctrl", "syscon", "simple-mfd";
+				reg = <0x18800 0x100 0x18c00 0x20>;
+				linux,phandle = <0xc>;
+				phandle = <0xc>;
+
+				gpio {
+					#gpio-cells = <0x2>;
+					gpio-ranges = <0xc 0x0 0x0 0x1e>;
+					gpio-controller;
+					interrupts = <0x0 0xa0 0x4 0x0 0x9f 0x4 0x0 0x9e 0x4 0x0 0x9d 0x4 0x0 0x9c 0x4>;
+					linux,phandle = <0x18>;
+					phandle = <0x18>;
+				};
+
+				mii-pins {
+					groups = "rgmii";
+					function = "mii";
+					linux,phandle = <0x7>;
+					phandle = <0x7>;
+				};
+
+				smi-pins {
+					groups = "smi";
+					function = "smi";
+					linux,phandle = <0x8>;
+					phandle = <0x8>;
+				};
+
+				sdio-pins {
+					groups = "sdio_sb";
+					function = "sdio";
+					linux,phandle = <0x12>;
+					phandle = <0x12>;
+				};
+
+				pcie-pins {
+					groups = "pcie1";
+					function = "gpio";
+					linux,phandle = <0x17>;
+					phandle = <0x17>;
+				};
+			};
+
+			u3d@50000 {
+				compatible = "marvell,armada3700-u3d";
+				reg = <0x50000 0x2000>;
+				interrupts = <0x0 0xf 0x4>;
+				clocks = <0x6 0xc>;
+				status = "disabled";
+				phys = <0xd 0x0 0xa0fc>;
+				phy-names = "usb";
+			};
+
+			udc@54100 {
+				compatible = "marvell,mv-udc";
+				reg = <0x54100 0x2000>;
+				interrupts = <0x0 0xf 0x4>;
+				clocks = <0x6 0xc>;
+				status = "disabled";
+				phys = <0xe>;
+				phy-names = "usb";
+			};
+
+			usb3@58000 {
+				compatible = "generic-xhci";
+				reg = <0x58000 0x4000>;
+				interrupts = <0x0 0x3 0x4>;
+				clocks = <0x6 0xc>;
+				separated-phys-for-usb2-usb3;
+				needs-reset-on-resume;
+				status = "okay";
+				phys = <0xe 0xd 0x0 0xa0fc>;
+				phy-names = "usb2", "usb3";
+			};
+
+			utmi@5d000 {
+				compatible = "marvell,armada-3700-utmi-phy";
+				reg = <0x5d000 0x1000>;
+				utmi-port = <0x0>;
+				#phy-cells = <0x0>;
+				status = "okay";
+				linux,phandle = <0xe>;
+				phandle = <0xe>;
+			};
+
+			usb_phy@5d800 {
+				compatible = "marvell,armada-3700-usb-phy";
+				reg = <0x5d800 0x100>;
+				interrupts = <0x0 0x10 0x4>;
+				status = "disabled";
+			};
+
+			usb@5e000 {
+				compatible = "marvell,armada-3700-ehci";
+				reg = <0x5e000 0x1000>;
+				interrupts = <0x0 0x11 0x4>;
+				needs-reset-on-resume;
+				status = "okay";
+				phys = <0xf>;
+				phy-names = "usb";
+			};
+
+			utmi@5f000 {
+				compatible = "marvell,armada-3700-utmi-phy";
+				reg = <0x5f000 0x1000>;
+				utmi-port = <0x3>;
+				#phy-cells = <0x0>;
+				status = "okay";
+				linux,phandle = <0xf>;
+				phandle = <0xf>;
+			};
+
+			xor@60900 {
+				compatible = "marvell,armada-3700-xor";
+				reg = <0x60900 0x100 0x60b00 0x100>;
+
+				xor10 {
+					interrupts = <0x0 0x2f 0x4>;
+					dmacap,memcpy;
+					dmacap,xor;
+				};
+
+				xor11 {
+					interrupts = <0x0 0x30 0x4>;
+					dmacap,memcpy;
+					dmacap,xor;
+					dmacap,memset;
+				};
+			};
+
+			sdhci@d0000 {
+				compatible = "marvell,armada-3700-sdhci", "marvell,sdhci-xenon";
+				reg = <0xd0000 0x300 0x1e808 0x4>;
+				interrupts = <0x0 0x19 0x4>;
+				clock-names = "core";
+				clocks = <0x4 0x0>;
+				status = "okay";
+				wp-inverted;
+				bus-width = <0x4>;
+				cd-gpios = <0x10 0x3 0x1>;
+				no-1-8-v;
+				vqmmc-supply = <0x11>;
+				marvell,pad-type = "sd";
+				pinctrl-names = "default";
+				pinctrl-0 = <0x12>;
+			};
+
+			sdhci@d8000 {
+				compatible = "marvell,armada-3700-sdhci", "marvell,sdhci-xenon";
+				reg = <0xd8000 0x300 0x17808 0x4>;
+				interrupts = <0x0 0x1a 0x4>;
+				clock-names = "core";
+				clocks = <0x4 0x0>;
+				status = "okay";
+				marvell,pad-type = "fixed-1-8v";
+				non-removable;
+				bus-width = <0x8>;
+				mmc-ddr-1_8v;
+				mmc-hs400-1_8v;
+				marvell,xenon-emmc;
+				marvell,xenon-tun-count = <0x9>;
+				pinctrl-names = "default";
+				pinctrl-0 = <0x13>;
+			};
+
+			sata@e0000 {
+				compatible = "marvell,armada-3700-ahci";
+				reg = <0xe0000 0x178>;
+				interrupts = <0x0 0x1b 0x4>;
+				clocks = <0x4 0x1>;
+				status = "okay";
+				phys = <0xd 0x2 0x10fc>;
+			};
+
+			interrupt-controller@1d00000 {
+				compatible = "arm,gic-v3";
+				#interrupt-cells = <0x3>;
+				interrupt-controller;
+				interrupts = <0x1 0x9 0xf04>;
+				reg = <0x1d00000 0x10000 0x1d40000 0x40000>;
+				linux,phandle = <0x1>;
+				phandle = <0x1>;
+			};
+
+			comphy@18300 {
+				compatible = "marvell,mvebu-comphy", "marvell,armada-3700-comphy";
+				reg = <0x18300 0x300 0x1f000 0x1000 0x5c000 0x1000 0xe0178 0x8>;
+				reg-names = "comphy", "serdes", "usb3_gbe1_phy", "indirect";
+				#phy-cells = <0x2>;
+				linux,phandle = <0xd>;
+				phandle = <0xd>;
+			};
+
+			bm@c0000 {
+				compatible = "marvell,armada-380-neta-bm";
+				reg = <0xc0000 0xac>;
+				clocks = <0x6 0x9>;
+				internal-mem = <0x14>;
+				status = "disabled";
+				linux,phandle = <0x9>;
+				phandle = <0x9>;
+			};
+
+			bm-bppi {
+				compatible = "mmio-sram";
+				reg = <0xc8000 0x1000>;
+				clocks = <0x6 0x9>;
+				no-memory-wc;
+				status = "disabled";
+				linux,phandle = <0x14>;
+				phandle = <0x14>;
+			};
+
+			eip97@90000 {
+				compatible = "inside-secure,safexcel-eip97";
+				reg = <0x90000 0x20000>;
+				interrupt-names = "eip_out", "ring0", "ring1", "ring2", "ring3", "eip_addr";
+				interrupts = <0x0 0x13 0x4 0x0 0x14 0x4 0x0 0x15 0x4 0x0 0x16 0x4 0x0 0x17 0x4 0x0 0x18 0x4>;
+				dma-coherent;
+				dma-bus-width = <0x20>;
+				cell-index = <0x0>;
+				status = "okay";
+			};
+
+			regulator@0 {
+				compatible = "regulator-gpio";
+				regulator-name = "vcc_sd1";
+				regulator-min-microvolt = <0x1b7740>;
+				regulator-max-microvolt = <0x325aa0>;
+				regulator-boot-on;
+				gpios = <0x10 0x4 0x0>;
+				gpios-states = <0x0>;
+				states = <0x1b7740 0x1 0x325aa0 0x0>;
+				enable-active-high;
+				linux,phandle = <0x11>;
+				phandle = <0x11>;
+			};
+		};
+
+		pcie@d0070000 {
+			compatible = "marvell,armada-3700-pcie";
+			device_type = "pci";
+			status = "okay";
+			reg = <0x0 0xd0070000 0x0 0x20000>;
+			#address-cells = <0x3>;
+			#size-cells = <0x2>;
+			bus-range = <0x0 0xff>;
+			interrupts = <0x0 0x1d 0x4>;
+			#interrupt-cells = <0x1>;
+			msi-parent = <0x15>;
+			msi-controller;
+			clocks = <0x6 0xd>;
+			ranges = <0x82000000 0x0 0xe8000000 0x0 0xe8000000 0x0 0x1000000 0x81000000 0x0 0xe9000000 0x0 0xe9000000 0x0 0x10000>;
+			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+			interrupt-map = <0x0 0x0 0x0 0x1 0x16 0x0 0x0 0x0 0x0 0x2 0x16 0x1 0x0 0x0 0x0 0x3 0x16 0x2 0x0 0x0 0x0 0x4 0x16 0x3>;
+			pinctrl-names = "default";
+			pinctrl-0 = <0x17>;
+			phys = <0xd 0x1 0x60fc>;
+			phy-names = "comphy";
+			reset-gpios = <0x18 0x3 0x0>;
+			linux,phandle = <0x15>;
+			phandle = <0x15>;
+
+			interrupt-controller {
+				interrupt-controller;
+				#interrupt-cells = <0x1>;
+				linux,phandle = <0x16>;
+				phandle = <0x16>;
+			};
+		};
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x0 0x0 0x0 0x20000000>;
+	};
+
+	dsa@0 {
+		compatible = "marvell,dsa";
+		dsa,ethernet = <0x19>;
+		dsa,mii-bus = <0x1a>;
+		#address-cells = <0x2>;
+		#size-cells = <0x0>;
+
+		switch@0 {
+			#address-cells = <0x1>;
+			#size-cells = <0x0>;
+			reg = <0x1 0x0>;
+
+			port@0 {
+				reg = <0x0>;
+				label = "cpu";
+
+				fixed-link {
+					speed = <0x3e8>;
+					full-duplex;
+				};
+			};
+
+			port@1 {
+				reg = <0x1>;
+				label = "wan";
+				phy-handle = <0x1b>;
+			};
+
+			port@2 {
+				reg = <0x2>;
+				label = "lan0";
+				phy-handle = <0x1c>;
+			};
+
+			port@3 {
+				reg = <0x3>;
+				label = "lan1";
+				phy-handle = <0x1d>;
+			};
+		};
+	};
+};
