@@ -41,8 +41,11 @@ Below is the board that Minos has been supported:
 5. Download Minos sample
 
         # git clone https://github.com/minos-project/minos-samples.git
+        # make
 
 	The minos-sample provides the dts/dtb file of the Guest VM and the created Guest VM boot.img file.
+        - aarch32-boot.img - boot image for aarch32 VM contains the ramdisk and dtb file
+        - aarch64-boot.img - boot image　for aarch64 VM contains the ramdisk and dtb file
 
 6. Download Minos hypervisor source code
 
@@ -66,9 +69,9 @@ Below is the board that Minos has been supported:
 
 # Run Minos on Raspberry Pi 3 Model B+
 
-Minos has been tested on Raspberry Pi 3 Model b+, Raspberry Pi 3 and 3 Model A+ are supported too. These boards use Broadcom's bcm28737 chip, which does not use GICv2 or GICv3 interrupt controllers that support interrupt virtualization. In order to implement interrupt virtualization on this chip and minimize Guest VM code modifications, the following method was adopted:
+Minos has been tested on Raspberry Pi 3 Model b+, Raspberry Pi 3 and 3 Model A+ are supported too. These boards use Broadcom's bcm28737 chip, bcm2837 does not use GICv2 or GICv3 interrupt controllers which can support hardware interrupt virtualization. In order to implement interrupt virtualization on this chip and minimize Guest VM code modifications, the following method was adopted:
 
-> * Implement virtual bcm2836-armctrl-ic and bcm2836-l1-intc interrupt controller for Host VM (VM0)
+> * Implement virtual bcm2835-armctrl-ic and bcm2836-l1-intc interrupt controller for Host VM (VM0)
 > * Extended the vGICv2 for the Guest VM
 
 1. Install operating system images for 3B+
@@ -100,22 +103,24 @@ Download the image and using dd to flash it to the SD card
         # make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules dtbs -j8
         # sudo make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_install INSTALL_MOD_PATH=/media/zac/711a5ddf-1ff4-4d5a-ad95-8b9b69953513
         # cp arch/arm64/boot/Image /media/zac/6A99-E637
-        # cp arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dtb /media/zac/6A99-E637
 
 	After above commands Raspberry kernel images and kernel moudules will be updated to 4.20
 
 4. Compile Minos
 
         # git clone https://github.com/minos-project/minos-hypervisor.git && cd minos-hypervisor
-        # make PLATFORM=raspberry3
-        # cp hypervisor/out/minos.bin /media/zac/6A99-E637  (Minos hypervisor binary)
+        # make ARCH=aarch64 CROSS_COMPILE=aarch64-linux-gnu- rpi_3_defconfig
+        # make ARCH=aarch64 CROSS_COMPILE=aarch64-linux-gnu-
+        # make dtbs
+        # cp hypervisor/minos.bin /media/minle/6A99-E637  (Minos hypervisor binary)
+        # cp hypervisor/dtbs/bcm2837-rpi-3-b-plus.dtb /media/minle/6A99-E637
         # sudo cp mvm/mvm /media/zac/711a5ddf-1ff4-4d5a-ad95-8b9b69953513/home/jiangxianxu  (Minos tools for VM0)
 
 5. Copy Guest VM boot.img to rootfs
 
-        # git clone https://github.com/minos-project/minos-samples.git && cd minos-samples
-        # sudo cp gvm-aarch32/boot.img /media/zac/711a5ddf-1ff4-4d5a-ad95-8b9b69953513/home/jiangxianxu/boot32.img
-        # sudo cp gvm-aarch64/boot.img /media/zac/711a5ddf-1ff4-4d5a-ad95-8b9b69953513/home/jiangxianxu/boot64.img
+        # cd minos-samples
+        # sudo cp aarch32-boot.img /media/zac/711a5ddf-1ff4-4d5a-ad95-8b9b69953513/home/jiangxianxu/boot32.img
+        # sudo cp aarch64-boot.img /media/zac/711a5ddf-1ff4-4d5a-ad95-8b9b69953513/home/jiangxianxu/boot64.img
 
 	The minos-sample provides the dts/dtb file of the Guest VM and the created Guest VM boot.img file.
 
@@ -148,14 +153,14 @@ Download the image and using dd to flash it to the SD card
         # sudo ./mvm -c 2 -m 96M -i boot64.img -n elinux64 -t linux -b 64 -v -r -d --gicv2 --earlyprintk -V virtio_console,@pty: -V virtio_blk,/home/jiangxianxu/sd.img -V virtio_net,tap0 -C "console=hvc0 loglevel=8 consolelog=9 root=/dev/vda2 rw"   (64bit VM with virtio_console; virtio_net and virtio_blk devices)
         # sudo ./mvm -c 2 -m 96M -i boot32.img -n elinux32 -t linux -b 32 -v -d --gicv2 --earlyprintk -V virtio_console,@pty: -C "console=hvc0 loglevel=8 consolelog=9"   (32bit VM with virtio console device)
 
-![Run Minos on Raspberry 3 B+](http://leyunxi.com/static/raspberry3_virtualization.png)
-
 # Run Minos on Marvell Esspressobin
 
 1. Compile Minos
 
-        # cd ~/minos-workspace/minos
-        # make
+        # cd ~/minos-workspace/minos-hypervisor
+        # make ARCH=aarch64 CROSS_COMPILE=aarch64-linux-gnu- espressobin_defconfig
+        # make ARCH=aarch64 CROSS_COMPILE=aarch64-linux-gnu-
+        # make dtbs   (new dtb file "armada-3720-community-v5.dtb" will be generate at hypervisor/dtbs folder)
 
 	The default platform for Minos is Marvel Esspressobin. After the compilation is completed, minos.bin will be generated in the hypervisor/out directory and the mvm application will be generated in the mvm directory.
 
@@ -184,8 +189,6 @@ Download the image and using dd to flash it to the SD card
 
         # mmc dev 1; ext4load mmc 1:1 $kernel_addr $image_name; ext4load mmc 1:1 $fdt_addr $fdt_name; setenv bootargs $console root=PARTUUID=89708921-01 rw rootwait net.ifnames=0 biosdevname=0; booti $kernel_addr - $fdt_addr
 
-![Run Minos on Marvell Board](http://leyunxi.com/static/minos-marvell-00.png)
-
 # Run Minos on ARM FVP
 
 1. Download ARM FVP and create a working directory
@@ -199,8 +202,9 @@ Download the image and using dd to flash it to the SD card
 2. Compile Minos
 
         # cd ~/minos-workspace/minos
-        # make distclean  (Need to execute before changing the compile target)
-        # make PLATFORM=fvp
+        # make ARCH=aarch64 CROSS_COMPILE=aarch64-linux-gnu- fvp_defconfig
+        # make ARCH=aarch64 CROSS_COMPILE=aarch64-linux-gnu-
+        # make dtbs
 
 3. Compile FVP Kernel
 
@@ -225,8 +229,8 @@ Download the image and using dd to flash it to the SD card
         # ln -s ~/minos-workspace/sd.img sd.img
         # ln -s ~/minos-workspace/arm-trusted-firmware/build/fvp/release/bl31.bin bl31.bin
         # ln -s ~/minos-workspace/linux-marvell/arch/arm64/boot/Image Image
-        # ln -s ~/minos-workspace/minos-sample/foundation-v8-gicv3.dtb fdt.dtb
-        # ln -s ~/minos-workspace/minos/hypervisor/out/minos.bin minos.bin
+        # ln -s ~/minos-workspace/minos-hypervisor/hypervisor/dtbs/foundation-v8-gicv3.dtb fdt.dtb
+        # ln -s ~/minos-workspace/minos-hypervisor/hypervisor/minos.bin minos.bin
 
         # /usr/local/DS-5_v5.27.0/bin/FVP_Base_AEMv8A               \
         -C pctl.startup=0.0.0.0                                     \
@@ -251,41 +255,23 @@ Download the image and using dd to flash it to the SD card
 
         # ssh -p 8022 root@127.0.0.1
 
-![Run Minos on FVP ](http://leyunxi.com/static/minos-fvp-00.png)
-
 # MVM usage
 
-Minos provides two ways to create a VM. One is to use the JSON file under the Minos source (for example, hypervisor/config/fvp/fvp.json.cc) to create a corresponding VM by creating a json member of the vmtag. VM memory, IRQ and other hardware resources are managed by the corresponding json file. This method is suitable for creating VMs with real hardware permissions in embedded systems. Minos supports assigning specific hardware devices to specific VMs. VMs created this way are currently not managed by mvm.
+Minos provides two ways to create a VM. One is to use the dts file under the Minos source (for example, hypervisor/dtbs/foundation-v8-gicv3.dts) to create a corresponding VM by creating a device tree node. This method is suitable for creating VMs with real hardware permissions in embedded systems. Minos supports assigning specific hardware devices to specific VMs. VMs created this way are currently not managed by mvm.
 
 ```
-#include "fvp_config.h"
-{
-	"version": "0.0.1",
-	"platform": "armv8-fvp",
-
-	"vmtags": [
-	{
-			"vmid": 0,
-			"name": "linux-01",
-			"type": "linux",
-			"nr_vcpu": 1,
-			"entry": "0x80080000",
-			"setup_data": "0x83e00000",
-			"vcpu0_affinity": 0,
-			"vcpu1_affinity": 1,
-			"vcpu2_affinity": 2,
-			"vcpu3_affinity": 3,
-			"cmdline": "",
-			"bit64": 1
-		}
-	],
-	#include "fvp_irq.json.cc"
-	#include "fvp_mem.json.cc"
-
-	"others" : {
-		"comments": "minos virtualization config json data"
-	}
-}
+vms {
+		vm0 {
+			device_type = "virtual_machine";
+			vmid = <0>;
+			vm_name = "fvp_linux_host";
+			type = "linux";
+			vcpus = <1>;
+			entry = <0x0 0x80080000>;
+			vcpu_affinity = <0 1>;
+			memory = <0x0 0x80000000 0x0 0x8000000>;
+		};
+	};
 ```
 
 Another way is to use the VM management tool mvm provided by Minos. Currently mvm already supports VM creation, destruction, restart and shutdown operations.
@@ -368,11 +354,9 @@ Minos currently supports the virtio-console backend driver. After creating the V
 
         # minicom /dev/pts/1
 
-![minicom to connect VM](http://leyunxi.com/static/minos-fvp-01.png)
-
 # Create a customize bootimage
 
-The default ramdisk.img in the boot.img provided by Minos is based on the default rootfs configuration of the busybox. If you need to customize your own ramdisk, it is also very simple. You only need to repackage the ramdisk.img, Image and dtb file.
+The default ramdisk.img in the boot.img provided by Minos is based on the default rootfs configuration of the busybox. If you need to customize your own ramdisk, it is also very simple. You only need to repackage the ramdisk.img, Image and dtb file. There are two samples boot image under minos-samples folder.
 
         # dtc -I dts -O dtb -o guest-vm.dtb guest-vm.dts
         # abootimg --create boot.img -c kerneladdr=0x80080000 -c ramdiskaddr=0x83000000 -c secondaddr=0x83e00000 -c cmdline="console=hvc0 loglevel=8 consolelog=9" -k Image -s guest-vm.dtb -r ramdisk.img

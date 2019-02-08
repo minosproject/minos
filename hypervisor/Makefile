@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 VERSION = 0
 PATCHLEVEL = 2
-SUBLEVEL = 1
+SUBLEVEL = 2
 EXTRAVERSION = -rc0
 NAME = unstable
 
