@@ -19,6 +19,25 @@
 #include <minos/of.h>
 #include <minos/virq_chip.h>
 
+/*
+ * The following cases are considered software programming
+ * errors and result in UNPREDICTABLE behavior:
+ *
+ * • Having a List register entry with ICH_LR<n>_EL2.HW= 1
+ *   which is associated with a physical interrupt, inactive
+ *   state or in pending state in the List registers if the
+ *   Distributor does not have the corresponding physical
+ *   interrupt in either the active state or the active and
+ *   pending state.
+ * • If ICC_CTLR_EL1.EOImode == 0 or ICC_CTLR_EL3.EOImode_EL3 == 0
+ *   then either:
+ *   — Having an active interrupt in the List registers with a priorit
+ *   that is not set in the corresponding Active Priorities Register.
+ *   — Having two interrupts in the List registers in the active stat
+ *   with the same preemption priority.>
+ * • Having two or more interrupts with the same pINTID in the Lis
+ *   registers for a single virtual CPU interface.
+ */
 int vgic_irq_enter_to_guest(struct vcpu *vcpu, void *data)
 {
 	/*
