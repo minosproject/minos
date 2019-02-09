@@ -5,7 +5,7 @@
 #include <inttypes.h>
 #include <vdev.h>
 #include <io.h>
-#include <virtio_mmio.h>
+#include <common/virtio_mmio.h>
 #include <barrier.h>
 
 #define VRING_DESC_F_NEXT		(1)

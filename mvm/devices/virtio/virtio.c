@@ -33,7 +33,6 @@
 
 #include <mvm.h>
 #include <virtio.h>
-#include <virtio_mmio.h>
 #include <io.h>
 #include <barrier.h>
 

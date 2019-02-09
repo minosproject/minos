@@ -35,7 +35,7 @@
 
 /* below register from 0x300 is used for hypervisor */
 #define VIRTIO_MMIO_GVM_ADDR		0x300
-#define VIRTIO_MMIO_GVM_IRQ		0x304
+#define VIRTIO_MMIO_DEV_FLAGS		0x304
 #define VIRTIO_MMIO_HOST_FEATURE0	0x308
 #define VIRTIO_MMIO_HOST_FEATURE1	0x30c
 #define VIRTIO_MMIO_HOST_FEATURE2	0x310
