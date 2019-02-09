@@ -25,7 +25,6 @@
 #include <minos/smp.h>
 #include <minos/atomic.h>
 #include <minos/softirq.h>
-#include <minos/virt.h>
 #include <minos/platform.h>
 #include <config/version.h>
 

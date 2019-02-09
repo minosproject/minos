@@ -15,7 +15,6 @@
  */
 
 #include <minos/minos.h>
-#include <minos/virt.h>
 #include <minos/vm.h>
 #include <minos/vcpu.h>
 #include <minos/mmu.h>

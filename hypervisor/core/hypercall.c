@@ -17,7 +17,6 @@
 #include <minos/minos.h>
 #include <asm/svccc.h>
 #include <minos/sched.h>
-#include <minos/virt.h>
 #include <minos/vm.h>
 #include <minos/hypercall.h>
 #include <minos/virq.h>

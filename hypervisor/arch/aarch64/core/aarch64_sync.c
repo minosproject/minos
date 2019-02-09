@@ -25,7 +25,6 @@
 #include <minos/irq.h>
 #include <asm/svccc.h>
 #include <asm/vtimer.h>
-#include <minos/virt.h>
 #include <minos/vdev.h>
 
 extern unsigned char __sync_desc_start;

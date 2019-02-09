@@ -22,8 +22,8 @@
 #include <minos/list.h>
 #include <minos/timer.h>
 #include <minos/time.h>
-#include <minos/virt.h>
 #include <minos/virq.h>
+#include <minos/vmodule.h>
 
 extern void sched_tick_disable(void);
 extern void sched_tick_enable(unsigned long exp);
@@ -40,6 +40,16 @@ DEFINE_PER_CPU(atomic_t, preempt);
 void pcpu_resched(int pcpu_id)
 {
 	send_sgi(CONFIG_MINOS_RESCHED_IRQ, pcpu_id);
+}
+
+static inline void save_vcpu_state(struct vcpu *vcpu)
+{
+	save_vcpu_vmodule_state(vcpu);
+}
+
+static inline void restore_vcpu_state(struct vcpu *vcpu)
+{
+	restore_vcpu_vmodule_state(vcpu);
 }
 
 void switch_to_vcpu(struct vcpu *current, struct vcpu *next)

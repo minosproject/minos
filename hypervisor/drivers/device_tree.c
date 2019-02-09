@@ -19,7 +19,6 @@
 #include <minos/vmm.h>
 #include <libfdt/libfdt.h>
 #include <minos/vm.h>
-#include <minos/virt.h>
 #include <minos/platform.h>
 #include <minos/of.h>
 #include <config/config.h>

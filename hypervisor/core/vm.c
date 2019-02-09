@@ -16,7 +16,6 @@
 
 #include <minos/minos.h>
 #include <minos/vcpu.h>
-#include <minos/virt.h>
 #include <minos/vm.h>
 #include <minos/vcpu.h>
 #include <minos/vmm.h>
@@ -25,6 +24,7 @@
 #include <minos/vdev.h>
 #include <minos/pm.h>
 #include <minos/of.h>
+#include <minos/vmodule.h>
 #include <minos/resource.h>
 #include <common/gvm.h>
 

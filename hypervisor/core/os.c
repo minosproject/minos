@@ -16,7 +16,6 @@
 
 #include <minos/minos.h>
 #include <minos/sched.h>
-#include <minos/virt.h>
 #include <minos/os.h>
 
 LIST_HEAD(os_list);

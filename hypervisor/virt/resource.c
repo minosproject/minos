@@ -44,11 +44,6 @@ int translate_device_address(struct device_node *node,
 	return translate_device_address_index(node, base, size, 0);
 }
 
-static int create_vm_memory_of(struct vm *vm, struct device_node *node)
-{
-	return 0;
-}
-
 static int create_vm_vdev_of(struct vm *vm, struct device_node *node)
 {
 	vdev_init_t func;
@@ -230,11 +225,6 @@ static void *__create_vm_resource_of(struct device_node *node, void *arg)
 	struct vm *vm = (struct vm *)arg;
 
 	switch(node->class) {
-		case DT_CLASS_MEMORY:
-			if (vm_is_native(vm))
-				break;
-			create_vm_memory_of(vm, node);
-			break;
 		case DT_CLASS_PCI_BUS:
 		case DT_CLASS_PDEV:
 			create_vm_pdev_of(vm, node);

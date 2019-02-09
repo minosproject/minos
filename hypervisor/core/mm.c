@@ -20,8 +20,8 @@
 #include <minos/minos.h>
 #include <minos/init.h>
 #include <minos/mm.h>
+#include <minos/vm.h>
 #include <minos/vmm.h>
-#include <minos/virt.h>
 
 extern unsigned char __code_start;
 extern void *bootmem_end;

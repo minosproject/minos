@@ -18,7 +18,6 @@
 #include <asm/svccc.h>
 #include <minos/sched.h>
 #include <asm/psci.h>
-#include <minos/virt.h>
 
 static int std_smc_handler(gp_regs *c,
 		uint32_t id, unsigned long *args)

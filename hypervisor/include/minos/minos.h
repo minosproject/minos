@@ -40,4 +40,21 @@ void irq_exit(gp_regs *regs);
 int do_hooks(void *item, void *context, enum hook_type type);
 int register_hook(hook_func_t fn, enum hook_type type);
 
+static inline int taken_from_guest(gp_regs *regs)
+{
+	return arch_taken_from_guest(regs);
+}
+
+static inline void exit_from_guest(struct vcpu *vcpu, gp_regs *regs)
+{
+	do_hooks((void *)vcpu, (void *)regs,
+			MINOS_HOOK_TYPE_EXIT_FROM_GUEST);
+}
+
+static inline void enter_to_guest(struct vcpu *vcpu, gp_regs *regs)
+{
+	do_hooks((void *)vcpu, (void *)regs,
+			MINOS_HOOK_TYPE_ENTER_TO_GUEST);
+}
+
 #endif

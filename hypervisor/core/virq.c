@@ -18,7 +18,6 @@
 #include <minos/irq.h>
 #include <minos/sched.h>
 #include <minos/virq.h>
-#include <minos/virt.h>
 #include <minos/virq_chip.h>
 
 static DEFINE_SPIN_LOCK(hvm_irq_lock);
