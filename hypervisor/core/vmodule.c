@@ -77,6 +77,22 @@ void *get_vmodule_data_by_id(struct vcpu *vcpu, int id)
 	return vcpu->vmodule_context[id];
 }
 
+void *get_vmodule_data_by_name(struct vcpu *vcpu, char *name)
+{
+	struct vmodule *vmodule;
+	int id = INVAILD_MODULE_ID;
+
+	list_for_each_entry(vmodule, &vmodule_list, list) {
+		if (strcmp(vmodule->name, name) == 0)
+			id = vmodule->id;
+	}
+
+	if (id != INVAILD_MODULE_ID)
+		return vcpu->vmodule_context[id];
+
+	return NULL;
+}
+
 int vcpu_vmodules_init(struct vcpu *vcpu)
 {
 	struct list_head *list;

@@ -32,6 +32,13 @@ extern unsigned char __sync_desc_end;
 
 static struct sync_desc *sync_descs[MAX_SYNC_TYPE] __align_cache_line;
 
+static inline void inject_virtual_abort(void)
+{
+	uint64_t hcr_el2 = read_sysreg(HCR_EL2) | HCR_EL2_VSE;
+
+	write_sysreg(hcr_el2, HCR_EL2);
+}
+
 void bad_mode(void)
 {
 	panic("Bad error received\n");
@@ -265,6 +272,11 @@ static int dataabort_tfl_handler(gp_regs *regs, uint32_t esr_value)
 		if (ret) {
 			pr_warn("handle mmio read/write fail 0x%x vmid:%d\n",
 					paddr, get_vmid(current_vcpu));
+			/*
+			 * if failed to handle the mmio trap inject a
+			 * sync error to guest vm to generate a fault
+			 */
+			inject_virtual_abort();
 		} else {
 			if (!dabt->write)
 				set_reg_value(regs, dabt->reg, value);
@@ -273,6 +285,7 @@ static int dataabort_tfl_handler(gp_regs *regs, uint32_t esr_value)
 	default:
 		pr_info("unsupport data abort type this time %d\n",
 				dabt->dfsc & ~FSC_LL_MASK);
+		inject_virtual_abort();
 		break;
 	}
 

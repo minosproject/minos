@@ -27,6 +27,36 @@
 #include <minos/of.h>
 #include <minos/platform.h>
 
+struct aarch64_system_context {
+	uint64_t vbar_el1;
+	uint64_t esr_el1;
+	uint64_t sp_el1;
+	uint64_t sp_el0;
+	uint64_t elr_el1;
+	uint64_t vmpidr;
+	uint64_t vpidr;
+	uint64_t sctlr_el1;
+	uint64_t hcr_el2;
+	uint64_t spsr_el1;
+	uint64_t far_el1;
+	uint64_t actlr_el1;
+	uint64_t tpidr_el1;
+	uint64_t csselr;
+	uint64_t cpacr;
+	uint64_t contextidr;
+	uint64_t tpidr_el0;
+	uint64_t tpidrro_el0;
+	uint64_t cntkctl;
+	uint64_t afsr0;
+	uint64_t afsr1;
+	uint32_t teecr;
+	uint32_t teehbr;
+	uint32_t dacr32_el2;
+	uint32_t ifsr32_el2;
+}__align(sizeof(unsigned long));
+
+#define AARCH64_SYSTEM_VMODULE	"aarch64-system"
+
 extern int el2_stage2_init(void);
 extern int el2_stage1_init(void);
 extern void fdt_vm0_init(struct vm *vm);
@@ -224,34 +254,6 @@ static int aarch64_init_percpu(void)
 }
 arch_initcall_percpu(aarch64_init_percpu);
 
-struct aarch64_system_context {
-	uint64_t vbar_el1;
-	uint64_t esr_el1;
-	uint64_t sp_el1;
-	uint64_t sp_el0;
-	uint64_t elr_el1;
-	uint64_t vmpidr;
-	uint64_t vpidr;
-	uint64_t sctlr_el1;
-	uint64_t hcr_el2;
-	uint64_t spsr_el1;
-	uint64_t far_el1;
-	uint64_t actlr_el1;
-	uint64_t tpidr_el1;
-	uint64_t csselr;
-	uint64_t cpacr;
-	uint64_t contextidr;
-	uint64_t tpidr_el0;
-	uint64_t tpidrro_el0;
-	uint64_t cntkctl;
-	uint64_t afsr0;
-	uint64_t afsr1;
-	uint32_t teecr;
-	uint32_t teehbr;
-	uint32_t dacr32_el2;
-	uint32_t ifsr32_el2;
-}__align(sizeof(unsigned long));
-
 static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
 {
 	struct aarch64_system_context *context =
@@ -379,4 +381,4 @@ static int aarch64_system_init(struct vmodule *vmodule)
 }
 
 MINOS_MODULE_DECLARE(aarch64_system,
-	"aarch64-system", (void *)aarch64_system_init);
+	AARCH64_SYSTEM_VMODULE, (void *)aarch64_system_init);

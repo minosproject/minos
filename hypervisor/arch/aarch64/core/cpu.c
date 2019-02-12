@@ -22,7 +22,7 @@
 #include <minos/vmm.h>
 
 extern unsigned char __smp_affinity_id;
-extern unsigned long smp_holding_address[CONFIG_NR_CPUS];
+extern phy_addr_t smp_holding_address[CONFIG_NR_CPUS];
 
 static inline unsigned long psci_fn(uint32_t id, unsigned long a1,
 		unsigned long a2, unsigned long a3)

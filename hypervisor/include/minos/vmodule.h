@@ -7,10 +7,6 @@
 
 #include <minos/device_id.h>
 
-#define MINOS_MODULE_NAME_IRQCHIP		"irq_chip"
-#define MINOS_MODULE_NAME_MMU			"mmu"
-#define MINOS_MODULE_NAME_SYSTEM		"system"
-
 #define INVAILD_MODULE_ID		(0xffff)
 
 struct vmodule {
@@ -35,11 +31,11 @@ int vcpu_vmodules_init(struct vcpu *vcpu);
 int vcpu_vmodules_deinit(struct vcpu *vcpu);
 int vcpu_vmodules_reset(struct vcpu *vcpu);
 void *get_vmodule_data_by_id(struct vcpu *vcpu, int id);
+void *get_vmodule_data_by_name(struct vcpu *vcpu, char *name);
 void save_vcpu_vmodule_state(struct vcpu *vcpu);
 void restore_vcpu_vmodule_state(struct vcpu *vcpu);
 void suspend_vcpu_vmodule_state(struct vcpu *vcpu);
 void resume_vcpu_vmodule_state(struct vcpu *vcpu);
-int get_vmodule_id(char *type);
 int vmodules_init(void);
 int register_vcpu_vmodule(char *name, vmodule_init_fn fn);
 
