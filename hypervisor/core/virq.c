@@ -72,7 +72,6 @@ static int inline __send_virq(struct vcpu *vcpu, struct virq_desc *desc)
 		virq_struct->active_count++;
 	}
 
-	/* for gicv2 */
 	if (desc->vno < VM_SGI_VIRQ_NR)
 		desc->src = get_vcpu_id(current_vcpu);
 
