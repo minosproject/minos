@@ -63,7 +63,6 @@ int register_hook(hook_func_t fn, enum hook_type type)
 
 	memset((char *)hook, 0, sizeof(struct hook));
 	hook->fn = fn;
-	init_list(&hook->list);
 
 	list_add_tail(&hook_lists[type], &hook->list);
 
