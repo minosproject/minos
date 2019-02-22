@@ -1,0 +1,15 @@
+obj-y += atomic.o
+obj-y += bitops.o
+obj-y += memchr.o
+obj-y += memcmp.o
+obj-y += memcpy.o
+obj-y += memmove.o
+obj-y += memset.o
+obj-y += spinlock.o
+obj-y += strchr.o
+obj-y += strcmp.o
+obj-y += strcpy.o
+obj-y += strlen.o
+obj-y += strncmp.o
+obj-y += strnlen.o
+obj-y += strrchr.o
