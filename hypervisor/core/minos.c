@@ -83,7 +83,7 @@ int do_hooks(void *item, void *context, enum hook_type type)
 void irq_enter(gp_regs *regs)
 {
 	if (taken_from_guest(regs))
-		exit_from_guest(current_vcpu, regs);
+		exit_from_guest(get_current_vcpu(), regs);
 }
 
 void irq_exit(gp_regs *reg)
@@ -94,9 +94,9 @@ void irq_exit(gp_regs *reg)
 	 * if preempt is not allowed and irq is taken from
 	 * guest, then will sched()
 	 */
-	if (need_resched && preempt_allowed() && taken_from_guest(reg)) {
+	if (need_resched() && preempt_allowed() && taken_from_guest(reg)) {
 		sched_new();
-		need_resched = 0;
+		set_need_resched(0);
 	}
 }
 

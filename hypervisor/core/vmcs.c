@@ -24,7 +24,7 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 		unsigned long *result, int nonblock)
 {
 	unsigned long flags;
-	struct vcpu *vcpu = current_vcpu;
+	struct vcpu *vcpu = get_current_vcpu();
 	struct vmcs *vmcs = vcpu->vmcs;
 	struct vm *vm0 = get_vm_by_id(0);
 
@@ -116,7 +116,7 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 
 int setup_vmcs_data(void *data, size_t size)
 {
-	void *base = (void *)current_vcpu->vmcs->data;
+	void *base = (void *)get_current_vcpu()->vmcs->data;
 
 	if (size > VMCS_DATA_SIZE)
 		return -ENOMEM;

@@ -34,7 +34,7 @@ static int std_smc_handler(gp_regs *c,
 	case PSCI_0_2_FN64_CPU_ON:
 	case PSCI_0_2_FN_CPU_ON:
 		pr_info("request vcpu on\n");
-		ret = vcpu_power_on(current_vcpu,
+		ret = vcpu_power_on(get_current_vcpu(),
 				args[0], args[1], args[2]);
 		if (ret)
 			SVC_RET1(c, PSCI_RET_INVALID_PARAMS);
@@ -43,7 +43,7 @@ static int std_smc_handler(gp_regs *c,
 	case PSCI_0_2_FN_CPU_OFF:
 		/* virtual vcpu only support freeze mode */
 		pr_info("request vcpu off\n");
-		ret = vcpu_off(current_vcpu);
+		ret = vcpu_off(get_current_vcpu());
 		if (ret)
 			SVC_RET1(c, PSCI_RET_INTERNAL_FAILURE);
 		break;
@@ -51,7 +51,7 @@ static int std_smc_handler(gp_regs *c,
 		/*
 		 * only can be called by vcpu self
 		 */
-		ret = vcpu_suspend(current_vcpu, c,
+		ret = vcpu_suspend(get_current_vcpu(), c,
 				(uint32_t)args[0], args[1]);
 		if (ret)
 			SVC_RET1(c, PSCI_RET_DENIED);
@@ -69,17 +69,17 @@ static int std_smc_handler(gp_regs *c,
 
 	case PSCI_0_2_FN_SYSTEM_OFF:
 		/* request reset by it self */
-		vm_power_off(get_vmid(current_vcpu), NULL);
+		vm_power_off(get_vmid(get_current_vcpu()), NULL);
 		break;
 
 	case PSCI_0_2_FN_SYSTEM_RESET:
-		vm_reset(get_vmid(current_vcpu), NULL);
+		vm_reset(get_vmid(get_current_vcpu()), NULL);
 		break;
 
 	case PSCI_1_0_FN_SYSTEM_SUSPEND:
 	case PSCI_1_0_FN64_SYSTEM_SUSPEND:
 		/* only can be called by vcpu0 itself */
-		vm_suspend(current_vm->vmid);
+		vm_suspend(get_vmid(get_current_vcpu()));
 		break;
 
 	case PSCI_1_0_FN_PSCI_FEATURES:

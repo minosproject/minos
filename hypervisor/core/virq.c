@@ -73,7 +73,7 @@ static int inline __send_virq(struct vcpu *vcpu, struct virq_desc *desc)
 	}
 
 	if (desc->vno < VM_SGI_VIRQ_NR)
-		desc->src = get_vcpu_id(current_vcpu);
+		desc->src = get_vcpu_id(get_current_vcpu());
 
 	spin_unlock_irqrestore(&virq_struct->lock, flags);
 	return 0;
@@ -129,7 +129,7 @@ static int guest_irq_handler(uint32_t irq, void *data)
 	/* send the virq to the guest */
 	if ((desc->vmid == VIRQ_AFFINITY_VM_ANY) &&
 			(desc->vcpu_id == VIRQ_AFFINITY_VCPU_ANY))
-		vcpu = current_vcpu;
+		vcpu = get_current_vcpu();
 	else
 		vcpu = get_vcpu_by_id(desc->vmid, desc->vcpu_id);
 

@@ -127,7 +127,7 @@ static void dump_register(gp_regs *regs)
 
 void arch_dump_stack(gp_regs *regs, unsigned long *stack)
 {
-	struct vcpu *vcpu = current_vcpu;
+	struct vcpu *vcpu = get_current_vcpu();
 	extern unsigned char __el2_stack_end;
 	unsigned long stack_base;
 	unsigned long fp, lr = 0;

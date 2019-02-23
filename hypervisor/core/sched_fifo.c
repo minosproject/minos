@@ -216,8 +216,7 @@ static int fifo_sched_vcpu(struct pcpu *pcpu, struct vcpu *t)
 
 static unsigned long fifo_tick_handler(struct pcpu *pcpu)
 {
-	next_vcpu = fifo_pick_vcpu(pcpu);
-
+	set_next_vcpu(fifo_pick_vcpu(pcpu));
 	return MILLISECS(50);
 }
 

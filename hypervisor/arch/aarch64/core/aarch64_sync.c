@@ -53,7 +53,7 @@ static int unknown_handler(gp_regs *reg, uint32_t esr_value)
 
 static int wfi_wfe_handler(gp_regs *reg, uint32_t esr_value)
 {
-	vcpu_idle(current_vcpu);
+	vcpu_idle(get_current_vcpu());
 
 	return 0;
 }
@@ -89,7 +89,7 @@ static int mcrr_mrrc_cp15_handler(gp_regs *reg, uint32_t esr_value)
 			reg_value0 = get_reg_value(reg, sysreg->reg1);
 			reg_value1 = get_reg_value(reg, sysreg->reg2);
 			reg_value = (reg_value1 << 32) | reg_value0;
-			vgicv3_send_sgi(current_vcpu, reg_value);
+			vgicv3_send_sgi(get_current_vcpu(), reg_value);
 		}
 		break;
 	}
@@ -198,7 +198,7 @@ static int access_system_reg_handler(gp_regs *reg, uint32_t esr_value)
 		pr_debug("access system reg SGI1R_EL1\n");
 		if (!sysreg->read) {
 			reg_value = get_reg_value(reg, regindex);
-			vgicv3_send_sgi(current_vcpu, reg_value);
+			vgicv3_send_sgi(get_current_vcpu(), reg_value);
 		}
 		break;
 
@@ -271,7 +271,7 @@ static int dataabort_tfl_handler(gp_regs *regs, uint32_t esr_value)
 		ret = vdev_mmio_emulation(regs, dabt->write, paddr, &value);
 		if (ret) {
 			pr_warn("handle mmio read/write fail 0x%x vmid:%d\n",
-					paddr, get_vmid(current_vcpu));
+					paddr, get_vmid(get_current_vcpu()));
 			/*
 			 * if failed to handle the mmio trap inject a
 			 * sync error to guest vm to generate a fault
@@ -475,12 +475,12 @@ void sync_from_lower_EL_handler(gp_regs *data)
 	uint32_t esr_value;
 	int ec_type;
 	struct sync_desc *ec;
-	struct vcpu *vcpu = current_vcpu;
+	struct vcpu *vcpu = get_current_vcpu();
 
 	if ((!vcpu) || (vcpu->affinity != cpuid))
 		panic("this vcpu is not belong to the pcpu");
 
-	exit_from_guest(current_vcpu, data);
+	exit_from_guest(get_current_vcpu(), data);
 
 	esr_value = data->esr_elx;
 	ec_type = (esr_value & 0xfc000000) >> 26;
@@ -498,7 +498,7 @@ void sync_from_lower_EL_handler(gp_regs *data)
 out:
 	local_irq_disable();
 
-	enter_to_guest(current_vcpu, NULL);
+	enter_to_guest(get_current_vcpu(), NULL);
 }
 
 void sync_from_current_EL_handler(gp_regs *data)

@@ -50,7 +50,7 @@ int pcpu_can_idle(struct pcpu *pcpu)
 	if (!sched_can_idle(pcpu))
 		return 0;
 
-	if (need_resched)
+	if (need_resched())
 		return 0;
 
 	return 1;

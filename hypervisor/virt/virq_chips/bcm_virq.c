@@ -94,7 +94,7 @@ static int bcm2835_virq_write(struct vdev *vdev, gp_regs *reg,
 		unsigned long offset, unsigned long *value)
 {
 	uint32_t irq;
-	struct vcpu *vcpu = current_vcpu;
+	struct vcpu *vcpu = get_current_vcpu();
 
 	switch (offset) {
 	case BCM2835_IRQ_ACK:
@@ -222,7 +222,7 @@ static int bcm2836_virq_write(struct vdev *vdev, gp_regs *reg,
 		unsigned long address, unsigned long *write_value)
 {
 	unsigned long offset = address - BCM2836_INC_BASE;
-	struct vcpu *vcpu = current_vcpu;
+	struct vcpu *vcpu = get_current_vcpu();
 	int cpu, irq;
 
 	if (offset >= BCM2835_INC_OFFSET)

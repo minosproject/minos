@@ -204,7 +204,7 @@ static int sched_timer_handler(uint32_t irq, void *data)
 static int virtual_timer_irq_handler(uint32_t irq, void *data)
 {
 	uint32_t value;
-	struct vcpu *vcpu = current_vcpu;
+	struct vcpu *vcpu = get_current_vcpu();
 
 	/*
 	 * if the current vcpu is idle, disable the vtimer

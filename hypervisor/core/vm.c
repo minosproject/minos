@@ -348,7 +348,7 @@ static int vm_resume(struct vm *vm)
 
 static int __vm_suspend(struct vm *vm)
 {
-	struct vcpu *vcpu = current_vcpu;
+	struct vcpu *vcpu = get_current_vcpu();
 
 	pr_info("suspend vm-%d\n", vm->vmid);
 	if (get_vcpu_id(vcpu) != 0) {
@@ -376,7 +376,7 @@ static int __vm_suspend(struct vm *vm)
 	/* call the hooks for suspend */
 	do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_SUSPEND_VM);
 
-	set_vcpu_suspend(current_vcpu);
+	set_vcpu_suspend(get_current_vcpu());
 	sched();
 
 	/* vm is resumed */

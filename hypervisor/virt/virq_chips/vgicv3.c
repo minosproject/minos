@@ -386,7 +386,7 @@ static int vgic_mmio_handler(struct vdev *vdev, gp_regs *regs, int read,
 	unsigned long offset;
 	struct vgic_gicd *gicd = NULL;
 	struct vgic_gicr *gicr = NULL;
-	struct vcpu *vcpu = current_vcpu;
+	struct vcpu *vcpu = get_current_vcpu();
 	struct vgicv3_dev *gic = vdev_to_vgic(vdev);
 
 	gicr = gic->gicr[get_vcpu_id(vcpu)];

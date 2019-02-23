@@ -334,7 +334,7 @@ static int vgicv2_mmio_handler(struct vdev *vdev, gp_regs *regs,
 		int read, unsigned long address, unsigned long *value)
 {
 	unsigned long offset;
-	struct vcpu *vcpu = current_vcpu;
+	struct vcpu *vcpu = get_current_vcpu();
 	struct vgicv2_dev *gic = vdev_to_vgicv2(vdev);
 
 	offset = address - gic->gicd_base;
@@ -393,7 +393,7 @@ static int vgicc_read(struct vdev *vdev, gp_regs *reg,
 		break;
 	case GICC_IAR:
 		/* get the pending irq number */
-		*value = get_pending_virq(current_vcpu);
+		*value = get_pending_virq(get_current_vcpu());
 		break;
 	case GICC_RPR:
 		/* TBD - now fix to 0xa0 */
@@ -428,7 +428,7 @@ static int vgicc_write(struct vdev *vdev, gp_regs *reg,
 		vgicc->gicc_bpr = *value;
 		break;
 	case GICC_EOIR:
-		clear_pending_virq(current_vcpu, *value);
+		clear_pending_virq(get_current_vcpu(), *value);
 		break;
 	case GICC_DIR:
 		/* if the virq is hw to deactive it TBD */

@@ -84,7 +84,7 @@ void switch_to_vcpu(struct vcpu *current, struct vcpu *next)
 void kick_vcpu(struct vcpu *vcpu)
 {
 	unsigned long flags;
-	struct vcpu *current = current_vcpu;
+	struct vcpu *current = get_current_vcpu();
 
 	/*
 	 * if the vcpu is in suspend or idle state
@@ -112,14 +112,15 @@ void kick_vcpu(struct vcpu *vcpu)
 void sched_new(void)
 {
 	struct pcpu *pcpu = get_cpu_var(pcpu);
+	struct vcpu *vcpu = pcpu->sched_class->pick_vcpu(pcpu);
 
-	next_vcpu = pcpu->sched_class->pick_vcpu(pcpu);
+	set_next_vcpu(vcpu);
 }
 
 void sched(void)
 {
 	unsigned long flags;
-	struct vcpu *vcpu, *current = current_vcpu;
+	struct vcpu *vcpu, *current = get_current_vcpu();
 	struct pcpu *pcpu;
 
 	if (in_interrupt)
@@ -134,7 +135,7 @@ void sched(void)
 	if (vcpu != current) {
 		local_irq_save(flags);
 		switch_to_vcpu(current, vcpu);
-		next_vcpu = vcpu;
+		set_next_vcpu(vcpu);
 		dsb();
 		arch_switch_vcpu_sw();
 		local_irq_restore(flags);
@@ -306,7 +307,7 @@ static int resched_handler(uint32_t irq, void *data)
 	}
 
 	if (pcpu->sched_class->flags & SCHED_FLAGS_PREEMPT)
-		need_resched = 1;
+		set_need_resched(1);
 
 	return 0;
 }

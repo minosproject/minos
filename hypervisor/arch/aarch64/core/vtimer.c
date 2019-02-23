@@ -138,7 +138,7 @@ static void vtimer_handle_cntp_ctl(gp_regs *regs,
 	uint32_t v;
 	struct vtimer *vtimer;
 	struct vtimer_context *c = (struct vtimer_context *)
-		get_vmodule_data_by_id(current_vcpu, vtimer_vmodule_id);
+		get_vmodule_data_by_id(get_current_vcpu(), vtimer_vmodule_id);
 	unsigned long ns;
 
 	get_access_vtimer(vtimer, c, access);
@@ -169,7 +169,7 @@ static void vtimer_handle_cntp_tval(gp_regs *regs,
 	unsigned long now;
 	unsigned long ticks;
 	struct vtimer_context *c = (struct vtimer_context *)
-		get_vmodule_data_by_id(current_vcpu, vtimer_vmodule_id);
+		get_vmodule_data_by_id(get_current_vcpu(), vtimer_vmodule_id);
 
 	get_access_vtimer(vtimer, c, access);
 	now = get_sys_ticks() - c->offset;
@@ -194,7 +194,7 @@ static void vtimer_handle_cntp_cval(gp_regs *regs,
 {
 	struct vtimer *vtimer;
 	struct vtimer_context *c = (struct vtimer_context *)
-		get_vmodule_data_by_id(current_vcpu, vtimer_vmodule_id);
+		get_vmodule_data_by_id(get_current_vcpu(), vtimer_vmodule_id);
 	unsigned long ns;
 
 	get_access_vtimer(vtimer, c, access);

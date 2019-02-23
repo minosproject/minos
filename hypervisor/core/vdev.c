@@ -164,7 +164,7 @@ unsigned long create_guest_vdev(struct vm *vm, uint32_t size)
 int vdev_mmio_emulation(gp_regs *regs, int write,
 		unsigned long address, unsigned long *value)
 {
-	struct vm *vm = current_vm;
+	struct vm *vm = get_current_vm();
 	struct vdev *vdev;
 
 	list_for_each_entry(vdev, &vm->vdev_list, list) {

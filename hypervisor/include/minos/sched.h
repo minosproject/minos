@@ -17,19 +17,9 @@
 DECLARE_PER_CPU(struct pcpu *, pcpu);
 DECLARE_PER_CPU(struct vcpu *, percpu_current_vcpu);
 DECLARE_PER_CPU(struct vcpu *, percpu_next_vcpu);
-
 DECLARE_PER_CPU(int, need_resched);
 
-#define current_vcpu		get_cpu_var(percpu_current_vcpu)
-#define next_vcpu		get_cpu_var(percpu_next_vcpu)
-
-#define current_vm		current_vcpu->vm
-
-#define get_vcpu_state(vcpu)	vcpu->state
-#define need_resched		(get_cpu_var(need_resched))
-
 #define SCHED_REASON_IRQ	(0x0)
-
 #define SCHED_FLAGS_PREEMPT	(1 << 0)
 
 typedef enum _pcpu_state_t {
@@ -75,6 +65,46 @@ static inline void set_vcpu_ready(struct vcpu *vcpu)
 static inline void set_vcpu_suspend(struct vcpu *vcpu)
 {
 	set_vcpu_state(vcpu, VCPU_STAT_SUSPEND);
+}
+
+static inline struct vcpu *get_current_vcpu(void)
+{
+	return get_cpu_var(percpu_current_vcpu);
+}
+
+static inline struct vm *get_current_vm(void)
+{
+	return get_cpu_var(percpu_current_vcpu)->vm;
+}
+
+static inline struct vcpu *get_next_vcpu(void)
+{
+	return get_cpu_var(percpu_next_vcpu);
+}
+
+static int inline need_resched(void)
+{
+	return get_cpu_var(need_resched);
+}
+
+static int inline get_vcpu_state(struct vcpu *vcpu)
+{
+	return vcpu->state;
+}
+
+static void inline set_next_vcpu(struct vcpu *vcpu)
+{
+	get_cpu_var(percpu_next_vcpu) = vcpu;
+}
+
+static void inline set_current_vcpu(struct vcpu *vcpu)
+{
+	get_cpu_var(percpu_current_vcpu) = vcpu;
+}
+
+static void inline set_need_resched(int n)
+{
+	get_cpu_var(need_resched) = n;
 }
 
 #endif

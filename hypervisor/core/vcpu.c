@@ -479,8 +479,8 @@ struct vcpu *create_idle_vcpu(void)
 
 	strncpy(idle->name, "idle", 4);
 
-	current_vcpu = idle;
-	next_vcpu = idle;
+	set_current_vcpu(idle);
+	set_next_vcpu(idle);
 
 	return idle;
 }
@@ -507,7 +507,7 @@ void vcpu_power_off_call(void *data)
 	 * may in el2 and el2/el0, force to sched to the
 	 * new vcpu
 	 */
-	if (vcpu == current_vcpu)
+	if (vcpu == get_current_vcpu())
 		sched_new();
 
 	pr_info("power off vcpu-%d-%d done\n", get_vmid(vcpu),
