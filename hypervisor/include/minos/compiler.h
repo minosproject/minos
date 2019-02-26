@@ -10,4 +10,7 @@
 #define __align_cache_line	__align(__cache_line_size__)
 #define __packed__		__attribute__((__packed__))
 
+#define likely(x) __builtin_expect(!!(x), 1)
+#define unlikely(x) __builtin_expect(!!(x), 0)
+
 #endif

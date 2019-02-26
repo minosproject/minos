@@ -50,7 +50,7 @@ void *alloc_boot_pages(int pages)
 	void *base = NULL;
 	size_t request_size = pages * PAGE_SIZE;
 
-	if (pages <= 0)
+	if (unlikely(pages <= 0))
 		return NULL;
 
 	spin_lock(&bootmem_lock);
@@ -77,12 +77,11 @@ void bootmem_init(void)
 
 #ifdef CONFIG_BOOTMEM_SIZE
 	min_size = CONFIG_BOOTMEM_SIZE;
+	if (min_size < BOOTMEM_MIN_SIZE)
+		min_size = BOOTMEM_MIN_SIZE;
 #else
 	min_size = BOOTMEM_MIN_SIZE;
 #endif
-
-	if (min_size < BOOTMEM_MIN_SIZE)
-		min_size = BOOTMEM_MIN_SIZE;
 
 	size = (&__code_end) - (&__code_start);
 	size = PAGE_BALIGN(size);

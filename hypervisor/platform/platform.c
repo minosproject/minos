@@ -39,7 +39,7 @@ int platform_set_to(char *name)
 
 void platform_init(void)
 {
-	if (platform && platform->platform_init)
+	if (platform->platform_init)
 		platform->platform_init();
 }
 

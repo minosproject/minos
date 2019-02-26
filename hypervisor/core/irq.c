@@ -452,7 +452,7 @@ int do_irq_handler(void)
 			return 0;
 
 		d = get_irq_domain(irq);
-		if (!d) {
+		if (unlikely(!d)) {
 			ret = -ENOENT;
 			goto error;
 		}
@@ -460,7 +460,7 @@ int do_irq_handler(void)
 		irq_chip->irq_eoi(irq);
 
 		irq_desc = d->ops->get_irq_desc(d, irq);
-		if (!irq_desc) {
+		if (unlikely(!irq_desc)) {
 			pr_error("irq is not actived %d\n", irq);
 			ret = -EINVAL;
 			goto error;

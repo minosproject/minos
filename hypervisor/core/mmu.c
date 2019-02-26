@@ -439,7 +439,7 @@ int create_early_pmd_mapping(vir_addr_t vir, phy_addr_t phy)
 	pudp = (pud_t *)(*pgd_offset(pgdp, vir) & ~PAGE_MASK);
 	if (!pudp) {
 		pudp = (pud_t *)alloc_boot_pages(1);
-		if (!pudp)
+		if (unlikely(!pudp))
 			return -ENOMEM;
 
 		memset(pudp, 0, PAGE_SIZE);
@@ -450,7 +450,7 @@ int create_early_pmd_mapping(vir_addr_t vir, phy_addr_t phy)
 	pmdp = (pmd_t *)(*pud_offset(pudp, vir) & ~PAGE_MASK);
 	if (!pmdp) {
 		pmdp = (pmd_t *)alloc_boot_pages(1);
-		if (!pmdp)
+		if (unlikely(!pmdp))
 			return -ENOMEM;
 
 		memset(pmdp, 0, PAGE_SIZE);
