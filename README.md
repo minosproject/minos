@@ -214,7 +214,7 @@ Download the image and using dd to flash it to the SD card
 4. Compile ARM Trusted Firmware
 
         # cd ~/minos-workspace/arm-trusted-firmware
-        # make PLAT=fvp RESET_TO_BL31=1 ARM_LINUX_KERNEL_AS_BL33=1 PRELOADED_BL33_BASE=0xc0000000 ARM_PRELOADED_DTB_BASE=0x83e00000
+        # make PLAT=fvp RESET_TO_BL31=1 ARM_LINUX_KERNEL_AS_BL33=1 PRELOADED_BL33_BASE=0xc0000000 ARM_PRELOADED_DTB_BASE=0x83e00000 ENABLE_PIE=0
 
 5. Download ARM64 virtio-block image
 
