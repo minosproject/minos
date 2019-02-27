@@ -14,6 +14,19 @@
 #include <minos/calltrace.h>
 #include <common/hypervisor.h>
 
+#define section_for_each_item_addr(__start_addr, __end_addr, __var)            \
+	size_t _i, _cnt;                                                       \
+	unsigned long _base, _end;                                             \
+	_base = __start_addr;                                                  \
+	_end = __end_addr;                                                     \
+	_cnt = (_end - _base) / sizeof(*(__var));                              \
+	__var = (__typeof__(__var))(_base);                                    \
+	for (_i = 0; _i < _cnt; ++_i, ++(__var))
+
+#define section_for_each_item(__start, __end, __var)                           \
+	section_for_each_item_addr ((unsigned long)&(__start),                 \
+				    (unsigned long)&(__end), __var)
+
 struct vcpu;
 
 typedef int (*hook_func_t)(void *item, void *contex);

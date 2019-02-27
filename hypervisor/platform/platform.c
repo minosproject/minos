@@ -19,33 +19,21 @@
 #include <minos/platform.h>
 #include <minos/of.h>
 
+extern unsigned char __platform_start;
+extern unsigned char __platform_end;
 struct platform *platform = NULL;
 
 int platform_set_to(char *name)
 {
-	int i, count;
-	extern unsigned char __platform_start;
-	extern unsigned char __platform_end;
-	unsigned long pstart;
-	unsigned long pend;
 	struct platform **pp;
 	struct platform *p;
-
-	pstart =(unsigned long)&__platform_start;
-	pend = (unsigned long)&__platform_end;
-	count = (pend - pstart) / sizeof(struct platform *);
-	pp = (struct platform **)pstart;
-
-	for (i = 0; i < count; i++) {
+	section_for_each_item (__platform_start, __platform_end, pp) {
 		p = *pp;
 		if (strcmp(p->name, name) == 0) {
 			platform = p;
 			break;
 		}
-
-		pp++;
 	}
-
 	return 0;
 }
 

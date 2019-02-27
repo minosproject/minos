@@ -214,23 +214,12 @@ void resume_vcpu_vmodule_state(struct vcpu *vcpu)
 
 int vmodules_init(void)
 {
-	int32_t i;
-	unsigned long base, end;
-	uint32_t size;
 	struct module_id *mid;
 	struct vmodule *vmodule;
-
-	base = (unsigned long)&__vmodule_start;
-	end = (unsigned long)&__vmodule_end;
-	size = (end - base) / sizeof(struct module_id);
-
-	for (i = 0; i < size; i++) {
-		mid = (struct module_id *)base;
+	section_for_each_item (__vmodule_start, __vmodule_end, mid) {
 		vmodule = create_vmodule(mid);
 		if (!vmodule)
 			pr_error("Can not create vmodule\n");
-
-		base += sizeof(struct module_id);
 	}
 
 	return 0;

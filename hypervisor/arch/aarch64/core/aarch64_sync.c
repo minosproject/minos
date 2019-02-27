@@ -519,23 +519,14 @@ void sync_from_current_EL_handler(gp_regs *data)
 
 static int aarch64_sync_init(void)
 {
-	int size, i;
-	unsigned long start, end;
 	struct sync_desc *desc;
 
 	memset((char *)sync_descs, 0, MAX_SYNC_TYPE
 			* sizeof(struct sync_desc *));
 
-	start = (unsigned long)&__sync_desc_start;
-	end = (unsigned long)&__sync_desc_end;
-	size = (end - start) / sizeof(struct sync_desc);
-	desc = (struct sync_desc *)start;
-
-	for (i = 0; i < size; i++) {
+	section_for_each_item (__sync_desc_start, __sync_desc_end, desc) {
 		sync_descs[desc->type] = desc;
-		desc++;
 	}
-
 	return 0;
 }
 
