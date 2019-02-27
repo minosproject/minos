@@ -39,22 +39,25 @@ int do_svc_handler(gp_regs *regs, uint32_t svc_id, uint64_t *args, int smc)
 
 	type = (svc_id & SVC_STYPE_MASK) >> 24;
 
-	if (type > SVC_STYPE_MAX) {
+	if (unlikely(type > SVC_STYPE_MAX)) {
 		pr_error("Unsupported SVC type %d\n", type);
-		SVC_RET1(regs, -EINVAL);
+		goto invalid;
 	}
 
 	desc = table[type];
-	if (!desc)
-		SVC_RET1(regs, -EINVAL);
+	if (unlikely(!desc))
+		goto invalid;
 
 	pr_debug("doing SVC Call %s:0x%x\n", desc->name, svc_id);
 
 	return desc->handler(regs, svc_id, args);
+
+invalid:
+	SVC_RET1(regs, -EINVAL);
 }
 
-static int parse_svc_desc(unsigned long start,
-		unsigned long end, struct svc_desc **table)
+static void parse_svc_desc(unsigned long start, unsigned long end,
+			   struct svc_desc **table)
 {
 	int size, i, j;
 	struct svc_desc *desc = (struct svc_desc *)start;
@@ -62,14 +65,8 @@ static int parse_svc_desc(unsigned long start,
 	size = (end - start) / sizeof(struct svc_desc);
 
 	for (i = 0; i < size; i++) {
-		if ((desc->type_start > desc->type_end) ||
-				(desc->type_end >= SVC_STYPE_MAX)) {
-			pr_warn("Invaild argument for SVC_DESC:%s\n",
-					desc->name);
-			desc++;
-			continue;
-		}
-
+		BUG_ON((desc->type_start > desc->type_end) ||
+		       (desc->type_end >= SVC_STYPE_MAX));
 		for (j = desc->type_start; j <= desc->type_end; j++) {
 			if (table[j])
 				pr_warn("overwrite SVC_DESC:%d %s\n",
@@ -79,8 +76,6 @@ static int parse_svc_desc(unsigned long start,
 
 		desc++;
 	}
-
-	return 0;
 }
 
 static int svc_service_init(void)

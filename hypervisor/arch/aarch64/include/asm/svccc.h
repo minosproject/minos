@@ -4,6 +4,8 @@
 #include <asm/arch.h>
 
 /*
+ * ARM_DEN0028B_SMC_Calling_Convention.pdf
+ * Table 2-1 Bit usage within the SMC and HVC Function Identifier
  * bit[31] 	: 0-yielding call 1-fast call
  * bit[30] 	: 0-smc32/hvc32 1-smc64/hvc64
  * bit[29:24]	: service call ranges SVC_STYPE_XX
@@ -91,19 +93,7 @@ struct svc_desc {
 		.handler = h, \
 	}
 
-int do_svc_handler(gp_regs *regs, uint32_t svc_id,
-		uint64_t *args, int smc);
-
-static int inline do_smc_handler(gp_regs *regs,
-		uint32_t svc_id, uint64_t *args)
-{
-	return do_svc_handler(regs, svc_id, args, 1);
-}
-
-static int inline do_hvc_handler(gp_regs *regs,
-		uint32_t svc_id, uint64_t *args)
-{
-	return do_svc_handler(regs, svc_id, args, 0);
-}
+extern int do_svc_handler(gp_regs *regs, uint32_t svc_id, uint64_t *args,
+			  int smc);
 
 #endif

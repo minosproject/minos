@@ -485,6 +485,7 @@ void sync_from_lower_EL_handler(gp_regs *data)
 	esr_value = data->esr_elx;
 	ec_type = (esr_value & 0xfc000000) >> 26;
 
+	pr_debug("sync from lower EL, handle 0x%x\n", ec_type);
 	ec = sync_descs[ec_type];
 	if (ec == NULL)
 		goto out;
@@ -517,6 +518,14 @@ void sync_from_current_EL_handler(gp_regs *data)
 	__panic(data, "system hang due to sync error in EL2\n");
 }
 
+void sync_c_handler(gp_regs *regs)
+{
+	if (taken_from_guest(regs))
+		sync_from_lower_EL_handler(regs);
+	else
+		sync_from_current_EL_handler(regs);
+}
+
 static int aarch64_sync_init(void)
 {
 	struct sync_desc *desc;
@@ -528,14 +537,6 @@ static int aarch64_sync_init(void)
 		sync_descs[desc->type] = desc;
 	}
 	return 0;
-}
-
-void sync_c_handler(gp_regs *regs)
-{
-	if (taken_from_guest(regs))
-		sync_from_lower_EL_handler(regs);
-	else
-		sync_from_current_EL_handler(regs);
 }
 
 arch_initcall(aarch64_sync_init);
