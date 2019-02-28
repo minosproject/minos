@@ -23,6 +23,7 @@ default_config = {
     'CONFIG_LOG_LEVEL': ['3', 1],
     'CONFIG_MINOS_START_ADDRESS': ['0x0', 1],
     'CONFIG_BOOTMEM_SIZE': ['64K', 1],
+    'CONFIG_MAX_MAILBOX_NR': ['10', 1],
 }
 
 

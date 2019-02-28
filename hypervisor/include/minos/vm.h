@@ -105,6 +105,11 @@ static inline int vm_is_native(struct vm *vm)
 	return !!(vm->flags & VM_FLAGS_NATIVE);
 }
 
+static inline int vm_id(struct vm *vm)
+{
+	return vm->vmid;
+}
+
 static inline int
 create_vm_mmap(int vmid,  unsigned long offset, unsigned long size)
 {

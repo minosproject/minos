@@ -28,8 +28,27 @@
 			vcpus = <1>;
 			entry = <0x0 0x80080000>;
 			vcpu_affinity = <0 1>;
-			memory = <0x0 0x80000000 0x0 0x8000000>;
+			memory = <0x0 0x80000000 0x0 0x08000000>;
+			shmem = <0x0 0xc0000000 0x0 0x1000000>;
 		};
+/*
+		vm1 {
+			device_type = "virtual_machine";
+			vmid = <1>;
+			vm_name = "fvp_linux_vm1";
+			type = "linux";
+			vcpus = "2";
+			entry = <0x0 0x90080000>;
+			setup_data = <0x0 0x97e00000>;
+			vcpu_affinity = <1 2>;
+			memory = <0x0 0x90000000 0x0 0x08000000>;;
+			shmem = <0x0 0xc0000000 0x0 0x10000000>;
+		};
+
+		vm_mailboxs {
+
+		}
+*/
 	};
 
 	psci {

@@ -15,6 +15,9 @@ typedef void * (*of_iterate_fn)(struct device_node *, void *arg);
 
 extern struct device_node *hv_node;
 
+#define of_node_for_each_child(node, child)	\
+	for (child = node->child; child != NULL; child = child->sibling)
+
 static fdt32_t inline cpu_to_of32(uint32_t v)
 {
 	return cpu_to_fdt32(v);
@@ -70,6 +73,9 @@ struct device_node *of_parse_device_tree(void *data);
 void of_release_all_node(struct device_node *node);
 void *of_device_node_match(struct device_node *node, void *s, void *e);
 int of_get_phandle(struct device_node *node);
+
+struct device_node *
+of_find_node_by_name(struct device_node *root, char *name);
 
 static inline int of_get_u64_array(struct device_node *node,
 		char *attr, uint64_t *array, int len)

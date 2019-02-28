@@ -4,11 +4,13 @@
 /* below defination is for HVC call */
 #define HVC_TYPE_HVC_VM0		(0x8)
 #define HVC_TYPE_HVC_MISC		(0x9)
+#define HVC_TYPE_HVC_MAILBOX		(0xa)
 
 #define HVC_CALL_BASE			(0xc0000000)
 
 #define HVC_VM0_FN(n)			(HVC_CALL_BASE + (HVC_TYPE_HVC_VM0 << 24) + n)
 #define HVC_MISC_FN(n)			(HVC_CALL_BASE + (HVC_TYPE_HVC_MISC << 24) + n)
+#define HVC_MAILBOX_FN(n)		(HVC_CALL_BASE + (HVC_TYPE_HVC_MAILBOX << 24) + n)
 
 /* hypercall for vm releated operation */
 #define	HVC_VM_CREATE			HVC_VM0_FN(0)
@@ -25,5 +27,11 @@
 #define HVC_VM_VIRTIO_MMIO_INIT		HVC_VM0_FN(11)
 #define HVC_VM_VIRTIO_MMIO_DEINIT	HVC_VM0_FN(12)
 #define HVC_VM_CREATE_HOST_VDEV		HVC_VM0_FN(13)
+
+#define HVC_MAILBOX_QUERY_INSTANCE	HVC_MAILBOX_FN(0)
+#define HVC_MAILBOX_GET_INFO		HVC_MAILBOX_FN(1)
+#define HVC_MAILBOX_CONNECT		HVC_MAILBOX_FN(2)
+#define HVC_MAILBOX_DISCONNECT		HCV_MAILBOX_FN(3)
+#define HVC_MAILBOX_POST_EVENT		HVC_MAILBOX_FN(4)
 
 #endif

@@ -74,7 +74,8 @@ static inline struct vcpu *get_current_vcpu(void)
 
 static inline struct vm *get_current_vm(void)
 {
-	return get_cpu_var(percpu_current_vcpu)->vm;
+	struct vcpu *vcpu = get_current_vcpu();
+	return vcpu->vm;
 }
 
 static inline struct vcpu *get_next_vcpu(void)

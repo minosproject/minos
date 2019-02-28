@@ -211,6 +211,11 @@ out:
 	return ret;
 }
 
+/*
+ * map VMx virtual memory to hypervisor memory
+ * space to let hypervisor can access guest vm's
+ * memory
+ */
 void *map_vm_mem(unsigned long gva, size_t size)
 {
 	unsigned long pa;
@@ -227,10 +232,18 @@ void unmap_vm_mem(unsigned long gva, size_t size)
 {
 	unsigned long pa;
 
+	/*
+	 * what will happend if this 4k mapping is used
+	 * in otherwhere
+	 */
 	pa = guest_va_to_pa(gva, 1);
 	destroy_host_mapping(pa, size);
 }
 
+/*
+ * map the guest vm memory space to vm0 to let vm0
+ * can access all the memory space of the guest vm
+ */
 int vm_mmap(struct vm *vm, unsigned long offset, unsigned long size)
 {
 	unsigned long vir, phy, value;
@@ -335,6 +348,7 @@ void vm_unmmap(struct vm *vm)
 	flush_local_tlb_guest();
 }
 
+/* alloc physical memory for guest vm */
 int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size)
 {
 	int i, count;
@@ -434,6 +448,43 @@ void vm_mm_struct_init(struct vm *vm)
 		mm->gvm_iomem_base = GVM_IO_MEM_START + SIZE_1G;
 		mm->gvm_iomem_size = GVM_IO_MEM_SIZE - SIZE_1G;
 	}
+}
+
+void vm_init_shmem(struct vm *vm, uint64_t base, uint64_t size)
+{
+	struct mm_struct *mm = &vm->mm;
+
+	if (!vm_is_native(vm)) {
+		pr_error("vm is not native vm can not init shmem\n");
+		return;
+	}
+
+	pr_info("find shmem info for vm-%d 0x%x 0x%x\n",
+			vm_id(vm), base, size);
+	mm->shmem_base = base;
+	mm->shmem_size = size;
+}
+
+void *vm_map_shmem(struct vm *vm, void *phy, uint32_t size,
+		unsigned long flags)
+{
+	int ret;
+	void *base;
+	struct mm_struct *mm = &vm->mm;
+
+	if (mm->shmem_size < size)
+		return NULL;
+
+	ret = create_guest_mapping(vm, (vir_addr_t)mm->shmem_base,
+			(phy_addr_t)phy, size, flags);
+	if (ret)
+		return NULL;
+
+	base = (void *)mm->shmem_base;
+	mm->shmem_base += size;
+	mm->shmem_size -= size;
+
+	return base;
 }
 
 int vm_mm_init(struct vm *vm)

@@ -29,3 +29,4 @@ obj-y += vm.o
 obj-y += vmcs.o
 obj-y += vmm.o
 obj-y += vmodule.o
+obj-y += mailbox.o

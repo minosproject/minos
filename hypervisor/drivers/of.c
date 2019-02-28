@@ -231,6 +231,8 @@ static int of_parse_dt_class(struct device_node *node)
 			node->class = DT_CLASS_MEMORY;
 		else if (strcmp(type, "pci") == 0)
 			node->class = DT_CLASS_PCI_BUS;
+		else if (strcmp(type, "virtual_machine"))
+			node->class = DT_CLASS_VM;
 		else
 			node->class = DT_CLASS_OTHER;
 	} else {
@@ -394,11 +396,26 @@ static void *find_node_by_compatible(struct device_node *node, void *comp)
 	return NULL;
 }
 
+static void *find_node_by_name(struct device_node *node, void *name)
+{
+	if (node->name && !(strcmp(node->name, (char *)name)))
+		return node;
+
+	return NULL;
+}
+
 struct device_node *
 of_find_node_by_compatible(struct device_node *root, char **comp)
 {
 	return (struct device_node *)__iterate_device_node(root,
 			find_node_by_compatible, (void *)comp, 0);
+}
+
+struct device_node *
+of_find_node_by_name(struct device_node *root, char *name)
+{
+	return (struct device_node *)__iterate_device_node(root,
+			find_node_by_name, (void *)name, 0);
 }
 
 int of_n_addr_cells(struct device_node *node)
