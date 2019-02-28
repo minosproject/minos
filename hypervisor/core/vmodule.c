@@ -57,8 +57,12 @@ static struct vmodule *create_vmodule(struct module_id *id)
 
 int register_vcpu_vmodule(const char *name, vmodule_init_fn fn)
 {
-	struct module_id mid = {.name = name, .comp = NULL, .data = fn};
 	struct vmodule *vmodule;
+	struct module_id mid = {
+		.name = (char *)name,
+		.comp = NULL,
+		.data = fn
+	};
 
 	vmodule = create_vmodule(&mid);
 	if (!vmodule)
