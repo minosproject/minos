@@ -55,15 +55,10 @@ static struct vmodule *create_vmodule(struct module_id *id)
 	return vmodule;
 }
 
-int register_vcpu_vmodule(char *name, vmodule_init_fn fn)
+int register_vcpu_vmodule(const char *name, vmodule_init_fn fn)
 {
-	struct module_id mid;
+	struct module_id mid = {.name = name, .comp = NULL, .data = fn};
 	struct vmodule *vmodule;
-
-	memset(&mid, 0, sizeof(struct module_id));
-	mid.data = fn;
-	mid.comp = NULL;
-	strncpy(mid.name, name, strlen(name) > 31 ? 31 : strlen(name));
 
 	vmodule = create_vmodule(&mid);
 	if (!vmodule)

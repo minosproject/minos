@@ -37,6 +37,6 @@ void restore_vcpu_vmodule_state(struct vcpu *vcpu);
 void suspend_vcpu_vmodule_state(struct vcpu *vcpu);
 void resume_vcpu_vmodule_state(struct vcpu *vcpu);
 int vmodules_init(void);
-int register_vcpu_vmodule(char *name, vmodule_init_fn fn);
+int register_vcpu_vmodule(const char *name, vmodule_init_fn fn);
 
 #endif
