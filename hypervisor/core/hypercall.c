@@ -23,16 +23,15 @@
 #include <minos/virtio.h>
 #include <minos/vmcs.h>
 
-static int vcpu_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
-{
-	return 0;
-}
-
 static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 {
-	int vmid = -1;
+	int vmid = -1, ret;
 	unsigned long addr;
+	unsigned long gbase = 0, hbase = 0;
 	struct vm *vm = get_vm_by_id((int)args[0]);
+
+	if (!vm_is_hvm(get_current_vm()))
+		panic("only vm0 can call vm related hypercall\n");
 
 	switch (id) {
 	case HVC_VM_CREATE:
@@ -90,6 +89,19 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 		vmid = vm_create_vmcs_irq(vm, (int)args[1]);
 		HVC_RET1(c, vmid);
 		break;
+
+	case HVC_VM_VIRTIO_MMIO_INIT:
+		ret = virtio_mmio_init(vm, args[1], &gbase, &hbase);
+		HVC_RET3(c, ret, gbase, hbase);
+		break;
+	case HVC_VM_VIRTIO_MMIO_DEINIT:
+		ret = virtio_mmio_deinit(vm);
+		HVC_RET1(c, 0);
+		break;
+	case HVC_VM_CREATE_HOST_VDEV:
+		ret = vm_create_host_vdev(vm);
+		HVC_RET1(c, ret);
+		break;
 	default:
 		pr_error("unsupport vm hypercall");
 		break;
@@ -98,45 +110,13 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 	HVC_RET1(c, -EINVAL);
 }
 
-static int pm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
-{
-	return 0;
-}
-
 static int misc_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 {
-	int ret;
-	unsigned long gbase = 0, hbase = 0;
-	struct vm *vm = get_vm_by_id((int)args[0]);
-
-	switch (id) {
-	case HVC_MISC_VIRTIO_MMIO_INIT:
-		ret = virtio_mmio_init(vm, args[1], &gbase, &hbase);
-		HVC_RET3(c, ret, gbase, hbase);
-		break;
-	case HVC_MISC_VIRTIO_MMIO_DEINIT:
-		ret = virtio_mmio_deinit(vm);
-		HVC_RET1(c, 0);
-		break;
-	case HVC_MISC_CREATE_HOST_VDEV:
-		ret = vm_create_host_vdev(vm);
-		HVC_RET1(c, ret);
-		break;
-	default:
-		break;
-	}
-
 	HVC_RET1(c, -EINVAL);
 }
 
-DEFINE_HVC_HANDLER("vcpu_hvc_handler", HVC_TYPE_HVC_VCPU,
-		HVC_TYPE_HVC_VCPU, vcpu_hvc_handler);
-
-DEFINE_HVC_HANDLER("vm_hvc_handler", HVC_TYPE_HVC_VM,
-		HVC_TYPE_HVC_VM, vm_hvc_handler);
-
-DEFINE_HVC_HANDLER("pm_hvc_handler", HVC_TYPE_HVC_PM,
-		HVC_TYPE_HVC_PM, pm_hvc_handler);
+DEFINE_HVC_HANDLER("vm_hvc_handler", HVC_TYPE_HVC_VM0,
+		HVC_TYPE_HVC_VM0, vm_hvc_handler);
 
 DEFINE_HVC_HANDLER("misc_hvc_handler", HVC_TYPE_HVC_MISC,
 		HVC_TYPE_HVC_MISC, misc_hvc_handler);
