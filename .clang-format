@@ -413,6 +413,8 @@ ForEachMacros:
   - 'xas_for_each_conflict'
   - 'xas_for_each_marked'
   - 'zorro_for_each_dev'
+  - 'section_for_each_item_addr'
+  - 'section_for_each_item'
 
 #IncludeBlocks: Preserve # Unknown to clang-format-5.0
 IncludeCategories:
