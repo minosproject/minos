@@ -59,22 +59,18 @@ invalid:
 static void parse_svc_desc(unsigned long start, unsigned long end,
 			   struct svc_desc **table)
 {
-	int size, i, j;
-	struct svc_desc *desc = (struct svc_desc *)start;
+	struct svc_desc *desc;
+	int32_t j;
 
-	size = (end - start) / sizeof(struct svc_desc);
-
-	for (i = 0; i < size; i++) {
+	section_for_each_item_addr(start, end, desc) {
 		BUG_ON((desc->type_start > desc->type_end) ||
 		       (desc->type_end >= SVC_STYPE_MAX));
 		for (j = desc->type_start; j <= desc->type_end; j++) {
 			if (table[j])
-				pr_warn("overwrite SVC_DESC:%d %s\n",
-						j, desc->name);
+				pr_warn("overwrite SVC_DESC:%d %s\n", j,
+					desc->name);
 			table[j] = desc;
 		}
-
-		desc++;
 	}
 }
 
@@ -83,9 +79,9 @@ static int svc_service_init(void)
 	pr_info("parsing SMC/HVC handler\n");
 
 	parse_svc_desc((unsigned long)&__hvc_handler_start,
-			(unsigned long)&__hvc_handler_end, hvc_descs);
+		       (unsigned long)&__hvc_handler_end, hvc_descs);
 	parse_svc_desc((unsigned long)&__smc_handler_start,
-			(unsigned long)&__smc_handler_end, smc_descs);
+		       (unsigned long)&__smc_handler_end, smc_descs);
 
 	return 0;
 }
