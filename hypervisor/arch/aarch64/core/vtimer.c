@@ -27,7 +27,7 @@
 static uint32_t __hw_virtual_irq;
 static uint32_t	__hw_phy_irq;
 
-int vtimer_vmodule_id = INVAILD_MODULE_ID;
+int vtimer_vmodule_id = INVALID_MODULE_ID;
 
 #define get_access_vtimer(vtimer, c, access)		\
 	do {						\

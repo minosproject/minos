@@ -24,7 +24,7 @@
 	for (_i = 0; _i < _cnt; ++_i, ++(__var))
 
 #define section_for_each_item(__start, __end, __var)                           \
-	section_for_each_item_addr ((unsigned long)&(__start),                 \
+	section_for_each_item_addr((unsigned long)&(__start),                  \
 				    (unsigned long)&(__end), __var)
 
 struct vcpu;

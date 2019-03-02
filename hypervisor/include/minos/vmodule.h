@@ -7,7 +7,7 @@
 
 #include <minos/device_id.h>
 
-#define INVAILD_MODULE_ID		(0xffff)
+#define INVALID_MODULE_ID (0xffff)
 
 struct vmodule {
 	char name[32];
@@ -31,7 +31,7 @@ int vcpu_vmodules_init(struct vcpu *vcpu);
 int vcpu_vmodules_deinit(struct vcpu *vcpu);
 int vcpu_vmodules_reset(struct vcpu *vcpu);
 void *get_vmodule_data_by_id(struct vcpu *vcpu, int id);
-void *get_vmodule_data_by_name(struct vcpu *vcpu, char *name);
+void *get_vmodule_data_by_name(struct vcpu *vcpu, const char *name);
 void save_vcpu_vmodule_state(struct vcpu *vcpu);
 void restore_vcpu_vmodule_state(struct vcpu *vcpu);
 void suspend_vcpu_vmodule_state(struct vcpu *vcpu);

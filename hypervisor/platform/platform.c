@@ -23,18 +23,17 @@ extern unsigned char __platform_start;
 extern unsigned char __platform_end;
 struct platform *platform = NULL;
 
-int platform_set_to(char *name)
+void platform_set_to(const char *name)
 {
 	struct platform **pp;
 	struct platform *p;
-	section_for_each_item (__platform_start, __platform_end, pp) {
+	section_for_each_item(__platform_start, __platform_end, pp) {
 		p = *pp;
 		if (strcmp(p->name, name) == 0) {
 			platform = p;
 			break;
 		}
 	}
-	return 0;
 }
 
 void platform_init(void)

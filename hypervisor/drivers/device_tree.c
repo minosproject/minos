@@ -145,7 +145,7 @@ static void fdt_setup_platform(void)
 	data = fdt_getprop(dtb, 0, "compatible", &len);
 	if (data) {
 		pr_info("platform : %s\n", (char *)data);
-		platform_set_to((char *)data);
+		platform_set_to((const char *)data);
 	}
 }
 

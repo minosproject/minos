@@ -32,18 +32,15 @@ static struct vmodule *create_vmodule(struct module_id *id)
 	struct vmodule *vmodule;
 	vmodule_init_fn fn;
 
-	vmodule = (struct vmodule *)
-		malloc(sizeof(struct vmodule));
+	vmodule = (struct vmodule *)malloc(sizeof(*vmodule));
 	if (!vmodule) {
-		pr_error("No more memory for vmodule\n");
 		return NULL;
 	}
 
-	memset((char *)vmodule, 0, sizeof(struct vmodule));
-	strncpy(vmodule->name, id->name, 31);
+	memset((char *)vmodule, 0, sizeof(*vmodule));
+	strncpy(vmodule->name, id->name, sizeof(vmodule->name) - 1);
 	init_list(&vmodule->list);
-	vmodule->id = vmodule_class_nr;
-	vmodule_class_nr++;
+	vmodule->id = vmodule_class_nr++;
 
 	/* call init routine */
 	if (id->data) {
@@ -65,8 +62,10 @@ int register_vcpu_vmodule(const char *name, vmodule_init_fn fn)
 	};
 
 	vmodule = create_vmodule(&mid);
-	if (!vmodule)
+	if (!vmodule) {
 		pr_error("create vmodule %s failed\n", name);
+		return -ENOMEM;
+	}
 
 	return 0;
 }
@@ -76,17 +75,19 @@ void *get_vmodule_data_by_id(struct vcpu *vcpu, int id)
 	return vcpu->vmodule_context[id];
 }
 
-void *get_vmodule_data_by_name(struct vcpu *vcpu, char *name)
+void *get_vmodule_data_by_name(struct vcpu *vcpu, const char *name)
 {
 	struct vmodule *vmodule;
-	int id = INVAILD_MODULE_ID;
+	int id = INVALID_MODULE_ID;
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
-		if (strcmp(vmodule->name, name) == 0)
+		if (strcmp(vmodule->name, name) == 0) {
 			id = vmodule->id;
+			break;
+		}
 	}
 
-	if (id != INVAILD_MODULE_ID)
+	if (id != INVALID_MODULE_ID)
 		return vcpu->vmodule_context[id];
 
 	return NULL;
@@ -216,10 +217,10 @@ int vmodules_init(void)
 {
 	struct module_id *mid;
 	struct vmodule *vmodule;
-	section_for_each_item (__vmodule_start, __vmodule_end, mid) {
+	section_for_each_item(__vmodule_start, __vmodule_end, mid) {
 		vmodule = create_vmodule(mid);
 		if (!vmodule)
-			pr_error("Can not create vmodule\n");
+			pr_error("create vmodule %s failed\n", mid->name);
 	}
 
 	return 0;

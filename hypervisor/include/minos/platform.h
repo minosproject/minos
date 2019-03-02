@@ -6,7 +6,7 @@
 struct vm;
 
 struct platform {
-	char *name;
+	const char *name;
 	int (*cpu_on)(unsigned long cpu, unsigned long entry);
 	int (*cpu_off)(unsigned long cpu);
 	void (*system_reboot)(int mode, const char *cmd);
@@ -24,6 +24,6 @@ extern struct platform *platform;
 	static struct platform *__platform__##pl __used \
 		__section(".__platform") = &pl
 
-int platform_set_to(char *name);
+extern void platform_set_to(const char *name);
 
 #endif
