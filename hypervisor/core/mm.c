@@ -1261,9 +1261,6 @@ int mm_init(void)
 {
 	pr_info("dynamic memory allocator init..\n");
 
-	nr_sections = 0;
-	memset(mem_sections, 0, sizeof(mem_sections));
-
 	/*
 	 * first need init the slab allocator then
 	 * parsing the memroy region to the hypervisor

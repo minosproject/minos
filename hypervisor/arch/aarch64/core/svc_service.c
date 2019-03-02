@@ -82,9 +82,6 @@ static int svc_service_init(void)
 {
 	pr_info("parsing SMC/HVC handler\n");
 
-	memset((char *)smc_descs, 0, sizeof(struct svc_desc *) * SVC_STYPE_MAX);
-	memset((char *)hvc_descs, 0, sizeof(struct svc_desc *) * SVC_STYPE_MAX);
-
 	parse_svc_desc((unsigned long)&__hvc_handler_start,
 			(unsigned long)&__hvc_handler_end, hvc_descs);
 	parse_svc_desc((unsigned long)&__smc_handler_start,

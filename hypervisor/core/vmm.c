@@ -458,7 +458,6 @@ int vmm_init(void)
 
 static int vmm_early_init(void)
 {
-	memset(&host_mm, 0, sizeof(struct mm_struct));
 	spin_lock_init(&host_mm.lock);
 	host_mm.pgd_base = (unsigned long)&__el2_ttb0_pgd;
 

@@ -161,7 +161,6 @@ void smp_init(void)
 		memset(cd, 0, sizeof(struct smp_call_data));
 	}
 
-	memset(smp_holding_address, 0, sizeof(phy_addr_t) * CONFIG_NR_CPUS);
 	arch_smp_init(smp_holding_address);
 
 	request_irq_percpu(SMP_FUNCTION_CALL_IRQ,

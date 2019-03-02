@@ -149,7 +149,6 @@ void pcpus_init(void)
 
 	for (i = 0; i < NR_CPUS; i++) {
 		pcpu = &pcpus[i];
-		memset(pcpu, 0, sizeof(struct pcpu));
 		pcpu->state = PCPU_STATE_OFFLINE;
 		init_list(&pcpu->vcpu_list);
 		pcpu->pcpu_id = i;

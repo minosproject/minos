@@ -530,12 +530,10 @@ static int aarch64_sync_init(void)
 {
 	struct sync_desc *desc;
 
-	memset((char *)sync_descs, 0, MAX_SYNC_TYPE
-			* sizeof(struct sync_desc *));
-
 	section_for_each_item(__sync_desc_start, __sync_desc_end, desc) {
 		sync_descs[desc->type] = desc;
 	}
+
 	return 0;
 }
 
