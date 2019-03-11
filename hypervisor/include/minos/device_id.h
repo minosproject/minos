@@ -43,7 +43,7 @@ struct device_node {
 };
 
 struct module_id {
-	char *name;
+	const char *name;
 	char **comp;
 	void *data;
 };

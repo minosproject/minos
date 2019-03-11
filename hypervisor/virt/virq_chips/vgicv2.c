@@ -648,7 +648,7 @@ static void gicv2_state_init(struct vcpu *vcpu, void *context)
 {
 	struct gicv2_context *c = (struct gicv2_context *)context;
 
-	memset(c, 0, sizeof(struct gicv2_context));
+	memset(c, 0, sizeof(*c));
 	c->hcr = 1;
 }
 

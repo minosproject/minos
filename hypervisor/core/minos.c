@@ -57,11 +57,11 @@ int register_hook(hook_func_t fn, enum hook_type type)
 		return -EINVAL;
 	}
 
-	hook = (struct hook *)malloc(sizeof(struct hook));
+	hook = malloc(sizeof(*hook));
 	if (!hook)
 		return -ENOMEM;
 
-	memset((char *)hook, 0, sizeof(struct hook));
+	memset(hook, 0, sizeof(*hook));
 	hook->fn = fn;
 
 	list_add_tail(&hook_lists[type], &hook->list);

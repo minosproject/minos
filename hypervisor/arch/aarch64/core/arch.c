@@ -204,7 +204,7 @@ void arch_init_vcpu(struct vcpu *vcpu, void *entry)
 	struct vm *vm = vcpu->vm;
 
 	regs = stack_to_gp_regs(vcpu->stack_origin);
-	memset((char *)regs, 0, sizeof(gp_regs));
+	memset(regs, 0, sizeof(gp_regs));
 	vcpu->stack_base = vcpu->stack_origin - sizeof(gp_regs);
 
 	arch_init_gp_regs(regs, entry, vcpu->is_idle, vm_is_64bit(vm));
@@ -259,7 +259,7 @@ static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
 	struct aarch64_system_context *context =
 			(struct aarch64_system_context *)c;
 
-	memset(context, 0, sizeof(struct aarch64_system_context));
+	memset(context, 0, sizeof(*context));
 
 	/*
 	 * HVC : enable hyper call function

@@ -79,7 +79,7 @@ int vm_suspend(int vmid);
 
 static inline struct vm *get_vm_by_id(uint32_t vmid)
 {
-	if (vmid >= CONFIG_MAX_VM)
+	if (unlikely(vmid >= CONFIG_MAX_VM))
 		return NULL;
 
 	return vms[vmid];

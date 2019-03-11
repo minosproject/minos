@@ -76,22 +76,6 @@ void get_vcpu_affinity(uint32_t *aff, int nr)
 	spin_unlock(&affinity_lock);
 }
 
-static int vcpu_affinity_init(void)
-{
-	struct vm *vm0 = get_vm_by_id(0);
-
-	if (!vm0)
-		panic("vm0 is not created\n");
-
-	e_base_current = e_base = vm0->vcpu_nr;
-	e_nr =  NR_CPUS - vm0->vcpu_nr;
-	f_base_current = f_base = 0;
-	f_nr = vm0->vcpu_nr;
-
-	return 0;
-}
-device_initcall(vcpu_affinity_init);
-
 static int vmtag_check_and_config(struct vmtag *tag)
 {
 	size_t size;
@@ -146,7 +130,6 @@ int vm_power_up(int vmid)
 	struct vm *vm = get_vm_by_id(vmid);
 
 	if (vm == NULL) {
-		pr_error("vm-%d is not exist\n", vmid);
 		return -ENOENT;
 	}
 
@@ -391,7 +374,6 @@ int vm_suspend(int vmid)
 	struct vm *vm = get_vm_by_id(vmid);
 
 	if (vm == NULL) {
-		pr_error("unknown vm called vm suspend\n");
 		return -EINVAL;
 	}
 
@@ -465,7 +447,8 @@ int virt_init(void)
 	for (i = 0; i < nr_static_vms; i++) {
 		vm = create_vm(&vmtags[i]);
 		if (!vm)
-			pr_error("create %d VM:%s failed\n", vmtags[i].name);
+			pr_error("create VM(%d):%s failed\n", i,
+				 vmtags[i].name);
 	}
 
 	/* check whether VM0 has been create correctly */
@@ -497,3 +480,19 @@ int virt_init(void)
 
 	return 0;
 }
+
+static int vcpu_affinity_init(void)
+{
+	struct vm *vm0 = get_vm_by_id(0);
+
+	if (!vm0)
+		panic("vm0 is not created\n");
+
+	e_base_current = e_base = vm0->vcpu_nr;
+	e_nr = NR_CPUS - vm0->vcpu_nr;
+	f_base_current = f_base = 0;
+	f_nr = vm0->vcpu_nr;
+
+	return 0;
+}
+device_initcall(vcpu_affinity_init);

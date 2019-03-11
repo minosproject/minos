@@ -670,7 +670,7 @@ static int mvm_main_loop(void)
 	 * create the eventfd and the epoll_fds for
 	 * this vm
 	 */
-	base = (int *)malloc(sizeof(int) * vm->nr_vcpus * 3);
+	base = malloc(sizeof(*base) * vm->nr_vcpus * 3);
 	if (!base)
 		return -ENOMEM;
 

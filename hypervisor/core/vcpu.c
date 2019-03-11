@@ -197,26 +197,24 @@ static struct vm *__create_vm(struct vmtag *vme)
 		return NULL;
 	}
 
-	vm = (struct vm *)malloc(sizeof(struct vm));
+	vm = malloc(sizeof(*vm));
 	if (!vm)
 		return NULL;
 
 	vme->nr_vcpu = MIN(vme->nr_vcpu, VM_MAX_VCPU);
 
-	memset((char *)vm, 0, sizeof(struct vm));
-	vm->vcpus = (struct vcpu **)malloc(sizeof(struct vcpu *)
-			* vme->nr_vcpu);
+	memset(vm, 0, sizeof(struct vm));
+	vm->vcpus = malloc(sizeof(struct vcpu *) * vme->nr_vcpu);
 	if (!vm->vcpus) {
 		free(vm);
 		return NULL;
 	}
 
 	vm->vmid = vme->vmid;
-	strncpy(vm->name, vme->name,
-		MIN(strlen((char *)vme->name), VM_NAME_SIZE - 1));
+	strncpy(vm->name, vme->name, sizeof(vm->name) - 1);
 	vm->vcpu_nr = vme->nr_vcpu;
 	vm->entry_point = vme->entry;
-	vm->setup_data = (void *)vme->setup_data;
+	vm->setup_data = vme->setup_data;
 	vm->state = VM_STAT_OFFLINE;
 	init_list(&vm->vdev_list);
 	memcpy(vm->vcpu_affinity, vme->vcpu_affinity,
@@ -272,11 +270,11 @@ static struct vcpu *alloc_vcpu(size_t size)
 	struct vcpu *vcpu;
 	void *stack_base = NULL;
 
-	vcpu = (struct vcpu *)malloc(sizeof(struct vcpu));
+	vcpu = malloc(sizeof(*vcpu));
 	if (!vcpu)
 		return NULL;
 
-	memset((char *)vcpu, 0, sizeof(struct vcpu));
+	memset(vcpu, 0, sizeof(*vcpu));
 	vcpu->virq_struct = malloc(sizeof(struct virq_struct));
 	if (!vcpu->virq_struct)
 		goto free_vcpu;
@@ -321,8 +319,7 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 	init_list(&vcpu->list);
 	memset(name, 0, 64);
 	sprintf(name, "%s-vcpu-%d", vm->name, vcpu_id);
-	strncpy(vcpu->name, name, strlen(name) > (VCPU_NAME_SIZE -1) ?
-			(VCPU_NAME_SIZE - 1) : strlen(name));
+	strncpy(vcpu->name, name, sizeof(vcpu->name) - 1);
 
 	vcpu_virq_struct_init(vcpu);
 	vm->vcpus[vcpu_id] = vcpu;

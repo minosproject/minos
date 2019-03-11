@@ -50,8 +50,7 @@ struct os *alloc_os(char *name)
 		return NULL;
 
 	init_list(&os->list);
-	strncpy(os->name, name, MIN(strlen(name),
-			MINOS_OS_NAME_SIZE - 1));
+	strncpy(os->name, name, sizeof(os->name) - 1);
 
 	return os;
 }

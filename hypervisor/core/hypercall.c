@@ -28,7 +28,7 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 	int vmid = -1, ret;
 	unsigned long addr;
 	unsigned long gbase = 0, hbase = 0;
-	struct vm *vm = get_vm_by_id((int)args[0]);
+	struct vm *vm = get_vm_by_id((uint32_t)args[0]);
 
 	if (!vm_is_hvm(get_current_vm()))
 		panic("only vm0 can call vm related hypercall\n");

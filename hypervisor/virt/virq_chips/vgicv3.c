@@ -460,7 +460,7 @@ static void vgic_gicd_init(struct vm *vm, struct vgic_gicd *gicd,
 	 * one vgic for each vm since gicr is percpu
 	 * but gicd is shared so created it here
 	 */
-	memset((char *)gicd, 0, sizeof(struct vgic_gicd));
+	memset(gicd, 0, sizeof(*gicd));
 
 	gicd->base = base;
 	gicd->end = base + size;
@@ -922,7 +922,7 @@ static void gicv3_state_init(struct vcpu *vcpu, void *context)
 {
 	struct gicv3_context *c = (struct gicv3_context *)context;
 
-	memset((char *)c, 0, sizeof(struct gicv3_context));
+	memset(c, 0, sizeof(*c));
 	c->icc_sre_el1 = 0x7;
 	c->ich_vmcr_el2 = GICH_VMCR_VENG1 | (0xff << 24);
 	c->ich_hcr_el2 = GICH_HCR_EN;

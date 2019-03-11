@@ -30,7 +30,7 @@ void percpus_init(void)
 	size_t size;
 
 	size = (&__percpu_end) - (&__percpu_start);
-	memset((char *)&__percpu_start, 0, size);
+	memset(&__percpu_start, 0, size);
 
 	for (i = 0; i < CONFIG_NR_CPUS; i++) {
 		percpu_offset[i] = (phy_addr_t)(&__percpu_start) +

@@ -92,7 +92,7 @@ struct vdev *create_iomem_vdev(struct vm *vm, uint32_t size)
 {
 	struct vdev *vdev;
 
-	vdev = malloc(sizeof(struct vdev));
+	vdev = malloc(sizeof(*vdev));
 	if (!vdev)
 		return NULL;
 
@@ -130,7 +130,7 @@ struct vdev *create_host_vdev(struct vm *vm, unsigned long base, uint32_t size)
 
 	size = PAGE_BALIGN(size);
 
-	vdev = malloc(sizeof(struct vdev));
+	vdev = malloc(sizeof(*vdev));
 	if (!vdev)
 		return NULL;
 

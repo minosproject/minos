@@ -32,12 +32,12 @@ static struct vmodule *create_vmodule(struct module_id *id)
 	struct vmodule *vmodule;
 	vmodule_init_fn fn;
 
-	vmodule = (struct vmodule *)malloc(sizeof(*vmodule));
+	vmodule = malloc(sizeof(*vmodule));
 	if (!vmodule) {
 		return NULL;
 	}
 
-	memset((char *)vmodule, 0, sizeof(*vmodule));
+	memset(vmodule, 0, sizeof(*vmodule));
 	strncpy(vmodule->name, id->name, sizeof(vmodule->name) - 1);
 	init_list(&vmodule->list);
 	vmodule->id = vmodule_class_nr++;
@@ -55,11 +55,7 @@ static struct vmodule *create_vmodule(struct module_id *id)
 int register_vcpu_vmodule(const char *name, vmodule_init_fn fn)
 {
 	struct vmodule *vmodule;
-	struct module_id mid = {
-		.name = (char *)name,
-		.comp = NULL,
-		.data = fn
-	};
+	struct module_id mid = { .name = name, .comp = NULL, .data = fn };
 
 	vmodule = create_vmodule(&mid);
 	if (!vmodule) {
@@ -105,11 +101,11 @@ int vcpu_vmodules_init(struct vcpu *vcpu)
 	 * context's context data
 	 */
 	size = vmodule_class_nr * sizeof(void *);
-	vcpu->vmodule_context = (void **)malloc(size);
+	vcpu->vmodule_context = malloc(size);
 	if (!vcpu->vmodule_context)
 		panic("No more memory for vcpu vmodule cotnext\n");
 
-	memset((char *)vcpu->vmodule_context, 0, size);
+	memset(vcpu->vmodule_context, 0, size);
 
 	list_for_each(&vmodule_list, list) {
 		vmodule = list_entry(list, struct vmodule, list);
@@ -117,11 +113,11 @@ int vcpu_vmodules_init(struct vcpu *vcpu)
 			/* for reboot if memory is areadly allocated skip it */
 			data = vcpu->vmodule_context[vmodule->id];
 			if (!data) {
-				data = (void *)malloc(vmodule->context_size);
+				data = malloc(vmodule->context_size);
 				vcpu->vmodule_context[vmodule->id] = data;
 			}
 
-			memset((char *)data, 0, vmodule->context_size);
+			memset(data, 0, vmodule->context_size);
 			if (vmodule->state_init)
 				vmodule->state_init(vcpu, data);
 		}

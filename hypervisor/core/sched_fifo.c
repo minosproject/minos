@@ -122,8 +122,7 @@ static int fifo_init_pcpu_data(struct pcpu *pcpu)
 {
 	struct fifo_pcpu_data *d;
 
-	d = (struct fifo_pcpu_data *)
-		malloc(sizeof(struct fifo_pcpu_data));
+	d = malloc(sizeof(*d));
 	if (!d)
 		return -ENOMEM;
 
@@ -149,8 +148,7 @@ static int fifo_init_vcpu_data(struct pcpu *pcpu, struct vcpu *vcpu)
 {
 	struct fifo_vcpu_data *data;
 
-	data = (struct fifo_vcpu_data *)
-		malloc(sizeof(struct fifo_vcpu_data));
+	data = malloc(sizeof(*data));
 	if (!data)
 		return -ENOMEM;
 

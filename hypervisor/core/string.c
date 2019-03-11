@@ -112,7 +112,7 @@ long ptoa(char *buf, unsigned long num)
 	return num_to_str(buf, num, 32);
 }
 
-char *strncpy(char *des, char *src, int len)
+char *strncpy(char *des, const char *src, int len)
 {
 	char *tmp = des;
 	int i;

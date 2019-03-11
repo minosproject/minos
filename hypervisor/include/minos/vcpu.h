@@ -12,8 +12,6 @@
 #include <minos/vmcs.h>
 #include <minos/spinlock.h>
 
-#define VCPU_DEFAULT_STACK_SIZE	(SIZE_4K * 2)
-
 #define VCPU_MAX_LOCAL_IRQS		(32)
 #define CONFIG_VCPU_MAX_ACTIVE_IRQS	(16)
 
@@ -96,10 +94,6 @@ static int inline vcpu_affinity(struct vcpu *vcpu)
 	return vcpu->affinity;
 }
 
-struct vm *get_vm_by_id(uint32_t vmid);
-int arch_vm_init(struct vm *vm);
-int create_vms(void);
-void boot_vms(void);
 struct vcpu *get_vcpu_in_vm(struct vm *vm, uint32_t vcpu_id);
 struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id);
 
