@@ -12,6 +12,7 @@ Below is the board that Minos has been supported:
 - [x] Raspberry Pi 3 Model B+ / Raspberry Pi 3 Model A+ / Raspberry Pi 3 Model B
 - [x] ARMv8 Fixed Virtual Platforms
 
+Here is a video shows how to run Minos on Raspberry Pi 3B+ [Run Minos Hypervisor On Raspberry 3B+](https://www.youtube.com/watch?v=82YrcGrkblo)
 
 # Download Source Code And Tools for Minos
 
