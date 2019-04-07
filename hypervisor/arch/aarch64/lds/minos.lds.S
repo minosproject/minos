@@ -85,6 +85,8 @@ SECTIONS
 	}
 	__virqchip_end = .;
 
+	. = ALIGN(8);
+
 	__vdev_start = .;
 	.__vdev : {
 		*(.__vdev)

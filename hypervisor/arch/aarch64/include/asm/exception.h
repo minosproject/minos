@@ -48,11 +48,11 @@
 typedef int (*sync_handler_t)(gp_regs *reg, uint32_t esr_value);
 
 struct sync_desc {
-	int type;
-	int aarch;
+	uint8_t type;
+	uint8_t aarch;
+	uint8_t irq_safe;
+	uint8_t ret_addr_adjust;
 	sync_handler_t handler;
-	int irq_safe;
-	int32_t ret_addr_adjust;
 };
 
 #define DEFINE_SYNC_DESC(t, arch, h, is, raa)		\

@@ -72,7 +72,7 @@ struct virq_desc {
 	uint16_t vmid;
 	uint16_t vno;
 	uint16_t hno;
-	unsigned long flags;
+	uint32_t flags;
 	struct list_head list;
 } __packed__;
 
