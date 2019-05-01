@@ -102,6 +102,9 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 		ret = vm_create_host_vdev(vm);
 		HVC_RET1(c, ret);
 		break;
+	case HVC_CHANGE_LOG_LEVEL:
+		change_log_level((unsigned int)args[0]);
+		break;
 	default:
 		pr_error("unsupport vm hypercall");
 		break;

@@ -22,42 +22,98 @@
 #include <config/config.h>
 #include <drivers/serial.h>
 #include <minos/smp.h>
+#include <minos/time.h>
+
+#ifndef CONFIG_LOG_LEVEL
+#define CONFIG_LOG_LEVEL	PRINT_LEVEL_INFO
+#endif
 
 static DEFINE_SPIN_LOCK(print_lock);
+static unsigned int print_level = CONFIG_LOG_LEVEL;
 
-int level_print(char *fmt, ...)
+static int get_print_time(char *buffer)
 {
-	char ch;
+	unsigned long us;
+	unsigned long second;
+	int len, left;
+	char buf[64];
+
+	us = NOW() / 1000;
+	second = us / 1000000;
+	us = us % 1000000;
+
+	memset(buf, '0', 64);
+	len = uitoa(buf, second);
+	len = len > 8 ? 8 : len;
+	left = 8 - len;
+
+	if (left > 0) {
+		memset(buffer, ' ', left);
+		buffer += left;
+	}
+	memcpy(buffer, buf, len);
+	buffer += len;
+
+	*buffer++ = '.';
+
+	memset(buf, '0', 8);
+	len = uitoa(buf, us);
+	len = len > 6 ? 6 : len;
+	left = 6 - len;
+
+	if (left > 0) {
+		memset(buffer, '0', left);
+		buffer += left;
+	}
+	memcpy(buffer, buf, len);
+
+	return 15;
+}
+
+void change_log_level(unsigned int level)
+{
+	print_level = level;
+}
+
+int level_print(int level, char *fmt, ...)
+{
 	va_list arg;
 	int printed, i;
-	char buffer[1024];
+	char buf[512];
+	char *buffer = buf;
 
-	ch = fmt[4];
-	if (is_digit(ch)) {
-		ch = ch - '0';
-		if(ch > CONFIG_LOG_LEVEL)
-			return 0;
-	}
+	if (level > print_level)
+		return 0;
 
 	/*
 	 * after to handle the level we change
 	 * the level to the current CPU
 	 */
+	*buffer++ = '[';
+
+	/* get the time of the log when it print */
+	buffer += get_print_time(buffer);
+	*buffer++ = ' ';
+
 	i = smp_processor_id();
-	fmt[1] = (i / 10) + '0';
-	fmt[2] = (i % 10) + '0';
+	*buffer++ = (i / 10) + '0';
+	*buffer++ = (i % 10) + '0';
+
+	*buffer++ = ']';
+	*buffer++ = ' ';
 
 	/*
 	 * TBD need to check the length of fmt
 	 * in case of buffer overflow
 	 */
+	printed = buffer - buf;
 	va_start(arg, fmt);
-	printed = vsprintf(buffer, fmt, arg);
+	printed += vsprintf(buffer, fmt, arg);
 	va_end(arg);
 
 	spin_lock(&print_lock);
 	for(i = 0; i < printed; i++)
-		serial_putc(buffer[i]);
+		serial_putc(buf[i]);
 	spin_unlock(&print_lock);
 
 	return printed;
