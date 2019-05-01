@@ -210,7 +210,7 @@ Download the image and using dd to flash it to the SD card
 3. Compile FVP Kernel
 
         # cd ~/minos-workspace/linux-marvell
-        # make ARCH=arm64 defconfig && make ARCH=arm64 -j8 Image
+        # make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig && make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j8 Image
 
 4. Compile ARM Trusted Firmware
 
