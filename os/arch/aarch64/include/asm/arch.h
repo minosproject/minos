@@ -299,7 +299,7 @@ void flush_dcache_all(void);
 void inv_dcache_all(void);
 
 int arch_taken_from_guest(gp_regs *regs);
-void arch_switch_vcpu_sw(void);
+void arch_switch_task_sw(void);
 void arch_dump_stack(gp_regs *regs, unsigned long *sp);
 unsigned long arch_get_fp(void);
 unsigned long arch_get_lr(void);

@@ -179,6 +179,8 @@ void sched_new(void)
 		if (os_highest_rdy[i] == OS_PRIO_IDLE)
 			os_highest_rdy[i] = OS_PRIO_PCPU;
 	}
+
+	dsb();
 #else
 	/*
 	 * only update the highest realtime task to
@@ -218,9 +220,10 @@ static void restore_task_state(struct task *task)
 
 }
 
-static void __switch_to_task(struct pcpu *pcpu,
-		struct task *cur, struct task *next)
+void switch_to_task(struct task *cur, struct task *next)
 {
+	struct pcpu *pcpu = get_cpu_var(pcpu);
+
 	save_task_context(cur);
 	restore_task_state(next);
 
@@ -275,9 +278,9 @@ void sched(void)
 
 	if (sched_flag) {
 		local_irq_save(flags);
-		__switch_to_task(pcpu, cur, next);
+		switch_to_task(cur, next);
 		dsb();
-		// arch_switch_task_sw();
+		arch_switch_task_sw();
 		local_irq_restore(flags);
 	}
 }
@@ -290,15 +293,33 @@ void irq_enter(gp_regs *regs)
 
 void irq_exit(gp_regs *regs)
 {
+	int i;
+	int cpuid = smp_processor_id();
+	struct pcpu *pcpu = get_per_cpu(pcpu, cpuid);
+
 	irq_softirq_exit();
+
+	if (!preempt_allowed())
+		return;
 
 	/*
 	 * if preempt is not allowed and irq is taken from
 	 * guest, then will sched()
 	 */
-	if (need_resched() && preempt_allowed()) {
-		sched_new();
+	kernel_lock();
+
+	sched_new();
+	for (i = 0; i < NR_CPUS; i++) {
+		if (os_prio_cur[i] != os_highest_rdy[i]) {
+			if (i == cpuid) {
+				set_next_task(get_next_run_task(pcpu));
+			} else
+				pcpu_resched(i);
+		}
 	}
+
+	kernel_unlock();
+	dsb();
 }
 
 int sched_can_idle(struct pcpu *pcpu)

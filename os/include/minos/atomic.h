@@ -11,6 +11,8 @@ void atomic_add(int i, atomic_t *t);
 void atomic_sub(int i, atomic_t *t);
 int atomic_add_return(int i, atomic_t *t);
 int atomic_sub_return(int i, atomic_t *t);
+int atomic_add_return_old(int i, atomic_t *t);
+int atomic_sub_return_old(int i, atomic_t *t);
 
 static inline int atomic_read(atomic_t *t)
 {
@@ -40,6 +42,16 @@ static inline int atomic_inc_return(atomic_t *t)
 static inline int atomic_dec_return(atomic_t *t)
 {
 	return atomic_sub_return(1, t);
+}
+
+static inline int atomic_inc_return_old(atomic_t *t)
+{
+	return atomic_add_return_old(1, t);
+}
+
+static inline int atomic_dec_return_old(atomic_t *t)
+{
+	return atomic_sub_return_old(1, t);
 }
 
 static inline int atomic_inc_and_test(atomic_t *t)

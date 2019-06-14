@@ -53,6 +53,8 @@ void sched_new(void);
 void pcpu_resched(int pcpu_id);
 int sched_can_idle(struct pcpu *pcpu);
 void set_task_ready(struct task *task);
+void irq_enter(gp_regs *regs);
+void irq_exit(gp_regs *regs);
 
 static inline struct task *get_current_task(void)
 {

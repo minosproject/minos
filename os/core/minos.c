@@ -27,6 +27,7 @@
 #include <minos/softirq.h>
 #include <minos/platform.h>
 #include <config/version.h>
+#include <minos/ticketlock.h>
 
 extern void softirq_init(void);
 extern void init_timers(void);
@@ -40,6 +41,8 @@ extern void platform_init(void);
 extern int create_idle_task(void);
 
 struct list_head hook_lists[MINOS_HOOK_TYPE_UNKNOWN];
+
+DEFINE_TICKET_LOCK(__kernel_lock);
 
 static void hooks_init(void)
 {

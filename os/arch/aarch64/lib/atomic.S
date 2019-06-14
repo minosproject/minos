@@ -20,7 +20,9 @@
 	.global atomic_add
 	.global atomic_sub
 	.global atomic_add_return
+	.global atomic_add_return_old
 	.global atomic_sub_return
+	.global atomic_sub_return_old
 
 	/*
 	 * ldaxr : a - acquire (equal add a dmb ins)
@@ -71,3 +73,25 @@ func atomic_sub_return
 	mov	w0, w2
 	ret
 endfunc atomic_sub_return
+
+func atomic_add_return_old
+3:
+	ldxr	w2, [x1]
+	add	w2, w2, w0
+	stlxr	w3, w2, [x1]
+	cbnz	w3, 3b
+	dmb	ish
+	sub	w0, w2, w0
+	ret
+endfunc atomic_add_return_old
+
+func atomic_sub_return_old
+4:
+	ldxr	w2, [x1]
+	sub	w2, w2, w0
+	stxr	w3, w2, [x1]
+	cbnz	w3, 4b
+	dmb	ish
+	add	w0, w2, w0
+	ret
+endfunc atomic_sub_return_old

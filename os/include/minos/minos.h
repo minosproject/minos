@@ -13,6 +13,7 @@
 #include <minos/arch.h>
 #include <minos/calltrace.h>
 #include <common/hypervisor.h>
+#include <minos/ticketlock.h>
 
 #define section_for_each_item_addr(__start_addr, __end_addr, __var)            \
 	size_t _i, _cnt;                                                       \
@@ -28,6 +29,7 @@
 				    (unsigned long)&(__end), __var)
 
 struct vcpu;
+extern ticketlock_t __kernel_lock;
 
 typedef int (*hook_func_t)(void *item, void *contex);
 
@@ -49,9 +51,6 @@ struct hook {
 	struct list_head list;
 };
 
-void irq_enter(gp_regs *regs);
-void irq_exit(gp_regs *regs);
-
 int do_hooks(void *item, void *context, enum hook_type type);
 int register_hook(hook_func_t fn, enum hook_type type);
 
@@ -72,14 +71,9 @@ static inline void enter_to_guest(struct vcpu *vcpu, gp_regs *regs)
 			MINOS_HOOK_TYPE_ENTER_TO_GUEST);
 }
 
-static inline void kernel_lock_irqsave(unsigned long flags)
-{
-
-}
-
-static inline void kernel_unlock_irqrestore(unsigned long flags)
-{
-
-}
+#define kernel_lock_irqsave(flags)	ticket_lock_irqsave(&__kernel_lock, flags)
+#define kernel_unlock_irqrestore(flags) ticket_unlock_irqrestore(&__kernel_lock, flags)
+#define kernel_lock()			ticket_lock(&__kernel_lock)
+#define kernel_unlock()			ticket_unlock(&__kernel_lock)
 
 #endif

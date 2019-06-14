@@ -26,8 +26,6 @@
 DEFINE_PER_CPU(struct irq_desc **, sgi_irqs);
 DEFINE_PER_CPU(struct irq_desc **, ppi_irqs);
 
-DEFINE_PER_CPU(int, in_interrupt);
-
 static struct irq_chip *irq_chip;
 static struct irq_domain *irq_domains[IRQ_DOMAIN_MAX];
 

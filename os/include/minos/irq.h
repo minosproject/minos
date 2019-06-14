@@ -115,10 +115,6 @@ struct irq_domain {
 #define local_irq_enable() arch_enable_local_irq()
 #define local_irq_disable() arch_disable_local_irq()
 
-DECLARE_PER_CPU(int, in_interrupt);
-
-#define in_interrupt	get_cpu_var(in_interrupt)
-
 int irq_init(void);
 int irq_secondary_init(void);
 void setup_irqs(void);

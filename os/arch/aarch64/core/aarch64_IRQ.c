@@ -16,12 +16,11 @@
 
 #include <minos/minos.h>
 #include <minos/irq.h>
-#include <minos/softirq.h>
-#include <minos/arch.h>
+#include <minos/sched.h>
 
 void irq_c_handler(gp_regs *regs)
 {
-	in_interrupt += 1;
+	inc_int_nesting();
 
 	irq_enter(regs);
 
@@ -29,5 +28,5 @@ void irq_c_handler(gp_regs *regs)
 
 	irq_exit(regs);
 
-	in_interrupt -= 1;
+	dec_int_nesting();
 }
