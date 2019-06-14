@@ -115,8 +115,8 @@ arch_switch_vcpu_sw:
 
 	str	x30, [sp, #-8]!
 
-	ldr	x5, =per_cpu_percpu_current_vcpu
-	ldr	x4, =per_cpu_percpu_next_vcpu
+	ldr	x5, =per_cpu_percpu_current_task
+	ldr	x4, =per_cpu_percpu_next_task
 	mrs	x1, mpidr_el1
 	ubfx	x8, x1, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
 	ubfx	x9, x1, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
@@ -257,8 +257,8 @@ __irq_handler:
 	mov	x0, sp
 	bl	irq_c_handler
 
-	ldr	x5, =per_cpu_percpu_current_vcpu
-	ldr	x4, =per_cpu_percpu_next_vcpu
+	ldr	x5, =per_cpu_percpu_current_task
+	ldr	x4, =per_cpu_percpu_next_task
 	mrs	x1, mpidr_el1
 	ubfx	x8, x1, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
 	ubfx	x9, x1, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
@@ -279,7 +279,7 @@ __irq_handler:
 
 	stp	x4, x5, [sp, #-16]!
 	stp	x0, x1, [sp, #-16]!
-	bl	switch_to_vcpu
+	//bl	switch_to_vcpu
 	ldp	x0, x1, [sp], #16
 	ldp	x4, x5, [sp], #16
 

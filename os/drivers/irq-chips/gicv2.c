@@ -30,6 +30,7 @@
 #include <minos/cpumask.h>
 #include <minos/irq.h>
 #include <minos/resource.h>
+#include <minos/of.h>
 
 /*
  * LR register definitions are GIC v2 specific.
@@ -399,7 +400,7 @@ static int gicv2_init(struct device_node *node)
 
 	spin_unlock(&gicv2_lock);
 
-#ifdef CONFIG_VIRQCHIP_VGICV2
+#if defined CONFIG_VIRQCHIP_VGICV2 && defined CONFIG_VIRT
 	vgicv2_init(array, 8);
 #endif
 

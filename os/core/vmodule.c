@@ -18,7 +18,7 @@
 #include <minos/vmodule.h>
 #include <minos/init.h>
 #include <minos/mm.h>
-#include <minos/vcpu.h>
+#include <minos/task.h>
 #include <minos/spinlock.h>
 
 extern unsigned char __vmodule_start;
@@ -52,7 +52,7 @@ static struct vmodule *create_vmodule(struct module_id *id)
 	return vmodule;
 }
 
-int register_vcpu_vmodule(const char *name, vmodule_init_fn fn)
+int register_task_vmodule(const char *name, vmodule_init_fn fn)
 {
 	struct vmodule *vmodule;
 	struct module_id mid = { .name = name, .comp = NULL, .data = fn };
@@ -66,12 +66,12 @@ int register_vcpu_vmodule(const char *name, vmodule_init_fn fn)
 	return 0;
 }
 
-void *get_vmodule_data_by_id(struct vcpu *vcpu, int id)
+void *get_vmodule_data_by_id(struct task *task, int id)
 {
-	return vcpu->vmodule_context[id];
+	return task->context[id];
 }
 
-void *get_vmodule_data_by_name(struct vcpu *vcpu, const char *name)
+void *get_vmodule_data_by_name(struct task *task, const char *name)
 {
 	struct vmodule *vmodule;
 	int id = INVALID_MODULE_ID;
@@ -84,12 +84,12 @@ void *get_vmodule_data_by_name(struct vcpu *vcpu, const char *name)
 	}
 
 	if (id != INVALID_MODULE_ID)
-		return vcpu->vmodule_context[id];
+		return task->context[id];
 
 	return NULL;
 }
 
-int vcpu_vmodules_init(struct vcpu *vcpu)
+int task_vmodules_init(struct task *task)
 {
 	struct list_head *list;
 	struct vmodule *vmodule;
@@ -101,40 +101,45 @@ int vcpu_vmodules_init(struct vcpu *vcpu)
 	 * context's context data
 	 */
 	size = vmodule_class_nr * sizeof(void *);
-	vcpu->vmodule_context = malloc(size);
-	if (!vcpu->vmodule_context)
-		panic("No more memory for vcpu vmodule cotnext\n");
+	task->context = malloc(size);
+	if (!task->context)
+		panic("No more memory for task vmodule cotnext\n");
 
-	memset(vcpu->vmodule_context, 0, size);
+	memset(task->context, 0, size);
 
 	list_for_each(&vmodule_list, list) {
 		vmodule = list_entry(list, struct vmodule, list);
 		if (vmodule->context_size) {
+			/* for the vcpu task some context is not necessary */
+			if (vmodule->valid_for_task &&
+					!vmodule->valid_for_task(task))
+				continue;
+
 			/* for reboot if memory is areadly allocated skip it */
-			data = vcpu->vmodule_context[vmodule->id];
+			data = task->context[vmodule->id];
 			if (!data) {
 				data = malloc(vmodule->context_size);
-				vcpu->vmodule_context[vmodule->id] = data;
+				task->context[vmodule->id] = data;
 			}
 
 			memset(data, 0, vmodule->context_size);
 			if (vmodule->state_init)
-				vmodule->state_init(vcpu, data);
+				vmodule->state_init(task, data);
 		}
 	}
 
 	return 0;
 }
 
-int vcpu_vmodules_deinit(struct vcpu *vcpu)
+int task_vmodules_deinit(struct task *task)
 {
 	struct vmodule *vmodule;
 	void *data;
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
-		data = vcpu->vmodule_context[vmodule->id];
+		data = task->context[vmodule->id];
 		if (vmodule->state_deinit)
-			vmodule->state_deinit(vcpu, data);
+			vmodule->state_deinit(task, data);
 
 		if (data)
 			free(data);
@@ -143,68 +148,68 @@ int vcpu_vmodules_deinit(struct vcpu *vcpu)
 	return 0;
 }
 
-int vcpu_vmodules_reset(struct vcpu *vcpu)
+int task_vmodules_reset(struct task *task)
 {
 	struct vmodule *vmodule;
 	void *data;
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
-		data = vcpu->vmodule_context[vmodule->id];
+		data = task->context[vmodule->id];
 		if (vmodule->state_reset)
-			vmodule->state_reset(vcpu, data);
+			vmodule->state_reset(task, data);
 	}
 
 	return 0;
 }
 
-void restore_vcpu_vmodule_state(struct vcpu *vcpu)
+void restore_task_vmodule_state(struct task *task)
 {
 	struct vmodule *vmodule;
 	void *context;
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
 		if (vmodule->state_restore) {
-			context = get_vmodule_data_by_id(vcpu, vmodule->id);
-			vmodule->state_restore(vcpu, context);
+			context = get_vmodule_data_by_id(task, vmodule->id);
+			vmodule->state_restore(task, context);
 		}
 	}
 }
 
-void save_vcpu_vmodule_state(struct vcpu *vcpu)
+void save_task_vmodule_state(struct task *task)
 {
 	struct vmodule *vmodule;
 	void *context;
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
 		if (vmodule->state_save) {
-			context = get_vmodule_data_by_id(vcpu, vmodule->id);
-			vmodule->state_save(vcpu, context);
+			context = get_vmodule_data_by_id(task, vmodule->id);
+			vmodule->state_save(task, context);
 		}
 	}
 }
 
-void suspend_vcpu_vmodule_state(struct vcpu *vcpu)
+void suspend_task_vmodule_state(struct task *task)
 {
 	struct vmodule *vmodule;
 	void *context;
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
 		if (vmodule->state_suspend) {
-			context = get_vmodule_data_by_id(vcpu, vmodule->id);
-			vmodule->state_suspend(vcpu, context);
+			context = get_vmodule_data_by_id(task, vmodule->id);
+			vmodule->state_suspend(task, context);
 		}
 	}
 }
 
-void resume_vcpu_vmodule_state(struct vcpu *vcpu)
+void resume_task_vmodule_state(struct task *task)
 {
 	struct vmodule *vmodule;
 	void *context;
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
 		if (vmodule->state_resume) {
-			context = get_vmodule_data_by_id(vcpu, vmodule->id);
-			vmodule->state_resume(vcpu, context);
+			context = get_vmodule_data_by_id(task, vmodule->id);
+			vmodule->state_resume(task, context);
 		}
 	}
 }

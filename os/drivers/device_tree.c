@@ -617,7 +617,7 @@ int fdt_parse_vm_info(void)
 
 	/* finally tell the system vmtags is ok */
 	vmtags[0].setup_data = dtb;
-	set_vmtags_to(vmtags, nr_vm);
+	//set_vmtags_to(vmtags, nr_vm);
 
 	return 0;
 }

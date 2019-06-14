@@ -28,6 +28,7 @@
 #include <minos/irq.h>
 #include <minos/virq.h>
 #include <minos/resource.h>
+#include <minos/of.h>
 
 spinlock_t gicv3_lock;
 static void *gicd_base = 0;
@@ -449,7 +450,7 @@ int gicv3_init(struct device_node *node)
 
 	spin_unlock(&gicv3_lock);
 
-#ifdef CONFIG_VIRQCHIP_VGICV3
+#if defined CONFIG_VIRQCHIP_VGICV3 && defined CONFIG_VIRT
 	vgicv3_init(array, 10);
 #endif
 

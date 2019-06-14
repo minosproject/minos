@@ -127,6 +127,7 @@ int el2_stage2_init(void)
 
 	return 0;
 }
+arch_early_initcall(el2_stage2_init);
 
 static void vmsa_state_init(struct vcpu *vcpu, void *context)
 {

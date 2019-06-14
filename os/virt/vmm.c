@@ -24,8 +24,6 @@ extern unsigned char __el2_ttb0_pud;
 extern unsigned char __el2_ttb0_pmd_code;
 extern unsigned char __el2_ttb0_pmd_io;
 
-static struct mm_struct host_mm;
-
 static DEFINE_SPIN_LOCK(mmap_lock);
 static unsigned long hvm_normal_mmap_base = HVM_NORMAL_MMAP_START;
 static size_t hvm_normal_mmap_size = HVM_NORMAL_MMAP_SIZE;
@@ -67,37 +65,6 @@ void *vm_alloc_pages(struct vm *vm, int pages)
 	spin_unlock(&vm->mm.lock);
 
 	return page_to_addr(page);
-}
-
-int create_host_mapping(vir_addr_t vir, phy_addr_t phy,
-		size_t size, unsigned long flags)
-{
-	unsigned long vir_base, phy_base, tmp;
-
-	/*
-	 * for host mapping, IO and Normal memory all mapped
-	 * as MEM_BLOCK_SIZE ALIGN
-	 */
-	vir_base = ALIGN(vir, MEM_BLOCK_SIZE);
-	phy_base = ALIGN(phy, MEM_BLOCK_SIZE);
-	tmp = BALIGN(vir_base + size, MEM_BLOCK_SIZE);
-	size = tmp - vir_base;
-	flags |= VM_HOST;
-
-	return create_mem_mapping(&host_mm,
-			vir_base, phy_base, size, flags);
-}
-
-int destroy_host_mapping(vir_addr_t vir, size_t size)
-{
-	unsigned long end;
-
-	end = vir + size;
-	end = BALIGN(end, MEM_BLOCK_SIZE);
-	vir = ALIGN(vir, MEM_BLOCK_SIZE);
-	size = end - vir;
-
-	return destroy_mem_mapping(&host_mm, vir, size, VM_HOST);
 }
 
 int create_guest_mapping(struct vm *vm, vir_addr_t vir,
@@ -506,13 +473,3 @@ int vmm_init(void)
 {
 	return 0;
 }
-
-static int vmm_early_init(void)
-{
-	spin_lock_init(&host_mm.lock);
-	host_mm.pgd_base = (unsigned long)&__el2_ttb0_pgd;
-
-	return 0;
-}
-
-early_initcall(vmm_early_init);

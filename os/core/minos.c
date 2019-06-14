@@ -125,8 +125,8 @@ void boot_main(void *setup_data)
 	sched_init();
 	local_sched_init();
 
-	virt_init();
-	vmm_init();
+	//virt_init();
+	//vmm_init();
 
 	device_init();
 	device_init_percpu();

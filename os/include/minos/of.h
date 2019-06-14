@@ -122,4 +122,22 @@ static int inline device_node_is_root(struct device_node *node)
 	return (node->parent == NULL);
 }
 
+static int inline translate_device_address_index(struct device_node *node,
+		uint64_t *base, uint64_t *size, int index)
+{
+	if (node->flags & DEVICE_NODE_F_OF)
+		return of_translate_address_index(node, base, size, index);
+
+	return -EINVAL;
+}
+
+static inline int translate_device_address(struct device_node *node,
+		uint64_t *base, uint64_t *size)
+{
+	return translate_device_address_index(node, base, size, 0);
+}
+
+int get_device_irq_index(struct device_node *node, uint32_t *irq,
+		unsigned long *flags, int index);
+
 #endif

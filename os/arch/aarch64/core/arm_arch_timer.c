@@ -57,7 +57,6 @@ uint32_t cpu_khz = 0;
 uint64_t boot_tick = 0;
 
 extern unsigned long sched_tick_handler(unsigned long data);
-extern int arch_vtimer_init(uint32_t virtual_irq, uint32_t phy_irq);
 
 void arch_enable_timer(unsigned long expires)
 {
@@ -126,8 +125,7 @@ static int timers_arch_init(void)
 
 	for (i = 0; i < TIMER_MAX; i++) {
 		info = &timer_info[i];
-		ret = get_device_irq_index(NULL, node,
-				&info->irq, &info->flags, i);
+		ret = get_device_irq_index(node, &info->irq, &info->flags, i);
 		if (ret) {
 			pr_error("error found in arm timer config\n");
 			return -ENOENT;
@@ -152,8 +150,11 @@ static int timers_arch_init(void)
 	if (platform->time_init)
 		platform->time_init();
 
+#ifdef CONFIG_VIRT
+	extern int arch_vtimer_init(uint32_t virtual_irq, uint32_t phy_irq);
 	arch_vtimer_init(timer_info[VIRT_TIMER].irq,
 			timer_info[NONSEC_PHY_TIMER].irq);
+#endif
 
 	return 0;
 }

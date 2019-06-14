@@ -11,6 +11,7 @@
 #include <minos/vmm.h>
 #include <minos/errno.h>
 #include <common/hypervisor.h>
+#include <minos/task.h>
 
 #define VM_MAX_VCPU		CONFIG_NR_CPUS
 
@@ -108,6 +109,11 @@ static inline int vm_is_native(struct vm *vm)
 static inline int vm_id(struct vm *vm)
 {
 	return vm->vmid;
+}
+
+static inline struct vm *task_to_vm(struct task *task)
+{
+	return vcpu_to_vm((struct vcpu *)task->pdata);
 }
 
 static inline int

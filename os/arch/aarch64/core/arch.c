@@ -28,7 +28,6 @@
 #include <minos/platform.h>
 #include <minos/task.h>
 
-extern int el2_stage2_init(void);
 extern int el2_stage1_init(void);
 extern void fdt_vm0_init(struct vm *vm);
 extern int fdt_early_init(void *setup_data);
@@ -167,8 +166,6 @@ int arch_early_init(void *setup_data)
 
 	if (!IS_IN_EL2())
 		panic("minos must run at EL2 mode\n");
-
-	el2_stage2_init();
 
 #ifdef CONFIG_DEVICE_TREE
 	fdt_early_init(setup_data);

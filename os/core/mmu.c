@@ -19,6 +19,13 @@
 #include <minos/mm.h>
 #include <minos/vcpu.h>
 
+static struct mm_struct host_mm;
+
+extern unsigned char __el2_ttb0_pgd;
+extern unsigned char __el2_ttb0_pud;
+extern unsigned char __el2_ttb0_pmd_code;
+extern unsigned char __el2_ttb0_pmd_io;
+
 #define DESC_MASK(n) (~((1UL << (n)) - 1))
 
 struct pagetable_attr {
@@ -465,3 +472,44 @@ int create_early_pmd_mapping(vir_addr_t vir, phy_addr_t phy)
 
 	return 0;
 }
+
+int create_host_mapping(vir_addr_t vir, phy_addr_t phy,
+		size_t size, unsigned long flags)
+{
+	unsigned long vir_base, phy_base, tmp;
+
+	/*
+	 * for host mapping, IO and Normal memory all mapped
+	 * as MEM_BLOCK_SIZE ALIGN
+	 */
+	vir_base = ALIGN(vir, MEM_BLOCK_SIZE);
+	phy_base = ALIGN(phy, MEM_BLOCK_SIZE);
+	tmp = BALIGN(vir_base + size, MEM_BLOCK_SIZE);
+	size = tmp - vir_base;
+	flags |= VM_HOST;
+
+	return create_mem_mapping(&host_mm,
+			vir_base, phy_base, size, flags);
+}
+
+int destroy_host_mapping(vir_addr_t vir, size_t size)
+{
+	unsigned long end;
+
+	end = vir + size;
+	end = BALIGN(end, MEM_BLOCK_SIZE);
+	vir = ALIGN(vir, MEM_BLOCK_SIZE);
+	size = end - vir;
+
+	return destroy_mem_mapping(&host_mm, vir, size, VM_HOST);
+}
+
+static int vmm_early_init(void)
+{
+	spin_lock_init(&host_mm.lock);
+	host_mm.pgd_base = (unsigned long)&__el2_ttb0_pgd;
+
+	return 0;
+}
+
+early_initcall(vmm_early_init);

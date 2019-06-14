@@ -57,10 +57,13 @@ void sync_from_current_EL_handler(gp_regs *data)
 
 void sync_c_handler(gp_regs *regs)
 {
-	if (taken_from_guest(regs))
+	if (taken_from_guest(regs)) {
+#ifdef CONFIG_VIRT
 		sync_from_lower_EL_handler(regs);
-	else
+#endif
+	} else {
 		sync_from_current_EL_handler(regs);
+	}
 }
 
 static int aarch64_sync_init(void)

@@ -238,6 +238,11 @@ static void __switch_to_task(struct pcpu *pcpu,
 	do_hooks((void *)next, NULL, OS_HOOK_TASK_SWITCH_TO);
 }
 
+unsigned long sched_tick_handler(unsigned long data)
+{
+	return 0;
+}
+
 void sched(void)
 {
 	int i;

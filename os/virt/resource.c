@@ -30,21 +30,6 @@ static void *virqchip_end;
 static void *vdev_start;
 static void *vdev_end;
 
-int translate_device_address_index(struct device_node *node,
-		uint64_t *base, uint64_t *size, int index)
-{
-	if (node->flags & DEVICE_NODE_F_OF)
-		return of_translate_address_index(node, base, size, index);
-
-	return -EINVAL;
-}
-
-int translate_device_address(struct device_node *node,
-		uint64_t *base, uint64_t *size)
-{
-	return translate_device_address_index(node, base, size, 0);
-}
-
 static int create_vm_vdev_of(struct vm *vm, struct device_node *node)
 {
 	vdev_init_t func;
@@ -92,6 +77,44 @@ static void *create_vm_irqchip_of(struct device_node *node, void *arg)
 	pr_info("create virq_chip %s successfully\n", node->compatible);
 
 	return node;
+}
+
+int get_device_irq_index(struct vm *vm, struct device_node *node,
+		uint32_t *irq, unsigned long *flags, int index)
+{
+	int irq_cells, len, i;
+	of32_t *value;
+	uint32_t irqv[4];
+
+	if (!node)
+		return -EINVAL;
+
+	value = (of32_t *)of_getprop(node, "interrupts", &len);
+	if (!value || (len < sizeof(of32_t)))
+		return -ENOENT;
+
+	irq_cells = of_n_interrupt_cells(node);
+	if (irq_cells == 0) {
+		pr_error("bad irqcells - %s\n", node->name);
+		return -ENOENT;
+	}
+
+	pr_debug("interrupt-cells %d\n", irq_cells);
+
+	len = len / sizeof(of32_t);
+	if (index >= len)
+		return -ENOENT;
+
+	value += (index * irq_cells);
+	for (i = 0; i < irq_cells; i++)
+		irqv[i] = of32_to_cpu(*value++);
+
+	if (vm && vm->virq_chip)
+		return vm->virq_chip->xlate(node, irqv, irq_cells, irq, flags);
+	else
+		return irq_xlate(node, irqv, irq_cells, irq, flags);
+
+	return -EINVAL;
 }
 
 static int create_pdev_virq_of(struct vm *vm, struct device_node *node)
@@ -171,44 +194,6 @@ static int create_pdev_iomem_of(struct vm *vm, struct device_node *node)
 	}
 
 	return 0;
-}
-
-int get_device_irq_index(struct vm *vm, struct device_node *node,
-		uint32_t *irq, unsigned long *flags, int index)
-{
-	int irq_cells, len, i;
-	of32_t *value;
-	uint32_t irqv[4];
-
-	if (!node)
-		return -EINVAL;
-
-	value = (of32_t *)of_getprop(node, "interrupts", &len);
-	if (!value || (len < sizeof(of32_t)))
-		return -ENOENT;
-
-	irq_cells = of_n_interrupt_cells(node);
-	if (irq_cells == 0) {
-		pr_error("bad irqcells - %s\n", node->name);
-		return -ENOENT;
-	}
-
-	pr_debug("interrupt-cells %d\n", irq_cells);
-
-	len = len / sizeof(of32_t);
-	if (index >= len)
-		return -ENOENT;
-
-	value += (index * irq_cells);
-	for (i = 0; i < irq_cells; i++)
-		irqv[i] = of32_to_cpu(*value++);
-
-	if (vm && vm->virq_chip)
-		return vm->virq_chip->xlate(node, irqv, irq_cells, irq, flags);
-	else
-		return irq_xlate(node, irqv, irq_cells, irq, flags);
-
-	return -EINVAL;
 }
 
 static int create_vm_pdev_of(struct vm *vm, struct device_node *node)

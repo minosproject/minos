@@ -18,6 +18,7 @@
 #include <minos/mm.h>
 #include <libfdt/libfdt.h>
 #include <minos/of.h>
+#include <minos/irq.h>
 
 #define OF_MAX_DEEPTH	5
 
@@ -797,6 +798,39 @@ int of_translate_address(struct device_node *node,
 		uint64_t *address, uint64_t *size)
 {
 	return of_translate_address_index(node, address, size, 0);
+}
+
+int get_device_irq_index(struct device_node *node, uint32_t *irq,
+		unsigned long *flags, int index)
+{
+	int irq_cells, len, i;
+	of32_t *value;
+	uint32_t irqv[4];
+
+	if (!node)
+		return -EINVAL;
+
+	value = (of32_t *)of_getprop(node, "interrupts", &len);
+	if (!value || (len < sizeof(of32_t)))
+		return -ENOENT;
+
+	irq_cells = of_n_interrupt_cells(node);
+	if (irq_cells == 0) {
+		pr_error("bad irqcells - %s\n", node->name);
+		return -ENOENT;
+	}
+
+	pr_debug("interrupt-cells %d\n", irq_cells);
+
+	len = len / sizeof(of32_t);
+	if (index >= len)
+		return -ENOENT;
+
+	value += (index * irq_cells);
+	for (i = 0; i < irq_cells; i++)
+		irqv[i] = of32_to_cpu(*value++);
+
+	return irq_xlate(node, irqv, irq_cells, irq, flags);
 }
 
 void *of_device_node_match(struct device_node *node, void *s, void *e)
