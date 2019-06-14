@@ -111,11 +111,6 @@ static inline int vm_id(struct vm *vm)
 	return vm->vmid;
 }
 
-static inline struct vm *task_to_vm(struct task *task)
-{
-	return vcpu_to_vm((struct vcpu *)task->pdata);
-}
-
 static inline int
 create_vm_mmap(int vmid,  unsigned long offset, unsigned long size)
 {

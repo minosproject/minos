@@ -94,6 +94,11 @@ static int inline vcpu_affinity(struct vcpu *vcpu)
 	return vcpu->affinity;
 }
 
+static inline struct vm *vcpu_to_vm(struct vcpu *vcpu)
+{
+	return vcpu->vm;
+}
+
 struct vcpu *get_vcpu_in_vm(struct vm *vm, uint32_t vcpu_id);
 struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id);
 
