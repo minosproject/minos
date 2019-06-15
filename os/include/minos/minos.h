@@ -31,6 +31,8 @@
 struct vcpu;
 extern ticketlock_t __kernel_lock;
 
+DECLARE_PERCPU(int, error_code);
+
 typedef int (*hook_func_t)(void *item, void *contex);
 
 enum hook_type {
@@ -69,6 +71,16 @@ static inline void enter_to_guest(struct vcpu *vcpu, gp_regs *regs)
 {
 	do_hooks((void *)vcpu, (void *)regs,
 			MINOS_HOOK_TYPE_ENTER_TO_GUEST);
+}
+
+static inline int get_error_code(void)
+{
+	return get_cpu_var(error_code);
+}
+
+static inline void set_error_code(int code)
+{
+	get_cpu_var(error_code) = code;
 }
 
 #define kernel_lock_irqsave(flags)	ticket_lock_irqsave(&__kernel_lock, flags)

@@ -33,8 +33,8 @@ static void inline spin_lock(spinlock_t *lock)
 
 static void inline spin_unlock(spinlock_t *lock)
 {
-	preempt_enable();
 	arch_spin_unlock(lock);
+	preempt_enable();
 }
 
 #define spin_lock_irqsave(l, flags) \

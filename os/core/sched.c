@@ -92,6 +92,16 @@ void set_task_ready(struct task *task)
 	}
 }
 
+struct task *get_highest_task(uint8_t group, prio_t *ready)
+{
+	uint8_t x, y;
+
+	y = os_prio_map_table[group];
+	x = os_prio_map_table[ready[y]];
+
+	return os_task_table[(y << 3) + x];
+}
+
 void set_task_suspend(struct task *task)
 {
 
@@ -252,14 +262,15 @@ void sched(void)
 	struct pcpu *pcpu;
 	unsigned long flags;
 	int sched_flag = 0;
-	struct task *cur, *next;
+	struct task *cur = get_current_task(), *next;
 	int cpuid = smp_processor_id();
 
 	if (unlikely(int_nesting()))
 		panic("os_sched can not be called in interrupt\n");
 
-	/* if (sched_lock_nesting())
-		return; */
+	cur = get_current_task();
+	if (!preempt_allowed() || atomic_read(&task->lock_cpu))
+		return;
 
 	kernel_lock_irqsave(flags);
 	sched_new();
@@ -267,7 +278,6 @@ void sched(void)
 		if (os_prio_cur[i] != os_highest_rdy[i]) {
 			if (i == cpuid) {
 				pcpu = get_per_cpu(pcpu, cpuid);
-				cur = get_current_task();
 				next = get_next_run_task(pcpu);
 				sched_flag = 1;
 			} else
@@ -294,12 +304,13 @@ void irq_enter(gp_regs *regs)
 void irq_exit(gp_regs *regs)
 {
 	int i;
+	struct task *task = get_current_task();
 	int cpuid = smp_processor_id();
 	struct pcpu *pcpu = get_per_cpu(pcpu, cpuid);
 
 	irq_softirq_exit();
 
-	if (!preempt_allowed())
+	if (!preempt_allowed() || atomic_read(&task->lock_cpu))
 		return;
 
 	/*

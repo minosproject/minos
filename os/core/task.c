@@ -26,7 +26,7 @@ struct task *os_task_table[OS_NR_TASKS];
 
 static atomic_t os_task_nr;
 
-static int alloc_pid(prio_t prio, int cpuid)
+int alloc_pid(prio_t prio, int cpuid)
 {
 	int pid = -1;
 	struct pcpu *pcpu = get_per_cpu(pcpu, cpuid);
@@ -63,7 +63,7 @@ out:
 	return pid;
 }
 
-static void release_pid(int pid)
+void release_pid(int pid)
 {
 	if (pid > OS_NR_TASKS)
 		return;

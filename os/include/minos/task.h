@@ -61,9 +61,7 @@ struct task {
 	 */
 	struct list_head list;
 	struct list_head stat_list;
-
-	struct event *event_ptr;
-	struct event **event_multi_ptr;
+	struct list_head event_list;
 
 	void *msg;
 	struct flag_node *flag_node;
@@ -79,6 +77,10 @@ struct task {
 	prio_t bitx;
 	prio_t bity;
 
+	/* the event that this task hold currently */
+	atomic_t lock_cpu;
+	struct event *lock_event;
+	struct event *wait_event;
 
 	uint16_t affinity;
 #define TASK_TYPE_NORMAL	0x0
@@ -118,5 +120,8 @@ static inline prio_t get_task_prio(struct task *task)
 {
 	return task->prio;
 }
+
+int alloc_pid(prio_t prio, int cpuid);
+void release_pid(int pid);
 
 #endif

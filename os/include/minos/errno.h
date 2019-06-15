@@ -143,5 +143,6 @@
 #define EHWPOISON	133	/* Memory page has hardware error */
 
 #define ENOPID		134	/* No such pid or pid error */
+#define EABORT		135	/* pend abort */
 
 #endif
