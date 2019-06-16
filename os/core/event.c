@@ -16,7 +16,7 @@
 
 #include <minos/event.h>
 
-struct event *create_event(int type, char *name)
+struct event *create_event(int type, void *pdata, char *name)
 {
 	struct evnet *event;
 
@@ -30,6 +30,7 @@ struct event *create_event(int type, char *name)
 	event->event_type = type;
 	ticketlock_init(&event->lock);
 	init_list(&event->wait_list);
+	event->data = pdata;
 	strncpy(event->name, name, MIN(strlen(name), OS_EVENT_NAME_SIZE));
 
 	return event;
@@ -79,7 +80,7 @@ void event_task_remove(struct task *task, struct event *ev)
 		ev->wait_grp &= ~task->bity;
 }
 
-static struct task *event_get_ready(struct event *ev)
+struct task *event_get_ready(struct event *ev)
 {
 	uint8_t x, y;
 	struct task *task;
@@ -89,4 +90,25 @@ static struct task *event_get_ready(struct event *ev)
 
 	return list_first_entry(&ev->wait_list,
 			struct task, event_list);
+}
+
+void del_event_always(struct event *ev)
+{
+	struct task *task;
+
+	/* ready all the task waitting for this mutex */
+	list_for_each_entry_safe(task, n, &ev->wait_list, event_list) {
+		event_task_ready(task, NULL, TASK_STAT_MUTEX,
+					TASK_STAT_PEND_OK);
+		event_task_remove(task, ev);
+	}
+
+	while (mutex->wait_grp != 0) {
+		task = get_highest_task(ev->wait_grp, ev->wait_tbl);
+		event_task_ready(task, NULL, TASK_STAT_MUTEX,
+					TASK_STAT_PEND_OK);
+		event_task_remove(task, ev);
+	}
+
+	free(ev);
 }

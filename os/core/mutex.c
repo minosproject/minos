@@ -20,11 +20,12 @@
 
 #define OS_MUTEX_AVAILABLE	0xffff
 
-#define invalid_mutex()	((mutex == NULL) && (mutex->type != OS_EVENT_TYPE_MUTEX))
+#define invalid_mutex(mutex)	\
+	((mutex == NULL) && (mutex->type != OS_EVENT_TYPE_MUTEX))
 
-mutex_t create_mutex(char *name)
+mutex_t *create_mutex(char *name)
 {
-	return (mutex_t *)create_event(OS_EVENT_TYPE_MUTEX, name);
+	return (mutex_t *)create_event(OS_EVENT_TYPE_MUTEX, NULL, name);
 }
 
 int mutex_accept(mutex_t *mutex)
@@ -74,7 +75,6 @@ int mutex_del(mutex_t *mutex, int opt)
 			pr_error("can not delete mutex task waitting for it\n");
 			ret = -EPERM;
 		} else {
-			release_pid(mutex->high_prio);
 			free(mutex);
 			ret = 0;
 		}
@@ -91,27 +91,13 @@ int mutex_del(mutex_t *mutex, int opt)
 			task->lock_event = NULL;
 		}
 
-		/* ready all the task waitting for this mutex */
-		list_for_each_entry_safe(task, n, &mutex->wait_list, event_list) {
-			event_task_ready(task, NULL, TASK_STAT_MUTEX,
-					TASK_STAT_PEND_OK);
-			event_task_remove(task, (struct evnet *)mutex);
-		}
-
-		while (mutex->wait_grp != 0) {
-			task = get_highest_task(mutex->wait_grp,
-					mutex->wait_tbl);
-			event_task_ready(task, NULL, TASK_STAT_MUTEX,
-					TASK_STAT_PEND_OK);
-			event_task_remove(task, (struct evnet *)mutex);
-		}
-
+		del_event_always((struct event *)mutex);
 		ticket_unlock_irqrestore(&mutex->lock, flags);
+
 		if (task_waiting)
 			sched();
 
 		return 0;
-
 	default:
 		ret = -EINVAL;
 		break;
@@ -121,7 +107,7 @@ int mutex_del(mutex_t *mutex, int opt)
 	return ret;
 }
 
-int mutex_lock(mutex_t *m, uint32_t timeout)
+int mutex_pend(mutex_t *m, uint32_t timeout)
 {
 	unsigned long flags;
 	struct task *task = get_current_task();
@@ -169,6 +155,7 @@ int mutex_lock(mutex_t *m, uint32_t timeout)
 
 	sched();
 
+	spin_lock(&task->lock);
 	switch (task->pend_stat) {
 	case TASK_STAT_PEND_OK:
 		ret = 0;
@@ -181,15 +168,13 @@ int mutex_lock(mutex_t *m, uint32_t timeout)
 	case TASK_EVENT_PEND_TO:
 	default:
 		ret = -ETIMEDOUT;
+		ticket_lock_irqsave(&m->lock, flags);
+		event_task_remove(task, (struct event *)m);
+		ticket_unlock_irqrestore(&m->lock, flags);
+
 		break;
 	}
 
-	/* remove this task to the event wait list */
-	ticket_lock_irqsave(&m->lock, flags);
-	event_task_remove(task, (struct event *)m);
-	ticket_unlock_irqrestore(&m->lock, flags);
-
-	spin_lock(&task->lock);
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->event = 0;
 	spin_unlock(&task->lock);
@@ -197,7 +182,7 @@ int mutex_lock(mutex_t *m, uint32_t timeout)
 	return ret;
 }
 
-int mutex_unlock(mutex_t *m)
+int mutex_post(mutex_t *m)
 {
 	unsigned long flags;
 	struct task *task = get_current_task();
