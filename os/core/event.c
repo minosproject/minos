@@ -80,7 +80,7 @@ void event_task_remove(struct task *task, struct event *ev)
 		ev->wait_grp &= ~task->bity;
 }
 
-struct task *event_get_ready(struct event *ev)
+struct task *event_get_waiter(struct event *ev)
 {
 	uint8_t x, y;
 	struct task *task;
@@ -88,8 +88,25 @@ struct task *event_get_ready(struct event *ev)
 	if (ev->wait_grp != 0)
 		return get_highest_task(ev->wait_grp, ev->wait_tbl);
 
-	return list_first_entry(&ev->wait_list,
-			struct task, event_list);
+	if (!list_is_empty(&ev->wait_list)) {
+		return list_first_entry(&ev->wait_list,
+				struct task, event_list);
+	}
+
+	return NULL;
+}
+
+void event_highest_task_ready(struct event *ev, void *msg,
+		uint32_t msk, int pend_stat)
+{
+	struct task *task;
+
+	task = event_get_waiter(ev);
+	if (!task)
+		return;
+
+	event_task_ready(task, msg, msk, pend_stat);
+	event_task_remove(ev, task);
 }
 
 void del_event_always(struct event *ev)
@@ -111,4 +128,9 @@ void del_event_always(struct event *ev)
 	}
 
 	free(ev);
+}
+
+static inline int event_has_waiter(struct event *ev)
+{
+	return ((ev->wait_grp) || (!is_list_empty(&ev->wait_list)));
 }

@@ -17,6 +17,7 @@
 #include <minos/minos.h>
 #include <minos/event.h>
 #include <minos/task.h>
+#include <minos/ticketlock.h>
 
 #define OS_MUTEX_AVAILABLE	0xffff
 
@@ -198,7 +199,8 @@ int mutex_post(mutex_t *m)
 
 	/* find the highest prio task to run */
 	if ((m->wait_grp != 0) || !(is_list_empty(&m->wait_list))) {
-		task = event_get_ready((struct event *)m);
+		event_highest_task_ready((struct event *)m, NULL,
+				TASK_STAT_MUTEX, TASK_STAT_PEND_OK);
 		m->cnt = task->pid;
 		m->data = task;
 		ticket_unlock_irqrestore(&m->lock, flags);

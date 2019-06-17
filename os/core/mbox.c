@@ -18,7 +18,6 @@
 #include <minos/event.h>
 #include <minos/task.h>
 
-
 #define invalid_mbox(mbox)	\
 	((mbox == NULL) && (mbox->type != OS_EVENT_TYPE_MBOX))
 
@@ -26,7 +25,6 @@ mbox_t *create_mbox(void *pmsg, char *name)
 {
 	return (mbox_t *)create_event(OS_EVENT_TYPE_MBOX, pmsg, name);
 }
-
 
 void *mbox_accept(mbox_t *m)
 {
@@ -64,9 +62,9 @@ int mbox_del(mbox_t *m, int opt)
 
 	switch (opt) {
 	case OS_DEL_NO_PEND:
-		if (tasks_waiting == 0) {
+		if (tasks_waiting == 0)
 			free(m);
-		} else
+		else
 			ret = -EPERM;
 		break;
 
@@ -74,7 +72,7 @@ int mbox_del(mbox_t *m, int opt)
 		del_event_always((struct event *)m);
 		ticket_unlock_irqrestore(&mutex->lock, flags);
 
-		if (task_waiting)
+		if (tasks_waiting)
 			sched();
 
 		return 0;
@@ -111,6 +109,7 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 		return pmsg;
 	}
 
+	/* no mbox message need to suspend the task */
 	task = get_current_task();
 	spin_lock(&task->lock);
 	task->stat |= TASK_STAT_MBOX;
@@ -119,6 +118,7 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 	spin_unlock(&task->lock);
 
 	event_task_wait(task, (struct event *)m);
+	set_task_suspend(task);
 	ticket_lock_irq_restore(&m->lock, flags);
 
 	sched();
@@ -147,4 +147,78 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 	spin_unlock(&task->lock);
 
 	return pmsg;
+}
+
+int mbox_post(mbox_t *m, void *pmsg)
+{
+	int ret = 0;
+	struct task *task;
+	unsigned long flags;
+
+	if (invalid_mbox(m) || !pmsg)
+		return -EINVAL;
+
+	ticket_lock_irqsave(&m->lock, flags);
+	task = event_get_ready((struct event *)m);
+	if (task) {
+		event_highest_task_ready((struct event *)m, pmsg,
+					TASK_STAT_MBOX, TASK_STAT_PEND_OK);
+		ticket_unlock_irqrestore(&m->lock, flags);
+		sched();
+
+		return 0;
+	}
+
+	if (m->data != NULL) {
+		pr_debug("mbox-%s is full\n", m->name);
+		ret = -ENOSPC;
+	} else {
+		m->data = pmsg;
+		ret = 0;
+	}
+
+	ticket_unlock_irqrestore(&m->lock, flags);
+
+	return ret;
+}
+
+int mbox_post_opt(mbox_t *m, void *pmsg, int opt)
+{
+	unsigned long flags;
+	struct task *task;
+
+	if (invalid_mbox(m) || !pmsg)
+		return -EINVAL;
+
+	/*
+	 * check whether the mbox need to broadcast to
+	 * all the waitting task
+	 */
+	ticket_lock_irqsave(&m->lock, flags);
+	if (m->wait_grp || !is_list_empty(&m->wait_list)) {
+		if (opt & OS_POST_OPT_BROADCAST) {
+			event_highest_task_ready((struct event *)m, pmsg,
+					TASK_STAT_MBOX, TASK_STAT_PEND_OK);
+		} else {
+			event_highest_task_ready((struct event *)m, pmsg,
+					TASK_STAT_MBOX, TASK_STAT_PEND_OK);
+		}
+
+		ticket_unlock_irqrestore(&m->lock, flags);
+		sched();
+
+		return 0;
+	}
+
+	if (m->data != NULL) {
+		pr_debug("mbox-%s is full\n", m->name);
+		ret = -ENOSPC;
+	} else {
+		m->data = pmsg;
+		ret = 0;
+	}
+
+	ticket_unlock_irqrestore(&m->lock, flags);
+
+	return 0;
 }
