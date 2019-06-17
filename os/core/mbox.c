@@ -21,7 +21,7 @@
 #define invalid_mbox(mbox)	\
 	((mbox == NULL) && (mbox->type != OS_EVENT_TYPE_MBOX))
 
-mbox_t *create_mbox(void *pmsg, char *name)
+mbox_t *mbox_create(void *pmsg, char *name)
 {
 	return (mbox_t *)create_event(OS_EVENT_TYPE_MBOX, pmsg, name);
 }
@@ -70,6 +70,7 @@ int mbox_del(mbox_t *m, int opt)
 
 	case OS_DEL_ALWAYS:
 		del_event_always((struct event *)m);
+		free(m);
 		ticket_unlock_irqrestore(&mutex->lock, flags);
 
 		if (tasks_waiting)

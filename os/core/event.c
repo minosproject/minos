@@ -109,7 +109,7 @@ void event_highest_task_ready(struct event *ev, void *msg,
 	event_task_remove(ev, task);
 }
 
-void del_event_always(struct event *ev)
+void event_dev_always(struct event *ev)
 {
 	struct task *task;
 
@@ -126,8 +126,6 @@ void del_event_always(struct event *ev)
 					TASK_STAT_PEND_OK);
 		event_task_remove(task, ev);
 	}
-
-	free(ev);
 }
 
 static inline int event_has_waiter(struct event *ev)

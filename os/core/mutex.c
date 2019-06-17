@@ -24,7 +24,7 @@
 #define invalid_mutex(mutex)	\
 	((mutex == NULL) && (mutex->type != OS_EVENT_TYPE_MUTEX))
 
-mutex_t *create_mutex(char *name)
+mutex_t *mutex_create(char *name)
 {
 	return (mutex_t *)create_event(OS_EVENT_TYPE_MUTEX, NULL, name);
 }
@@ -93,6 +93,7 @@ int mutex_del(mutex_t *mutex, int opt)
 		}
 
 		del_event_always((struct event *)mutex);
+		free(mutex);
 		ticket_unlock_irqrestore(&mutex->lock, flags);
 
 		if (task_waiting)

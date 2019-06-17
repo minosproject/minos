@@ -22,7 +22,7 @@
 #define invalid_sem(sem) \
 	((sem == NULL) || (sem->type != OS_EVENT_TYPE_MBOX))
 
-sem_t *create_sem(uint32_t cnt, char *name)
+sem_t *sem_create(uint32_t cnt, char *name)
 {
 	sem_t *sem;
 
@@ -78,6 +78,7 @@ int sem_del(sem_t *sem, int opt)
 
 	case OS_DEL_ALWAYS:
 		del_event_always((struct event *)sem);
+		free(sem);
 		ticket_unlock_irqrestore(&sem->lock, flags);
 
 		if (tasks_waiting)
@@ -155,7 +156,7 @@ int sem_pend_abort(sem_t *sem, int opt)
 		case OS_PEND_OPT_BROADCAST:
 			while (event_has_waiter((struct event *)sem)) {
 				event_highest_task_ready((struct event *)sem,
-					NULL, TASK_STAT_SEM, TASK_STAT_PEND_OK);
+					NULL, TASK_STAT_SEM, TASK_STAT_PEND_ABORT);
 				nbr_tasks++;
 			}
 			break;

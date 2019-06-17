@@ -34,4 +34,6 @@ typedef struct event sem_t;
 typedef struct event mutex_t;
 typedef struct event flag_t;
 
+#define to_event(e)	(struct event *)e
+
 #endif
