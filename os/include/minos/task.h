@@ -82,6 +82,9 @@ struct task {
 	struct event *lock_event;
 	struct event *wait_event;
 
+	/* used to the flag type */
+	int flag_rdy;
+
 	uint16_t affinity;
 #define TASK_TYPE_NORMAL	0x0
 #define TASK_TYPE_VCPU		0x1
