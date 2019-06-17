@@ -14,8 +14,8 @@ typedef uint64_t flag_t;
 
 #define FLAG_CONSUME		0x80
 
-#define OS_FLAG_CLR             0
-#define OS_FLAG_SET             1
+#define FLAG_CLR             0
+#define FLAG_SET             1
 
 
 struct flag_grp {

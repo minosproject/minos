@@ -84,6 +84,7 @@ struct task {
 
 	/* used to the flag type */
 	int flag_rdy;
+	struct flag_node *flag_node;
 
 	uint16_t affinity;
 #define TASK_TYPE_NORMAL	0x0
