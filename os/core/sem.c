@@ -77,7 +77,7 @@ int sem_del(sem_t *sem, int opt)
 		break;
 
 	case OS_DEL_ALWAYS:
-		del_event_always((struct event *)sem);
+		event_del_always((struct event *)sem);
 		free(sem);
 		ticket_unlock_irqrestore(&sem->lock, flags);
 
@@ -93,6 +93,7 @@ int sem_del(sem_t *sem, int opt)
 
 void sem_pend(sem_t *sem, uint32_t timeout)
 {
+	int ret;
 	unsigned long flags;
 	struct task *task = get_current_task();
 
@@ -110,35 +111,37 @@ void sem_pend(sem_t *sem, uint32_t timeout)
 	task->stat |= TASK_STAT_SEM;
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->delay = timeout;
+	task->wait_event = to_event(sem);
 	spin_unlock(&task->lock);
 
 	event_task_wait(task, (struct event *)sem);
 	set_task_suspend(task);
 	ticket_unlock_irqrestore(&sem->lock, flags);
 
+	sched();
+
+	ticket_lock_irqsave(&m->lock, flags);
 	spin_lock(&task->lock);
 	switch (task->pend_stat) {
 	case TASK_STAT_PEND_OK:
-		pmsg = task->msg;
+		ret = 0;
 		break;
-
 	case TASK_STAT_PEND_ABORT:
-		pmsg = NULL;
+		ret = -EABORT;
 		break;
-
 	case TASK_EVENT_PEND_TO:
 	default:
-		ticket_lock_irqsave(&m->lock, flags);
-		event_task_remove(task, (struct event *)sem);
-		ticket_unlock_irqrestore(&sem->lock, flags);
+		event_task_remove(task, to_event(sem));
+		ret = -ETIMEDOUT;
 		break;
 	}
 
 	task->pend_stat = TASK_STAT_PEND_OK;
-	task->event = 0;
+	task->wait_event = NULL;
 	spin_unlock(&task->lock);
+	ticket_unlock_irqrestore(&sem->lock, flags);
 
-	sched();
+	return 0;
 }
 
 int sem_pend_abort(sem_t *sem, int opt)
@@ -196,7 +199,8 @@ int sem_post(sem_t *sem)
 		return 0;
 	}
 
-	sem->cnt++; // need check overflow
+	if (sem->cnt < 65535)
+		sem->cnt++;
 	ticket_unlock_irqrestore(&sem->lock, flags);
 
 	return 0;

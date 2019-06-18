@@ -15,21 +15,12 @@
  */
 
 #include <minos/minos.h>
-#include <minos/event.h>
+#include <minos/queue.h>
 #include <minos/task.h>
 #include <minos/ticketlock.h>
 
 #define invalid_queue(qt) \
 	((qt == NULL) || (qt->type != OS_EVENT_TYPE_Q))
-
-struct queue {
-	void **q_start;		/* contain the pointer of the data */
-	void **q_end;		/* end of the queue buffer */
-	void **q_in;		/* next message in */
-	void **q_out;		/* next message out */
-	int q_size;		/* the total size of the queue */
-	int q_cnt;		/* current queue entriy size */
-};
 
 queue_t *queue_create(int size, char *name)
 {
@@ -75,7 +66,7 @@ static inline void queue_free(queue_t *qt)
 	if (q)
 		free(q);
 
-	free(qt);
+	release_event(to_event(qt));
 }
 
 int queue_del(queue_t *qt, int opt)
@@ -197,6 +188,7 @@ void *queue_pend(queue_t *qt, uint32_t timeout)
 	task->stat |= TASK_STAT_Q;
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->delay = timeout;
+	task->wait_event = to_event(qt);
 	spin_unlock(&task->lock);
 
 	event_task_wait(task, to_event(qt));
@@ -227,6 +219,7 @@ void *queue_pend(queue_t *qt, uint32_t timeout)
 	task->stat_pend = TASK_STAT_PEND_OK;
 	task->wait_event = NULL;
 	task->msg = NULL;
+
 	spin_unlock(&task->lock);
 	ticket_unlock_irqrestore(&m->lock, flags);
 

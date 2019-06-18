@@ -17,7 +17,6 @@ typedef uint64_t flag_t;
 #define FLAG_CLR             0
 #define FLAG_SET             1
 
-
 struct flag_grp {
 	int type;
 	struct list_head wait_list;
@@ -32,5 +31,14 @@ struct flag_node {
 	flag_t flags;
 	int wait_type;
 };
+
+struct flag_grp *flag_create(flag_t flags);
+int flag_del(struct flag_grp *grp, int opt);
+flag_t flag_accept(struct flag_grp *grp, flag_t flags, int wait_type);
+
+flag_t flag_pend(struct flag_grp *grp, flag_t flags,
+		int wait_type, uint32_t timeout);
+flag_t flag_pend_get_flags_ready(void);
+flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt);
 
 #endif

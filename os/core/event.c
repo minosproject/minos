@@ -14,10 +14,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <minos/minos.h>
+#include <minos/task.h>
+#include <minos/sched.h>
 #include <minos/event.h>
+
+static LIST_HEAD(event_list);
+static DEFINE_SPIN_LOCK(event_lock);
 
 struct event *create_event(int type, void *pdata, char *name)
 {
+	unsigned long flags;
 	struct evnet *event;
 
 	if (int_nesting())
@@ -33,15 +40,23 @@ struct event *create_event(int type, void *pdata, char *name)
 	event->data = pdata;
 	strncpy(event->name, name, MIN(strlen(name), OS_EVENT_NAME_SIZE));
 
+	spin_lock_irqsave(&event_lock, &flags);
+	list_add_tail(&event_list, &event->list);
+	spin_unlock_irqrestore(&event_lock, &flags);
+
 	return event;
 }
 
 void release_event(struct event *event)
 {
+	spin_lock_irqsave(&event_lock, &flags);
+	list_del(&event->list);
+	spin_unlock_irqrestore(&event_lock, &flags);
 	free(event);
 }
 
-int event_task_ready(struct task *task, void *msg, uint32_t msk, int pend_stat)
+int event_task_ready(struct task *task, void *msg,
+		uint32_t msk, int pend_stat)
 {
 	spin_lock(&task->lock);
 	task->delay = 0;
@@ -57,10 +72,6 @@ int event_task_ready(struct task *task, void *msg, uint32_t msk, int pend_stat)
 
 void event_task_wait(struct task *task, struct event *ev)
 {
-	uint8_t y;
-
-	task->wait_event = ev;
-
 	if (task->prio <= OS_LOWEST_PRIO) {
 		ev->wait_grp |= task->bity;
 		ev->wait_tbl[task->by] |= task->bx;
@@ -109,26 +120,26 @@ void event_highest_task_ready(struct event *ev, void *msg,
 	event_task_remove(ev, task);
 }
 
-void event_dev_always(struct event *ev)
+void event_del_always(struct event *ev)
 {
 	struct task *task;
 
-	/* ready all the task waitting for this mutex */
+	/*
+	 * ready all the task waitting for this mutex
+	 * set the pend stat to PEND_ABORT to indicate
+	 * that the event is not valid when the task
+	 * has been waked up
+	 */
 	list_for_each_entry_safe(task, n, &ev->wait_list, event_list) {
 		event_task_ready(task, NULL, TASK_STAT_MUTEX,
-					TASK_STAT_PEND_OK);
+					TASK_STAT_PEND_ABORT);
 		event_task_remove(task, ev);
 	}
 
 	while (mutex->wait_grp != 0) {
 		task = get_highest_task(ev->wait_grp, ev->wait_tbl);
 		event_task_ready(task, NULL, TASK_STAT_MUTEX,
-					TASK_STAT_PEND_OK);
+					TASK_STAT_PEND_ABORT);
 		event_task_remove(task, ev);
 	}
-}
-
-static inline int event_has_waiter(struct event *ev)
-{
-	return ((ev->wait_grp) || (!is_list_empty(&ev->wait_list)));
 }

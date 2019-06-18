@@ -63,14 +63,14 @@ int mbox_del(mbox_t *m, int opt)
 	switch (opt) {
 	case OS_DEL_NO_PEND:
 		if (tasks_waiting == 0)
-			free(m);
+			release_event(to_event(m));
 		else
 			ret = -EPERM;
 		break;
 
 	case OS_DEL_ALWAYS:
 		del_event_always((struct event *)m);
-		free(m);
+		release_event(m);
 		ticket_unlock_irqrestore(&mutex->lock, flags);
 
 		if (tasks_waiting)
@@ -92,13 +92,7 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 	struct task *task;
 	unsigned long flags;
 
-	if (invalid_mbox(m))
-		return NULL;
-
-	if (int_nesting())
-		return NULL;
-
-	if (preempt_allowed())
+	if (invalid_mbox(m) || int_nesting() || !preempt_allowed())
 		return NULL;
 
 	ticket_lock_irqsave(&m->lock, flags);
@@ -116,6 +110,7 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 	task->stat |= TASK_STAT_MBOX;
 	task->stat_pend = TASK_STAT_PEND_OK;
 	task->delay = timeout;
+	task->wait_event = to_event(m);
 	spin_unlock(&task->lock);
 
 	event_task_wait(task, (struct event *)m);
@@ -124,6 +119,7 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 
 	sched();
 
+	ticket_lock_irqsave(&m->lock, flags);
 	spin_lock(&task->lock);
 	switch (task->pend_stat) {
 	case TASK_STAT_PEND_OK:
@@ -136,16 +132,15 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 
 	case TASK_EVENT_PEND_TO:
 	default:
-		ticket_lock_irqsave(&m->lock, flags);
 		event_task_remove(task, (struct event *)m);
-		ticket_unlock_irqrestore(&m->lock, flags);
 		pmsg = NULL;
 		break;
 	}
 
 	task->pend_stat = TASK_STAT_PEND_OK;
-	task->event = 0;
+	task->wait_event = NULL;
 	spin_unlock(&task->lock);
+	ticket_unlock_irqrestore(&m->lock, flags);
 
 	return pmsg;
 }
@@ -196,7 +191,7 @@ int mbox_post_opt(mbox_t *m, void *pmsg, int opt)
 	 * all the waitting task
 	 */
 	ticket_lock_irqsave(&m->lock, flags);
-	if (m->wait_grp || !is_list_empty(&m->wait_list)) {
+	if (event_has_waiter(to_event(m))) {
 		if (opt & OS_POST_OPT_BROADCAST) {
 			event_highest_task_ready((struct event *)m, pmsg,
 					TASK_STAT_MBOX, TASK_STAT_PEND_OK);

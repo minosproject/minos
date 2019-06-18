@@ -31,7 +31,7 @@ mutex_t *mutex_create(char *name)
 
 int mutex_accept(mutex_t *mutex)
 {
-	int ret = 0;
+	int ret = -EBUSY;
 	unsigned long flags;
 	struct task *task = get_current_task();
 
@@ -41,11 +41,13 @@ int mutex_accept(mutex_t *mutex)
 	if(int_nesting())
 		return -EPERM;
 
+	/* if the mutex is avaliable now, lock it */
 	ticket_lock_irqsave(&mutex->lock, flags);
 	if (mutex->cnt == OS_MUTEX_AVAILABLE) {
 		mutex->owner = task->pid;
 		mutex->data = task;
 		mutex->cnt = task->prio;
+		ret = 0;
 	}
 	ticket_lock_irqrestore(&mutex->lock, flags);
 
@@ -65,7 +67,7 @@ int mutex_del(mutex_t *mutex, int opt)
 
 	ticket_lock_irqsave(&mutex->lock, flags);
 
-	if (mutex->wait_grp || !is_list_empty(&mutex->wait_list))
+	if (event_has_waiter(to_event(mutex)))
 		task_waiting = 1;
 	else
 		task_waiting = 0;
@@ -76,7 +78,7 @@ int mutex_del(mutex_t *mutex, int opt)
 			pr_error("can not delete mutex task waitting for it\n");
 			ret = -EPERM;
 		} else {
-			free(mutex);
+			release_event(to_event(mutex));
 			ret = 0;
 		}
 		break;
@@ -84,7 +86,8 @@ int mutex_del(mutex_t *mutex, int opt)
 	case OS_DEL_ALWAYS:
 		/*
 		 * need to unlock the cpu if the cpu is lock
-		 * by this task
+		 * by this task, the mutex can not be accessed
+		 * by the task after it has been locked.
 		 */
 		task = (struct task *)mutex->data;
 		if (task != NULL) {
@@ -92,8 +95,8 @@ int mutex_del(mutex_t *mutex, int opt)
 			task->lock_event = NULL;
 		}
 
-		del_event_always((struct event *)mutex);
-		free(mutex);
+		event_del_always(to_event(mutex));
+		release_event(to_event(mutex));
 		ticket_unlock_irqrestore(&mutex->lock, flags);
 
 		if (task_waiting)
@@ -148,6 +151,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	task->stat |= TASK_STAT_MUTEX;
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->delay = timeout;
+	task->wait_event = ev;
 	spin_unlock(&task->lock);
 
 	event_task_wait(task, (struct event *)m);
@@ -157,7 +161,9 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 
 	sched();
 
+	ticket_lock_irqsave(&m->lock, flags);
 	spin_lock(&task->lock);
+
 	switch (task->pend_stat) {
 	case TASK_STAT_PEND_OK:
 		ret = 0;
@@ -170,16 +176,14 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	case TASK_EVENT_PEND_TO:
 	default:
 		ret = -ETIMEDOUT;
-		ticket_lock_irqsave(&m->lock, flags);
 		event_task_remove(task, (struct event *)m);
-		ticket_unlock_irqrestore(&m->lock, flags);
-
 		break;
 	}
 
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->event = 0;
 	spin_unlock(&task->lock);
+	ticket_unlock_irqrestore(&m->lock, flags);
 
 	return ret;
 }
