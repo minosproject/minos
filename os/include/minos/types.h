@@ -93,6 +93,8 @@ typedef void (*void_func_t)(void);
 #define PAGE_BALIGN(x)	BALIGN(x, PAGE_SIZE)
 #define PAGE_ALIGN(x)	ALIGN(x, PAGE_SIZE)
 
+#define IS_PAGE_ALIGN(x)	(!((unsigned long)(x) & (PAGE_SIZE - 1)))
+
 #define __stringify_1(x...) #x
 #define __stringify(x...)   __stringify_1(x)
 

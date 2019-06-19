@@ -164,8 +164,10 @@ int arch_early_init(void *setup_data)
 {
 	pr_info("current EL is 0x%x\n", GET_EL(read_CurrentEl()));
 
+#ifdef CONFIG_VIRT
 	if (!IS_IN_EL2())
 		panic("minos must run at EL2 mode\n");
+#endif
 
 #ifdef CONFIG_DEVICE_TREE
 	fdt_early_init(setup_data);

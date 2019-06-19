@@ -27,6 +27,7 @@
 #define MAX_DTB_SIZE	(MEM_BLOCK_SIZE)
 
 static void *dtb = NULL;
+static size_t dtb_size;
 struct device_node *hv_node;
 static struct vmtag *vmtags;
 
@@ -153,6 +154,9 @@ int fdt_init(void)
 {
 	if (!dtb)
 		panic("dtb address is not set\n");
+
+	/* first reserve the memory space for dtb */
+	reserve_memory((phy_addr_t)dtb, dtb_size);
 
 	hv_node = of_parse_device_tree(dtb);
 	if (!hv_node)
@@ -624,23 +628,20 @@ int fdt_parse_vm_info(void)
 
 int fdt_early_init(void *setup_data)
 {
-	unsigned long base;
-
-	base = (unsigned long)setup_data;
-	pr_info("dtb address is 0x%x\n", (unsigned long)base);
-
-	if (!setup_data || (base & (MEM_BLOCK_SIZE - 1))) {
-		pr_fatal("invalid dtb address\n");
+	/*
+	 * the dtb file need to store at the end of the os memory
+	 * region and the size can not beyond 2M, also it must
+	 * 4K align
+	 */
+	if (!setup_data || !IS_PAGE_ALIGN(setup_data)) {
+		pr_fatal("invalid dtb address 0x%p must 4K align\n",
+				(unsigned long)setup_data);
 		return -ENOMEM;
 	}
 
-	/* map the dtb space to hypervisor's mem space */
-	if (create_early_pmd_mapping(base, base)) {
-		pr_error("map dtb memory failed\n");
-		return -EINVAL;
-	}
-
 	dtb = setup_data;
+	dtb_size = fdt_total_size(dtb);
+	pr_info("DTB - 0x%x ---> 0x%x\n", (unsigned long) dtb, dtb_size);
 
 	if (fdt_check_header(dtb)) {
 		pr_error("invaild dtb header\n");
@@ -649,14 +650,11 @@ int fdt_early_init(void *setup_data)
 	}
 
 	/*
-	 * set up the platform from the dtb file
-	 * then get the spin table information if the
-	 * platform is using spin table to wake up
-	 * other cores
+	 * set up the platform from the dtb file then get the spin
+	 * table information if the platform is using spin table to
+	 * wake up other cores
 	 */
 	fdt_setup_platform();
-	fdt_parse_memory_info();
-	fdt_parse_vm_info();
 
 	return 0;
 }

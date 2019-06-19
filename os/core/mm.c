@@ -1164,6 +1164,25 @@ int has_enough_memory(size_t size)
 	return (free_blocks >= (size >> MEM_BLOCK_SHIFT));
 }
 
+int reserve_memory(phy_addr_t addr, size_t size)
+{
+	struct mem_block *mb;
+
+	addr = PAGE_ALIGN(addr);
+	size = PAGE_ALIGN(size);
+
+	mb = addr_to_mem_block(addr);
+	if (!mb) {
+		pr_error("Invalid memory space 0x%x --> 0x%x", addr, size);
+		return -EINVAL;
+	}
+
+	if ((mb->flags & GFB_PAGE_META) || (mb->flags & GFB_VM)
+			|| (mb->flags & GFB_IO)) {
+		pr_error("")
+	}
+}
+
 int add_memory_region(uint64_t base, uint64_t size, int vmid)
 {
 	struct memory_region *region;
