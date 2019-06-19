@@ -1,7 +1,7 @@
 #ifndef __MINOS_FLAG_H__
 #define __MINOS_FLAG_H__
 
-typedef uint64_t flag_t;
+typedef uint32_t flag_t;
 
 #define FLAG_WAIT_CLR_ALL       0
 #define FLAG_WAIT_CLR_AND       0

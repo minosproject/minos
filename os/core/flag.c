@@ -16,8 +16,11 @@
 
 #include <minos/minos.h>
 #include <minos/flag.h>
+#include <minos/event.h>
+#include <minos/mm.h>
 #include <minos/task.h>
 #include <minos/sched.h>
+#include <minos/ticketlock.h>
 
 #define invalid_flag(f) \
 	((f == NULL) || (f->type != OS_EVENT_TYPE_FLAG))
@@ -27,7 +30,7 @@ struct flag_grp *flag_create(flag_t flags)
 	struct flag_grp *fg;
 
 	if (int_nesting())
-		return -EPERM;
+		return NULL;
 
 	fg = zalloc(sizeof(*fg));
 	if (fg)
@@ -93,7 +96,7 @@ static inline flag_t flag_wait_clr_any(struct flag_grp *grp,
 
 	flags_rdy = ~grp->flags & flags;
 	if (flags_rdy != 0) {
-		if (cosume)
+		if (consume)
 			grp->flags |= flags_rdy;
 	} else
 		flags_rdy = 0;
@@ -111,7 +114,7 @@ flag_t flag_accept(struct flag_grp *grp, flag_t flags, int wait_type)
 	if (invalid_flag(grp))
 		return 0;
 
-	result = wait_type & FLAG_COMSUME;
+	result = wait_type & FLAG_CONSUME;
 	if (result != 0) {
 		wait_type &= ~FLAG_CONSUME;
 		consume = 1;
@@ -124,13 +127,13 @@ flag_t flag_accept(struct flag_grp *grp, flag_t flags, int wait_type)
 	case FLAG_WAIT_SET_ALL:
 		flags_rdy = flag_wait_set_all(grp, flags, consume);
 		break;
-	case OS_FLAG_WAIT_SET_ANY:
+	case FLAG_WAIT_SET_ANY:
 		flags_rdy = flag_wait_set_any(grp, flags, consume);
 		break;
-	case OS_FLAG_WAIT_CLR_ALL:
+	case FLAG_WAIT_CLR_ALL:
 		flags_rdy = flag_wait_clr_all(grp, flags, consume);
 		break;
-	case OS_FLAG_WAIT_CLR_ANY:
+	case FLAG_WAIT_CLR_ANY:
 		flags_rdy = flag_wait_clr_any(grp, flags, consume);
 		break;
 	default:
@@ -139,7 +142,7 @@ flag_t flag_accept(struct flag_grp *grp, flag_t flags, int wait_type)
 	}
 
 	ticket_unlock_irqrestore(&grp->lock, irq);
-	return flag_rdy;
+	return flags_rdy;
 }
 
 static int flag_task_ready(struct flag_node *node, flag_t flags)
@@ -159,7 +162,7 @@ static int flag_task_ready(struct flag_node *node, flag_t flags)
 		sched = 1;
 	} else {
 		sched = 0;
-		spin_unlock(&task->lock)
+		spin_unlock(&task->lock);
 	}
 
 	return sched;
@@ -198,7 +201,7 @@ int flag_del(struct flag_grp *grp, int opt)
 		}
 
 		free(grp);
-		ticket_unlock_irqrestore(irq);
+		ticket_unlock_irqrestore(&grp->lock, irq);
 
 		if (tasks_waiting)
 			sched();
@@ -215,13 +218,13 @@ int flag_del(struct flag_grp *grp, int opt)
 static void flag_block(struct flag_grp *grp, struct flag_node *pnode,
 		flag_t flags, int wait_type, uint32_t timeout)
 {
-	struct task *task = get_current_task;
+	struct task *task = get_current_task();
 
 	memset(pnode, 0, sizeof(*pnode));
 	pnode->flags = flags;
 	pnode->wait_type = wait_type;
 	pnode->task = task;
-	pnode->flags_grp = grp;
+	pnode->flag_grp = grp;
 
 	spin_lock(&task->lock);
 	task->stat |= TASK_STAT_FLAG;
@@ -241,8 +244,7 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 	struct flag_node node;
 	flag_t flags_rdy;
 	int result, consume;
-	int pend_stat;
-	struct task *task = get_current_task;
+	struct task *task = get_current_task();
 
 	if (invalid_flag(grp) || int_nesting() || !preempt_allowed())
 		return 0;
@@ -258,10 +260,10 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 
 	switch (wait_type) {
 	case FLAG_WAIT_SET_ALL:
-		flags_rdy = flag_wait_set_all(grp, flags. consume);
+		flags_rdy = flag_wait_set_all(grp, flags, consume);
 		break;
 	case FLAG_WAIT_SET_ANY:
-		flags_rdy = flag_wait_set_any(grp, flags. consume);
+		flags_rdy = flag_wait_set_any(grp, flags, consume);
 		break;
 	case FLAG_WAIT_CLR_ALL:
 		flags_rdy = flag_wait_clr_all(grp, flags, consume);
@@ -287,9 +289,8 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 	ticket_lock_irqsave(&grp->lock, irq);
 	spin_lock(&task->lock);
 
-	if (task->stat_pend != TASK_STAT_PEND_OK) {
-		pend_stat = task->stat_pend;
-		task->stat_pend = TASK_STAT_PEND_OK;
+	if (task->pend_stat != TASK_STAT_PEND_OK) {
+		task->pend_stat = TASK_STAT_PEND_OK;
 		list_del(&node.list);
 		flags_rdy = 0;
 	} else {
@@ -322,19 +323,19 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 flag_t flag_pend_get_flags_ready(void)
 {
 	struct task *task = get_current_task();
-	unsigned long flags;
+	unsigned long irq;
 	flag_t flags;
 
-	spin_lock_irqsave(&task->lock, flags);
+	spin_lock_irqsave(&task->lock, irq);
 	flags = task->flags_rdy;
-	spin_unlock_irqrestore(&task->lock, flags);
+	spin_unlock_irqrestore(&task->lock, irq);
 
 	return flags;
 }
 
 flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt)
 {
-	int sched;
+	int need_sched;
 	flag_t flags_rdy;
 	unsigned long irq;
 	struct flag_node *pnode, *n;
@@ -349,17 +350,17 @@ flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt)
 		break;
 
 	case FLAG_SET:
-		grp->flag |= flags;
+		grp->flags |= flags;
 		break;
 	}
 
-	sched = 0;
+	need_sched = 0;
 	list_for_each_entry_safe(pnode, n, &grp->wait_list, list) {
 		switch (pnode->wait_type) {
 		case FLAG_WAIT_SET_ALL:
 			flags_rdy = grp->flags & pnode->flags;
 			if (flags_rdy == pnode->flags) {
-				sched = flag_task_ready(pnode,
+				need_sched = flag_task_ready(pnode,
 						flags_rdy);
 			}
 			break;
@@ -367,7 +368,7 @@ flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt)
 		case FLAG_WAIT_SET_ANY:
 			flags_rdy = grp->flags & pnode->flags;
 			if (flags_rdy != 0) {
-				sched = flag_task_ready(pnode,
+				need_sched = flag_task_ready(pnode,
 						flags_rdy);
 			}
 			break;
@@ -375,7 +376,7 @@ flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt)
 		case FLAG_WAIT_CLR_ALL:
 			flags_rdy = ~grp->flags & pnode->flags;
 			if (flags_rdy == pnode->flags) {
-				sched = flag_task_ready(pnode,
+				need_sched = flag_task_ready(pnode,
 						flags_rdy);
 			}
 			break;
@@ -383,7 +384,7 @@ flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt)
 		case FLAG_WAIT_CLR_ANY:
 			flags_rdy = ~grp->flags & pnode->flags;
 			if (flags_rdy != 0) {
-				sched = flag_task_ready(pnode,
+				need_sched = flag_task_ready(pnode,
 						flags_rdy);
 			}
 
@@ -395,12 +396,12 @@ flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt)
 
 	ticket_unlock_irqrestore(&grp->lock, irq);
 
-	if (sched)
+	if (need_sched)
 		sched();
 
 	ticket_lock_irqsave(&grp->lock, irq);
 	flags_rdy = grp->flags;
-	ticket_lock_irqrestore(&grp->lock, irq);
+	ticket_unlock_irqrestore(&grp->lock, irq);
 
 	return flags_rdy;
 }

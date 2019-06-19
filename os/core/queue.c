@@ -17,6 +17,8 @@
 #include <minos/minos.h>
 #include <minos/queue.h>
 #include <minos/task.h>
+#include <minos/sched.h>
+#include <minos/mm.h>
 #include <minos/ticketlock.h>
 
 #define invalid_queue(qt) \
@@ -97,7 +99,7 @@ int queue_del(queue_t *qt, int opt)
 		break;
 
 	case OS_DEL_ALWAYS:
-		event_dev_always(to_event(qt));
+		event_del_always(to_event(qt));
 		queue_free(qt);
 		ticket_unlock_irqrestore(&qt->lock, flags);
 
@@ -111,7 +113,7 @@ int queue_del(queue_t *qt, int opt)
 	}
 
 	ticket_unlock_irqrestore(&qt->lock, flags);
-	return 0;
+	return ret;
 }
 
 static inline void *queue_pop(struct queue *q)
@@ -126,20 +128,36 @@ static inline void *queue_pop(struct queue *q)
 	return pmsg;
 }
 
+static inline void queue_push(struct queue *q, void *pmsg)
+{
+	*q->q_in++ = pmsg;
+	if (q->q_in == q->q_end)
+		q->q_in = q->q_start;
+	q->q_cnt++;
+}
+
+static inline void queue_push_front(struct queue *q, void *pmsg)
+{
+	if (q->q_out == q->q_start)
+		q->q_out = q->q_end;
+	q->q_out--;
+	*q->q_out = pmsg;
+	q->q_cnt++;
+}
+
 void *queue_accept(queue_t *qt)
 {
-	int ret = 0;
 	unsigned long flags;
 	struct queue *q;
 	void *pmsg = NULL;
 
 	if (invalid_queue(qt))
-		return -EINVAL;
+		return NULL;
 
 	ticket_lock_irqsave(&qt->lock, flags);
 
 	q = (struct queue *)qt->data;
-	if (q->q_cnt > 0) {
+	if (q->q_cnt > 0)
 		pmsg = queue_pop(q);
 
 	ticket_unlock_irqrestore(&qt->lock, flags);
@@ -159,7 +177,7 @@ int queue_flush(queue_t *qt)
 	q = (struct queue *)qt->data;
 	q->q_in = q->q_start;
 	q->q_out = q->q_start;
-	q->q_cnt = 0
+	q->q_cnt = 0;
 	ticket_unlock_irqrestore(&qt->lock, flags);
 
 	return 0;
@@ -193,11 +211,11 @@ void *queue_pend(queue_t *qt, uint32_t timeout)
 
 	event_task_wait(task, to_event(qt));
 	set_task_suspend(task);
-	ticket_lock_irqrestore(&qt->lock, flags);
+	ticket_unlock_irqrestore(&qt->lock, flags);
 
 	sched();
 
-	ticket_lock_irqsave(&m->lock, flags);
+	ticket_lock_irqsave(&qt->lock, flags);
 	spin_lock(&task->lock);
 
 	switch (task->pend_stat) {
@@ -209,19 +227,19 @@ void *queue_pend(queue_t *qt, uint32_t timeout)
 		pmsg = NULL;
 		break;
 
-	case TASK_EVENT_PEND_TO:
+	case TASK_STAT_PEND_TO:
 	default:
-		event_task_remove(task, (struct event *)m);
+		event_task_remove(task, to_event(qt));
 		pmsg = NULL;
 		break;
 	}
 
-	task->stat_pend = TASK_STAT_PEND_OK;
+	task->pend_stat = TASK_STAT_PEND_OK;
 	task->wait_event = NULL;
 	task->msg = NULL;
 
 	spin_unlock(&task->lock);
-	ticket_unlock_irqrestore(&m->lock, flags);
+	ticket_unlock_irqrestore(&qt->lock, flags);
 
 	return pmsg;
 }
@@ -229,11 +247,10 @@ void *queue_pend(queue_t *qt, uint32_t timeout)
 int queue_post_abort(queue_t *qt, int opt)
 {
 	unsigned long flags;
-	struct queue *q;
 	int nbr_tasks = 0;
 
-	if (invalid_sem(sem) || int_nesting() || preempt_allowed())
-		return;
+	if (invalid_queue(qt) || int_nesting() || preempt_allowed())
+		return -EINVAL;
 
 	ticket_lock_irqsave(&qt->lock, flags);
 	if (event_has_waiter(to_event(qt))) {
@@ -257,28 +274,11 @@ int queue_post_abort(queue_t *qt, int opt)
 		ticket_unlock_irqrestore(&qt->lock, flags);
 		sched();
 
-		return nbr_task;
+		return nbr_tasks;
 	}
 
 	ticket_unlock_irqrestore(&qt->lock, flags);
 	return nbr_tasks;
-}
-
-static void inline queue_push(struct queue *q, void *pmsg)
-{
-	*q->q_in++ = pmsg;
-	if (q->q_in == q->q_end)
-		q->q_in = q->q_start;
-	q->q_cnt++;
-}
-
-static void inline queue_push_front(struct queue *q, void *pmsg)
-{
-	if (q->q_out == q->q_start)
-		q->q_out = q->q_end;
-	q->q_out--;
-	*q->q_out = pmsg
-	q->q_cnt++;
 }
 
 static int __queue_post(queue_t *qt, void *pmsg, int front)
@@ -305,7 +305,7 @@ static int __queue_post(queue_t *qt, void *pmsg, int front)
 		return -ENOSPC;
 	}
 
-	if (front) {
+	if (front)
 		queue_push_front(q, pmsg);
 	else
 		queue_push(q, pmsg);
@@ -325,7 +325,7 @@ int queue_post_front(queue_t *qt, void *pmsg)
 	return __queue_post(qt, pmsg, 1);
 }
 
-int queue_post_opt(queue_t *qt, void *pmsg)
+int queue_post_opt(queue_t *qt, int opt, void *pmsg)
 {
 	unsigned long flags;
 	struct queue *q;
@@ -333,7 +333,7 @@ int queue_post_opt(queue_t *qt, void *pmsg)
 	if (invalid_queue(qt) || !pmsg)
 		return -EINVAL;
 
-	ticket_lock_irq_save(&qt->lock, flags);
+	ticket_lock_irqsave(&qt->lock, flags);
 	if (event_has_waiter(to_event(qt))) {
 		if (opt & OS_POST_OPT_BROADCAST) {
 			while (event_has_waiter(to_event(qt))) {

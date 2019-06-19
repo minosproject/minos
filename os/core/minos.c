@@ -43,7 +43,7 @@ extern int create_idle_task(void);
 struct list_head hook_lists[MINOS_HOOK_TYPE_UNKNOWN];
 
 DEFINE_TICKET_LOCK(__kernel_lock);
-DEFINE_PERCPU(int, error_code);
+DEFINE_PER_CPU(int, error_code);
 
 static void hooks_init(void)
 {

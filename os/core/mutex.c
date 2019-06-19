@@ -18,6 +18,8 @@
 #include <minos/event.h>
 #include <minos/task.h>
 #include <minos/ticketlock.h>
+#include <minos/mutex.h>
+#include <minos/sched.h>
 
 #define OS_MUTEX_AVAILABLE	0xffff
 
@@ -35,7 +37,7 @@ int mutex_accept(mutex_t *mutex)
 	unsigned long flags;
 	struct task *task = get_current_task();
 
-	if (invalid_mutex())
+	if (invalid_mutex(mutex))
 		return -EPERM;
 
 	if(int_nesting())
@@ -49,7 +51,7 @@ int mutex_accept(mutex_t *mutex)
 		mutex->cnt = task->prio;
 		ret = 0;
 	}
-	ticket_lock_irqrestore(&mutex->lock, flags);
+	ticket_unlock_irqrestore(&mutex->lock, flags);
 
 	return ret;
 }
@@ -59,22 +61,21 @@ int mutex_del(mutex_t *mutex, int opt)
 	unsigned long flags;
 	int tasks_waiting;
 	int ret;
-	prio_t prio;
-	struct task *task, *n;
+	struct task *task;
 
-	if (invalid_mutex())
+	if (invalid_mutex(mutex))
 		return -EINVAL;
 
 	ticket_lock_irqsave(&mutex->lock, flags);
 
 	if (event_has_waiter(to_event(mutex)))
-		task_waiting = 1;
+		tasks_waiting = 1;
 	else
-		task_waiting = 0;
+		tasks_waiting = 0;
 
 	switch (opt) {
 	case OS_DEL_NO_PEND:
-		if (task_waiting) {
+		if (tasks_waiting) {
 			pr_error("can not delete mutex task waitting for it\n");
 			ret = -EPERM;
 		} else {
@@ -91,7 +92,7 @@ int mutex_del(mutex_t *mutex, int opt)
 		 */
 		task = (struct task *)mutex->data;
 		if (task != NULL) {
-			atomic_set(&task->lock_cpu);
+			atomic_set(&task->lock_cpu, 1);
 			task->lock_event = NULL;
 		}
 
@@ -99,7 +100,7 @@ int mutex_del(mutex_t *mutex, int opt)
 		release_event(to_event(mutex));
 		ticket_unlock_irqrestore(&mutex->lock, flags);
 
-		if (task_waiting)
+		if (tasks_waiting)
 			sched();
 
 		return 0;
@@ -114,15 +115,17 @@ int mutex_del(mutex_t *mutex, int opt)
 
 int mutex_pend(mutex_t *m, uint32_t timeout)
 {
+	int ret;
 	unsigned long flags;
+	struct task *owner;
 	struct task *task = get_current_task();
 
-	if (invalid_mutex() || int_nesting() || !preempt_allowed())
+	if (invalid_mutex(m) || int_nesting() || !preempt_allowed())
 		return -EINVAL;
 
 	ticket_lock_irqsave(&m->lock, flags);
 	if (m->cnt == OS_MUTEX_AVAILABLE) {
-		m->pid = task->pid;
+		m->owner = task->pid;
 		m->data = (void *)task;
 		ticket_unlock_irqrestore(&m->lock, flags);
 		return 0;
@@ -141,9 +144,10 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	 * finish it work, but there is a big problem, if the
 	 * task need to get two mutex, how to deal with this ?
 	 */
-	if (m->prio > task->prio) {
+	owner = (struct task *)m->data;
+	if (owner->prio > task->prio) {
 		atomic_set(&task->lock_cpu, 1);
-		task->lock_event = (struct evnet *)m;
+		task->lock_event = to_event(m);
 	}
 
 	/* set the task's state and suspend the task */
@@ -151,7 +155,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	task->stat |= TASK_STAT_MUTEX;
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->delay = timeout;
-	task->wait_event = ev;
+	task->wait_event = to_event(m);
 	spin_unlock(&task->lock);
 
 	event_task_wait(task, (struct event *)m);
@@ -173,7 +177,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 		ret = EABORT;
 		break;
 
-	case TASK_EVENT_PEND_TO:
+	case TASK_STAT_PEND_TO:
 	default:
 		ret = -ETIMEDOUT;
 		event_task_remove(task, (struct event *)m);
@@ -181,7 +185,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	}
 
 	task->pend_stat = TASK_STAT_PEND_OK;
-	task->event = 0;
+	task->wait_event = 0;
 	spin_unlock(&task->lock);
 	ticket_unlock_irqrestore(&m->lock, flags);
 
@@ -193,7 +197,7 @@ int mutex_post(mutex_t *m)
 	unsigned long flags;
 	struct task *task = get_current_task();
 
-	if (invalid_mutex() || int_nesting() || !preempt_allowed())
+	if (invalid_mutex(m) || int_nesting() || !preempt_allowed())
 		return -EPERM;
 
 	ticket_lock_irqsave(&m->lock, flags);

@@ -16,6 +16,8 @@
 
 #include <minos/minos.h>
 #include <minos/event.h>
+#include <minos/sched.h>
+#include <minos/mbox.h>
 #include <minos/task.h>
 
 #define invalid_mbox(mbox)	\
@@ -29,14 +31,14 @@ mbox_t *mbox_create(void *pmsg, char *name)
 void *mbox_accept(mbox_t *m)
 {
 	unsigned long flags;
-	void *msgi = NULL;
+	void *msg = NULL;
 
 	if (invalid_mbox(m))
 		return NULL;
 
 	ticket_lock_irqsave(&m->lock, flags);
 	msg = m->data;
-	ticket_lock_irqrestore(&m->lock, flags);
+	ticket_unlock_irqrestore(&m->lock, flags);
 
 	return msg;
 }
@@ -46,7 +48,6 @@ int mbox_del(mbox_t *m, int opt)
 	int ret = 0;
 	unsigned long flags;
 	int tasks_waiting;
-	struct task *task;
 
 	if (invalid_mbox(m))
 		return -EINVAL;
@@ -69,9 +70,9 @@ int mbox_del(mbox_t *m, int opt)
 		break;
 
 	case OS_DEL_ALWAYS:
-		del_event_always((struct event *)m);
+		event_del_always((struct event *)m);
 		release_event(m);
-		ticket_unlock_irqrestore(&mutex->lock, flags);
+		ticket_unlock_irqrestore(&m->lock, flags);
 
 		if (tasks_waiting)
 			sched();
@@ -82,7 +83,7 @@ int mbox_del(mbox_t *m, int opt)
 		break;
 	}
 
-	ticket_unlock_irqrestore(&mutex->lock, flags);
+	ticket_unlock_irqrestore(&m->lock, flags);
 	return ret;
 }
 
@@ -108,14 +109,14 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 	task = get_current_task();
 	spin_lock(&task->lock);
 	task->stat |= TASK_STAT_MBOX;
-	task->stat_pend = TASK_STAT_PEND_OK;
+	task->pend_stat = TASK_STAT_PEND_OK;
 	task->delay = timeout;
 	task->wait_event = to_event(m);
 	spin_unlock(&task->lock);
 
 	event_task_wait(task, (struct event *)m);
 	set_task_suspend(task);
-	ticket_lock_irq_restore(&m->lock, flags);
+	ticket_unlock_irqrestore(&m->lock, flags);
 
 	sched();
 
@@ -130,7 +131,7 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 		pmsg = NULL;
 		break;
 
-	case TASK_EVENT_PEND_TO:
+	case TASK_STAT_PEND_TO:
 	default:
 		event_task_remove(task, (struct event *)m);
 		pmsg = NULL;
@@ -148,15 +149,13 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 int mbox_post(mbox_t *m, void *pmsg)
 {
 	int ret = 0;
-	struct task *task;
 	unsigned long flags;
 
 	if (invalid_mbox(m) || !pmsg)
 		return -EINVAL;
 
 	ticket_lock_irqsave(&m->lock, flags);
-	task = event_get_ready((struct event *)m);
-	if (task) {
+	if (event_has_waiter(to_event(m))) {
 		event_highest_task_ready((struct event *)m, pmsg,
 					TASK_STAT_MBOX, TASK_STAT_PEND_OK);
 		ticket_unlock_irqrestore(&m->lock, flags);
@@ -180,8 +179,8 @@ int mbox_post(mbox_t *m, void *pmsg)
 
 int mbox_post_opt(mbox_t *m, void *pmsg, int opt)
 {
+	int ret = 0;
 	unsigned long flags;
-	struct task *task;
 
 	if (invalid_mbox(m) || !pmsg)
 		return -EINVAL;
@@ -216,5 +215,5 @@ int mbox_post_opt(mbox_t *m, void *pmsg, int opt)
 
 	ticket_unlock_irqrestore(&m->lock, flags);
 
-	return 0;
+	return ret;
 }

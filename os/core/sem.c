@@ -17,6 +17,8 @@
 #include <minos/minos.h>
 #include <minos/event.h>
 #include <minos/task.h>
+#include <minos/sem.h>
+#include <minos/sched.h>
 #include <minos/ticketlock.h>
 
 #define invalid_sem(sem) \
@@ -30,7 +32,7 @@ sem_t *sem_create(uint32_t cnt, char *name)
 	if (sem)
 		sem->cnt = cnt;
 
-	return sem
+	return sem;
 }
 
 uint32_t sem_accept(sem_t *sem)
@@ -45,7 +47,7 @@ uint32_t sem_accept(sem_t *sem)
 	cnt = sem->cnt;
 	if (cnt > 0)
 		sem->cnt--;
-	ticket_unlock_irqrestore(&sem->lock, lfags);
+	ticket_unlock_irqrestore(&sem->lock, flags);
 
 	return cnt;
 }
@@ -70,15 +72,15 @@ int sem_del(sem_t *sem, int opt)
 
 	switch (opt) {
 	case OS_DEL_NO_PEND:
-		if (task_waiting == 0)
-			free(m);
+		if (tasks_waiting == 0)
+			release_event(to_event(sem));
 		else
 			ret = -EPERM;
 		break;
 
 	case OS_DEL_ALWAYS:
 		event_del_always((struct event *)sem);
-		free(sem);
+		release_event(to_event(sem));
 		ticket_unlock_irqrestore(&sem->lock, flags);
 
 		if (tasks_waiting)
@@ -89,22 +91,24 @@ int sem_del(sem_t *sem, int opt)
 		break;
 	}
 	ticket_unlock_irqrestore(&sem->lock, flags);
+
+	return ret;
 }
 
-void sem_pend(sem_t *sem, uint32_t timeout)
+int sem_pend(sem_t *sem, uint32_t timeout)
 {
 	int ret;
 	unsigned long flags;
 	struct task *task = get_current_task();
 
 	if (invalid_sem(sem) || int_nesting() || preempt_allowed())
-		return;
+		return -EINVAL;
 
 	ticket_lock_irqsave(&sem->lock, flags);
 	if (sem->cnt > 0) {
 		sem->cnt--;
 		ticket_unlock_irqrestore(&sem->lock, flags);
-		return;
+		return 0;
 	}
 
 	spin_lock(&task->lock);
@@ -120,7 +124,7 @@ void sem_pend(sem_t *sem, uint32_t timeout)
 
 	sched();
 
-	ticket_lock_irqsave(&m->lock, flags);
+	ticket_lock_irqsave(&sem->lock, flags);
 	spin_lock(&task->lock);
 	switch (task->pend_stat) {
 	case TASK_STAT_PEND_OK:
@@ -129,7 +133,7 @@ void sem_pend(sem_t *sem, uint32_t timeout)
 	case TASK_STAT_PEND_ABORT:
 		ret = -EABORT;
 		break;
-	case TASK_EVENT_PEND_TO:
+	case TASK_STAT_PEND_TO:
 	default:
 		event_task_remove(task, to_event(sem));
 		ret = -ETIMEDOUT;
@@ -141,19 +145,18 @@ void sem_pend(sem_t *sem, uint32_t timeout)
 	spin_unlock(&task->lock);
 	ticket_unlock_irqrestore(&sem->lock, flags);
 
-	return 0;
+	return ret;
 }
 
 int sem_pend_abort(sem_t *sem, int opt)
 {
-	struct task *tasks;
 	int nbr_tasks = 0;
 	unsigned long flags;
 
 	if (invalid_sem(sem) || int_nesting() || preempt_allowed())
-		return;
+		return -EINVAL;
 
-	ticket_lock_irqsave(&m->lock, flags);
+	ticket_lock_irqsave(&sem->lock, flags);
 	if (event_has_waiter((struct event *)sem)) {
 		switch (opt) {
 		case OS_PEND_OPT_BROADCAST:
@@ -166,7 +169,7 @@ int sem_pend_abort(sem_t *sem, int opt)
 		case OS_PEND_OPT_NONE:
 		default:
 			event_highest_task_ready((struct event *)sem,
-				NULL, TASK_STAT_SEM, TASK_STAT_PEND_OK)
+				NULL, TASK_STAT_SEM, TASK_STAT_PEND_OK);
 			nbr_tasks++;
 			break;
 		}
@@ -184,7 +187,6 @@ int sem_pend_abort(sem_t *sem, int opt)
 int sem_post(sem_t *sem)
 {
 	unsigned long flags;
-	struct task *task;
 
 	if (invalid_sem(sem))
 		return -EINVAL;

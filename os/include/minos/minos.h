@@ -31,7 +31,7 @@
 struct vcpu;
 extern ticketlock_t __kernel_lock;
 
-DECLARE_PERCPU(int, error_code);
+DECLARE_PER_CPU(int, error_code);
 
 typedef int (*hook_func_t)(void *item, void *contex);
 

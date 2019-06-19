@@ -29,7 +29,6 @@ typedef unsigned long vir_addr_t;
 typedef unsigned long uintptr_t;
 
 typedef uint8_t prio_t;
-typedef uint32_t flag_t;
 
 #define MAX(a, b)	a > b ? a : b
 #define MIN(a, b)	a < b ? a : b

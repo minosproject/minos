@@ -22,6 +22,6 @@ void *queue_pend(queue_t *qt, uint32_t timeout);
 int queue_post_abort(queue_t *qt, int opt);
 int queue_post(queue_t *qt, void *pmsg);
 int queue_post_front(queue_t *qt, void *pmsg);
-int queue_post_opt(queue_t *qt, void *pmsg);
+int queue_post_opt(queue_t *qt, int opt, void *pmsg);
 
 #endif

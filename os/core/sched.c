@@ -269,7 +269,7 @@ void sched(void)
 		panic("os_sched can not be called in interrupt\n");
 
 	cur = get_current_task();
-	if (!preempt_allowed() || atomic_read(&task->lock_cpu))
+	if (!preempt_allowed() || atomic_read(&cur->lock_cpu))
 		return;
 
 	kernel_lock_irqsave(flags);

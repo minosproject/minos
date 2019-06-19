@@ -2,6 +2,7 @@
 #define __MINOS_TASK_H__
 
 #include <minos/minos.h>
+#include <minos/flag.h>
 #include <config/config.h>
 
 /* the max realtime task will be 64 */
@@ -43,7 +44,10 @@
 
 #define TASK_DEFAULT_STACK_SIZE CONFIG_TASK_DEFAULT_STACK_SIZE
 
+extern struct task *os_task_table[OS_NR_TASKS];
+
 typedef void (*task_func_t)(void *data);
+struct event;
 
 struct task {
 	void *stack_base;
@@ -64,7 +68,6 @@ struct task {
 	struct list_head event_list;
 
 	void *msg;
-	struct flag_node *flag_node;
 	flag_t flags_rdy;
 
 	uint32_t delay;
