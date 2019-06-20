@@ -200,6 +200,4 @@ Bank 2:
 
 **********/
 
-int bcm_virq_send_virq(struct vcpu *vcpu, uint32_t virq);
-
 #endif

@@ -18,10 +18,9 @@
 #include <asm/cpu.h>
 #include <asm/vtimer.h>
 #include <asm/io.h>
-#include <minos/vmm.h>
 #include <minos/platform.h>
-#include <minos/vm.h>
 #include <libfdt/libfdt.h>
+#include <minos/mmu.h>
 
 static int fvp_time_init(void)
 {
@@ -32,6 +31,7 @@ static int fvp_time_init(void)
 	return 0;
 }
 
+#ifdef CONFIG_VIRT
 static int inline fvp_setup_hvm_of(struct vm *vm, void *data)
 {
 	int node, len;
@@ -61,13 +61,16 @@ static int fvp_setup_hvm(struct vm *vm, void *data)
 
 	return 0;
 }
+#endif
 
 static struct platform platform_fvp = {
 	.name 		 = "arm,fvp-base",
 	.time_init 	 = fvp_time_init,
 	.cpu_on		 = psci_cpu_on,
 	.cpu_off	 = psci_cpu_off,
+#ifdef CONFIG_VIRT
 	.setup_hvm	 = fvp_setup_hvm,
+#endif
 	.system_reboot	 = psci_system_reboot,
 	.system_shutdown = psci_system_shutdown,
 };

@@ -16,16 +16,19 @@
 
 #include <minos/minos.h>
 #include <asm/arch.h>
-#include <asm/vtimer.h>
 #include <asm/io.h>
-#include <minos/vmm.h>
+#include <minos/mmu.c>
 #include <asm/bcm_irq.h>
 #include <libfdt/libfdt.h>
-#include <minos/vm.h>
 #include <minos/of.h>
 #include <asm/cpu.h>
-#include <minos/virq.h>
 #include <minos/platform.h>
+
+#ifdef CONFIG_VIRT
+#include <virt/virq.h>
+#include <virt/vm.h>
+#include <virt/vmm.h>
+#include <virt/vtimer.h>
 
 static int raspberry3_setup_hvm(struct vm *vm, void *dtb)
 {
@@ -84,6 +87,7 @@ static int raspberry3_setup_hvm(struct vm *vm, void *dtb)
 
 	return 0;
 }
+#endif
 
 static void raspberry3_system_reboot(int mode, const char *cmd)
 {
@@ -107,7 +111,9 @@ static struct platform platform_raspberry3 = {
 	.cpu_on		 = spin_table_cpu_on,
 	.system_reboot	 = raspberry3_system_reboot,
 	.system_shutdown = raspberry3_system_shutdown,
+#ifdef CONFIG_VIRT
 	.setup_hvm	 = raspberry3_setup_hvm,
+#endif
 	.parse_mem_info  = raspberry3_parse_mem_info,
 };
 DEFINE_PLATFORM(platform_raspberry3);

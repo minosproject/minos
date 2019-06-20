@@ -21,13 +21,12 @@
 #include <minos/print.h>
 #include <minos/errno.h>
 #include <minos/vmodule.h>
-#include <minos/vcpu.h>
 #include <asm/arch.h>
 #include <minos/cpumask.h>
 #include <minos/irq.h>
-#include <minos/virq.h>
 #include <minos/of.h>
 #include <asm/bcm_irq.h>
+#include <minos/mmu.h>
 
 extern int bcm_virq_init(unsigned long l1_base, size_t l1_size,
 		unsigned long l2_base, size_t l2_size);

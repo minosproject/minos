@@ -16,7 +16,6 @@
 
 #include <asm/aarch64_common.h>
 #include <asm/aarch64_helper.h>
-#include <minos/vcpu.h>
 #include <minos/vmodule.h>
 #include <asm/arch.h>
 #include <minos/string.h>
@@ -29,7 +28,6 @@
 #include <minos/task.h>
 
 extern int el2_stage1_init(void);
-extern void fdt_vm0_init(struct vm *vm);
 extern int fdt_early_init(void *setup_data);
 extern int fdt_init(void);
 extern int fdt_spin_table_init(phy_addr_t *smp_holding);
@@ -130,7 +128,7 @@ void arch_dump_stack(gp_regs *regs, unsigned long *stack)
 	do {
 		print_symbol(lr);
 
-		if ((fp < (stack_base - VCPU_DEFAULT_STACK_SIZE))
+		if ((fp < (stack_base - TASK_DEFAULT_STACK_SIZE))
 				|| (fp >= stack_base))
 				break;
 

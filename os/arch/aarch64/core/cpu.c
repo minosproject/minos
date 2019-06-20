@@ -19,7 +19,7 @@
 #include <minos/arch.h>
 #include <minos/of.h>
 #include <asm/psci.h>
-#include <minos/vmm.h>
+#include <minos/mmu.h>
 
 extern unsigned char __smp_affinity_id;
 extern phy_addr_t smp_holding_address[CONFIG_NR_CPUS];

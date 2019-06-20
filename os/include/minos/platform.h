@@ -3,7 +3,9 @@
 
 #include <minos/compiler.h>
 
+#ifdef CONFIG_VIRT
 struct vm;
+#endif
 
 struct platform {
 	const char *name;
@@ -13,7 +15,9 @@ struct platform {
 	void (*system_shutdown)(void);
 	int (*system_suspend)(void);
 	int (*time_init)(void);
+#ifdef CONFIG_VIRT
 	int (*setup_hvm)(struct vm *vm, void *data);
+#endif
 	int (*platform_init)(void);
 	void (*parse_mem_info)(void);
 };

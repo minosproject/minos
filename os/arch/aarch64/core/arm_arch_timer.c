@@ -20,16 +20,12 @@
 #include <asm/io.h>
 #include <minos/stdlib.h>
 #include <minos/softirq.h>
-#include <asm/vtimer.h>
 #include <minos/sched.h>
 #include <minos/vmodule.h>
 #include <minos/irq.h>
-#include <minos/virq.h>
 #include <minos/of.h>
 #include <asm/processer.h>
 #include <minos/platform.h>
-#include <minos/resource.h>
-#include <common/gvm.h>
 
 enum timer_type {
 	SEC_PHY_TIMER,

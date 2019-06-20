@@ -6,14 +6,13 @@
 #include <minos/memattr.h>
 
 struct memtag;
-struct vm;
 
 struct mem_block {
 	unsigned long phy_base;
-	uint16_t vmid;
 	uint16_t flags;
 	uint16_t free_pages;
 	uint16_t bm_current;
+	uint16_t padding;
 	struct list_head list;
 	unsigned long *pages_bitmap;
 } __packed__;
@@ -32,15 +31,14 @@ struct page {
 } __packed__;
 
 struct memory_region {
-	int vmid;
 	phy_addr_t phy_base;
 	vir_addr_t vir_base;
 	size_t size;
 	struct list_head list;
 };
 
-int add_memory_region(uint64_t base, uint64_t size, int vmid);
-int split_memory_region(vir_addr_t base, size_t size, int vmid);
+int add_memory_region(uint64_t base, uint64_t size);
+int split_memory_region(vir_addr_t base, size_t size);
 
 int mm_init(void);
 void *malloc(size_t size);

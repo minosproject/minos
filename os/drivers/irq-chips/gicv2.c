@@ -25,12 +25,11 @@
 #include <asm/gicv2.h>
 #include <minos/errno.h>
 #include <minos/vmodule.h>
-#include <minos/vcpu.h>
 #include <asm/arch.h>
 #include <minos/cpumask.h>
 #include <minos/irq.h>
-#include <minos/resource.h>
 #include <minos/of.h>
+#include <minos/mmu.h>
 
 /*
  * LR register definitions are GIC v2 specific.

@@ -20,8 +20,7 @@
 #include <minos/minos.h>
 #include <minos/init.h>
 #include <minos/mm.h>
-#include <minos/vm.h>
-#include <minos/vmm.h>
+#include <minos/mmu.h>
 
 extern unsigned char __code_start;
 extern void *bootmem_end;
@@ -197,14 +196,10 @@ static void parse_system_regions(void)
 	/* need to split the hypervisor's memory from the system
 	 * then just add host region to the mem section */
 	split_memory_region(CONFIG_MINOS_START_ADDRESS,
-			CONFIG_MINOS_RAM_SIZE, VMID_HOST);
+			CONFIG_MINOS_RAM_SIZE);
 
-	list_for_each_entry(region, &mem_list, list) {
-		if (region->vmid != VMID_HOST)
-			continue;
-
+	list_for_each_entry(region, &mem_list, list)
 		add_memory_section(region->vir_base, region->size);
-	}
 }
 
 static unsigned long blocks_bitmap_init(unsigned long base)
@@ -323,7 +318,6 @@ static int mem_sections_init(void)
 		set_bit(i, section->bitmap);
 		init_list(&block->list);
 		block->free_pages = 0;
-		block->vmid = VMID_HOST;
 		block->bm_current = 0;
 		block->phy_base = code_base;
 
@@ -435,7 +429,6 @@ __alloc_mem_block(struct mem_section *section, unsigned long f)
 	memset(block, 0, sizeof(struct mem_block));
 	block->free_pages = PAGES_IN_BLOCK;
 	block->flags = f & GFB_MASK;
-	block->vmid = VMID_HOST;
 	block->phy_base = section->phy_base + bit * MEM_BLOCK_SIZE;
 
 	return block;
@@ -1164,26 +1157,7 @@ int has_enough_memory(size_t size)
 	return (free_blocks >= (size >> MEM_BLOCK_SHIFT));
 }
 
-int reserve_memory(phy_addr_t addr, size_t size)
-{
-	struct mem_block *mb;
-
-	addr = PAGE_ALIGN(addr);
-	size = PAGE_ALIGN(size);
-
-	mb = addr_to_mem_block(addr);
-	if (!mb) {
-		pr_error("Invalid memory space 0x%x --> 0x%x", addr, size);
-		return -EINVAL;
-	}
-
-	if ((mb->flags & GFB_PAGE_META) || (mb->flags & GFB_VM)
-			|| (mb->flags & GFB_IO)) {
-		pr_error("")
-	}
-}
-
-int add_memory_region(uint64_t base, uint64_t size, int vmid)
+int add_memory_region(uint64_t base, uint64_t size)
 {
 	struct memory_region *region;
 
@@ -1198,7 +1172,6 @@ int add_memory_region(uint64_t base, uint64_t size, int vmid)
 	region->vir_base = base;
 	region->phy_base = base;
 	region->size = size;
-	region->vmid = vmid;
 
 	pr_info("ADD MEM : 0x%x -> 0x%x 0x%x\n", region->vir_base,
 		region->phy_base, region->size);
@@ -1209,13 +1182,13 @@ int add_memory_region(uint64_t base, uint64_t size, int vmid)
 	return 0;
 }
 
-int split_memory_region(vir_addr_t base, size_t size, int vmid)
+int split_memory_region(vir_addr_t base, size_t size)
 {
 	vir_addr_t start, end;
 	vir_addr_t new_end = base + size;
 	struct memory_region *region, *n, *tmp;
 
-	pr_info("SPLIT MEM 0x%x 0x%x vmid-%d\n", base, size, vmid);
+	pr_info("SPLIT MEM 0x%x 0x%x\n", base, size);
 	if ((size == 0))
 		return -EINVAL;
 
@@ -1226,17 +1199,12 @@ int split_memory_region(vir_addr_t base, size_t size, int vmid)
 	list_for_each_entry_safe(region, n, &mem_list, list) {
 		start = region->vir_base;
 		end = start + region->size;
-		if ((region->vmid != VMID_HOST) || (base > end) ||
-				(base < start))
-			continue;
 
-		/* beyond the address range */
-		if (new_end > end)
+		if ((base > end) || (base < start) || (new_end > end))
 			continue;
 
 		/* just delete this region from the list */
 		if ((base == start) && (new_end == end)) {
-			region->vmid = vmid;
 			return 0;
 		} else if ((base == start) && (new_end < end)) {
 			region->vir_base = region->phy_base = new_end;
@@ -1248,7 +1216,6 @@ int split_memory_region(vir_addr_t base, size_t size, int vmid)
 			init_list(&n->list);
 			n->vir_base = n->phy_base = new_end;
 			n->size = end - new_end;
-			n->vmid = region->vmid;
 			list_add_tail(&mem_list, &n->list);
 			region->size = base - start;
 		} else if ((base > start) && (end == new_end)) {
@@ -1266,13 +1233,12 @@ int split_memory_region(vir_addr_t base, size_t size, int vmid)
 		init_list(&tmp->list);
 		tmp->vir_base = tmp->phy_base = base;
 		tmp->size = size;
-		tmp->vmid = vmid;
 		list_add_tail(&mem_list, &tmp->list);
 
 		return 0;
 	}
 
-	add_memory_region(base, size, vmid);
+	add_memory_region(base, size);
 	return 0;
 }
 

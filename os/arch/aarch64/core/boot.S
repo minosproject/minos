@@ -124,7 +124,7 @@ do_start:
 	msr	TCR_EL2, x1
 	isb
 
-	/* idle vcpu is in EL2 */
+	/* idle task is in EL2 */
 	mov	x1, #0x1c9
 	msr	spsr_el2, x1
 	isb

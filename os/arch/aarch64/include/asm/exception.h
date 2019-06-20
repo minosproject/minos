@@ -2,6 +2,7 @@
 #define _MINOS_EXCEPTION_H_
 
 #include <config/config.h>
+#include <asm/arch.h>
 
 #define EC_UNKNOWN		(0x00)
 #define EC_WFI_WFE		(0x01)

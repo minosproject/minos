@@ -17,7 +17,6 @@
 #include <minos/minos.h>
 #include <minos/mmu.h>
 #include <minos/mm.h>
-#include <minos/vcpu.h>
 
 static struct mm_struct host_mm;
 

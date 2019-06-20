@@ -15,17 +15,13 @@
  */
 
 #include <asm/aarch64_helper.h>
-#include <minos/vcpu.h>
 #include <asm/exception.h>
 #include <minos/minos.h>
 #include <minos/smp.h>
 #include <asm/processer.h>
 #include <minos/sched.h>
-#include <asm/vgicv3.h>
 #include <minos/irq.h>
 #include <asm/svccc.h>
-#include <asm/vtimer.h>
-#include <minos/vdev.h>
 
 extern unsigned char __sync_desc_start;
 extern unsigned char __sync_desc_end;

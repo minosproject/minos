@@ -8,43 +8,6 @@
 
 struct vm;
 
-/*
- * pgd_base : the lvl0 table base
- * mem_list : static config memory region for this vm
- * block_list : the mem_block allocated for this vm
- * head : the pages table allocated for this vm
- */
-struct mm_struct {
-	size_t mem_size;
-	size_t mem_free;
-	unsigned long mem_base;
-	unsigned long pgd_base;
-	unsigned long hvm_mmap_base;
-
-	/*
-	 * for the shared memory of native vm
-	 * or the iomem space of guest vm
-	 */
-	union {
-		unsigned long gvm_iomem_base;
-		unsigned long shmem_base;
-	};
-	union {
-		unsigned long gvm_iomem_size;
-		unsigned long shmem_size;
-	};
-
-	/* for virtio devices */
-	unsigned long virtio_mmio_gbase;
-	void *virtio_mmio_iomem;
-	size_t virtio_mmio_size;
-
-	struct page *head;
-	struct list_head mem_list;
-	struct list_head block_list;
-	spinlock_t lock;
-};
-
 int register_memory_region(struct memtag *res);
 int vm_mm_init(struct vm *vm);
 
@@ -56,24 +19,8 @@ int unmap_vm_memory(struct vm *vm, unsigned long vir_addr,
 int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size);
 void release_vm_memory(struct vm *vm);
 
-int create_host_mapping(unsigned long vir, unsigned long phy,
-		size_t size, unsigned long flags);
-int destroy_host_mapping(unsigned long vir, size_t size);
-
 int create_guest_mapping(struct vm *vm, unsigned long vir,
 		unsigned long phy, size_t size, unsigned long flags);
-
-static inline int
-io_remap(vir_addr_t vir, phy_addr_t phy, size_t size)
-{
-	return create_host_mapping(vir, phy, size, VM_IO);
-}
-
-static inline int
-io_unmap(unsigned long vir, size_t size)
-{
-	return destroy_host_mapping(vir, size);
-}
 
 int vm_mmap(struct vm *vm, unsigned long offset, unsigned long size);
 void vm_unmmap(struct vm *vm);

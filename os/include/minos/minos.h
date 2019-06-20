@@ -12,7 +12,6 @@
 #include <minos/init.h>
 #include <minos/arch.h>
 #include <minos/calltrace.h>
-#include <common/hypervisor.h>
 #include <minos/ticketlock.h>
 
 #define section_for_each_item_addr(__start_addr, __end_addr, __var)            \
@@ -28,7 +27,6 @@
 	section_for_each_item_addr((unsigned long)&(__start),                  \
 				    (unsigned long)&(__end), __var)
 
-struct vcpu;
 extern ticketlock_t __kernel_lock;
 
 DECLARE_PER_CPU(int, error_code);
@@ -59,18 +57,6 @@ int register_hook(hook_func_t fn, enum hook_type type);
 static inline int taken_from_guest(gp_regs *regs)
 {
 	return arch_taken_from_guest(regs);
-}
-
-static inline void exit_from_guest(struct vcpu *vcpu, gp_regs *regs)
-{
-	do_hooks((void *)vcpu, (void *)regs,
-			MINOS_HOOK_TYPE_EXIT_FROM_GUEST);
-}
-
-static inline void enter_to_guest(struct vcpu *vcpu, gp_regs *regs)
-{
-	do_hooks((void *)vcpu, (void *)regs,
-			MINOS_HOOK_TYPE_ENTER_TO_GUEST);
 }
 
 static inline int get_error_code(void)

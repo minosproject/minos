@@ -19,6 +19,7 @@
 #include <minos/vmm.h>
 #include <minos/platform.h>
 
+#ifdef CONFIG_VIRT
 static int espressobin_setup_vm0(struct vm *vm, void *dtb)
 {
 	/* create the pcie region for the vm0 */
@@ -27,6 +28,7 @@ static int espressobin_setup_vm0(struct vm *vm, void *dtb)
 
 	return 0;
 }
+#endif
 
 static struct platform platform_espressobin = {
 	.name		 = "marvell,armada-3720-community",
@@ -34,7 +36,9 @@ static struct platform platform_espressobin = {
 	.cpu_off	 = psci_cpu_off,
 	.system_reboot	 = psci_system_reboot,
 	.system_shutdown = psci_system_shutdown,
+#ifdef CONFIG_VIRT
 	.setup_hvm	 = espressobin_setup_vm0,
+#endif
 };
 
 DEFINE_PLATFORM(platform_espressobin);

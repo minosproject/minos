@@ -5,6 +5,8 @@
 #include <config/config.h>
 #include <minos/memattr.h>
 #include <asm/pagetable.h>
+#include <minos/list.h>
+#include <minos/spinlock.h>
 
 typedef __pgd_t pgd_t;
 typedef __pud_t pud_t;
@@ -109,6 +111,43 @@ struct mapping_struct {
 	struct pagetable_attr *config;
 };
 
+/*
+ * pgd_base : the lvl0 table base
+ * mem_list : static config memory region for this vm
+ * block_list : the mem_block allocated for this vm
+ * head : the pages table allocated for this vm
+ */
+struct mm_struct {
+	size_t mem_size;
+	size_t mem_free;
+	unsigned long mem_base;
+	unsigned long pgd_base;
+	unsigned long hvm_mmap_base;
+
+	/*
+	 * for the shared memory of native vm
+	 * or the iomem space of guest vm
+	 */
+	union {
+		unsigned long gvm_iomem_base;
+		unsigned long shmem_base;
+	};
+	union {
+		unsigned long gvm_iomem_size;
+		unsigned long shmem_size;
+	};
+
+	/* for virtio devices */
+	unsigned long virtio_mmio_gbase;
+	void *virtio_mmio_iomem;
+	size_t virtio_mmio_size;
+
+	struct page *head;
+	struct list_head mem_list;
+	struct list_head block_list;
+	spinlock_t lock;
+};
+
 int create_mem_mapping(struct mm_struct *mm, unsigned long addr,
 		unsigned long phy, size_t size, unsigned long flags);
 
@@ -157,5 +196,21 @@ void create_pgd_mapping(unsigned long pgd, unsigned long vir,
 		unsigned long value, unsigned long flags);
 
 unsigned long alloc_guest_pmd(struct mm_struct *mm, unsigned long phy);
+
+int create_host_mapping(unsigned long vir, unsigned long phy,
+		size_t size, unsigned long flags);
+int destroy_host_mapping(unsigned long vir, size_t size);
+
+static inline int
+io_remap(vir_addr_t vir, phy_addr_t phy, size_t size)
+{
+	return create_host_mapping(vir, phy, size, VM_IO);
+}
+
+static inline int
+io_unmap(unsigned long vir, size_t size)
+{
+	return destroy_host_mapping(vir, size);
+}
 
 #endif

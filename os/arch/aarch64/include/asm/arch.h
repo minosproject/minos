@@ -5,8 +5,6 @@
 #include <asm/aarch64_helper.h>
 #include <config/config.h>
 
-struct vcpu;
-struct vm;
 struct task;
 
 typedef struct aarch64_regs {
@@ -303,7 +301,6 @@ void arch_switch_task_sw(void);
 void arch_dump_stack(gp_regs *regs, unsigned long *sp);
 unsigned long arch_get_fp(void);
 unsigned long arch_get_lr(void);
-void arch_hvm_init(struct vm *vm);
 void arch_set_virq_flag(void);
 void arch_clear_virq_flag(void);
 void arch_smp_init(phy_addr_t *smp_h_addr);

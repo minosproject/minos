@@ -115,4 +115,18 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 		unsigned long entry, unsigned long unsed);
 int vcpu_power_off(struct vcpu *vcpu, int timeout);
 
+static inline void exit_from_guest(struct vcpu *vcpu, gp_regs *regs)
+{
+	do_hooks((void *)vcpu, (void *)regs,
+			MINOS_HOOK_TYPE_EXIT_FROM_GUEST);
+}
+
+static inline void enter_to_guest(struct vcpu *vcpu, gp_regs *regs)
+{
+	do_hooks((void *)vcpu, (void *)regs,
+			MINOS_HOOK_TYPE_ENTER_TO_GUEST);
+}
+
+
+
 #endif

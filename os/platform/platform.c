@@ -27,6 +27,7 @@ void platform_set_to(const char *name)
 {
 	struct platform **pp;
 	struct platform *p;
+
 	section_for_each_item(__platform_start, __platform_end, pp) {
 		p = *pp;
 		if (strcmp(p->name, name) == 0) {
