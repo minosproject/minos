@@ -335,7 +335,7 @@ void irq_exit(gp_regs *regs)
 
 int sched_can_idle(struct pcpu *pcpu)
 {
-	return 0;
+	return 1;
 }
 
 void pcpus_init(void)

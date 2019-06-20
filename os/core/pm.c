@@ -18,6 +18,7 @@
 #include <asm/arch.h>
 #include <minos/sched.h>
 #include <minos/platform.h>
+#include <minos/irq.h>
 
 void system_reboot(void)
 {
@@ -58,13 +59,7 @@ int pcpu_can_idle(struct pcpu *pcpu)
 
 void cpu_idle(void)
 {
-	unsigned long flags;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
-
-	/*
-	 * here we create the stat task for each
-	 * cpu
-	 */
 
 	while (1) {
 		sched();
@@ -73,14 +68,14 @@ void cpu_idle(void)
 		 * need to check whether the pcpu can go to idle
 		 * state to avoid the interrupt happend before wfi
 		 */
-		local_irq_save(flags);
+		local_irq_disable();
 		if (pcpu_can_idle(pcpu)) {
 			pcpu->state = PCPU_STATE_IDLE;
-			local_irq_restore(flags);
+			local_irq_enable();
 			wfi();
 			dsb();
 			pcpu->state = PCPU_STATE_RUNNING;
 		} else
-			local_irq_restore(flags);
+			local_irq_enable();
 	}
 }

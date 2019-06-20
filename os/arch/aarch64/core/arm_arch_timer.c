@@ -89,17 +89,6 @@ unsigned long get_sys_time(void)
 	return ticks_to_ns(ticks);
 }
 
-void udelay(unsigned long us)
-{
-	unsigned long deadline = get_sys_time() + 1000 *
-		(unsigned long)us;
-
-	while (get_sys_time() - deadline < 0);
-
-	dsbsy();
-	isb();
-}
-
 static int timers_arch_init(void)
 {
 	int i, ret;

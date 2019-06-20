@@ -468,8 +468,3 @@ int vm_mm_init(struct vm *vm)
 
 	return 0;
 }
-
-int vmm_init(void)
-{
-	return 0;
-}

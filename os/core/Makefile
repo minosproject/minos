@@ -25,3 +25,4 @@ obj-y += sem.o
 obj-y += queue.o
 obj-y += mbox.o
 obj-y += flag.o
+obj-y += delay.o

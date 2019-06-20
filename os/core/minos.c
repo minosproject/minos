@@ -31,14 +31,16 @@
 
 extern void softirq_init(void);
 extern void init_timers(void);
-extern int virt_init(void);
 extern void cpu_idle(void);
 extern void sched_tick_enable(unsigned long exp);
-extern void vmm_init(void);
 extern void bootmem_init(void);
 extern int allsymbols_init(void);
 extern void platform_init(void);
 extern int create_idle_task(void);
+
+#ifdef CONFIG_VIRT
+extern int virt_init(void);
+#endif
 
 struct list_head hook_lists[MINOS_HOOK_TYPE_UNKNOWN];
 
@@ -129,8 +131,9 @@ void boot_main(void *setup_data)
 	sched_init();
 	local_sched_init();
 
-	//virt_init();
-	//vmm_init();
+#ifdef CONFIG_VIRT
+	virt_init();
+#endif
 
 	device_init();
 	device_init_percpu();

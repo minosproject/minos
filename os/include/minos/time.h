@@ -25,4 +25,7 @@ static inline void enable_timer(unsigned long e)
 	arch_enable_timer(e);
 }
 
+void udelay(uint32_t us);
+void mdelay(uint32_t ms);
+
 #endif
