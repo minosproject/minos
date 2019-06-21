@@ -20,6 +20,15 @@
 #include <minos/platform.h>
 #include <minos/irq.h>
 
+extern void apps_cpu0_init(void);
+extern void apps_cpu1_init(void);
+extern void apps_cpu2_init(void);
+extern void apps_cpu3_init(void);
+extern void apps_cpu4_init(void);
+extern void apps_cpu5_init(void);
+extern void apps_cpu6_init(void);
+extern void apps_cpu7_init(void);
+
 void system_reboot(void)
 {
 	if (platform->system_reboot)
@@ -57,9 +66,53 @@ int pcpu_can_idle(struct pcpu *pcpu)
 	return 1;
 }
 
+static void os_clean(void)
+{
+	/* recall the memory for init function and data */
+	extern unsigned char __init_start;
+	extern unsigned char __init_end;
+	unsigned long size;
+
+	size = (unsigned long)&__init_end -
+		(unsigned long)&__init_start;
+	pr_info("release unused memory [0x%x 0x%x]\n",
+			(unsigned long)&__init_start, size);
+}
+
 void cpu_idle(void)
 {
 	struct pcpu *pcpu = get_cpu_var(pcpu);
+
+	switch (pcpu->pcpu_id) {
+	case 0:
+		apps_cpu0_init();
+		os_clean();
+		break;
+	case 1:
+		apps_cpu1_init();
+		break;
+	case 2:
+		apps_cpu2_init();
+		break;
+	case 3:
+		apps_cpu3_init();
+		break;
+	case 4:
+		apps_cpu4_init();
+		break;
+	case 5:
+		apps_cpu5_init();
+		break;
+	case 6:
+		apps_cpu6_init();
+		break;
+	case 7:
+		apps_cpu7_init();
+		break;
+	default:
+		pr_warn("cpu specfical init function not defined\n");
+		break;
+	}
 
 	while (1) {
 		sched();

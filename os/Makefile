@@ -164,7 +164,7 @@ export RCS_TAR_IGNORE := --exclude SCCS --exclude BitKeeper --exclude .svn \
 PHONY += all
 _all: all
 
-core-y		:= core/
+core-y		:= core/ apps/
 drivers-y	:= drivers/ platform/
 external-y	:= external/
 libs-y		:=

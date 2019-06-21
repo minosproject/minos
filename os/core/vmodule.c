@@ -138,7 +138,7 @@ int task_vmodules_deinit(struct task *task)
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
 		data = task->context[vmodule->id];
-		if (vmodule->state_deinit)
+		if (vmodule->state_deinit && data)
 			vmodule->state_deinit(task, data);
 
 		if (data)
@@ -155,7 +155,7 @@ int task_vmodules_reset(struct task *task)
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
 		data = task->context[vmodule->id];
-		if (vmodule->state_reset)
+		if (vmodule->state_reset && data)
 			vmodule->state_reset(task, data);
 	}
 
@@ -168,10 +168,9 @@ void restore_task_vmodule_state(struct task *task)
 	void *context;
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
-		if (vmodule->state_restore) {
-			context = get_vmodule_data_by_id(task, vmodule->id);
+		context = get_vmodule_data_by_id(task, vmodule->id);
+		if (vmodule->state_restore && context)
 			vmodule->state_restore(task, context);
-		}
 	}
 }
 
@@ -181,10 +180,9 @@ void save_task_vmodule_state(struct task *task)
 	void *context;
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
-		if (vmodule->state_save) {
-			context = get_vmodule_data_by_id(task, vmodule->id);
+		context = get_vmodule_data_by_id(task, vmodule->id);
+		if (vmodule->state_save && context)
 			vmodule->state_save(task, context);
-		}
 	}
 }
 
@@ -194,10 +192,9 @@ void suspend_task_vmodule_state(struct task *task)
 	void *context;
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
-		if (vmodule->state_suspend) {
-			context = get_vmodule_data_by_id(task, vmodule->id);
+		context = get_vmodule_data_by_id(task, vmodule->id);
+		if (vmodule->state_suspend && context)
 			vmodule->state_suspend(task, context);
-		}
 	}
 }
 
@@ -207,10 +204,9 @@ void resume_task_vmodule_state(struct task *task)
 	void *context;
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
-		if (vmodule->state_resume) {
-			context = get_vmodule_data_by_id(task, vmodule->id);
+		context = get_vmodule_data_by_id(task, vmodule->id);
+		if (vmodule->state_resume && context)
 			vmodule->state_resume(task, context);
-		}
 	}
 }
 
@@ -218,6 +214,7 @@ int vmodules_init(void)
 {
 	struct module_id *mid;
 	struct vmodule *vmodule;
+
 	section_for_each_item(__vmodule_start, __vmodule_end, mid) {
 		vmodule = create_vmodule(mid);
 		if (!vmodule)

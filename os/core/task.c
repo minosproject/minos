@@ -19,6 +19,7 @@
 #include <minos/sched.h>
 #include <minos/mm.h>
 #include <minos/atomic.h>
+#include <minos/vmodule.h>
 
 static DEFINE_SPIN_LOCK(pid_lock);
 static DECLARE_BITMAP(pid_map, OS_NR_TASKS);
@@ -162,18 +163,19 @@ static struct task *__create_task(char *name, task_func_t func,
 
 	task_init(task, name, stack, arg, prio,
 			pid, aff, stk_size, opt);
+	task_vmodules_init(task);
 
 	return task;
 }
 
-void task_create_hook(struct task *task)
+static void task_create_hook(struct task *task)
 {
 
 }
 
 int create_task(char *name, task_func_t func,
 		void *arg, prio_t prio, uint16_t aff,
-		uint32_t stk_size, uint32_t opt)
+		uint32_t stk_size, unsigned long opt)
 {
 	int pid = -1;
 	struct task *task;
@@ -195,6 +197,9 @@ int create_task(char *name, task_func_t func,
 		pid = -ENOPID;
 	}
 
+	task_create_hook(task);
+	arch_init_task(task, (void *)func, task->udata);
+
 	/*
 	 * the vcpu task's stat is different with the normal
 	 * task
@@ -205,9 +210,6 @@ int create_task(char *name, task_func_t func,
 		if (os_is_running())
 			sched();
 	}
-
-	task_create_hook(task);
-	arch_init_task(task, (void *)func, task->udata);
 
 	return pid;
 }
@@ -231,6 +233,9 @@ int create_idle_task(void)
 	task->stack_origin = el2_stack_base -
 		(aff << CONFIG_IDLE_TASK_STACK_SHIFT);
 	task->stat = TASK_STAT_RUNNING;
+
+	/* call the hooks for the idle task */
+	task_create_hook(task);
 
 	set_current_task(task);
 	set_next_task(task);

@@ -14,8 +14,6 @@ struct vmodule {
 	int id;
 	struct list_head list;
 	uint32_t context_size;
-	void *pdata;
-	void *context;
 	int (*valid_for_task)(struct task *task);
 	void (*state_save)(struct task *task, void *context);
 	void (*state_restore)(struct task *task, void *context);

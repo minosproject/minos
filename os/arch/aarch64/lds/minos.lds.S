@@ -95,14 +95,6 @@ SECTIONS
 
 	. = ALIGN(8);
 
-	__vm_start = .;
-	.__vm : {
-		*(.__vm)
-	}
-	__vm_end = .;
-
-	. = ALIGN(8);
-
 	__sync_desc_start = .;
 	.__sync_desc : {
 		*(.__sync_desc)
@@ -136,6 +128,14 @@ SECTIONS
 	. = ALIGN(8);
 
 	__init_start = .;
+
+	__task_desc_start = .;
+	.__task_desc : {
+		*(.__task_desc)
+	}
+	__task_desc_end = .;
+
+	. = ALIGN(8);
 
 	__init_func_start = .;
 	__init_func_0_start = .;

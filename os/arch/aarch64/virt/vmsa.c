@@ -17,7 +17,7 @@
 #include <minos/minos.h>
 #include <minos/mmu.h>
 #include <config/config.h>
-#include <minos/vcpu.h>
+#include <minos/task.h>
 #include <minos/vmodule.h>
 #include <asm/arch.h>
 #include <minos/vmm.h>
@@ -129,9 +129,9 @@ int el2_stage2_init(void)
 }
 arch_early_initcall(el2_stage2_init);
 
-static void vmsa_state_init(struct vcpu *vcpu, void *context)
+static void vmsa_state_init(struct task *task, void *context)
 {
-	struct vm *vm = vcpu->vm;
+	struct vm *vm = task->vm;
 	struct vmsa_context *c = (struct vmsa_context *)context;
 
 	c->vtcr_el2 = generate_vtcr_el2();
@@ -144,7 +144,7 @@ static void vmsa_state_init(struct vcpu *vcpu, void *context)
 	c->amair_el1 = 0;
 }
 
-static void vmsa_state_save(struct vcpu *vcpu, void *context)
+static void vmsa_state_save(struct task *task, void *context)
 {
 	struct vmsa_context *c = (struct vmsa_context *)context;
 
@@ -159,7 +159,7 @@ static void vmsa_state_save(struct vcpu *vcpu, void *context)
 	c->amair_el1 = read_sysreg(AMAIR_EL1);
 }
 
-static void vmsa_state_restore(struct vcpu *vcpu, void *context)
+static void vmsa_state_restore(struct task *task, void *context)
 {
 	struct vmsa_context *c = (struct vmsa_context *)context;
 
@@ -175,9 +175,14 @@ static void vmsa_state_restore(struct vcpu *vcpu, void *context)
 	flush_local_tlb_guest();
 }
 
-static void vmsa_state_resume(struct vcpu *vcpu, void *context)
+static void vmsa_state_resume(struct task *task, void *context)
 {
-	vmsa_state_init(vcpu, context);
+	vmsa_state_init(task, context);
+}
+
+static int vmsa_valid_for_task(struct task *task)
+{
+	return !!(task->flags & TASK_FLAGS_VCPU);
 }
 
 static int vmsa_vmodule_init(struct vmodule *vmodule)

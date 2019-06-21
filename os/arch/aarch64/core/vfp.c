@@ -97,7 +97,6 @@ static void vfp_state_restore(struct task *task, void *context)
 static int vfp_vmodule_init(struct vmodule *vmodule)
 {
 	vmodule->context_size	= sizeof(struct vfp_context);
-	vmodule->pdata		= NULL;
 	vmodule->state_init	= vfp_state_init;
 	vmodule->state_save	= vfp_state_save;
 	vmodule->state_restore	= vfp_state_restore;

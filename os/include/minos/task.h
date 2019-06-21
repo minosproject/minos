@@ -113,6 +113,30 @@ struct task {
 	void **context;
 } __align_cache_line;
 
+struct task_desc {
+	char name[TASK_NAME_SIZE + 1];
+	task_func_t func;
+	void *arg;
+	unsigned long opt;
+	prio_t prio;
+	uint16_t aff;
+	uint32_t stk_size;
+	unsigned long flags;
+};
+
+#define DEFINE_TASK(tn, n, f, a, o, p, af, ss, fl) \
+	static const struct task_desc __used \
+	task_desc_##tn __section(.__task_desc) = { \
+		.name = tn,		\
+		.func = func,		\
+		.arg = arg,		\
+		.opt = o,		\
+		.prio = p,		\
+		.aff = af,		\
+		.stk_size = ss,		\
+		.flags = fl		\
+	}
+
 static int inline is_idle_task(struct task *task)
 {
 	return !!(task->flags & TASK_FLAGS_IDLE);
@@ -130,5 +154,9 @@ static inline prio_t get_task_prio(struct task *task)
 
 int alloc_pid(prio_t prio, int cpuid);
 void release_pid(int pid);
+
+int create_task(char *name, task_func_t func,
+		void *arg, prio_t prio, uint16_t aff,
+		uint32_t stk_size, unsigned long opt);
 
 #endif

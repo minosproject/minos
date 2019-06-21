@@ -268,7 +268,6 @@ void sched(void)
 	if (unlikely(int_nesting()))
 		panic("os_sched can not be called in interrupt\n");
 
-	cur = get_current_task();
 	if (!preempt_allowed() || atomic_read(&cur->lock_cpu))
 		return;
 

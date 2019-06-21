@@ -146,7 +146,6 @@ void boot_main(void *setup_data)
 	local_irq_enable();
 
 	cpu_idle();
-	panic("Should Not be here\n");
 }
 
 void boot_secondary(void)

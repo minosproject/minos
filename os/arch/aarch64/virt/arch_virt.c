@@ -214,6 +214,11 @@ static void aarch64_system_state_restore(struct vcpu *vcpu, void *c)
 	dsb();
 }
 
+static int aarch64_system_valid_for_task(struct task *task)
+{
+	return !!(task->flags & TASK_FLAGS_VCPU);
+}
+
 static int aarch64_system_init(struct vmodule *vmodule)
 {
 	vmodule->context_size = sizeof(struct aarch64_system_context);
@@ -222,6 +227,7 @@ static int aarch64_system_init(struct vmodule *vmodule)
 	vmodule->state_save = aarch64_system_state_save;
 	vmodule->state_restore = aarch64_system_state_restore;
 	vmodule->state_resume = aarch64_system_state_resume;
+	vmodule->valid_for_task = aarch64_system_valid_for_task;
 
 	return 0;
 }
