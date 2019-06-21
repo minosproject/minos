@@ -60,7 +60,7 @@ int register_hook(hook_func_t fn, enum hook_type type)
 	struct hook *hook;
 
 	if ((fn == NULL) || (type >= MINOS_HOOK_TYPE_UNKNOWN)) {
-		pr_error("Hook info is invaild\n");
+		pr_err("Hook info is invaild\n");
 		return -EINVAL;
 	}
 

@@ -88,7 +88,7 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 	 */
 	vcpu = get_vcpu_by_id(caller->vm->vmid, cpuid);
 	if (!vcpu) {
-		pr_error("no such:%d->0x%x vcpu for this VM %s\n",
+		pr_err("no such:%d->0x%x vcpu for this VM %s\n",
 				cpuid, affinity, caller->vm->name);
 		return -ENOENT;
 	}
@@ -99,7 +99,7 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 		os->ops->vcpu_power_on(vcpu, entry);
 		vcpu_online(vcpu);
 	} else {
-		pr_error("vcpu_power_on : invalid vcpu state\n");
+		pr_err("vcpu_power_on : invalid vcpu state\n");
 		return -EINVAL;
 	}
 
@@ -193,7 +193,7 @@ static struct vm *__create_vm(struct vmtag *vme)
 
 	if (vm_check_vcpu_affinity(vme->vmid, vme->vcpu_affinity,
 				vme->nr_vcpu)) {
-		pr_error("vcpu affinit for vm no incorrect\n");
+		pr_err("vcpu affinit for vm no incorrect\n");
 		return NULL;
 	}
 
@@ -367,7 +367,7 @@ static int create_vcpus(struct vm *vm)
 	for (i = 0; i < vm->vcpu_nr; i++) {
 		vcpu = create_vcpu(vm, i);
 		if (!vcpu) {
-			pr_error("create vcpu:%d for %s failed\n", i, vm->name);
+			pr_err("create vcpu:%d for %s failed\n", i, vm->name);
 			for (j = 0; j < vm->vcpu_nr; j++) {
 				vcpu = vm->vcpus[j];
 				if (!vcpu)
@@ -461,7 +461,7 @@ void vcpu_power_off_call(void *data)
 		return;
 
 	if (vcpu->affinity != smp_processor_id()) {
-		pr_error("vcpu-%s do not belong to this pcpu\n",
+		pr_err("vcpu-%s do not belong to this pcpu\n",
 				vcpu->name);
 		return;
 	}
@@ -539,13 +539,13 @@ struct vm *create_vm(struct vmtag *vme)
 
 	ret = create_vcpus(vm);
 	if (ret) {
-		pr_error("create vcpus for vm failded\n");
+		pr_err("create vcpus for vm failded\n");
 		ret = VMID_INVALID;
 		goto release_vm;
 	}
 
 	if (do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_CREATE_VM)) {
-		pr_error("create vm failed in hook function\n");
+		pr_err("create vm failed in hook function\n");
 		goto release_vm;
 	}
 

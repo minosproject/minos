@@ -140,7 +140,7 @@ int __of_get_u16_array(void *dtb, int node, char *attr,
 		return -EINVAL;
 
 	if ((length % sizeof(uint16_t)) != 0) {
-		pr_error("node is not a u32 array %d\n", length);
+		pr_err("node is not a u32 array %d\n", length);
 		return -EINVAL;
 	}
 
@@ -165,7 +165,7 @@ int __of_get_u32_array(void *dtb, int node, char *attr,
 		return -EINVAL;
 
 	if ((length % sizeof(fdt32_t)) != 0) {
-		pr_error("node is not a u32 array %d\n", length);
+		pr_err("node is not a u32 array %d\n", length);
 		return -EINVAL;
 	}
 
@@ -187,12 +187,12 @@ int __of_get_u64_array(void *dtb, int node, char *attr,
 	memset(array, 0, sizeof(uint64_t) * len);
 	val = (fdt64_t *)__of_getprop(dtb, node, attr, &length);
 	if (!val) {
-		pr_error("can not get %s\n", attr);
+		pr_err("can not get %s\n", attr);
 		return -EINVAL;
 	}
 
 	if ((length % sizeof(fdt64_t)) != 0) {
-		pr_error("node is not a u64 array %d\n", length);
+		pr_err("node is not a u64 array %d\n", length);
 		return -EINVAL;
 	}
 
@@ -369,7 +369,7 @@ void *of_iterate_all_node_loop(struct device_node *node,
 		of_iterate_fn func, void *arg)
 {
 	if (!device_node_is_root(node)) {
-		pr_error("root_device_node is not root\n");
+		pr_err("root_device_node is not root\n");
 		return NULL;
 	}
 
@@ -380,7 +380,7 @@ void *of_iterate_all_node(struct device_node *node,
 		of_iterate_fn func, void *arg)
 {
 	if (!device_node_is_root(node)) {
-		pr_error("root_device_node is not root\n");
+		pr_err("root_device_node is not root\n");
 		return NULL;
 	}
 
@@ -722,7 +722,7 @@ static uint64_t __of_translate_address(struct device_node *node,
 		pbus = &of_busses[0];
 		pbus->count_cells(data, parent->offset, &pna, &pns);
 		if (!of_check_counts(pna, pns)) {
-			pr_error("%s: Bad cell count for %s\n",
+			pr_err("%s: Bad cell count for %s\n",
 					__func__, parent->name);
 			break;
 		}
@@ -816,7 +816,7 @@ int get_device_irq_index(struct device_node *node, uint32_t *irq,
 
 	irq_cells = of_n_interrupt_cells(node);
 	if (irq_cells == 0) {
-		pr_error("bad irqcells - %s\n", node->name);
+		pr_err("bad irqcells - %s\n", node->name);
 		return -ENOENT;
 	}
 
@@ -879,7 +879,7 @@ struct device_node *of_parse_device_tree(void *data)
 		return NULL;
 
 	if (fdt_check_header(data)) {
-		pr_error("invaild dtb header for dt parsing\n");
+		pr_err("invaild dtb header for dt parsing\n");
 		return NULL;
 	}
 

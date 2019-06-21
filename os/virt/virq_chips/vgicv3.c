@@ -66,7 +66,7 @@ void vgicv3_send_sgi(struct vcpu *vcpu, unsigned long sgi_value)
 
 	sgi = (sgi_value & (0xf << 24)) >> 24;
 	if (sgi >= 16) {
-		pr_error("vgic : sgi number is incorrect %d\n", sgi);
+		pr_err("vgic : sgi number is incorrect %d\n", sgi);
 		return;
 	}
 
@@ -411,7 +411,7 @@ static int vgic_mmio_handler(struct vdev *vdev, gp_regs *regs, int read,
 
 out:
 	if (type == GIC_TYPE_INVAILD) {
-		pr_error("invaild gicr type and address\n");
+		pr_err("invaild gicr type and address\n");
 		return -EINVAL;
 	}
 
@@ -430,7 +430,7 @@ out:
 	case GIC_TYPE_GICR_VLPI:
 		return vgic_gicr_vlpi_mmio(vcpu, gicr, read, offset, value);
 	default:
-		pr_error("unsupport gic type %d\n", type);
+		pr_err("unsupport gic type %d\n", type);
 		return -EINVAL;
 	}
 
@@ -625,7 +625,7 @@ static int gicv3_send_virq(struct vcpu *vcpu, struct virq_desc *virq)
 	struct gic_lr *lr = (struct gic_lr *)&value;
 
 	if (virq->id >= gicv3_nr_lr) {
-		pr_error("invalid virq id %d\n", virq->id);
+		pr_err("invalid virq id %d\n", virq->id);
 		return -EINVAL;
 	}
 
@@ -725,7 +725,7 @@ struct virq_chip *vgicv3_virqchip_init(struct vm *vm,
 	if (ret || (gicd_size == 0) || (gicr_size == 0))
 		return NULL;
 
-	pr_error("vgicv3 address 0x%x 0x%x 0x%x 0x%x\n",
+	pr_err("vgicv3 address 0x%x 0x%x 0x%x 0x%x\n",
 				gicd_base, gicd_size,
 				gicr_base, gicr_size);
 

@@ -104,7 +104,7 @@ static int timers_arch_init(void)
 	node = of_find_node_by_compatible(hv_node, comp);
 #endif
 	if (!node) {
-		pr_error("can not find arm-arch-timer\n");
+		pr_err("can not find arm-arch-timer\n");
 		return -EINVAL;
 	}
 
@@ -112,7 +112,7 @@ static int timers_arch_init(void)
 		info = &timer_info[i];
 		ret = get_device_irq_index(node, &info->irq, &info->flags, i);
 		if (ret) {
-			pr_error("error found in arm timer config\n");
+			pr_err("error found in arm timer config\n");
 			return -ENOENT;
 		}
 

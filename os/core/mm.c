@@ -479,7 +479,7 @@ static unsigned long *get_page_meta(struct page_pool *pool)
 		bit = find_next_zero_bit_loop(block->pages_bitmap,
 				PAGE_METAS_IN_BLOCK, block->bm_current);
 		if (bit >= PAGE_METAS_IN_BLOCK) {
-			pr_error("block meta free_pages is not correct\n");
+			pr_err("block meta free_pages is not correct\n");
 			list_del(&block->list);
 			continue;
 		}
@@ -1061,7 +1061,7 @@ void free_pages(void *addr)
 	start = offset_in_block_bitmap((unsigned long)addr, block);
 
 	if (!(block->flags & BIT(GFB_PAGE_BIT))) {
-		pr_error("addr is not a page 0x%p\n", addr);
+		pr_err("addr is not a page 0x%p\n", addr);
 		return;
 	}
 

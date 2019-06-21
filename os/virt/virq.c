@@ -134,7 +134,7 @@ static int guest_irq_handler(uint32_t irq, void *data)
 		vcpu = get_vcpu_by_id(desc->vmid, desc->vcpu_id);
 
 	if (!vcpu) {
-		pr_error("%s: Can not get the vcpu for irq:%d\n", irq);
+		pr_err("%s: Can not get the vcpu for irq:%d\n", irq);
 		return -ENOENT;
 	}
 
@@ -286,7 +286,7 @@ int send_virq_to_vm(struct vm *vm, uint32_t virq)
 		return -ENOENT;
 
 	if (virq_is_hw(desc)) {
-		pr_error("can not send hw irq in here\n");
+		pr_err("can not send hw irq in here\n");
 		return -EPERM;
 	}
 
@@ -500,14 +500,14 @@ int request_virq_affinity(struct vm *vm, uint32_t virq, uint32_t hwirq,
 
 	vcpu = get_vcpu_in_vm(vm, affinity);
 	if (!vcpu) {
-		pr_error("request virq fail no vcpu-%d in vm-%d\n",
+		pr_err("request virq fail no vcpu-%d in vm-%d\n",
 				affinity, vm->vmid);
 		return -EINVAL;
 	}
 
 	desc = get_virq_desc(vcpu, virq);
 	if (!desc) {
-		pr_error("virq-%d not exist vm-%d", virq, vm->vmid);
+		pr_err("virq-%d not exist vm-%d", virq, vm->vmid);
 		return -ENOENT;
 	}
 
@@ -524,7 +524,7 @@ int request_hw_virq(struct vm *vm, uint32_t virq, uint32_t hwirq,
 	else
 		max = MAX_GVM_VIRQ;
 	if (virq >= max) {
-		pr_error("invaild virq-%d for vm-%d\n", virq, vm->vmid);
+		pr_err("invaild virq-%d for vm-%d\n", virq, vm->vmid);
 		return -EINVAL;
 	}
 
@@ -552,7 +552,7 @@ int request_virq_pervcpu(struct vm *vm, uint32_t virq, unsigned long flags)
 
 		ret = __request_virq(vcpu, desc, virq, 0, flags);
 		if (ret) {
-			pr_error("request percpu virq-%d failed vm-%d\n",
+			pr_err("request percpu virq-%d failed vm-%d\n",
 					virq, vm->vmid);
 		}
 

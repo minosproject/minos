@@ -33,7 +33,7 @@ void fdt_vm0_init(struct vm *vm)
 
 	fdt_open_into(fdt, fdt, MAX_DTB_SIZE);
 	if(fdt_check_header(fdt)) {
-		pr_error("invaild dtb after open into\n");
+		pr_err("invaild dtb after open into\n");
 		return;
 	}
 
@@ -82,7 +82,7 @@ static int fdt_setup_minos(struct vm *vm)
 	size = PAGE_BALIGN(size);
 	tmp = (uint32_t *)get_free_pages(PAGE_NR(size));
 	if (!tmp) {
-		pr_error("fdt setup minos failed no memory\n");
+		pr_err("fdt setup minos failed no memory\n");
 		return -ENOMEM;
 	}
 
@@ -97,7 +97,7 @@ static int fdt_setup_minos(struct vm *vm)
 	if (size) {
 		i = fdt_setprop(dtb, node, "interrupts", (void *)tmp, size);
 		if (i)
-			pr_error("fdt set interrupt for minos failed\n");
+			pr_err("fdt set interrupt for minos failed\n");
 	}
 
 	free(tmp);
@@ -115,7 +115,7 @@ static int fdt_setup_cmdline(struct vm *vm)
 	if (chosen_node < 0) {
 		chosen_node = fdt_add_subnode(dtb, 0, "chosen");
 		if (chosen_node < 0) {
-			pr_error("add chosen node failed for vm0\n");
+			pr_err("add chosen node failed for vm0\n");
 			return chosen_node;
 		}
 	}
@@ -158,7 +158,7 @@ static int fdt_setup_cpu(struct vm *vm)
 	 */
 	offset = of_get_node_by_name(dtb, 0, "cpus");
 	if (offset < 0) {
-		pr_error("can not find cpus node in dtb\n");
+		pr_err("can not find cpus node in dtb\n");
 		return -ENOENT;
 	}
 

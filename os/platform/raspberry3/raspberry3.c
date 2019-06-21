@@ -40,7 +40,7 @@ static int raspberry3_setup_hvm(struct vm *vm, void *dtb)
 
 	offset = of_get_node_by_name(dtb, 0, "cpus");
 	if (offset < 0) {
-		pr_error("can not find vcpus node for hvm\n");
+		pr_err("can not find vcpus node for hvm\n");
 		return -ENOENT;
 	}
 

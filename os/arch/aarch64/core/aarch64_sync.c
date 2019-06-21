@@ -44,7 +44,7 @@ void sync_from_current_EL_handler(gp_regs *data)
 	esr_value = read_esr_el2();
 	ec_type = (esr_value & 0xfc000000) >> 26;
 	ec = sync_descs[ec_type];
-	pr_error("SError_from_current_EL_handler : 0x%x\n", ec_type);
+	pr_err("SError_from_current_EL_handler : 0x%x\n", ec_type);
 	if (ec != NULL)
 		ec->handler(data, esr_value);
 

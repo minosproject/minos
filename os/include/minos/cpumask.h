@@ -45,7 +45,7 @@ static inline void cpumask_setall(cpumask_t *dstp)
 	bitmap_fill(dstp->bits, nr_cpumask_bits);
 }
 
-static inline void cpumask_clear(cpumask_t *dstp)
+static inline void cpumask_clearall(cpumask_t *dstp)
 {
 	bitmap_zero(dstp->bits, nr_cpumask_bits);
 }

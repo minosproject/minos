@@ -51,7 +51,7 @@ int vgic_irq_enter_to_guest(struct vcpu *vcpu, void *data)
 
 	list_for_each_entry_safe(virq, n, &virq_struct->pending_list, list) {
 		if (!virq_is_pending(virq)) {
-			pr_error("virq is not request %d %d\n", virq->vno, virq->id);
+			pr_err("virq is not request %d %d\n", virq->vno, virq->id);
 			virq->state = 0;
 			if (virq->id != VIRQ_INVALID_ID)
 				virqchip_update_virq(vcpu, virq, VIRQ_ACTION_CLEAR);

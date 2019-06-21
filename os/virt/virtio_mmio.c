@@ -188,7 +188,7 @@ static void *virtio_create_device(struct vm *vm, struct device_node *node)
 		return NULL;
 
 	if (base >= (mm->virtio_mmio_gbase + mm->virtio_mmio_size)) {
-		pr_error("invalid virtio mmio range 0x%x\n", base);
+		pr_err("invalid virtio mmio range 0x%x\n", base);
 		return NULL;
 	}
 
@@ -229,12 +229,12 @@ int virtio_mmio_init(struct vm *vm, size_t size,
 	struct mm_struct *mm = &vm->mm;
 
 	if (mm->virtio_mmio_iomem) {
-		pr_error("virtio mmio has been inited\n");
+		pr_err("virtio mmio has been inited\n");
 		return -EINVAL;
 	}
 
 	if (size == 0) {
-		pr_error("invaild virtio mmio size\n");
+		pr_err("invaild virtio mmio size\n");
 		return -EINVAL;
 	}
 

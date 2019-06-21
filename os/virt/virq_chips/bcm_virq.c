@@ -258,7 +258,7 @@ static int bcm2836_virq_write(struct vdev *vdev, gp_regs *reg,
 	case BCM2836_RELEASE_OFFSET...BCM2836_RELEASE_OFFSET_END:
 		cpu = (offset - BCM2836_RELEASE_OFFSET) / sizeof(uint64_t);
 		if (cpu == 0) {
-			pr_error("vcpu0 has alreadly power on\n");
+			pr_err("vcpu0 has alreadly power on\n");
 			break;
 		}
 		vcpu_power_on(vcpu, cpuid_to_affinity(cpu), *write_value, 0);
@@ -406,7 +406,7 @@ static int bcm2836_clear_spi(struct vcpu *vcpu, uint32_t virq)
 
 	dev = (struct bcm2836_virq *)vm->virq_chip->inc_pdata;
 	if (bcm2836_get_spi_bank(dev, virq, &base, &bit, &bank)) {
-		pr_error("get irq bank failed %d\n", virq);
+		pr_err("get irq bank failed %d\n", virq);
 		return -EINVAL;
 	}
 
@@ -490,7 +490,7 @@ int bcm2836_send_virq(struct vcpu *vcpu, uint32_t virq)
 		bcm2836_inject_spi(vcpu, virq);
 		break;
 	default:
-		pr_error("unsupport bcm2836 virq number\n");
+		pr_err("unsupport bcm2836 virq number\n");
 		break;
 	}
 
@@ -539,7 +539,7 @@ static int bcm2836_enter_to_guest(struct vcpu *vcpu, void *data)
 	 */
 	list_for_each_entry_safe(virq, n, &virq_struct->pending_list, list) {
 		if (!virq_is_pending(virq)) {
-			pr_error("virq is not request %d\n", virq->vno);
+			pr_err("virq is not request %d\n", virq->vno);
 			list_del(&virq->list);
 			virq->list.next = NULL;
 			continue;

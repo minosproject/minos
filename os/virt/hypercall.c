@@ -106,7 +106,7 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 		change_log_level((unsigned int)args[0]);
 		break;
 	default:
-		pr_error("unsupport vm hypercall");
+		pr_err("unsupport vm hypercall");
 		break;
 	}
 

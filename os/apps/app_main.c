@@ -16,27 +16,45 @@
 
 #include <minos/minos.h>
 #include <minos/task.h>
+#include <minos/time.h>
 
 static void create_static_tasks(void)
 {
-	int ret;
+	int ret = 0, cpu;
 	struct task_desc *tdesc;
 	extern unsigned char __task_desc_start;
 	extern unsigned char __task_desc_end;
 
 	section_for_each_item(__task_desc_start, __task_desc_end, tdesc) {
-		ret = create_task(tdesc->name, tdesc->func,
-				tdesc->arg, tdesc->prio,
-				tdesc->aff, tdesc->stk_size,
-				tdesc->opt);
-		if (ret)
-			pr_error("create task [%s] failed\n", tdesc->name);
+		if (tdesc->aff == PCPU_AFF_PERCPU) {
+			for_each_online_cpu(cpu) {
+				ret = create_task(tdesc->name, tdesc->func,
+						tdesc->arg, OS_PRIO_PCPU,
+						cpu, tdesc->stk_size,
+						tdesc->flags);
+				if(ret) {
+					pr_err("create [%s] fail on cpu-%d\n",
+							tdesc->name, cpu);
+				}
+			}
+		} else {
+			ret = create_task(tdesc->name, tdesc->func,
+					tdesc->arg, tdesc->prio,
+					tdesc->aff, tdesc->stk_size,
+					tdesc->flags);
+			if (ret) {
+				pr_err("create [%s] fail on cpu-%d@%d\n",
+					tdesc->name, tdesc->aff, tdesc->prio);
+			}
+
+		}
 	}
 }
 
 void apps_cpu0_init(void)
 {
-	/* init the system here */
+	/* init the system start */
+	/* init the system end */
 
 	create_static_tasks();
 }
@@ -75,3 +93,10 @@ void apps_cpu7_init(void)
 {
 
 }
+
+void test_task(void *data)
+{
+	pr_info("test task\n");
+	mdelay(100);
+}
+DEFINE_TASK(test, test_task, NULL, 20, 0, 4096, 0);

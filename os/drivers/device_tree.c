@@ -83,7 +83,7 @@ int fdt_spin_table_init(phy_addr_t *smp_holding)
 
 	offset = of_get_node_by_name(dtb, 0, "cpus");
 	if (offset <= 0) {
-		pr_error("can not find cpus node in dtb\n");
+		pr_err("can not find cpus node in dtb\n");
 		return -EINVAL;
 	}
 
@@ -91,7 +91,7 @@ int fdt_spin_table_init(phy_addr_t *smp_holding)
 		sprintf(name, "cpu@%d", i);
 		node = of_get_node_by_name(dtb, offset, name);
 		if (node <= 0) {
-			pr_error("can not find %s\n", name);
+			pr_err("can not find %s\n", name);
 			continue;
 		}
 
@@ -240,7 +240,7 @@ int fdt_early_init(void *setup_data)
 	pr_info("DTB - 0x%x ---> 0x%x\n", (unsigned long) dtb, dtb_size);
 
 	if (fdt_check_header(dtb)) {
-		pr_error("invaild dtb header\n");
+		pr_err("invaild dtb header\n");
 		dtb = NULL;
 		return -EINVAL;
 	}

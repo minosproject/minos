@@ -76,7 +76,7 @@ int mutex_del(mutex_t *mutex, int opt)
 	switch (opt) {
 	case OS_DEL_NO_PEND:
 		if (tasks_waiting) {
-			pr_error("can not delete mutex task waitting for it\n");
+			pr_err("can not delete mutex task waitting for it\n");
 			ret = -EPERM;
 		} else {
 			release_event(to_event(mutex));

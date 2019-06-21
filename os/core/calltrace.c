@@ -124,7 +124,7 @@ void print_symbol(unsigned long addr)
 	offset = allsyms_offset[pos];
 	name = allsyms_names + offset;
 
-	pr_error("[%p] ? %s+0x%x/0x%x\n", addr, name,
+	pr_err("[%p] ? %s+0x%x/0x%x\n", addr, name,
 			addr - symbol_left,
 			symbol_right - symbol_left);
 }

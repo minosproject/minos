@@ -19,8 +19,10 @@
 
 #define TASK_FLAGS_IDLE		0x0001
 #define TASK_FLAGS_VCPU		0x0002
+#define TASK_FLAGS_PERCPU	0x0004
 
 #define PCPU_AFF_NONE		0xffff
+#define PCPU_AFF_PERCPU		0xfffe
 
 #define TASK_DEF_STACK_SIZE	(4096)
 
@@ -90,14 +92,9 @@ struct task {
 	struct flag_node *flag_node;
 
 	uint16_t affinity;
-#define TASK_TYPE_NORMAL	0x0
-#define TASK_TYPE_VCPU		0x1
-#define TASK_TYPE_STAT		0x2
-#define TASK_TYPE_IDLE		0x3
-	uint8_t task_type;
 
-	spinlock_t idle_lock;
 	spinlock_t lock;
+
 
 	/* stat information */
 	unsigned long ctx_sw_cnt;
@@ -117,22 +114,44 @@ struct task_desc {
 	char name[TASK_NAME_SIZE + 1];
 	task_func_t func;
 	void *arg;
-	unsigned long opt;
 	prio_t prio;
 	uint16_t aff;
 	uint32_t stk_size;
 	unsigned long flags;
 };
 
-#define DEFINE_TASK(tn, n, f, a, o, p, af, ss, fl) \
+#define DEFINE_TASK(tn, f, a, p, af, ss, fl) \
 	static const struct task_desc __used \
 	task_desc_##tn __section(.__task_desc) = { \
-		.name = tn,		\
-		.func = func,		\
-		.arg = arg,		\
-		.opt = o,		\
+		.name = #tn,		\
+		.func = f,		\
+		.arg = a,		\
 		.prio = p,		\
 		.aff = af,		\
+		.stk_size = ss,		\
+		.flags = fl		\
+	}
+
+#define DEFINE_TASK_PERCPU(tn, f, a, ss, fl) \
+	static const struct task_desc __used \
+	task_desc_##tn __section(.__task_desc) = { \
+		.name = #tn,		\
+		.func = f,		\
+		.arg = a,		\
+		.prio = OS_PRIO_PCPU,	\
+		.aff = PCPU_AFF_PERCPU,	\
+		.stk_size = ss,		\
+		.flags = fl		\
+	}
+
+#define DEFINE_REALTIME(tn, f, a, p, ss, fl) \
+	static const struct task_desc __used \
+	task_desc_##tn __section(.__task_desc) = { \
+		.name = #tn,		\
+		.func = f,		\
+		.arg = a,		\
+		.prio = p,		\
+		.aff = 0,		\
 		.stk_size = ss,		\
 		.flags = fl		\
 	}

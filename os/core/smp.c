@@ -26,6 +26,8 @@ extern unsigned char __smp_affinity_id;
 uint64_t *smp_affinity_id;
 phy_addr_t smp_holding_address[CONFIG_NR_CPUS];
 
+cpumask_t cpu_online;
+
 struct smp_call {
 	smp_function fn;
 	unsigned long flags;
@@ -126,25 +128,32 @@ int smp_cpu_up(unsigned long cpu, unsigned long entry)
 
 void smp_cpus_up(void)
 {
-	int i, ret;
+	int i, ret, cnt;
 	uint64_t affinity;
 
 	flush_cache_all();
 
 	for (i = 1; i < CONFIG_NR_CPUS; i++) {
+		cnt = 0;
 		affinity = cpuid_to_affinity(i);
+
 		ret = smp_cpu_up(affinity, CONFIG_MINOS_START_ADDRESS);
 		if (ret) {
 			pr_fatal("failed to bring up cpu-%d\n", i);
 			continue;
 		}
 
-		pr_info("waiting for cpu-%d up\n", i);
-		while (smp_affinity_id[i] == 0)
-			cpu_relax();
+		pr_info("waiting 2 seconds for cpu-%d up\n", i);
+		while ((smp_affinity_id[i] == 0) && (cnt < 20)) {
+			mdelay(100);
+			cnt++;
+		}
 
-		pr_debug("cpu-%d is up with affinity id 0x%p\n",
-				i, smp_affinity_id[i]);
+		if (smp_affinity_id[i] == 0) {
+			pr_debug("cpu-%d is up with affinity id 0x%p\n",
+					i, smp_affinity_id[i]);
+		} else
+			cpumask_set_cpu(i, &cpu_online);
 	}
 }
 
@@ -155,6 +164,7 @@ void smp_init(void)
 
 	smp_affinity_id = (uint64_t *)&__smp_affinity_id;
 	memset(smp_affinity_id, 0, sizeof(uint64_t) * NR_CPUS);
+	cpumask_clearall(&cpu_online);
 
 	for (i = 0; i < NR_CPUS; i++) {
 		cd = &get_per_cpu(smp_call_data, i);

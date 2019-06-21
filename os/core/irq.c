@@ -51,7 +51,7 @@ void send_sgi(uint32_t sgi, int cpu)
 	if (sgi >= 16)
 		return;
 
-	cpumask_clear(&mask);
+	cpumask_clearall(&mask);
 	cpumask_set_cpu(cpu, &mask);
 
 	irq_chip->send_sgi(sgi, SGI_TO_LIST, &mask);
@@ -69,7 +69,7 @@ static int do_handle_host_irq(struct irq_desc *irq_desc)
 	}
 
 	if (!irq_desc->handler) {
-		pr_error("Irq is not register by MINOS\n");
+		pr_err("Irq is not register by MINOS\n");
 		ret = -EINVAL;
 		goto out;
 	}
@@ -123,7 +123,7 @@ static struct irq_desc **spi_alloc_irqs(uint32_t start,
 	for (i = 0; i < count; i++) {
 		desc = alloc_irq_desc();
 		if (!desc) {
-			pr_error("No more memory for irq desc\n");
+			pr_err("No more memory for irq desc\n");
 			return irqs;
 		}
 
@@ -192,7 +192,7 @@ static struct irq_desc **local_alloc_irqs(uint32_t start,
 		for (j = 0; j < count; j++) {
 			desc = alloc_irq_desc();
 			if (!desc) {
-				pr_error("No more memory for local irq desc\n");
+				pr_err("No more memory for local irq desc\n");
 				return irqs;
 			}
 
@@ -237,12 +237,12 @@ static int irq_domain_create_irqs(struct irq_domain *d,
 	struct irq_desc **irqs;
 
 	if ((cnt == 0) || (cnt >= 1024)) {
-		pr_error("%s: invaild irq cnt %d\n", __func__, cnt);
+		pr_err("%s: invaild irq cnt %d\n", __func__, cnt);
 		return -EINVAL;
 	}
 
 	if (d->irqs) {
-		pr_error("irq desc table has been created\n");
+		pr_err("irq desc table has been created\n");
 		return -EINVAL;
 	}
 
@@ -275,7 +275,7 @@ static int alloc_irqs(uint32_t start, uint32_t cnt, int type)
 	 */
 	ret = irq_domain_create_irqs(domain, start, cnt);
 	if (ret) {
-		pr_error("add domain:%d irqs failed\n", type);
+		pr_err("add domain:%d irqs failed\n", type);
 		goto out;
 	}
 
@@ -458,7 +458,7 @@ int do_irq_handler(void)
 
 		irq_desc = d->ops->get_irq_desc(d, irq);
 		if (unlikely(!irq_desc)) {
-			pr_error("irq is not actived %d\n", irq);
+			pr_err("irq is not actived %d\n", irq);
 			ret = -EINVAL;
 			goto error;
 		}

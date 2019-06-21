@@ -455,7 +455,7 @@ static int vgicv2_create_vgicc(struct vm *vm,
 
 	vgicc = zalloc(sizeof(struct vdev));
 	if (!vgicc) {
-		pr_error("no memory for vgicv2 vgicc\n");
+		pr_err("no memory for vgicv2 vgicc\n");
 		return -ENOMEM;
 	}
 
@@ -500,7 +500,7 @@ static int gicv2_send_virq(struct vcpu *vcpu, struct virq_desc *virq)
 	struct gich_lr *gich_lr;
 
 	if (virq->id >= gicv2_nr_lrs) {
-		pr_error("invalid virq %d\n", virq->id);
+		pr_err("invalid virq %d\n", virq->id);
 		return -EINVAL;
 	}
 
@@ -583,7 +583,7 @@ static struct virq_chip *vgicv2_virqchip_init(struct vm *vm,
 	if (ret || (gicd_size == 0) || (gicc_size == 0))
 		return NULL;
 
-	pr_error("vgicv2 address 0x%x 0x%x 0x%x 0x%x\n",
+	pr_err("vgicv2 address 0x%x 0x%x 0x%x 0x%x\n",
 				gicd_base, gicd_size,
 				gicc_base, gicc_size);
 

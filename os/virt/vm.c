@@ -214,7 +214,7 @@ int create_new_vm(struct vmtag *tag)
 	 */
 	ret = vm_mmap_init(vm, vmtag->mem_size);
 	if (ret) {
-		pr_error("no more mmap space for vm\n");
+		pr_err("no more mmap space for vm\n");
 		goto release_vm;
 	}
 
@@ -257,7 +257,7 @@ static int __vm_reset(struct vm *vm, void *args)
 	vm_for_each_vcpu(vm, vcpu) {
 		ret = vcpu_power_off(vcpu, 1000);
 		if (ret) {
-			pr_error("vm-%d vcpu-%d power off failed\n",
+			pr_err("vm-%d vcpu-%d power off failed\n",
 					vm->vmid, vcpu->vcpu_id);
 			return ret;
 		}
@@ -335,7 +335,7 @@ static int __vm_suspend(struct vm *vm)
 
 	pr_info("suspend vm-%d\n", vm->vmid);
 	if (get_vcpu_id(vcpu) != 0) {
-		pr_error("vm suspend can only called by vcpu0\n");
+		pr_err("vm suspend can only called by vcpu0\n");
 		return -EPERM;
 	}
 
@@ -344,7 +344,7 @@ static int __vm_suspend(struct vm *vm)
 			continue;
 
 		if (vcpu->state != VCPU_STAT_STOPPED) {
-			pr_error("vcpu-%d is not suspend vm suspend fail\n",
+			pr_err("vcpu-%d is not suspend vm suspend fail\n",
 					get_vcpu_id(vcpu));
 			return -EINVAL;
 		}
@@ -447,7 +447,7 @@ int virt_init(void)
 	for (i = 0; i < nr_static_vms; i++) {
 		vm = create_vm(&vmtags[i]);
 		if (!vm)
-			pr_error("create VM(%d):%s failed\n", i,
+			pr_err("create VM(%d):%s failed\n", i,
 				 vmtags[i].name);
 	}
 

@@ -95,7 +95,7 @@ int get_device_irq_index(struct vm *vm, struct device_node *node,
 
 	irq_cells = of_n_interrupt_cells(node);
 	if (irq_cells == 0) {
-		pr_error("bad irqcells - %s\n", node->name);
+		pr_err("bad irqcells - %s\n", node->name);
 		return -ENOENT;
 	}
 
@@ -263,7 +263,7 @@ static int of_create_vm_mailbox(struct device_node *node)
 		of_get_u32_array(child, "event_size", &event, 1);
 		if (!create_mailbox(child->name, owner[0],
 				owner[1], size, event))
-			pr_error("create mailbox [%s] fail\n", child->name);
+			pr_err("create mailbox [%s] fail\n", child->name);
 		else
 			pr_info("create mailbox [%s] successful\n", child->name);
 	}
@@ -283,7 +283,7 @@ int create_vm_resource_of(struct vm *vm, void *data)
 	else
 		node = of_parse_device_tree(data);
 	if (!node) {
-		pr_error("invaild setup data for vm-%d\n", vm->vmid);
+		pr_err("invaild setup data for vm-%d\n", vm->vmid);
 		return -EINVAL;
 	}
 

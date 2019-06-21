@@ -83,7 +83,7 @@ struct mailbox *create_mailbox(const char *name,
 	struct mailbox *mailbox;
 
 	if (mailbox_index >= MAX_MAILBOX_NR) {
-		pr_error("mailbox count beyond the max size\n");
+		pr_err("mailbox count beyond the max size\n");
 		return NULL;
 	}
 
@@ -178,7 +178,7 @@ static struct mailbox *cookie_to_mailbox(uint64_t cookie)
 
 	mailbox = mailboxs[index];
 	if (!mailbox) {
-		pr_error("mailbox-%d is not created\n", index);
+		pr_err("mailbox-%d is not created\n", index);
 		return NULL;
 	}
 
@@ -306,7 +306,7 @@ static int mailbox_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 
 	index = id - HVC_MAILBOX_FN(0);
 	if (index >= sizeof(mailbox_hvc_handlers)) {
-		pr_error("unsupport mailbox hypercall %d\n", index);
+		pr_err("unsupport mailbox hypercall %d\n", index);
 		HVC_RET1(c, -EINVAL)
 	}
 

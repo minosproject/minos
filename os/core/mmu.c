@@ -263,7 +263,7 @@ int create_mem_mapping(struct mm_struct *mm, vir_addr_t addr,
 	spin_unlock(&mm->lock);
 
 	if (ret)
-		pr_error("map fail 0x%x->0x%x size:%x\n", addr, phy, size);
+		pr_err("map fail 0x%x->0x%x size:%x\n", addr, phy, size);
 
 	/* need to flush the addr + size's mem's cache ? */
 	if (flags & VM_HOST)
@@ -291,7 +291,7 @@ static int __destroy_mem_mapping(struct mapping_struct *info)
 			offset = (vir & attr->offset_mask) >> attr->range_offset;
 			des = *(table + offset);
 			if (des == 0) {
-				pr_error("mapping error on 0x%x\n", vir);
+				pr_err("mapping error on 0x%x\n", vir);
 				return -EINVAL;
 			}
 
@@ -304,7 +304,7 @@ static int __destroy_mem_mapping(struct mapping_struct *info)
 				table = (unsigned long *)(des & ~PAGE_MASK);
 				attr = attr->next;
 				if ((lvl > PTE) || (attr == NULL)) {
-					pr_error("mapping error on 0x%x\n", vir);
+					pr_err("mapping error on 0x%x\n", vir);
 					return -EINVAL;
 				}
 			} else {

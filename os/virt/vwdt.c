@@ -193,7 +193,7 @@ static int vwdt_mmio_write(struct vdev *vdev, gp_regs *regs,
 	unsigned long offset = address - SP805_IOMEM_BASE;
 
 	if ((offset != SP805_WDT_LOCK) && wdt->access_lock) {
-		pr_error("register is locked of the wdt\n");
+		pr_err("register is locked of the wdt\n");
 		return -EPERM;
 	}
 

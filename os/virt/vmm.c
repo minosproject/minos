@@ -398,7 +398,7 @@ void vm_mm_struct_init(struct vm *vm)
 
 	mm->pgd_base = alloc_pgd();
 	if (mm->pgd_base == 0) {
-		pr_error("No memory for vm page table\n");
+		pr_err("No memory for vm page table\n");
 		return;
 	}
 
@@ -422,7 +422,7 @@ void vm_init_shmem(struct vm *vm, uint64_t base, uint64_t size)
 	struct mm_struct *mm = &vm->mm;
 
 	if (!vm_is_native(vm)) {
-		pr_error("vm is not native vm can not init shmem\n");
+		pr_err("vm is not native vm can not init shmem\n");
 		return;
 	}
 

@@ -29,7 +29,7 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 	struct vm *vm0 = get_vm_by_id(0);
 
 	if (vcpu->vmcs_irq < 0) {
-		pr_error("no hvm irq for this vcpu\n");
+		pr_err("no hvm irq for this vcpu\n");
 		return -ENOENT;
 	}
 
@@ -74,7 +74,7 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 	dsb();
 
 	if (send_virq_to_vm(vm0, vcpu->vmcs_irq)) {
-		pr_error("vmcs failed to send virq for vm-%d\n",
+		pr_err("vmcs failed to send virq for vm-%d\n",
 				vcpu->vm->vmid);
 		vmcs->host_index--;
 		vmcs->trap_ret = -EPERM;
@@ -130,7 +130,7 @@ static void vcpu_vmcs_init(struct vcpu *vcpu)
 	struct vmcs *vmcs = vcpu->vmcs;
 
 	if (!vmcs) {
-		pr_error("vmcs of vcpu is NULL\n");
+		pr_err("vmcs of vcpu is NULL\n");
 		return;
 	}
 
@@ -157,7 +157,7 @@ unsigned long vm_create_vmcs(struct vm *vm)
 
 	vm->hvm_vmcs = (void *)create_hvm_iomem_map(base, size);
 	if (!vm->hvm_vmcs) {
-		pr_error("mapping vmcs to hvm failed\n");
+		pr_err("mapping vmcs to hvm failed\n");
 		free(vm->vmcs);
 		return 0;
 	}
@@ -181,7 +181,7 @@ int vm_create_vmcs_irq(struct vm *vm, int vcpu_id)
 
 	vcpu->vmcs_irq = alloc_hvm_virq();
 	if (vcpu->vmcs_irq < 0)
-		pr_error("alloc virq for vmcs failed\n");
+		pr_err("alloc virq for vmcs failed\n");
 
 	return vcpu->vmcs_irq;
 }

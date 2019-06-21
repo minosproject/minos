@@ -130,7 +130,7 @@ static struct task *__create_task(char *name, task_func_t func,
 	/* now create the task and init it */
 	task = zalloc(sizeof(*task));
 	if (!task) {
-		pr_error("no more memory for task\n");
+		pr_err("no more memory for task\n");
 		return NULL;
 	}
 
@@ -144,7 +144,7 @@ static struct task *__create_task(char *name, task_func_t func,
 		stack = malloc(stk_size);
 #endif
 		if (stack == NULL) {
-			pr_error("no more memory for task stack\n");
+			pr_err("no more memory for task stack\n");
 			free(task);
 			return NULL;
 		}

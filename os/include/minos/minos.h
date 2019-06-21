@@ -13,6 +13,7 @@
 #include <minos/arch.h>
 #include <minos/calltrace.h>
 #include <minos/ticketlock.h>
+#include <minos/time.h>
 
 #define section_for_each_item_addr(__start_addr, __end_addr, __var)            \
 	size_t _i, _cnt;                                                       \

@@ -59,7 +59,7 @@ int register_task_vmodule(const char *name, vmodule_init_fn fn)
 
 	vmodule = create_vmodule(&mid);
 	if (!vmodule) {
-		pr_error("create vmodule %s failed\n", name);
+		pr_err("create vmodule %s failed\n", name);
 		return -ENOMEM;
 	}
 
@@ -218,7 +218,7 @@ int vmodules_init(void)
 	section_for_each_item(__vmodule_start, __vmodule_end, mid) {
 		vmodule = create_vmodule(mid);
 		if (!vmodule)
-			pr_error("create vmodule %s failed\n", mid->name);
+			pr_err("create vmodule %s failed\n", mid->name);
 	}
 
 	return 0;

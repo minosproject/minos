@@ -191,7 +191,7 @@ static void gicv3_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *cpu)
 	if (sgi > 15)
 		return;
 
-	cpumask_clear(&cpus_mask);
+	cpumask_clearall(&cpus_mask);
 
 	switch (mode) {
 	case SGI_TO_OTHERS:
@@ -207,7 +207,7 @@ static void gicv3_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *cpu)
 		gicv3_send_sgi_list(sgi, cpu);
 		break;
 	default:
-		pr_error("Sgi mode not supported\n");
+		pr_err("Sgi mode not supported\n");
 		break;
 	}
 }

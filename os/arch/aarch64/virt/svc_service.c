@@ -40,7 +40,7 @@ int do_svc_handler(gp_regs *regs, uint32_t svc_id, uint64_t *args, int smc)
 	type = (svc_id & SVC_STYPE_MASK) >> 24;
 
 	if (unlikely(type > SVC_STYPE_MAX)) {
-		pr_error("Unsupported SVC type %d\n", type);
+		pr_err("Unsupported SVC type %d\n", type);
 		goto invalid;
 	}
 
