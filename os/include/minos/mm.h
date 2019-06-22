@@ -90,4 +90,6 @@ int has_enough_memory(size_t size);
 void *alloc_boot_mem(size_t size);
 void *alloc_boot_pages(int pages);
 
+void add_slab_mem(unsigned long base, size_t size);
+
 #endif

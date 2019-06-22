@@ -63,16 +63,18 @@ int mbox_del(mbox_t *m, int opt)
 
 	switch (opt) {
 	case OS_DEL_NO_PEND:
-		if (tasks_waiting == 0)
+		if (tasks_waiting == 0) {
+			ticket_unlock_irqrestore(&m->lock, flags);
 			release_event(to_event(m));
-		else
+			return 0;
+		} else
 			ret = -EPERM;
 		break;
 
 	case OS_DEL_ALWAYS:
 		event_del_always((struct event *)m);
-		release_event(m);
 		ticket_unlock_irqrestore(&m->lock, flags);
+		release_event(m);
 
 		if (tasks_waiting)
 			sched();
@@ -107,21 +109,20 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 
 	/* no mbox message need to suspend the task */
 	task = get_current_task();
-	spin_lock(&task->lock);
+	task_lock(task);
 	task->stat |= TASK_STAT_MBOX;
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->delay = timeout;
 	task->wait_event = to_event(m);
-	spin_unlock(&task->lock);
+	task_unlock(task);
 
 	event_task_wait(task, (struct event *)m);
-	set_task_suspend(task);
 	ticket_unlock_irqrestore(&m->lock, flags);
 
 	sched();
 
 	ticket_lock_irqsave(&m->lock, flags);
-	spin_lock(&task->lock);
+	task_lock(task);
 	switch (task->pend_stat) {
 	case TASK_STAT_PEND_OK:
 		pmsg = task->msg;
@@ -140,7 +141,7 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->wait_event = NULL;
-	spin_unlock(&task->lock);
+	task_unlock(task);
 	ticket_unlock_irqrestore(&m->lock, flags);
 
 	return pmsg;
@@ -157,7 +158,7 @@ int mbox_post(mbox_t *m, void *pmsg)
 	ticket_lock_irqsave(&m->lock, flags);
 	if (event_has_waiter(to_event(m))) {
 		event_highest_task_ready((struct event *)m, pmsg,
-					TASK_STAT_MBOX, TASK_STAT_PEND_OK);
+				TASK_STAT_MBOX, TASK_STAT_PEND_OK);
 		ticket_unlock_irqrestore(&m->lock, flags);
 		sched();
 
@@ -181,6 +182,7 @@ int mbox_post_opt(mbox_t *m, void *pmsg, int opt)
 {
 	int ret = 0;
 	unsigned long flags;
+	int nr_tasks;
 
 	if (invalid_mbox(m) || !pmsg)
 		return -EINVAL;
@@ -192,11 +194,17 @@ int mbox_post_opt(mbox_t *m, void *pmsg, int opt)
 	ticket_lock_irqsave(&m->lock, flags);
 	if (event_has_waiter(to_event(m))) {
 		if (opt & OS_POST_OPT_BROADCAST) {
-			event_highest_task_ready((struct event *)m, pmsg,
-					TASK_STAT_MBOX, TASK_STAT_PEND_OK);
+			while (event_has_waiter(to_event(m))) {
+				event_highest_task_ready((struct event *)m,
+						pmsg, TASK_STAT_MBOX,
+						TASK_STAT_PEND_OK);
+				nr_tasks++;
+			}
 		} else {
-			event_highest_task_ready((struct event *)m, pmsg,
-					TASK_STAT_MBOX, TASK_STAT_PEND_OK);
+			event_highest_task_ready((struct event *)m,
+					pmsg, TASK_STAT_MBOX,
+					TASK_STAT_PEND_OK);
+			nr_tasks++;
 		}
 
 		ticket_unlock_irqrestore(&m->lock, flags);

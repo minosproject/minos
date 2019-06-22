@@ -19,6 +19,7 @@
 #include <minos/sched.h>
 #include <minos/event.h>
 #include <minos/mm.h>
+#include <minos/smp.h>
 
 static LIST_HEAD(event_list);
 static DEFINE_SPIN_LOCK(event_lock);
@@ -58,23 +59,6 @@ void release_event(struct event *event)
 	free(event);
 }
 
-int event_task_ready(struct task *task, void *msg,
-		uint32_t msk, int pend_stat)
-{
-	spin_lock(&task->lock);
-	task->delay = 0;
-	task->msg = msg;
-	task->stat &= ~msk;		// clear the pending stat
-	task->pend_stat = pend_stat;
-	task->wait_event = 0;
-	spin_unlock(&task->lock);
-
-	if ((task->stat & TASK_STAT_SUSPEND) == TASK_STAT_RDY)
-		set_task_ready(task);
-
-	return 0;
-}
-
 void event_task_wait(struct task *task, struct event *ev)
 {
 	if (task->prio <= OS_LOWEST_PRIO) {
@@ -109,17 +93,57 @@ struct task *event_get_waiter(struct event *ev)
 	return NULL;
 }
 
-void event_highest_task_ready(struct event *ev, void *msg,
+static void event_task_ready(struct task *task, void *msg,
+		uint32_t msk, int pend_stat)
+{
+	struct task_event *tevent;
+	int cpuid = smp_processor_id();
+
+	if (is_realtime_task(task) || (task->affinity == cpuid)) {
+		task->delay = 0;
+		task->msg = msg;
+		task->stat &= ~msk;
+		task->pend_stat = pend_stat;
+		task->wait_event = NULL;
+		set_task_ready(task);
+	} else {
+		/*
+		 * send a ipi to let the task's pcpu to update
+		 * the task's stat
+		 */
+		tevent = malloc(sizeof(*tevent));
+		if (!tevent)
+			panic("no memory for event task event\n");
+
+		tevent->task = task;
+		tevent->action = TASK_EVENT_EVENT_READY;
+		tevent->msg = msg;
+		tevent->msk = msk;
+		tevent->pend_stat = pend_stat;
+
+		task_ipi_event(task, tevent, 0);
+	}
+}
+
+struct task *event_highest_task_ready(struct event *ev, void *msg,
 		uint32_t msk, int pend_stat)
 {
 	struct task *task;
 
 	task = event_get_waiter(ev);
-	if (!task)
-		return;
 
-	event_task_ready(task, msg, msk, pend_stat);
+	/*
+	 * need to check whether this task has got
+	 * timeout firstly, since even it is timeout
+	 * the task will not remove from the waiter
+	 * list soon.
+	 */
+	task_lock(task);
 	event_task_remove(task, ev);
+	event_task_ready(task, msg, msk, pend_stat);
+	task_unlock(task);
+
+	return task;
 }
 
 void event_del_always(struct event *ev)
@@ -133,9 +157,9 @@ void event_del_always(struct event *ev)
 	 * has been waked up
 	 */
 	list_for_each_entry_safe(task, n, &ev->wait_list, event_list) {
+		event_task_remove(task, ev);
 		event_task_ready(task, NULL, TASK_STAT_MUTEX,
 					TASK_STAT_PEND_ABORT);
-		event_task_remove(task, ev);
 	}
 
 	while (ev->wait_grp != 0) {

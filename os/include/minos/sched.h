@@ -53,10 +53,12 @@ void sched_new(void);
 void pcpu_resched(int pcpu_id);
 int sched_can_idle(struct pcpu *pcpu);
 void set_task_ready(struct task *task);
-void set_task_suspend(struct task *task);
+void set_task_suspend(struct task *task, uint32_t delay);
+void set_task_sleep(struct task *task);
 struct task *get_highest_task(uint8_t group, prio_t *ready);
 void irq_enter(gp_regs *regs);
 void irq_exit(gp_regs *regs);
+void pcpu_need_resched(void);
 
 static inline struct task *get_current_task(void)
 {

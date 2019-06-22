@@ -79,8 +79,9 @@ int mutex_del(mutex_t *mutex, int opt)
 			pr_err("can not delete mutex task waitting for it\n");
 			ret = -EPERM;
 		} else {
+			ticket_unlock_irqrestore(&mutex->lock, flags);
 			release_event(to_event(mutex));
-			ret = 0;
+			return 0;
 		}
 		break;
 
@@ -97,8 +98,8 @@ int mutex_del(mutex_t *mutex, int opt)
 		}
 
 		event_del_always(to_event(mutex));
-		release_event(to_event(mutex));
 		ticket_unlock_irqrestore(&mutex->lock, flags);
+		release_event(to_event(mutex));
 
 		if (tasks_waiting)
 			sched();
@@ -151,22 +152,20 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	}
 
 	/* set the task's state and suspend the task */
-	spin_lock(&task->lock);
+	task_lock(task);
 	task->stat |= TASK_STAT_MUTEX;
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->delay = timeout;
 	task->wait_event = to_event(m);
-	spin_unlock(&task->lock);
+	task_unlock(task);
 
-	event_task_wait(task, (struct event *)m);
-	set_task_suspend(task);
-
+	event_task_wait(task, to_event(m));
 	ticket_unlock_irqrestore(&m->lock, flags);
 
 	sched();
 
 	ticket_lock_irqsave(&m->lock, flags);
-	spin_lock(&task->lock);
+	task_lock(task);
 
 	switch (task->pend_stat) {
 	case TASK_STAT_PEND_OK:
@@ -186,7 +185,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->wait_event = 0;
-	spin_unlock(&task->lock);
+	task_unlock(task);
 	ticket_unlock_irqrestore(&m->lock, flags);
 
 	return ret;
@@ -206,16 +205,20 @@ int mutex_post(mutex_t *m)
 		return -EINVAL;
 	}
 
-	/* find the highest prio task to run */
-	if ((m->wait_grp != 0) || !(is_list_empty(&m->wait_list))) {
-		event_highest_task_ready((struct event *)m, NULL,
+	/*
+	 * find the highest prio task to run, if there is
+	 * no task, then set the mutex is available else
+	 * resched
+	 */
+	if (event_has_waiter(to_event(m))) {
+		task = event_highest_task_ready((struct event *)m, NULL,
 				TASK_STAT_MUTEX, TASK_STAT_PEND_OK);
 		m->cnt = task->pid;
 		m->data = task;
+
 		ticket_unlock_irqrestore(&m->lock, flags);
 
 		sched();
-
 		return 0;
 	}
 

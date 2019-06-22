@@ -34,20 +34,20 @@ struct event {
 	prio_t wait_tbl[OS_RDY_TBL_SIZE];	/* wait bitmap */
 	struct list_head wait_list;		/* non realtime task waitting list */
 	struct list_head list;			/* link to the all event that created */
-	char name[OS_EVENT_NAME_SIZE];	/* event name */
+	char name[OS_EVENT_NAME_SIZE];		/* event name */
 };
 
 #define to_event(e)	(struct event *)e
 
 struct event *create_event(int type, void *pdata, char *name);
 void release_event(struct event *event);
-int event_task_ready(struct task *task, void *msg,
-		uint32_t msk, int pend_stat);
 void event_task_wait(struct task *task, struct event *ev);
 void event_task_remove(struct task *task, struct event *ev);
 struct task *event_get_waiter(struct event *ev);
-void event_highest_task_ready(struct event *ev, void *msg,
+
+struct task *event_highest_task_ready(struct event *ev, void *msg,
 		uint32_t msk, int pend_stat);
+
 void event_del_always(struct event *ev);
 
 static inline int event_has_waiter(struct event *ev)

@@ -147,22 +147,37 @@ flag_t flag_accept(struct flag_grp *grp, flag_t flags, int wait_type)
 
 static int flag_task_ready(struct flag_node *node, flag_t flags)
 {
-	int sched;
+	int sched = 0;
 	struct task *task;
+	int cpuid = smp_processor_id();
+	struct task_event *tevent;
 
 	task = node->task;
-	spin_lock(&task->lock);
-	task->delay = 0;
-	task->flags_rdy = flags;
-	task->stat &= ~TASK_STAT_FLAG;
-	task->pend_stat = TASK_STAT_PEND_OK;
-	if (task->stat == TASK_STAT_RDY) {
-		spin_unlock(&task->lock);
-		set_task_ready(task);
-		sched = 1;
+
+	if (is_realtime_task(task) || (task->affinity == cpuid)) {
+		task_lock(task);
+		task->delay = 0;
+		task->flags_rdy = flags;
+		task->stat &= ~TASK_STAT_FLAG;
+		task->pend_stat = TASK_STAT_PEND_OK;
+		if (task->stat == TASK_STAT_RDY)
+			sched = 1;
+		else
+			sched = 0;
+
+		task_unlock(task);
 	} else {
-		sched = 0;
-		spin_unlock(&task->lock);
+		tevent = zalloc(sizeof(*tevent));
+		if (!tevent)
+			panic("no memory for flag task event\n");
+
+		tevent->msk = TASK_STAT_FLAG;
+		tevent->pend_stat = TASK_STAT_PEND_OK;
+		tevent->task = task;
+		tevent->action = TASK_EVENT_FLAG_READY;
+		tevent->flags = flags;
+
+		task_ipi_event(task, tevent, 0);
 	}
 
 	return sched;
@@ -226,15 +241,16 @@ static void flag_block(struct flag_grp *grp, struct flag_node *pnode,
 	pnode->task = task;
 	pnode->flag_grp = grp;
 
-	spin_lock(&task->lock);
+	task_lock(task);
 	task->stat |= TASK_STAT_FLAG;
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->delay = timeout;
 	task->flag_node = pnode;
 	list_add_tail(&grp->wait_list, &pnode->list);
-	spin_unlock(&task->lock);
 
-	set_task_suspend(task);
+	set_task_sleep(task);
+
+	task_unlock(task);
 }
 
 flag_t flag_pend(struct flag_grp *grp, flag_t flags,
@@ -287,7 +303,7 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 	sched();
 
 	ticket_lock_irqsave(&grp->lock, irq);
-	spin_lock(&task->lock);
+	task_lock(task);
 
 	if (task->pend_stat != TASK_STAT_PEND_OK) {
 		task->pend_stat = TASK_STAT_PEND_OK;
@@ -314,7 +330,7 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 		}
 	}
 
-	spin_unlock(&task->lock);
+	task_unlock(task);
 	ticket_unlock_irqrestore(&grp->lock, irq);
 
 	return flags_rdy;
@@ -326,6 +342,7 @@ flag_t flag_pend_get_flags_ready(void)
 	unsigned long irq;
 	flag_t flags;
 
+	/* TBD */
 	spin_lock_irqsave(&task->lock, irq);
 	flags = task->flags_rdy;
 	spin_unlock_irqrestore(&task->lock, irq);

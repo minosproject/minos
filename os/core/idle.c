@@ -19,6 +19,7 @@
 #include <minos/sched.h>
 #include <minos/platform.h>
 #include <minos/irq.h>
+#include <minos/mm.h>
 
 extern void apps_cpu0_init(void);
 extern void apps_cpu1_init(void);
@@ -28,6 +29,39 @@ extern void apps_cpu4_init(void);
 extern void apps_cpu5_init(void);
 extern void apps_cpu6_init(void);
 extern void apps_cpu7_init(void);
+
+static void create_static_tasks(void)
+{
+	int ret = 0, cpu;
+	struct task_desc *tdesc;
+	extern unsigned char __task_desc_start;
+	extern unsigned char __task_desc_end;
+
+	section_for_each_item(__task_desc_start, __task_desc_end, tdesc) {
+		if (tdesc->aff == PCPU_AFF_PERCPU) {
+			for_each_online_cpu(cpu) {
+				ret = create_task(tdesc->name, tdesc->func,
+						tdesc->arg, OS_PRIO_PCPU,
+						cpu, tdesc->stk_size,
+						tdesc->flags);
+				if(ret) {
+					pr_err("create [%s] fail on cpu-%d\n",
+							tdesc->name, cpu);
+				}
+			}
+		} else {
+			ret = create_task(tdesc->name, tdesc->func,
+					tdesc->arg, tdesc->prio,
+					tdesc->aff, tdesc->stk_size,
+					tdesc->flags);
+			if (ret) {
+				pr_err("create [%s] fail on cpu-%d@%d\n",
+					tdesc->name, tdesc->aff, tdesc->prio);
+			}
+
+		}
+	}
+}
 
 void system_reboot(void)
 {
@@ -77,6 +111,8 @@ static void os_clean(void)
 		(unsigned long)&__init_start;
 	pr_info("release unused memory [0x%x 0x%x]\n",
 			(unsigned long)&__init_start, size);
+
+	add_slab_mem((unsigned long)&__init_start, size);
 }
 
 void cpu_idle(void)
@@ -85,8 +121,9 @@ void cpu_idle(void)
 
 	switch (pcpu->pcpu_id) {
 	case 0:
-		apps_cpu0_init();
 		os_clean();
+		apps_cpu0_init();
+		create_static_tasks();
 		break;
 	case 1:
 		apps_cpu1_init();

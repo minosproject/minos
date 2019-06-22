@@ -93,15 +93,16 @@ int queue_del(queue_t *qt, int opt)
 	switch (opt) {
 	case OS_DEL_NO_PEND:
 		if (tasks_waiting == 0) {
+			ticket_unlock_irqrestore(&qt->lock, flags);
 			queue_free(qt);
-			ret = 0;
+			return 0;
 		}
 		break;
 
 	case OS_DEL_ALWAYS:
 		event_del_always(to_event(qt));
-		queue_free(qt);
 		ticket_unlock_irqrestore(&qt->lock, flags);
+		queue_free(qt);
 
 		if (tasks_waiting)
 			sched();
@@ -202,21 +203,20 @@ void *queue_pend(queue_t *qt, uint32_t timeout)
 	}
 
 	task = get_current_task();
-	spin_lock(&task->lock);
+	task_lock(task);
 	task->stat |= TASK_STAT_Q;
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->delay = timeout;
 	task->wait_event = to_event(qt);
-	spin_unlock(&task->lock);
+	task_unlock(task);
 
 	event_task_wait(task, to_event(qt));
-	set_task_suspend(task);
 	ticket_unlock_irqrestore(&qt->lock, flags);
 
 	sched();
 
 	ticket_lock_irqsave(&qt->lock, flags);
-	spin_lock(&task->lock);
+	task_lock(task);
 
 	switch (task->pend_stat) {
 	case TASK_STAT_PEND_OK:
@@ -238,7 +238,7 @@ void *queue_pend(queue_t *qt, uint32_t timeout)
 	task->wait_event = NULL;
 	task->msg = NULL;
 
-	spin_unlock(&task->lock);
+	task_unlock(task);
 	ticket_unlock_irqrestore(&qt->lock, flags);
 
 	return pmsg;
@@ -257,8 +257,9 @@ int queue_post_abort(queue_t *qt, int opt)
 		switch(opt) {
 		case OS_PEND_OPT_BROADCAST:
 			while (event_has_waiter(to_event(qt))) {
-				event_highest_task_ready(to_event(qt), NULL,
-						TASK_STAT_Q, TASK_STAT_PEND_ABORT);
+				event_highest_task_ready(to_event(qt),
+						NULL, TASK_STAT_Q,
+						TASK_STAT_PEND_ABORT);
 				nbr_tasks++;
 			}
 			break;
@@ -329,6 +330,7 @@ int queue_post_opt(queue_t *qt, int opt, void *pmsg)
 {
 	unsigned long flags;
 	struct queue *q;
+	int nr_task = 0;
 
 	if (invalid_queue(qt) || !pmsg)
 		return -EINVAL;
@@ -339,18 +341,21 @@ int queue_post_opt(queue_t *qt, int opt, void *pmsg)
 			while (event_has_waiter(to_event(qt))) {
 				event_highest_task_ready(to_event(qt), pmsg,
 					TASK_STAT_Q, TASK_STAT_PEND_OK);
+				nr_task++;
 			}
 		} else {
 			event_highest_task_ready(to_event(qt), pmsg,
 				TASK_STAT_Q, TASK_STAT_PEND_OK);
+			nr_task++;
 		}
 
-		ticket_unlock_irqrestore(&qt->lock, flags);
+		if (nr_task) {
+			ticket_unlock_irqrestore(&qt->lock, flags);
+			if ((opt & OS_POST_OPT_NO_SCHED) == 0)
+				sched();
 
-		if ((opt & OS_POST_OPT_NO_SCHED) == 0)
-			sched();
-
-		return 0;
+			return 0;
+		}
 	}
 
 	q = (struct queue *)qt->data;

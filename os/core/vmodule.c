@@ -168,7 +168,7 @@ void restore_task_vmodule_state(struct task *task)
 	void *context;
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
-		context = get_vmodule_data_by_id(task, vmodule->id);
+		context = task->context[vmodule->id];
 		if (vmodule->state_restore && context)
 			vmodule->state_restore(task, context);
 	}
@@ -180,7 +180,7 @@ void save_task_vmodule_state(struct task *task)
 	void *context;
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
-		context = get_vmodule_data_by_id(task, vmodule->id);
+		context = task->context[vmodule->id];
 		if (vmodule->state_save && context)
 			vmodule->state_save(task, context);
 	}
@@ -192,7 +192,7 @@ void suspend_task_vmodule_state(struct task *task)
 	void *context;
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
-		context = get_vmodule_data_by_id(task, vmodule->id);
+		context = task->context[vmodule->id];
 		if (vmodule->state_suspend && context)
 			vmodule->state_suspend(task, context);
 	}
@@ -204,7 +204,7 @@ void resume_task_vmodule_state(struct task *task)
 	void *context;
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
-		context = get_vmodule_data_by_id(task, vmodule->id);
+		context = task->context[vmodule->id];
 		if (vmodule->state_resume && context)
 			vmodule->state_resume(task, context);
 	}

@@ -83,6 +83,36 @@ struct task *pid_to_task(int pid)
 	return os_task_table[pid];
 }
 
+static void task_timeout_handler(unsigned long data)
+{
+	unsigned long flags;
+	struct task *task = (struct task *)data;
+
+	/*
+	 * when task is suspended by sleep or waitting
+	 * for a event, it may set the delay time, when
+	 * the delay time is arrvie, then it will called
+	 * this function
+	 */
+	spin_lock_irqsave(&task->lock, flags);
+
+	if (task->delay) {
+		/* task is timeout and check its stat */
+		task->delay = 0;
+
+		if (is_task_pending(task)) {
+			task->stat &= ~TASK_STAT_PEND_ANY;
+			task->pend_stat = TASK_STAT_PEND_TO;
+		} else
+			task->pend_stat = TASK_STAT_PEND_OK;
+
+		if (!is_task_suspend(task))
+			set_task_ready(task);
+	}
+
+	spin_unlock_irqrestore(&task->lock, flags);
+}
+
 static void task_init(struct task *task, char *name,
 		void *stack, void *arg, prio_t prio,
 		int pid, int aff,size_t stk_size, unsigned long opt)
@@ -116,6 +146,12 @@ static void task_init(struct task *task, char *name,
 	if (task->prio == OS_PRIO_IDLE)
 		task->flags |= TASK_FLAGS_IDLE;
 
+	if (task->affinity == PCPU_AFF_NONE)
+		aff = 0;
+
+	task->delay_timer.function = task_timeout_handler;
+	task->delay_timer.data = (unsigned long)task;
+	init_timer_on_cpu(&task->delay_timer, 0);
 	strncpy(task->name, name, MIN(strlen(name), TASK_NAME_SIZE));
 }
 
@@ -171,6 +207,58 @@ static struct task *__create_task(char *name, task_func_t func,
 static void task_create_hook(struct task *task)
 {
 
+}
+
+static void task_ipi_event_handler(void *data)
+{
+	struct task *task;
+	struct task_event *ev = (struct task_event *)data;
+
+	if (data == NULL)
+		pr_err("got invalid argument in %s\n", __func__);
+
+	task = ev->task;
+	if (task->affinity != smp_processor_id())
+		return;
+
+	switch (ev->action) {
+	case TASK_EVENT_EVENT_READY:
+		/* if the task has been timeout then skip it */
+		if (!is_task_pending(task))
+			return;
+
+		task->delay = 0;
+		task->msg = ev->msg;
+		task->stat &= ~ev->msk;
+		task->pend_stat = ev->pend_stat;
+		task->wait_event = NULL;
+
+		set_task_ready(task);
+		break;
+
+	case TASK_EVENT_FLAG_READY:
+		if (!is_task_pending(task))
+			return;
+
+		task->delay = 0;
+		task->flags_rdy = ev->flags;
+		task->stat &= ev->msk;
+		task->pend_stat = ev->pend_stat;
+		break;
+
+	default:
+		break;
+	}
+
+	/* set resched flag according to the current prio */
+	free(ev);
+	pcpu_need_resched();
+}
+
+int task_ipi_event(struct task *task, struct task_event *ev, int wait)
+{
+	return smp_function_call(task->affinity, (void *)ev,
+			task_ipi_event_handler, wait);
 }
 
 int create_task(char *name, task_func_t func,

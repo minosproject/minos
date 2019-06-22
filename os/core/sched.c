@@ -19,6 +19,7 @@
 #include <minos/sched.h>
 #include <minos/irq.h>
 #include <minos/softirq.h>
+#include <minos/vmodule.h>
 
 static uint8_t const os_prio_map_table[256] = {
 	0u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, /* 0x00 to 0x0F */
@@ -65,31 +66,55 @@ void pcpu_resched(int pcpu_id)
 	send_sgi(CONFIG_MINOS_RESCHED_IRQ, pcpu_id);
 }
 
+void pcpu_need_resched(void)
+{
+	if (os_prio_cur[smp_processor_id()] == OS_PRIO_PCPU)
+		set_need_resched();
+}
+
 void set_task_ready(struct task *task)
 {
-	unsigned long flags;
 	struct pcpu *pcpu;
+
+	/* realtime task or percpu task */
+	if (is_realtime_task(task)) {
+		os_rdy_grp |= task->bity;
+		os_rdy_table[task->by] |= task->bitx;
+	} else {
+		pcpu = get_per_cpu(pcpu, task->affinity);
+
+		list_del(&task->stat_list);
+		list_add(&pcpu->ready_list, &task->stat_list);
+	}
+}
+
+void set_task_sleep(struct task *task)
+{
+	struct pcpu *pcpu = get_cpu_var(pcpu);
 
 	if (is_idle_task(task))
 		return;
 
-	if (task->prio > OS_LOWEST_PRIO) {
-		kernel_lock_irqsave(flags);
-
-		os_rdy_grp |= task->bity;
-		os_rdy_table[task->by] |= task->bitx;
-
-		kernel_unlock_irqrestore(flags);
+	if (is_realtime_task(task)) {
+		os_rdy_grp &= ~task->bity;
+		os_rdy_table[task->by] &= ~task->bitx;
 	} else {
-		pcpu = get_per_cpu(pcpu, task->affinity);
-		spin_lock_irqsave(&pcpu->lock, flags);
-
-		if (task->list.next != NULL)
-			list_del(&task->stat_list);
-		list_add_tail(&pcpu->ready_list, &task->stat_list);
-
-		spin_unlock_irqrestore(&pcpu->lock, flags);
+		list_del(&task->stat_list);
+		list_add(&pcpu->sleep_list, &task->stat_list);
 	}
+}
+
+void set_task_suspend(struct task *task, uint32_t delay)
+{
+	struct task *cur = get_current_task();
+
+	task->delay = delay;
+	task->stat |= TASK_STAT_SUSPEND;
+
+	if (task == cur)
+		sched();
+	else
+		pcpu_resched(task->cpu);
 }
 
 struct task *get_highest_task(uint8_t group, prio_t *ready)
@@ -100,11 +125,6 @@ struct task *get_highest_task(uint8_t group, prio_t *ready)
 	x = os_prio_map_table[ready[y]];
 
 	return os_task_table[(y << 3) + x];
-}
-
-void set_task_suspend(struct task *task)
-{
-
 }
 
 /*
@@ -220,40 +240,67 @@ static struct task *get_next_run_task(struct pcpu *pcpu)
 	return pcpu->idle_task;
 }
 
-static void save_task_context(struct task *task)
+static inline void save_task_context(struct task *task)
 {
-
+	save_task_vmodule_state(task);
 }
 
-static void restore_task_state(struct task *task)
+static inline void restore_task_context(struct task *task)
 {
-
+	restore_task_vmodule_state(task);
 }
 
 void switch_to_task(struct task *cur, struct task *next)
 {
-	struct pcpu *pcpu = get_cpu_var(pcpu);
+	// unsigned long flags;
+
+	// need to acquire the kernel lock ?
+	// kernel_lock_irqsave(flags);
 
 	save_task_context(cur);
-	restore_task_state(next);
+	restore_task_context(next);
 
 	/*
-	 * put the next run task to the tail of the
-	 * ready list
+	 * check the current task's stat and do some action
+	 * to it, first if it is a percpu task, then put it
+	 * to the sleep list of its affinity pcpu, then
+	 * check whether it suspend time is set or not
 	 */
-	if (cur->prio == OS_PRIO_PCPU) {
-		spin_lock(&pcpu->lock);
-		list_del(&next->stat_list);
-		list_add_tail(&pcpu->ready_list, &next->stat_list);
-		spin_unlock(&pcpu->lock);
+	if (!is_task_ready(cur)) {
+		if (cur->delay) {
+			mod_timer(&cur->delay_timer,
+				NOW() + MILLISECS(cur->delay));
+		}
 	}
 
+	if (!is_realtime_task(next))
+		sched_tick_enable(MILLISECS(next->run_time));
+
 	do_hooks((void *)next, NULL, OS_HOOK_TASK_SWITCH_TO);
+
+	// kernel_unlock_irqrestore(flags);
 }
 
 unsigned long sched_tick_handler(unsigned long data)
 {
 	return 0;
+}
+
+static inline void recal_task_time_ready(struct task *task, struct pcpu *pcpu)
+{
+	unsigned long now;
+
+	if (is_realtime_task(task))
+		return;
+
+	list_del(&task->stat_list);
+	now = (NOW() - task->start_ns) / 1000000;
+	if (now > 15) {
+		list_add(&pcpu->ready_list, &task->stat_list);
+	} else {
+		task->run_time = 85 + now;
+		list_add_tail(&pcpu->ready_list, &task->stat_list);
+	}
 }
 
 void sched(void)
@@ -262,7 +309,8 @@ void sched(void)
 	struct pcpu *pcpu;
 	unsigned long flags;
 	int sched_flag = 0;
-	struct task *cur = get_current_task(), *next;
+	struct task *cur = get_current_task();
+	struct task *next = cur;
 	int cpuid = smp_processor_id();
 
 	if (unlikely(int_nesting()))
@@ -272,20 +320,43 @@ void sched(void)
 		return;
 
 	kernel_lock_irqsave(flags);
+
+	/*
+	 * need to check whether the current task is to
+	 * pending on some thing or suspend, then call
+	 * sched_new to get the next run task
+	 */
+	pcpu = get_per_cpu(pcpu, cpuid);
+	if (!is_task_ready(cur))
+		set_task_sleep(cur);
+
 	sched_new();
+
+	/* check whether current pcpu need to resched */
 	for (i = 0; i < NR_CPUS; i++) {
 		if (os_prio_cur[i] != os_highest_rdy[i]) {
 			if (i == cpuid) {
-				pcpu = get_per_cpu(pcpu, cpuid);
-				next = get_next_run_task(pcpu);
 				sched_flag = 1;
 			} else
 				pcpu_resched(i);
 		}
 	}
+
+	/*
+	 * if this task is a percpu task and it will sched
+	 * out not because its run time is expries, then will
+	 * set it to the correct stat
+	 */
+	if (sched_flag) {
+		if (is_task_ready(cur))
+			recal_task_time_ready(cur, pcpu);
+
+		next = get_next_run_task(pcpu);
+	}
+
 	kernel_unlock_irqrestore(flags);
 
-	if (sched_flag) {
+	if (sched_flag && (cur != next)) {
 		local_irq_save(flags);
 		switch_to_task(cur, next);
 		dsb();
@@ -363,6 +434,22 @@ int sched_init(void)
 
 int resched_handler(uint32_t irq, void *data)
 {
+#if 0
+	struct task *task, *n;
+	struct pcpu *pcpu = get_cpu_var(pcpu);
+
+	/*
+	 * scan all the sleep list to see which percpu task
+	 * need to change the stat
+	 */
+
+	list_for_each_entry_safe(task, n, &pcpu->sleep_list, stat_list) {
+		if (task->need_resched) {
+
+		}
+	}
+#endif
+
 	return 0;
 }
 

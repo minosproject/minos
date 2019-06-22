@@ -4,6 +4,7 @@
 #include <minos/minos.h>
 #include <minos/flag.h>
 #include <config/config.h>
+#include <minos/timer.h>
 
 /* the max realtime task will be 64 */
 #define OS_NR_TASKS		512
@@ -38,7 +39,7 @@
 #define TASK_STAT_MULTI         0x80  /* Pending on multiple events */
 #define TASK_STAT_RUNNING	0x100 /* Task is running */
 
-#define TASK_STAT_PEND_ANY      (OS_STAT_SEM | OS_STAT_MBOX | OS_STAT_Q | OS_STAT_MUTEX | OS_STAT_FLAG)
+#define TASK_STAT_PEND_ANY      (TASK_STAT_SEM | TASK_STAT_MBOX | TASK_STAT_Q | TASK_STAT_MUTEX | TASK_STAT_FLAG)
 
 #define TASK_STAT_PEND_OK       0u  /* Pending status OK, not pending, or pending complete */
 #define TASK_STAT_PEND_TO       1u  /* Pending timed out */
@@ -73,6 +74,8 @@ struct task {
 	flag_t flags_rdy;
 
 	uint32_t delay;
+	struct timer_list delay_timer;
+
 	volatile uint16_t stat;
 	volatile uint16_t pend_stat;
 	uint8_t del_req;
@@ -91,10 +94,17 @@ struct task {
 	int flag_rdy;
 	struct flag_node *flag_node;
 
+	/*
+	 * affinity - the cpu node which the task affinity to
+	 * cpu - the cpu node which the task runing at currently
+	 */
 	uint16_t affinity;
+	uint16_t cpu;
+
+	uint32_t run_time;
+	unsigned long start_ns;
 
 	spinlock_t lock;
-
 
 	/* stat information */
 	unsigned long ctx_sw_cnt;
@@ -118,6 +128,18 @@ struct task_desc {
 	uint16_t aff;
 	uint32_t stk_size;
 	unsigned long flags;
+};
+
+struct task_event {
+	struct task *task;
+#define TASK_EVENT_EVENT_READY		0x0
+#define TASK_EVENT_FLAG_READY		0x1
+	int action;
+	void *msg;
+	uint32_t msk;
+	int pend_stat;
+	uint32_t delay;
+	flag_t flags;
 };
 
 #define DEFINE_TASK(tn, f, a, p, af, ss, fl) \
@@ -151,14 +173,14 @@ struct task_desc {
 		.func = f,		\
 		.arg = a,		\
 		.prio = p,		\
-		.aff = 0,		\
+		.aff = PCPU_AFF_NONE,	\
 		.stk_size = ss,		\
 		.flags = fl		\
 	}
 
 static int inline is_idle_task(struct task *task)
 {
-	return !!(task->flags & TASK_FLAGS_IDLE);
+	return (task->prio == OS_PRIO_IDLE);
 }
 
 static inline int get_task_pid(struct task *task)
@@ -171,11 +193,63 @@ static inline prio_t get_task_prio(struct task *task)
 	return task->prio;
 }
 
+static inline int is_realtime_task(struct task *task)
+{
+	return (task->prio <= OS_LOWEST_PRIO);
+}
+
+static inline int is_percpu_task(struct task *task)
+{
+	return (task->prio == OS_PRIO_PCPU);
+}
+
+static inline int is_task_pending(struct task *task)
+{
+	return ((task->stat & TASK_STAT_PEND_ANY) !=
+			TASK_STAT_RDY);
+}
+
+static inline int is_task_suspend(struct task *task)
+{
+	return !!(task->stat & TASK_STAT_SUSPEND);
+}
+
+static inline int is_task_ready(struct task *task)
+{
+	return ((task->stat == TASK_STAT_RDY) ||
+			(task->stat == TASK_STAT_RUNNING));
+}
+
 int alloc_pid(prio_t prio, int cpuid);
 void release_pid(int pid);
+int task_ipi_event(struct task *task, struct task_event *ev, int wait);
 
 int create_task(char *name, task_func_t func,
 		void *arg, prio_t prio, uint16_t aff,
 		uint32_t stk_size, unsigned long opt);
+
+#define task_lock(task)				\
+	do {					\
+		if (is_realtime_task(task))	\
+			kernel_lock();		\
+	} while (0)
+
+#define task_unlock(task)				\
+	do {						\
+		if (is_realtime_task(task)) 		\
+			kernel_unlock();		\
+	} while (0)
+
+#define task_lock_irqsave(task, flags)				\
+	do {							\
+		if (is_realtime_task(task)) 			\
+			kernel_lock_irqsave(flags);		\
+	} while (0)
+
+#define task_unlock_irqrestore(task)					\
+	do {								\
+		if (is_realtime_task(task)) 				\
+			kernel_unlock_irqrestore(flags);		\
+	} while (0)
 
 #endif

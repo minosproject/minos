@@ -91,7 +91,6 @@ static struct page_pool *io_pool = &__io_pool;
 static struct page_pool *page_pool = &__page_pool;
 static size_t free_blocks;
 
-static void add_slab_mem(unsigned long base, size_t size);
 static void inline add_slab_to_slab_pool(struct slab_header *header,
 		struct slab_pool *pool);
 
@@ -655,7 +654,7 @@ static inline int slab_pool_id(size_t size)
 			(pslab->pool_nr - FREE_POOL_OFFSET) : id;
 }
 
-static void add_slab_mem(unsigned long base, size_t size)
+void add_slab_mem(unsigned long base, size_t size)
 {
 	int i;
 	struct slab_pool *pool;
