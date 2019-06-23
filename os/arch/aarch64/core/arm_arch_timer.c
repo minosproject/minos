@@ -176,13 +176,11 @@ void sched_tick_enable(unsigned long exp)
 
 static int sched_timer_handler(uint32_t irq, void *data)
 {
-	unsigned long next_evt;
-
 	/* disable timer to avoid interrupt */
 	write_sysreg32(0, CNTHP_CTL_EL2);
 
-	next_evt = sched_tick_handler((unsigned long)data);
-	sched_tick_enable(next_evt);
+	(void)sched_tick_handler((unsigned long)data);
+//	sched_tick_enable(next_evt);
 
 	return 0;
 }

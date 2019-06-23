@@ -122,7 +122,7 @@ struct mm_struct {
 	size_t mem_free;
 	unsigned long mem_base;
 	unsigned long pgd_base;
-	unsigned long hvm_mmap_base;
+	unsigned long hvm_mmap_base;		/* the base address mapped in VM0 */
 
 	/*
 	 * for the shared memory of native vm
