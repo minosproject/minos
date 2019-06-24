@@ -10,9 +10,9 @@
 DECLARE_PER_CPU(struct pcpu *, pcpu);
 DECLARE_PER_CPU(struct task *, percpu_current_task);
 DECLARE_PER_CPU(struct task *, percpu_next_task);
-DECLARE_PER_CPU(atomic_t, __need_resched);
-DECLARE_PER_CPU(atomic_t, __preempt);
-DECLARE_PER_CPU(atomic_t, __int_nesting);
+DECLARE_PER_CPU(int, __need_resched);
+DECLARE_PER_CPU(int, __preempt);
+DECLARE_PER_CPU(int, __int_nesting);
 DECLARE_PER_CPU(int, __os_running);
 
 extern prio_t os_highest_rdy[NR_CPUS];
@@ -91,32 +91,32 @@ static inline void set_next_task(struct task *task)
 
 static inline void set_need_resched(void)
 {
-	atomic_set(&get_cpu_var(__need_resched), 1);
+	get_cpu_var(__need_resched) = 1;
 }
 
 static inline void clear_need_resched(void)
 {
-	atomic_set(&get_cpu_var(__need_resched), 0);
+	get_cpu_var(__need_resched) = 0;
 }
 
 static inline int need_resched(void)
 {
-	return atomic_read(&get_cpu_var(__need_resched));
+	return get_cpu_var(__need_resched);
 }
 
 static inline void inc_int_nesting(void)
 {
-	atomic_inc(&get_cpu_var(__int_nesting));
+	get_cpu_var(__int_nesting)++;
 }
 
 static inline void dec_int_nesting(void)
 {
-	atomic_dec(&get_cpu_var(__int_nesting));
+	get_cpu_var(__int_nesting)--;
 }
 
 static inline int int_nesting(void)
 {
-	return atomic_read(&get_cpu_var(__int_nesting));
+	return get_cpu_var(__int_nesting);
 }
 
 static inline int os_is_running(void)

@@ -53,9 +53,9 @@ static struct pcpu pcpus[NR_CPUS];
 DEFINE_PER_CPU(struct pcpu *, pcpu);
 DEFINE_PER_CPU(struct task *, percpu_current_task);
 DEFINE_PER_CPU(struct task *, percpu_next_task);
-DEFINE_PER_CPU(atomic_t, __need_resched);
-DEFINE_PER_CPU(atomic_t, __preempt);
-DEFINE_PER_CPU(atomic_t, __int_nesting);
+DEFINE_PER_CPU(int, __need_resched);
+DEFINE_PER_CPU(int, __preempt);
+DEFINE_PER_CPU(int, __int_nesting);
 DEFINE_PER_CPU(int, __os_running);
 
 extern void sched_tick_disable(void);
@@ -246,6 +246,12 @@ static struct task *get_next_run_task(struct pcpu *pcpu)
 		return list_first_entry(&pcpu->ready_list,
 				struct task, stat_list);
 
+	/*
+	 * if next run task is idle task, change the highest
+	 * to the IDLE prio
+	 */
+	os_highest_rdy[pcpu->pcpu_id] = OS_PRIO_IDLE;
+
 	return pcpu->idle_task;
 }
 
@@ -261,6 +267,7 @@ static inline void restore_task_context(struct task *task)
 
 void switch_to_task(struct task *cur, struct task *next)
 {
+	int cpuid = smp_processor_id();
 	// unsigned long flags;
 
 	// need to acquire the kernel lock ?
@@ -287,12 +294,16 @@ void switch_to_task(struct task *cur, struct task *next)
 	 * need to enable the sched timer for fifo task sched
 	 * otherwise disable it.
 	 */
-	if (!is_realtime_task(next))
+	if (!is_realtime_task(next)) {
 		sched_tick_enable(MILLISECS(next->run_time));
-	else
+		next->start_ns = NOW();
+	} else
 		sched_tick_disable();
 
 	do_hooks((void *)next, NULL, OS_HOOK_TASK_SWITCH_TO);
+
+	/* set the current prio to the highest ready */
+	os_prio_cur[cpuid] = os_highest_rdy[cpuid];
 
 	// kernel_unlock_irqrestore(flags);
 }
@@ -303,14 +314,15 @@ unsigned long sched_tick_handler(unsigned long data)
 	struct task *next, *task;
 
 	task = get_current_task();
+
 	if (task->prio != OS_PRIO_PCPU)
 		panic("wrong task type on tick handler %d\n", task->pid);
 
-#define CONFIG_TASK_RUN_TIME	100
+	if ((NOW() - task->start_ns) < (task->run_time * 1000000))
+		pr_warn("Bug happend on timer tick sched\n");
 
 	list_del(&task->stat_list);
 	list_add_tail(&pcpu->ready_list, &task->stat_list);
-
 	task->run_time = CONFIG_TASK_RUN_TIME;
 
 	next = list_first_entry(&pcpu->ready_list, struct task, stat_list);
@@ -410,6 +422,7 @@ void irq_exit(gp_regs *regs)
 {
 	int i;
 	struct task *task = get_current_task();
+	struct task *next = task;
 	int cpuid = smp_processor_id();
 	struct pcpu *pcpu = get_per_cpu(pcpu, cpuid);
 
@@ -433,7 +446,10 @@ void irq_exit(gp_regs *regs)
 	for (i = 0; i < NR_CPUS; i++) {
 		if (os_prio_cur[i] != os_highest_rdy[i]) {
 			if (i == cpuid) {
-				set_next_task(get_next_run_task(pcpu));
+				recal_task_time_ready(task, pcpu);
+				task = get_next_run_task(pcpu);
+				if (next != task)
+					set_next_task(next);
 			} else
 				pcpu_resched(i);
 		}

@@ -4,10 +4,10 @@
 #include <minos/percpu.h>
 #include <minos/atomic.h>
 
-DECLARE_PER_CPU(atomic_t, __preempt);
+DECLARE_PER_CPU(int, __preempt);
 
-#define preempt_disable()	atomic_inc(&get_cpu_var(__preempt))
-#define preempt_enable()	atomic_dec(&get_cpu_var(__preempt))
-#define preempt_allowed()	(!atomic_read(&get_cpu_var(__preempt)))
+#define preempt_disable()	get_cpu_var(__preempt)++
+#define preempt_enable()	get_cpu_var(__preempt)--
+#define preempt_allowed()	(!get_cpu_var(__preempt))
 
 #endif

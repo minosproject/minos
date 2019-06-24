@@ -138,8 +138,11 @@ static void task_init(struct task *task, char *name,
 		task->bitx = 1ul << task->bx;
 	}
 
-	task->stat = TASK_STAT_RDY;
 	task->pend_stat = 0;
+	if (task->flags & TASK_FLAGS_VCPU)
+		task->stat = TASK_STAT_SUSPEND;
+	else
+		task->stat = TASK_STAT_RDY;
 
 	task->affinity = aff;
 	task->flags = opt;
@@ -160,8 +163,6 @@ static struct task *__create_task(char *name, task_func_t func,
 {
 	struct task *task;
 	void *stack = NULL;
-	struct pcpu *pcpu;
-	unsigned long flags;
 
 	/* now create the task and init it */
 	task = zalloc(sizeof(*task));
@@ -195,19 +196,6 @@ static struct task *__create_task(char *name, task_func_t func,
 	else if (aff == PCPU_AFF_PERCPU)
 		aff = smp_processor_id();
 
-	/*
-	 * after create the task, it can add the task to
-	 * the ready list directly
-	 */
-	if ((aff < NR_CPUS) && (prio == OS_PRIO_PCPU)) {
-		pcpu = get_per_cpu(pcpu, aff);
-		spin_lock_irqsave(&pcpu->lock, flags);
-		list_add_tail(&pcpu->task_list, &task->list);
-		list_add_tail(&pcpu->new_list, &task->stat_list);
-		pcpu->nr_pcpu_task++;
-		spin_unlock_irqrestore(&pcpu->lock, flags);
-	}
-
 	task_init(task, name, stack, arg, prio,
 			pid, aff, stk_size, opt);
 	task_vmodules_init(task);
@@ -217,7 +205,7 @@ static struct task *__create_task(char *name, task_func_t func,
 
 static void task_create_hook(struct task *task)
 {
-
+	do_hooks((void *)task, NULL, OS_HOOK_CREATE_TASK);
 }
 
 static void task_ipi_event_handler(void *data)
@@ -278,6 +266,8 @@ int create_task(char *name, task_func_t func,
 {
 	int pid = -1;
 	struct task *task;
+	unsigned long flags;
+	struct pcpu *pcpu;
 
 	if (int_nesting())
 		return -EFAULT;
@@ -299,22 +289,51 @@ int create_task(char *name, task_func_t func,
 	task_create_hook(task);
 	arch_init_task(task, (void *)func, task->udata);
 
+	aff = task->affinity;
+	pcpu = get_per_cpu(pcpu, aff);
+
+	/*
+	 * after create the task, if the task is affinity to
+	 * the current cpu, then it can add the task to
+	 * the ready list directly, this action need done after
+	 * the task has been finish all the related init things
+	 */
+	if ((aff < NR_CPUS) && (prio == OS_PRIO_PCPU)) {
+		pcpu = get_per_cpu(pcpu, aff);
+		spin_lock_irqsave(&pcpu->lock, flags);
+		list_add_tail(&pcpu->task_list, &task->list);
+		if (aff == smp_processor_id())
+			list_add_tail(&pcpu->ready_list, &task->stat_list);
+		else
+			list_add_tail(&pcpu->new_list, &task->stat_list);
+		pcpu->nr_pcpu_task++;
+		spin_unlock_irqrestore(&pcpu->lock, flags);
+	} else
+		panic("wrong cpu affinity detected\n");
+
 	/*
 	 * the vcpu task's stat is different with the normal
-	 * task
+	 * task, the vcpu task's init stat is controled by
+	 * other mechism
 	 */
 	if (!(task->flags & TASK_FLAGS_VCPU)) {
+		kernel_lock_irqsave(flags);
 		set_task_ready(task);
+		kernel_unlock_irqrestore(flags);
 
 		/*
 		 * if the task is a realtime task and the os
 		 * sched is running then resched the task
 		 * otherwise send a ipi to the task
 		 */
-		if (os_is_running() && is_realtime_task(task))
-			sched();
-		else if (aff != smp_processor_id())
-			pcpu_resched(aff);
+		if (os_is_running()) {
+			if (is_realtime_task(task))
+				sched();
+			else {
+				if (aff != smp_processor_id())
+					pcpu_resched(aff);
+			}
+		}
 	}
 
 	return pid;

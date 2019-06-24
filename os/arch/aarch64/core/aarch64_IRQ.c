@@ -21,6 +21,7 @@
 void irq_c_handler(gp_regs *regs)
 {
 	inc_int_nesting();
+	set_need_resched();
 
 	irq_enter(regs);
 
@@ -28,5 +29,6 @@ void irq_c_handler(gp_regs *regs)
 
 	irq_exit(regs);
 
+	clear_need_resched();
 	dec_int_nesting();
 }

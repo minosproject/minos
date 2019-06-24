@@ -123,7 +123,7 @@ void cpu_idle(void)
 	case 0:
 		apps_cpu0_init();
 		create_static_tasks();
-		//os_clean();
+		os_clean();
 		break;
 	case 1:
 		apps_cpu1_init();
