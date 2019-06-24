@@ -121,9 +121,9 @@ void cpu_idle(void)
 
 	switch (pcpu->pcpu_id) {
 	case 0:
-		os_clean();
 		apps_cpu0_init();
 		create_static_tasks();
+		//os_clean();
 		break;
 	case 1:
 		apps_cpu1_init();

@@ -81,16 +81,21 @@ void set_task_ready(struct task *task)
 {
 	struct pcpu *pcpu;
 
+	/*
+	 * when call this function need to ensure :
+	 * 1 - kernel sched lock is locked
+	 * 2 - the interrupt is disabled
+	 */
 	if (is_idle_task(task))
 		return;
-
-	pcpu = get_cpu_var(pcpu);
 
 	if (is_realtime_task(task)) {
 		os_rdy_grp |= task->bity;
 		os_rdy_table[task->by] |= task->bitx;
 	} else {
-		pcpu = get_per_cpu(pcpu, task->affinity);
+		pcpu = get_cpu_var(pcpu);
+		if (pcpu->pcpu_id != task->affinity)
+			panic("can not ready task by other cpu\n");
 
 		list_del(&task->stat_list);
 		list_add(&pcpu->ready_list, &task->stat_list);
@@ -104,12 +109,14 @@ void set_task_sleep(struct task *task)
 	if (is_idle_task(task))
 		return;
 
-	pcpu = get_cpu_var(pcpu);
-
 	if (is_realtime_task(task)) {
 		os_rdy_grp &= ~task->bity;
 		os_rdy_table[task->by] &= ~task->bitx;
 	} else {
+		pcpu = get_cpu_var(pcpu);
+		if (pcpu->pcpu_id != task->affinity)
+			panic("can not sleep task by other cpu\n");
+
 		list_del(&task->stat_list);
 		list_add(&pcpu->sleep_list, &task->stat_list);
 	}
@@ -303,6 +310,7 @@ unsigned long sched_tick_handler(unsigned long data)
 
 	list_del(&task->stat_list);
 	list_add_tail(&pcpu->ready_list, &task->stat_list);
+
 	task->run_time = CONFIG_TASK_RUN_TIME;
 
 	next = list_first_entry(&pcpu->ready_list, struct task, stat_list);
@@ -324,6 +332,7 @@ static inline void recal_task_time_ready(struct task *task, struct pcpu *pcpu)
 	now = (NOW() - task->start_ns) / 1000000;
 	if (now < 15) {
 		task->run_time = 85 + now;
+
 		list_del(&task->stat_list);
 		list_add_tail(&pcpu->ready_list, &task->stat_list);
 	}
@@ -468,6 +477,22 @@ int resched_handler(uint32_t irq, void *data)
 	int sched = 0, cpuid;
 	struct task *task, *n;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
+
+	/*
+	 * check whether there new task need to add to
+	 * this pcpu
+	 */
+	spin_lock(&pcpu->lock);
+	list_for_each_entry_safe(task, n, &pcpu->new_list, stat_list) {
+		list_del(&task->stat_list);
+		if (task->stat == TASK_STAT_RDY)
+			list_add_tail(&pcpu->ready_list, &task->stat_list);
+		else if (task->stat == TASK_STAT_SUSPEND)
+			list_add_tail(&pcpu->sleep_list, &task->stat_list);
+		else
+			pr_err("wrong task state when create this task\n");
+	}
+	spin_unlock(&pcpu->lock);
 
 	/*
 	 * scan all the sleep list to see which percpu task

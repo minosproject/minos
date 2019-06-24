@@ -51,6 +51,8 @@ int alloc_pid(prio_t prio, int cpuid)
 				OS_REALTIME_TASK);
 		if (pid >= OS_NR_TASKS)
 			pid = -1;
+		else
+			set_bit(pid, pid_map);
 	} else {
 		if (!test_and_set_bit(prio, pid_map)) {
 			pid = prio;
@@ -146,12 +148,9 @@ static void task_init(struct task *task, char *name,
 	if (task->prio == OS_PRIO_IDLE)
 		task->flags |= TASK_FLAGS_IDLE;
 
-	if (task->affinity == PCPU_AFF_NONE)
-		aff = 0;
-
 	task->delay_timer.function = task_timeout_handler;
 	task->delay_timer.data = (unsigned long)task;
-	init_timer_on_cpu(&task->delay_timer, 0);
+	init_timer_on_cpu(&task->delay_timer, aff);
 	strncpy(task->name, name, MIN(strlen(name), TASK_NAME_SIZE));
 }
 
@@ -162,6 +161,7 @@ static struct task *__create_task(char *name, task_func_t func,
 	struct task *task;
 	void *stack = NULL;
 	struct pcpu *pcpu;
+	unsigned long flags;
 
 	/* now create the task and init it */
 	task = zalloc(sizeof(*task));
@@ -190,11 +190,22 @@ static struct task *__create_task(char *name, task_func_t func,
 	os_task_table[pid] = task;
 	atomic_inc(&os_task_nr);
 
-	if ((task->affinity < NR_CPUS) && (prio == OS_PRIO_PCPU)) {
-		pcpu = get_per_cpu(pcpu, task->affinity);
-		spin_lock(&pcpu->lock);
+	if (aff == PCPU_AFF_NONE)
+		aff = 0;
+	else if (aff == PCPU_AFF_PERCPU)
+		aff = smp_processor_id();
+
+	/*
+	 * after create the task, it can add the task to
+	 * the ready list directly
+	 */
+	if ((aff < NR_CPUS) && (prio == OS_PRIO_PCPU)) {
+		pcpu = get_per_cpu(pcpu, aff);
+		spin_lock_irqsave(&pcpu->lock, flags);
 		list_add_tail(&pcpu->task_list, &task->list);
-		spin_unlock(&pcpu->lock);
+		list_add_tail(&pcpu->new_list, &task->stat_list);
+		pcpu->nr_pcpu_task++;
+		spin_unlock_irqrestore(&pcpu->lock, flags);
 	}
 
 	task_init(task, name, stack, arg, prio,
@@ -272,7 +283,7 @@ int create_task(char *name, task_func_t func,
 		return -EFAULT;
 
 	if ((aff >= NR_CPUS) && (aff != PCPU_AFF_NONE))
-		return
+		return -EINVAL;
 
 	pid = alloc_pid(prio, aff);
 	if (pid < 0)
@@ -295,8 +306,15 @@ int create_task(char *name, task_func_t func,
 	if (!(task->flags & TASK_FLAGS_VCPU)) {
 		set_task_ready(task);
 
-		if (os_is_running())
+		/*
+		 * if the task is a realtime task and the os
+		 * sched is running then resched the task
+		 * otherwise send a ipi to the task
+		 */
+		if (os_is_running() && is_realtime_task(task))
 			sched();
+		else if (aff != smp_processor_id())
+			pcpu_resched(aff);
 	}
 
 	return pid;
@@ -309,6 +327,7 @@ int create_idle_task(void)
 	int aff = smp_processor_id();
 	extern unsigned char __el2_stack_end;
 	void *el2_stack_base = (void *)&__el2_stack_end;
+	struct pcpu *pcpu = get_per_cpu(pcpu, aff);
 
 	pid = alloc_pid(OS_PRIO_IDLE, aff);
 
@@ -321,6 +340,8 @@ int create_idle_task(void)
 	task->stack_origin = el2_stack_base -
 		(aff << CONFIG_IDLE_TASK_STACK_SHIFT);
 	task->stat = TASK_STAT_RUNNING;
+
+	pcpu->idle_task = task;
 
 	/* call the hooks for the idle task */
 	task_create_hook(task);

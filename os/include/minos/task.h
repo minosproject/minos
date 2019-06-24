@@ -121,7 +121,7 @@ struct task {
 } __align_cache_line;
 
 struct task_desc {
-	char name[TASK_NAME_SIZE + 1];
+	char *name;
 	task_func_t func;
 	void *arg;
 	prio_t prio;
@@ -142,10 +142,10 @@ struct task_event {
 	flag_t flags;
 };
 
-#define DEFINE_TASK(tn, f, a, p, af, ss, fl) \
+#define DEFINE_TASK(nn, f, a, p, af, ss, fl) \
 	static const struct task_desc __used \
-	task_desc_##tn __section(.__task_desc) = { \
-		.name = #tn,		\
+	task_desc_##f __section(.__task_desc) = { \
+		.name = nn,		\
 		.func = f,		\
 		.arg = a,		\
 		.prio = p,		\
@@ -154,10 +154,10 @@ struct task_event {
 		.flags = fl		\
 	}
 
-#define DEFINE_TASK_PERCPU(tn, f, a, ss, fl) \
+#define DEFINE_TASK_PERCPU(nn, f, a, ss, fl) \
 	static const struct task_desc __used \
-	task_desc_##tn __section(.__task_desc) = { \
-		.name = #tn,		\
+	task_desc_##f __section(.__task_desc) = { \
+		.name = nn,		\
 		.func = f,		\
 		.arg = a,		\
 		.prio = OS_PRIO_PCPU,	\
@@ -166,10 +166,10 @@ struct task_event {
 		.flags = fl		\
 	}
 
-#define DEFINE_REALTIME(tn, f, a, p, ss, fl) \
+#define DEFINE_REALTIME(nn, f, a, p, ss, fl) \
 	static const struct task_desc __used \
-	task_desc_##tn __section(.__task_desc) = { \
-		.name = #tn,		\
+	task_desc_##f __section(.__task_desc) = { \
+		.name = nn,		\
 		.func = f,		\
 		.arg = a,		\
 		.prio = p,		\

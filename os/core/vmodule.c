@@ -101,6 +101,9 @@ int task_vmodules_init(struct task *task)
 	 * context's context data
 	 */
 	size = vmodule_class_nr * sizeof(void *);
+	if (size == 0)
+		return 0;
+
 	task->context = malloc(size);
 	if (!task->context)
 		panic("No more memory for task vmodule cotnext\n");

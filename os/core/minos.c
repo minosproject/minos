@@ -37,6 +37,7 @@ extern void bootmem_init(void);
 extern int allsymbols_init(void);
 extern void platform_init(void);
 extern int create_idle_task(void);
+extern int vmodules_init(void);
 
 #ifdef CONFIG_VIRT
 extern int virt_init(void);
@@ -130,6 +131,8 @@ void boot_main(void *setup_data)
 
 	sched_init();
 	local_sched_init();
+
+	vmodules_init();
 
 #ifdef CONFIG_VIRT
 	virt_init();

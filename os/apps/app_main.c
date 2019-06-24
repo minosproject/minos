@@ -20,8 +20,7 @@
 
 void apps_cpu0_init(void)
 {
-	/* init the system start */
-	/* init the system end */
+
 }
 
 void apps_cpu1_init(void)
@@ -64,4 +63,4 @@ void test_task(void *data)
 	pr_info("test task\n");
 	mdelay(100);
 }
-DEFINE_TASK(test, test_task, NULL, 20, 0, 4096, 0);
+DEFINE_TASK_PERCPU("test task", test_task, NULL,  4096, 0);

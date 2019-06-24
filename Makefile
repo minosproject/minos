@@ -7,7 +7,7 @@ CROSS_COMPILE ?= aarch64-linux-gnu-
 
 hypervisor:
 	@ echo "build hypervisor"
-	@ cd hypervisor && make ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) all
+	@ cd os && make ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) all
 
 mvm:
 	@ echo "build minos userspace tools"
@@ -15,16 +15,16 @@ mvm:
 
 clean:
 	@ echo "clean all things"
-	@ cd hypervisor && make clean
+	@ cd os && make clean
 	@ cd mvm && make ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) clean
 
 distclean:
 	@ echo "clean all things"
-	@ cd hypervisor && make distclean
+	@ cd os && make distclean
 	@ cd mvm && make ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) clean
 
 %defconfig:
-	@ cd hypervisor && make ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) $@
+	@ cd os && make ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) $@
 
 dtbs:
-	@ cd hypervisor && make ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) $@
+	@ cd os && make ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE) $@

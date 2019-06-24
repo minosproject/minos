@@ -182,7 +182,7 @@ int mbox_post_opt(mbox_t *m, void *pmsg, int opt)
 {
 	int ret = 0;
 	unsigned long flags;
-	int nr_tasks;
+	int nr_tasks = 0;
 
 	if (invalid_mbox(m) || !pmsg)
 		return -EINVAL;

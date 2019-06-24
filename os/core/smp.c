@@ -164,7 +164,9 @@ void smp_init(void)
 
 	smp_affinity_id = (uint64_t *)&__smp_affinity_id;
 	memset(smp_affinity_id, 0, sizeof(uint64_t) * NR_CPUS);
+
 	cpumask_clearall(&cpu_online);
+	cpumask_set_cpu(0, &cpu_online);
 
 	for (i = 0; i < NR_CPUS; i++) {
 		cd = &get_per_cpu(smp_call_data, i);

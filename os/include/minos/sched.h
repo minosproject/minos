@@ -28,14 +28,23 @@ struct pcpu {
 	uint32_t pcpu_id;
 	volatile int state;
 
-	spinlock_t lock;
 	uint32_t nr_pcpu_task;
 
 	/*
-	 * link to the task for the pcpu and the
-	 * task which is ready and whichi is sleep
+	 * the below two list member can be accessed
+	 * by all cpus in the system, when access this
+	 * it need to using lock to avoid race condition
 	 */
 	struct list_head task_list;
+	struct list_head new_list;
+	spinlock_t lock;
+
+	/*
+	 * link to the task for the pcpu and the
+	 * task which is ready and which is sleep, these
+	 * two list can only be accessed by the cpu
+	 * which the task is affinitied.
+	 */
 	struct list_head ready_list;
 	struct list_head sleep_list;
 
