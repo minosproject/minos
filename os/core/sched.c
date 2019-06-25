@@ -176,12 +176,14 @@ static void sched_new(struct pcpu *pcpu)
 	 * table, if there is no any realtime task ready
 	 * just exist
 	 */
-	if (__rdy_table == 0)
-		goto out;
+	if (__rdy_table == 0) {
+		memset(os_highest_rdy, OS_PRIO_PCPU, sizeof(os_highest_rdy));
+		return;
+	}
 
 	rdy_grp = os_rdy_grp;
 	rdy_table = (uint8_t *)&__rdy_table;
-	memset(ncpu_highest, OS_PRIO_PCPU, sizeof(ncpu_highest));
+	memset(ncpu_highest, OS_PRIO_IDLE + 1, sizeof(ncpu_highest));
 
 	for (i = 0; i < NR_CPUS; i++) {
 		y = os_prio_map_table[rdy_grp];
@@ -201,21 +203,20 @@ static void sched_new(struct pcpu *pcpu)
 		if (sched_array_contain(os_prio_cur[i], ncpu_highest))
 			os_highest_rdy[i] = os_prio_cur[i];
 		else {
-			for (j = 0; j < NR_CPUS; j++) {
-				if (sched_array_contain(ncpu_highest[j], os_prio_cur))
+			for (j = i; j < NR_CPUS; j++) {
+				if (sched_array_contain(ncpu_highest[j],
+							os_prio_cur))
 					continue;
 
-				os_highest_rdy[i] = os_prio_cur[j];
+				os_highest_rdy[i] = ncpu_highest[j];
+				break;
 			}
 		}
 	}
 
-out:
-	if (os_highest_rdy[pcpu->pcpu_id] > OS_LOWEST_PRIO) {
-		if (is_list_empty(&pcpu->ready_list))
-			os_highest_rdy[pcpu->pcpu_id] = OS_PRIO_IDLE;
-		else
-			os_highest_rdy[pcpu->pcpu_id] = OS_PRIO_PCPU;
+	for (i = 0; i < NR_CPUS; i++) {
+		if (os_highest_rdy[i] > OS_PRIO_PCPU)
+			os_highest_rdy[i] = OS_PRIO_PCPU;
 	}
 
 	dsb();
@@ -290,7 +291,7 @@ void switch_to_task(struct task *cur, struct task *next)
 	 * need to enable the sched timer for fifo task sched
 	 * otherwise disable it.
 	 */
-	if (!is_realtime_task(next)) {
+	if (is_percpu_task(next)) {
 		sched_tick_enable(MILLISECS(next->run_time));
 		next->start_ns = NOW();
 	} else
@@ -377,20 +378,20 @@ void sched(void)
 	 * sched_new to get the next run task
 	 */
 	pcpu = get_per_cpu(pcpu, cpuid);
-	if (!is_task_ready(cur))
+	if (!is_task_ready(cur)) {
+		sched_flag = 1;
 		set_task_sleep(cur);
+	}
 
 	sched_new(pcpu);
 
 	/* check whether current pcpu need to resched */
 	for (i = 0; i < NR_CPUS; i++) {
 		if ((os_prio_cur[i] != os_highest_rdy[i])) {
-			if (i == cpuid) {
+			if (i == cpuid)
 				sched_flag = 1;
-			} else {
-				if (os_highest_rdy[i] <= OS_LOWEST_PRIO)
-					pcpu_resched(i);
-			}
+			else
+				pcpu_resched(i);
 		}
 	}
 
@@ -399,7 +400,7 @@ void sched(void)
 	 * out not because its run time is expries, then will
 	 * set it to the correct stat
 	 */
-	if (sched_flag) {
+	if (sched_flag || is_idle_task(cur)) {
 		if (is_task_ready(cur))
 			recal_task_time_ready(cur, pcpu);
 
@@ -408,7 +409,7 @@ void sched(void)
 
 	kernel_unlock_irqrestore(flags);
 
-	if (sched_flag && (cur != next)) {
+	if (cur != next) {
 		local_irq_save(flags);
 		switch_to_task(cur, next);
 		set_next_task(next);
@@ -426,7 +427,7 @@ void irq_enter(gp_regs *regs)
 
 void irq_exit(gp_regs *regs)
 {
-	int i;
+	int i, sched_flag;
 	struct task *task = get_current_task();
 	struct task *next = task;
 	int cpuid = smp_processor_id();
@@ -451,16 +452,23 @@ void irq_exit(gp_regs *regs)
 	sched_new(pcpu);
 	for (i = 0; i < NR_CPUS; i++) {
 		if (os_prio_cur[i] != os_highest_rdy[i]) {
-			if (i == cpuid) {
-				recal_task_time_ready(task, pcpu);
-				task = get_next_run_task(pcpu);
-				if (next != task)
-					set_next_task(next);
-			} else {
-				if (os_highest_rdy[i] <= OS_LOWEST_PRIO)
-					pcpu_resched(i);
-			}
+			if (i == cpuid)
+				sched_flag = 1;
+			else
+				pcpu_resched(i);
 		}
+	}
+
+	/*
+	 * if need sched or the current task is idle, then
+	 * try to get the next task to check whether need
+	 * to sched to anther task
+	 */
+	if (sched_flag || is_idle_task(task)) {
+		recal_task_time_ready(task, pcpu);
+		next = get_next_run_task(pcpu);
+		if (next != task)
+			set_next_task(next);
 	}
 
 	kernel_unlock();
@@ -550,7 +558,8 @@ int resched_handler(uint32_t irq, void *data)
 
 	/* prio changed need to select a new task to sched */
 	if ((os_prio_cur[cpuid] != os_highest_rdy[cpuid]) || sched) {
-		recal_task_time_ready(task, pcpu);
+		if (is_task_ready(task))
+			recal_task_time_ready(task, pcpu);
 		n = get_next_run_task(pcpu);
 	}
 

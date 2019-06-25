@@ -20,8 +20,10 @@
 
 static void rt_task(void *data)
 {
-	pr_info("rt_task test on cpu-%d", smp_processor_id());
-	msleep(100);
+	while (1) {
+		pr_info("rt_task test on cpu-%d\n", smp_processor_id());
+		msleep(100);
+	}
 }
 
 void apps_cpu0_init(void)

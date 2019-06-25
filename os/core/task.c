@@ -87,7 +87,6 @@ struct task *pid_to_task(int pid)
 
 static void task_timeout_handler(unsigned long data)
 {
-	unsigned long flags;
 	struct task *task = (struct task *)data;
 
 	/*
@@ -96,7 +95,7 @@ static void task_timeout_handler(unsigned long data)
 	 * the delay time is arrvie, then it will called
 	 * this function
 	 */
-	spin_lock_irqsave(&task->lock, flags);
+	task_lock(task);
 
 	if (task->delay) {
 		/* task is timeout and check its stat */
@@ -108,11 +107,11 @@ static void task_timeout_handler(unsigned long data)
 		} else
 			task->pend_stat = TASK_STAT_PEND_OK;
 
-		if (!is_task_suspend(task))
+		if (!is_task_ready(task))
 			set_task_ready(task);
 	}
 
-	spin_unlock_irqrestore(&task->lock, flags);
+	task_unlock(task);
 }
 
 static void task_init(struct task *task, char *name,
@@ -149,9 +148,9 @@ static void task_init(struct task *task, char *name,
 	if (task->prio == OS_PRIO_IDLE)
 		task->flags |= TASK_FLAGS_IDLE;
 
+	init_timer_on_cpu(&task->delay_timer, aff);
 	task->delay_timer.function = task_timeout_handler;
 	task->delay_timer.data = (unsigned long)task;
-	init_timer_on_cpu(&task->delay_timer, aff);
 	strncpy(task->name, name, MIN(strlen(name), TASK_NAME_SIZE));
 }
 
