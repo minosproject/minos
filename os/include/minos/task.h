@@ -101,7 +101,7 @@ struct task {
 	uint16_t affinity;
 	uint16_t cpu;
 
-	uint32_t run_time;
+	unsigned long run_time;
 	unsigned long start_ns;
 
 	spinlock_t lock;
@@ -223,6 +223,15 @@ static inline int is_task_ready(struct task *task)
 int alloc_pid(prio_t prio, int cpuid);
 void release_pid(int pid);
 int task_ipi_event(struct task *task, struct task_event *ev, int wait);
+
+int create_percpu_task(char *name, task_func_t func, void *arg,
+		size_t stk_size, unsigned long flags);
+
+int create_realtime_task(char *name, task_func_t func, void *arg,
+		prio_t prio, size_t stk_size, unsigned long flags);
+
+int create_vcpu_task(char *name, task_func_t func, void *arg,
+		int aff, size_t stk_size, unsigned long flags);
 
 int create_task(char *name, task_func_t func,
 		void *arg, prio_t prio, uint16_t aff,

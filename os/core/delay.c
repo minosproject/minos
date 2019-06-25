@@ -17,6 +17,8 @@
 #include <minos/types.h>
 #include <minos/arch.h>
 #include <minos/time.h>
+#include <minos/task.h>
+#include <minos/sched.h>
 
 void udelay(uint32_t us)
 {
@@ -38,4 +40,9 @@ void mdelay(uint32_t ms)
 
 	dsbsy();
 	isb();
+}
+
+void msleep(uint32_t ms)
+{
+	set_task_suspend(ms);
 }

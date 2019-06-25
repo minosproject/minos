@@ -122,19 +122,16 @@ void set_task_sleep(struct task *task)
 	}
 }
 
-void set_task_suspend(struct task *task, uint32_t delay)
+void set_task_suspend(uint32_t delay)
 {
-	struct task *cur = get_current_task();
+	struct task *task = get_current_task();
 
 	task_lock(task);
 	task->delay = delay;
 	task->stat |= TASK_STAT_SUSPEND;
 	task_unlock(task);
 
-	if (task == cur)
-		sched();
-	else
-		pcpu_resched(task->cpu);
+	sched();
 }
 
 struct task *get_highest_task(uint8_t group, prio_t *ready)
@@ -159,7 +156,7 @@ static int inline sched_array_contain(prio_t prio, prio_t *array)
 	return 0;
 }
 
-void sched_new(void)
+static void sched_new(struct pcpu *pcpu)
 {
 	/*
 	 * this function need always called with
@@ -180,11 +177,11 @@ void sched_new(void)
 	 * just exist
 	 */
 	if (__rdy_table == 0)
-		return;
+		goto out;
 
 	rdy_grp = os_rdy_grp;
 	rdy_table = (uint8_t *)&__rdy_table;
-	memset(ncpu_highest, OS_PRIO_IDLE, sizeof(ncpu_highest));
+	memset(ncpu_highest, OS_PRIO_PCPU, sizeof(ncpu_highest));
 
 	for (i = 0; i < NR_CPUS; i++) {
 		y = os_prio_map_table[rdy_grp];
@@ -213,9 +210,12 @@ void sched_new(void)
 		}
 	}
 
-	for (i = 0; i < NR_CPUS; i++) {
-		if (os_highest_rdy[i] == OS_PRIO_IDLE)
-			os_highest_rdy[i] = OS_PRIO_PCPU;
+out:
+	if (os_highest_rdy[pcpu->pcpu_id] > OS_LOWEST_PRIO) {
+		if (is_list_empty(&pcpu->ready_list))
+			os_highest_rdy[pcpu->pcpu_id] = OS_PRIO_IDLE;
+		else
+			os_highest_rdy[pcpu->pcpu_id] = OS_PRIO_PCPU;
 	}
 
 	dsb();
@@ -246,12 +246,6 @@ static struct task *get_next_run_task(struct pcpu *pcpu)
 		return list_first_entry(&pcpu->ready_list,
 				struct task, stat_list);
 
-	/*
-	 * if next run task is idle task, change the highest
-	 * to the IDLE prio
-	 */
-	os_highest_rdy[pcpu->pcpu_id] = OS_PRIO_IDLE;
-
 	return pcpu->idle_task;
 }
 
@@ -272,6 +266,8 @@ void switch_to_task(struct task *cur, struct task *next)
 
 	// need to acquire the kernel lock ?
 	// kernel_lock_irqsave(flags);
+	if (cur == next)
+		return;
 
 	save_task_context(cur);
 	restore_task_context(next);
@@ -325,9 +321,16 @@ unsigned long sched_tick_handler(unsigned long data)
 	list_add_tail(&pcpu->ready_list, &task->stat_list);
 	task->run_time = CONFIG_TASK_RUN_TIME;
 
+	/*
+	 * select the next running task from the pcpu list
+	 * if there is one task, need to reenalbe the sched
+	 * timer
+	 */
 	next = list_first_entry(&pcpu->ready_list, struct task, stat_list);
 	if (task != next)
 		set_next_task(next);
+	else
+		sched_tick_enable(MILLISECS(next->run_time));
 
 	clear_need_resched();
 
@@ -338,7 +341,7 @@ static inline void recal_task_time_ready(struct task *task, struct pcpu *pcpu)
 {
 	unsigned long now;
 
-	if (is_realtime_task(task))
+	if (!is_percpu_task(task))
 		return;
 
 	now = (NOW() - task->start_ns) / 1000000;
@@ -377,15 +380,17 @@ void sched(void)
 	if (!is_task_ready(cur))
 		set_task_sleep(cur);
 
-	sched_new();
+	sched_new(pcpu);
 
 	/* check whether current pcpu need to resched */
 	for (i = 0; i < NR_CPUS; i++) {
-		if (os_prio_cur[i] != os_highest_rdy[i]) {
+		if ((os_prio_cur[i] != os_highest_rdy[i])) {
 			if (i == cpuid) {
 				sched_flag = 1;
-			} else
-				pcpu_resched(i);
+			} else {
+				if (os_highest_rdy[i] <= OS_LOWEST_PRIO)
+					pcpu_resched(i);
+			}
 		}
 	}
 
@@ -406,6 +411,7 @@ void sched(void)
 	if (sched_flag && (cur != next)) {
 		local_irq_save(flags);
 		switch_to_task(cur, next);
+		set_next_task(next);
 		dsb();
 		arch_switch_task_sw();
 		local_irq_restore(flags);
@@ -442,7 +448,7 @@ void irq_exit(gp_regs *regs)
 	 */
 	kernel_lock();
 
-	sched_new();
+	sched_new(pcpu);
 	for (i = 0; i < NR_CPUS; i++) {
 		if (os_prio_cur[i] != os_highest_rdy[i]) {
 			if (i == cpuid) {
@@ -450,8 +456,10 @@ void irq_exit(gp_regs *regs)
 				task = get_next_run_task(pcpu);
 				if (next != task)
 					set_next_task(next);
-			} else
-				pcpu_resched(i);
+			} else {
+				if (os_highest_rdy[i] <= OS_LOWEST_PRIO)
+					pcpu_resched(i);
+			}
 		}
 	}
 
@@ -475,6 +483,7 @@ void pcpus_init(void)
 		init_list(&pcpu->task_list);
 		init_list(&pcpu->ready_list);
 		init_list(&pcpu->sleep_list);
+		init_list(&pcpu->new_list);
 		pcpu->pcpu_id = i;
 		get_per_cpu(pcpu, i) = pcpu;
 		spin_lock_init(&pcpu->lock);
@@ -547,6 +556,8 @@ int resched_handler(uint32_t irq, void *data)
 
 	if (n != task)
 		set_next_task(n);
+	else
+		os_prio_cur[cpuid] = os_highest_rdy[cpuid];
 
 	clear_need_resched();
 	kernel_unlock();

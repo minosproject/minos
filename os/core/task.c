@@ -119,9 +119,6 @@ static void task_init(struct task *task, char *name,
 		void *stack, void *arg, prio_t prio,
 		int pid, int aff,size_t stk_size, unsigned long opt)
 {
-	if (!task || !stack)
-		return;
-
 	task->stack_base = task->stack_origin = stack;
 	task->stack_size = stk_size;
 	task->udata = arg;
@@ -147,6 +144,7 @@ static void task_init(struct task *task, char *name,
 	task->affinity = aff;
 	task->flags = opt;
 	task->del_req = 0;
+	task->run_time = CONFIG_TASK_RUN_TIME;
 
 	if (task->prio == OS_PRIO_IDLE)
 		task->flags |= TASK_FLAGS_IDLE;
@@ -308,8 +306,7 @@ int create_task(char *name, task_func_t func,
 			list_add_tail(&pcpu->new_list, &task->stat_list);
 		pcpu->nr_pcpu_task++;
 		spin_unlock_irqrestore(&pcpu->lock, flags);
-	} else
-		panic("wrong cpu affinity detected\n");
+	}
 
 	/*
 	 * the vcpu task's stat is different with the normal
@@ -317,9 +314,15 @@ int create_task(char *name, task_func_t func,
 	 * other mechism
 	 */
 	if (!(task->flags & TASK_FLAGS_VCPU)) {
-		kernel_lock_irqsave(flags);
-		set_task_ready(task);
-		kernel_unlock_irqrestore(flags);
+		/*
+		 * percpu task has already added the the
+		 * ready list
+		 */
+		if (is_realtime_task(task)) {
+			kernel_lock_irqsave(flags);
+			set_task_ready(task);
+			kernel_unlock_irqrestore(flags);
+		}
 
 		/*
 		 * if the task is a realtime task and the os
@@ -372,4 +375,32 @@ int create_idle_task(void)
 	set_next_prio(OS_PRIO_IDLE);
 
 	return 0;
+}
+
+int create_percpu_task(char *name, task_func_t func, void *arg,
+		size_t stk_size, unsigned long flags)
+{
+	int cpu, ret = 0;
+
+	for_each_online_cpu(cpu) {
+		ret = create_task(name, func, arg, OS_PRIO_PCPU,
+				cpu, stk_size, flags);
+		if (ret < 0)
+			pr_err("create [%s] fail on cpu%d\n", name, cpu);
+	}
+
+	return 0;
+}
+
+int create_realtime_task(char *name, task_func_t func, void *arg,
+		prio_t prio, size_t stk_size, unsigned long flags)
+{
+	return create_task(name, func, arg, prio, 0, stk_size, flags);
+}
+
+int create_vcpu_task(char *name, task_func_t func, void *arg,
+		int aff, size_t stk_size, unsigned long flags)
+{
+	return create_task(name, func, arg, OS_PRIO_PCPU,
+			aff, stk_size, flags & TASK_FLAGS_VCPU);
 }

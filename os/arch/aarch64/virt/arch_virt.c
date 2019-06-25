@@ -82,24 +82,6 @@ void arch_init_vcpu(struct vcpu *vcpu, void *entry, void *arg)
 				AARCH64_SPSR_A | (1 << 4);
 }
 
-static int aarch64_init_percpu(void)
-{
-	uint64_t reg;
-
-	/*
-	 * set IMO and FMO let physic irq and fiq taken to
-	 * EL2, without this irq and fiq will not send to
-	 * the cpu
-	 */
-	reg = read_sysreg64(HCR_EL2);
-	reg |= HCR_EL2_IMO | HCR_EL2_FMO;
-	write_sysreg64(reg, HCR_EL2);
-	dsb();
-
-	return 0;
-}
-arch_initcall_percpu(aarch64_init_percpu);
-
 static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
 {
 	struct aarch64_system_context *context =

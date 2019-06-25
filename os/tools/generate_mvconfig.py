@@ -24,6 +24,7 @@ default_config = {
     'CONFIG_MINOS_START_ADDRESS': ['0x0', 1],
     'CONFIG_BOOTMEM_SIZE': ['64K', 1],
     'CONFIG_MAX_MAILBOX_NR': ['10', 1],
+    'CONFIG_TASK_RUN_TIME' : ['100', 1],
 }
 
 

@@ -154,9 +154,26 @@ void arch_init_task(struct task *task, void *entry, void *arg)
 
 	regs->x0 = (uint64_t)arg;
 	regs->elr_elx = (uint64_t)entry;
-	regs->spsr_elx = AARCH64_SPSR_EL2h | AARCH64_SPSR_F | \
-				 AARCH64_SPSR_I | AARCH64_SPSR_A;
+	regs->spsr_elx = AARCH64_SPSR_EL2h;
 }
+
+static int aarch64_init_percpu(void)
+{
+	uint64_t reg;
+
+	/*
+	 * set IMO and FMO let physic irq and fiq taken to
+	 * EL2, without this irq and fiq will not send to
+	 * the cpu
+	 */
+	reg = read_sysreg64(HCR_EL2);
+	reg |= HCR_EL2_IMO | HCR_EL2_FMO;
+	write_sysreg64(reg, HCR_EL2);
+	dsb();
+
+	return 0;
+}
+arch_initcall_percpu(aarch64_init_percpu);
 
 int arch_early_init(void *setup_data)
 {
