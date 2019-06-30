@@ -81,6 +81,7 @@ int level_print(int level, char *fmt, ...)
 	int printed, i;
 	char buf[512];
 	char *buffer = buf;
+	unsigned long flags;
 
 	if (level > print_level)
 		return 0;
@@ -111,10 +112,10 @@ int level_print(int level, char *fmt, ...)
 	printed += vsprintf(buffer, fmt, arg);
 	va_end(arg);
 
-	spin_lock(&print_lock);
+	spin_lock_irqsave(&print_lock, flags);
 	for(i = 0; i < printed; i++)
 		serial_putc(buf[i]);
-	spin_unlock(&print_lock);
+	spin_unlock_irqrestore(&print_lock, flags);
 
 	return printed;
 }

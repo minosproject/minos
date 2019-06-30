@@ -111,6 +111,7 @@ static void task_timeout_handler(unsigned long data)
 			set_task_ready(task);
 	}
 
+	pcpu_need_resched();
 	task_unlock(task);
 }
 
@@ -181,6 +182,9 @@ static struct task *__create_task(char *name, task_func_t func,
 			pr_err("no more memory for task stack\n");
 			free(task);
 			return NULL;
+		} else {
+			pr_info("stack 0x%x for task-%d\n",
+					(unsigned long)stack, pid);
 		}
 	}
 
@@ -246,7 +250,10 @@ static void task_ipi_event_handler(void *data)
 		break;
 	}
 
-	/* set resched flag according to the current prio */
+	/* set resched flag according to the current prio
+	 * BUG - Do not free memory in interrupt, need to
+	 * fix it
+	 */
 	free(ev);
 	pcpu_need_resched();
 }
@@ -351,6 +358,8 @@ int create_idle_task(void)
 	struct pcpu *pcpu = get_per_cpu(pcpu, aff);
 
 	pid = alloc_pid(OS_PRIO_IDLE, aff);
+	if (pid < -1)
+		panic("can not create task, PID error\n");
 
 	task = __create_task("idle", NULL, NULL,
 			OS_PRIO_IDLE, pid, aff, 0, 0);
@@ -361,6 +370,7 @@ int create_idle_task(void)
 	task->stack_origin = el2_stack_base -
 		(aff << CONFIG_IDLE_TASK_STACK_SHIFT);
 	task->stat = TASK_STAT_RUNNING;
+	task->flags |= TASK_FLAGS_IDLE;
 
 	pcpu->idle_task = task;
 
@@ -370,8 +380,8 @@ int create_idle_task(void)
 	set_current_task(task);
 	set_next_task(task);
 
-	set_current_prio(OS_PRIO_IDLE);
-	set_next_prio(OS_PRIO_IDLE);
+	set_current_prio(OS_PRIO_PCPU);
+	set_next_prio(OS_PRIO_PCPU);
 
 	return 0;
 }

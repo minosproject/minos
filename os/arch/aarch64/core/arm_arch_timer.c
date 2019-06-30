@@ -65,7 +65,6 @@ void arch_enable_timer(unsigned long expires)
 
 	deadline = ns_to_ticks(expires);
 	write_sysreg64(deadline, CNTP_CVAL_EL0);
-	isb();
 	write_sysreg32(1 << 0, CNTP_CTL_EL0);
 	isb();
 }

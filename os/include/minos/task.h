@@ -255,7 +255,7 @@ int create_task(char *name, task_func_t func,
 			kernel_lock_irqsave(flags);		\
 	} while (0)
 
-#define task_unlock_irqrestore(task)					\
+#define task_unlock_irqrestore(task, flags)					\
 	do {								\
 		if (is_realtime_task(task)) 				\
 			kernel_unlock_irqrestore(flags);		\

@@ -66,17 +66,6 @@ void pcpu_resched(int pcpu_id)
 	send_sgi(CONFIG_MINOS_RESCHED_IRQ, pcpu_id);
 }
 
-void pcpu_need_resched(void)
-{
-	/*
-	 * if the current prio PCPU, now the current task
-	 * is going to sleep or another task which has been
-	 * waked up by a signal, then need to resched TBD
-	 */
-	if (os_prio_cur[smp_processor_id()] == OS_PRIO_PCPU)
-		set_need_resched();
-}
-
 void set_task_ready(struct task *task)
 {
 	struct pcpu *pcpu;
@@ -92,6 +81,7 @@ void set_task_ready(struct task *task)
 	if (is_realtime_task(task)) {
 		os_rdy_grp |= task->bity;
 		os_rdy_table[task->by] |= task->bitx;
+		isb();
 	} else {
 		pcpu = get_cpu_var(pcpu);
 		if (pcpu->pcpu_id != task->affinity)
@@ -110,8 +100,10 @@ void set_task_sleep(struct task *task)
 		return;
 
 	if (is_realtime_task(task)) {
-		os_rdy_grp &= ~task->bity;
 		os_rdy_table[task->by] &= ~task->bitx;
+		if (os_rdy_table[task->by] == 0)
+			os_rdy_grp &= ~task->bity;
+		isb();
 	} else {
 		pcpu = get_cpu_var(pcpu);
 		if (pcpu->pcpu_id != task->affinity)
@@ -124,12 +116,13 @@ void set_task_sleep(struct task *task)
 
 void set_task_suspend(uint32_t delay)
 {
+	unsigned long flags;
 	struct task *task = get_current_task();
 
-	task_lock(task);
+	task_lock_irqsave(task, flags);
 	task->delay = delay;
 	task->stat |= TASK_STAT_SUSPEND;
-	task_unlock(task);
+	task_unlock_irqrestore(task, flags);
 
 	sched();
 }
@@ -144,13 +137,29 @@ struct task *get_highest_task(uint8_t group, prio_t *ready)
 	return os_task_table[(y << 3) + x];
 }
 
-static int inline sched_array_contain(prio_t prio, prio_t *array)
+static int has_high_prio(prio_t prio, prio_t *array, int *map)
 {
 	int i;
 
 	for (i = 0; i < NR_CPUS; i++) {
-		if (prio == array[i])
+		if (map[i] == 1)
+			continue;
+
+		if (prio == array[i]) {
 			return 1;
+		}
+	}
+
+	return 0;
+}
+
+static int has_current_prio(prio_t prio, prio_t *array, int *map)
+{
+	int i;
+
+	for (i = 0; i < NR_CPUS; i++) {
+		if ((prio == array[i]) && (map[i] == 0))
+			return (i + 1);
 	}
 
 	return 0;
@@ -165,9 +174,11 @@ static void sched_new(struct pcpu *pcpu)
 	uint8_t x, y, p;
 
 #ifndef CONFIG_OS_REALTIME_CORE0
-	int i, j = 0;
+	int i, j = 0, k;
 	prio_t rdy_grp;
 	prio_t ncpu_highest[NR_CPUS];
+	int high_map[NR_CPUS];
+	int current_map[NR_CPUS];
 	uint64_t __rdy_table = __os_rdy_table;
 	uint8_t *rdy_table;
 
@@ -176,14 +187,15 @@ static void sched_new(struct pcpu *pcpu)
 	 * table, if there is no any realtime task ready
 	 * just exist
 	 */
-	if (__rdy_table == 0) {
-		memset(os_highest_rdy, OS_PRIO_PCPU, sizeof(os_highest_rdy));
+	memset(os_highest_rdy, OS_PRIO_PCPU, sizeof(os_highest_rdy));
+	if (__rdy_table == 0)
 		return;
-	}
 
 	rdy_grp = os_rdy_grp;
 	rdy_table = (uint8_t *)&__rdy_table;
 	memset(ncpu_highest, OS_PRIO_IDLE + 1, sizeof(ncpu_highest));
+	memset(high_map, 0, sizeof(high_map));
+	memset(current_map, 0, sizeof(current_map));
 
 	for (i = 0; i < NR_CPUS; i++) {
 		y = os_prio_map_table[rdy_grp];
@@ -200,15 +212,22 @@ static void sched_new(struct pcpu *pcpu)
 	}
 
 	for (i = 0; i < NR_CPUS; i++) {
-		if (sched_array_contain(os_prio_cur[i], ncpu_highest))
+		k = has_current_prio(os_prio_cur[i], ncpu_highest, high_map);
+		if (k > 0) {
 			os_highest_rdy[i] = os_prio_cur[i];
-		else {
-			for (j = i; j < NR_CPUS; j++) {
-				if (sched_array_contain(ncpu_highest[j],
-							os_prio_cur))
+			high_map[k - 1] = 1;
+			current_map[i] = 1;
+		} else {
+			for (j = 0; j < NR_CPUS; j++) {
+				if (high_map[j])
+					continue;
+
+				if (has_high_prio(ncpu_highest[j],
+						os_prio_cur, current_map))
 					continue;
 
 				os_highest_rdy[i] = ncpu_highest[j];
+				high_map[j] = 1;
 				break;
 			}
 		}
@@ -225,6 +244,7 @@ static void sched_new(struct pcpu *pcpu)
 	 * only update the highest realtime task to
 	 * the core0
 	 */
+	os_highest_rdy[0] = OS_PRIO_PCPU;
 	if (__rdy_table == 0)
 		return;
 
@@ -263,12 +283,7 @@ static inline void restore_task_context(struct task *task)
 void switch_to_task(struct task *cur, struct task *next)
 {
 	int cpuid = smp_processor_id();
-	// unsigned long flags;
-
-	// need to acquire the kernel lock ?
-	// kernel_lock_irqsave(flags);
-	if (cur == next)
-		return;
+	prio_t prio;
 
 	save_task_context(cur);
 	restore_task_context(next);
@@ -300,20 +315,26 @@ void switch_to_task(struct task *cur, struct task *next)
 	do_hooks((void *)next, NULL, OS_HOOK_TASK_SWITCH_TO);
 
 	/* set the current prio to the highest ready */
-	os_prio_cur[cpuid] = os_highest_rdy[cpuid];
+	if (is_idle_task(next))
+		prio = OS_PRIO_PCPU;
+	else
+		prio = next->prio;
 
-	// kernel_unlock_irqrestore(flags);
+	os_prio_cur[cpuid] = prio;
+	set_next_task(next);
 }
 
 unsigned long sched_tick_handler(unsigned long data)
 {
+	struct task *task;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
-	struct task *next, *task;
 
 	task = get_current_task();
 
-	if (task->prio != OS_PRIO_PCPU)
-		panic("wrong task type on tick handler %d\n", task->pid);
+	if (task->prio != OS_PRIO_PCPU) {
+		pr_debug("wrong task type on tick handler %d\n", task->pid);
+		return 0;
+	}
 
 	if ((NOW() - task->start_ns) < (task->run_time * 1000000))
 		pr_warn("Bug happend on timer tick sched\n");
@@ -322,18 +343,7 @@ unsigned long sched_tick_handler(unsigned long data)
 	list_add_tail(&pcpu->ready_list, &task->stat_list);
 	task->run_time = CONFIG_TASK_RUN_TIME;
 
-	/*
-	 * select the next running task from the pcpu list
-	 * if there is one task, need to reenalbe the sched
-	 * timer
-	 */
-	next = list_first_entry(&pcpu->ready_list, struct task, stat_list);
-	if (task != next)
-		set_next_task(next);
-	else
-		sched_tick_enable(MILLISECS(next->run_time));
-
-	clear_need_resched();
+	pcpu_need_resched();
 
 	return 0;
 }
@@ -407,16 +417,13 @@ void sched(void)
 		next = get_next_run_task(pcpu);
 	}
 
-	kernel_unlock_irqrestore(flags);
-
 	if (cur != next) {
-		local_irq_save(flags);
 		switch_to_task(cur, next);
-		set_next_task(next);
-		dsb();
+		kernel_unlock();
 		arch_switch_task_sw();
 		local_irq_restore(flags);
-	}
+	} else
+		kernel_unlock_irqrestore(flags);
 }
 
 void irq_enter(gp_regs *regs)
@@ -427,7 +434,8 @@ void irq_enter(gp_regs *regs)
 
 void irq_exit(gp_regs *regs)
 {
-	int i, sched_flag;
+	int i;
+	int p, n, lk;
 	struct task *task = get_current_task();
 	struct task *next = task;
 	int cpuid = smp_processor_id();
@@ -439,39 +447,48 @@ void irq_exit(gp_regs *regs)
 	 * if preempt is disabled or current task lock
 	 * the cpu just return
 	 */
-	if (!preempt_allowed() || !need_resched() ||
-			atomic_read(&task->lock_cpu))
+	p = !preempt_allowed();
+	n = !need_resched();
+	lk = atomic_read(&task->lock_cpu);
+	dsb();
+
+	if (p || n || lk)
 		return;
 
 	/*
 	 * if preempt is not allowed and irq is taken from
-	 * guest, then will sched()
+	 * guest, then will try to sched
 	 */
 	kernel_lock();
 
+	if ((os_prio_cur[cpuid] != os_highest_rdy[cpuid]))
+		goto out;
+
 	sched_new(pcpu);
+
 	for (i = 0; i < NR_CPUS; i++) {
 		if (os_prio_cur[i] != os_highest_rdy[i]) {
-			if (i == cpuid)
-				sched_flag = 1;
-			else
+			if (i != cpuid)
 				pcpu_resched(i);
 		}
 	}
 
+out:
 	/*
 	 * if need sched or the current task is idle, then
 	 * try to get the next task to check whether need
 	 * to sched to anther task
 	 */
-	if (sched_flag || is_idle_task(task)) {
-		recal_task_time_ready(task, pcpu);
-		next = get_next_run_task(pcpu);
-		if (next != task)
-			set_next_task(next);
+	next = get_next_run_task(pcpu);
+	if (next != task) {
+		if (is_task_ready(task))
+			recal_task_time_ready(task, pcpu);
+		switch_to_task(task, next);
 	}
 
 	kernel_unlock();
+
+	clear_need_resched();
 	dsb();
 }
 
@@ -507,7 +524,6 @@ int sched_init(void)
 
 int resched_handler(uint32_t irq, void *data)
 {
-	int sched = 0, cpuid;
 	struct task *task, *n;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
@@ -544,31 +560,11 @@ int resched_handler(uint32_t irq, void *data)
 
 	kernel_lock();
 
-	/*
-	 * if the current task need to sleep, then set
-	 * the correct right
-	 */
-	cpuid = pcpu->pcpu_id;
-	n = task = get_current_task();
-
-	if ((!is_task_ready(task))) {
-		sched = 1;
+	task = get_current_task();
+	if ((!is_task_ready(task)))
 		set_task_sleep(task);
-	}
 
-	/* prio changed need to select a new task to sched */
-	if ((os_prio_cur[cpuid] != os_highest_rdy[cpuid]) || sched) {
-		if (is_task_ready(task))
-			recal_task_time_ready(task, pcpu);
-		n = get_next_run_task(pcpu);
-	}
-
-	if (n != task)
-		set_next_task(n);
-	else
-		os_prio_cur[cpuid] = os_highest_rdy[cpuid];
-
-	clear_need_resched();
+	pcpu_need_resched();
 	kernel_unlock();
 
 	return 0;

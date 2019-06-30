@@ -276,12 +276,13 @@ __irq_handler:
 	add	x4, x4, x2
 	ldr	x0, [x5]		// x0 is current running task
 	ldr	x1, [x4]		// x4 is next running task
+	dsb	sy
 
-	stp	x4, x5, [sp, #-16]!
-	stp	x0, x1, [sp, #-16]!
-	bl	switch_to_task
-	ldp	x0, x1, [sp], #16
-	ldp	x4, x5, [sp], #16
+	//stp	x4, x5, [sp, #-16]!
+	//stp	x0, x1, [sp, #-16]!
+	//bl	switch_to_task
+	//ldp	x0, x1, [sp], #16
+	//ldp	x4, x5, [sp], #16
 
 	cmp	x0, x1
 	beq	__switch_to_task
@@ -293,7 +294,7 @@ __irq_handler:
 	mov	sp, x2			// load the sp from the next task
 
 	str	x1, [x5]		// current task = next task
-	dsb sy
+	dsb 	sy
 
 __switch_to_task:
 	//restore_gp_regs

@@ -20,15 +20,35 @@
 
 static void rt_task(void *data)
 {
+	int task_id = (int)((unsigned long)data);
+
 	while (1) {
-		pr_info("rt_task test on cpu-%d\n", smp_processor_id());
-		msleep(100);
+		pr_info("rt_task-%d test on cpu-%d\n",
+				task_id, smp_processor_id());
+		mdelay(100);
+		msleep(100 * (task_id % 4 + 1));
 	}
 }
 
 void apps_cpu0_init(void)
 {
-	create_realtime_task("rt-task-1", rt_task, NULL, 45, 4096, 0);
+	create_realtime_task("rt-task-1", rt_task, (void *)0, 45, 4096, 0);
+	create_realtime_task("rt-task-2", rt_task, (void *)1, 44, 4096, 0);
+	create_realtime_task("rt-task-3", rt_task, (void *)2, 43, 4096, 0);
+	create_realtime_task("rt-task-4", rt_task, (void *)3, 42, 4096, 0);
+	create_realtime_task("rt-task-5", rt_task, (void *)4, 41, 4096, 0);
+	create_realtime_task("rt-task-6", rt_task, (void *)5, 40, 4096, 0);
+	create_realtime_task("rt-task-7", rt_task, (void *)6, 39, 4096, 0);
+	create_realtime_task("rt-task-8", rt_task, (void *)7, 38, 4096, 0);
+	create_realtime_task("rt-task-9", rt_task, (void *)8, 37, 4096, 0);
+	create_realtime_task("rt-task-10", rt_task, (void *)9, 36, 4096, 0);
+	create_realtime_task("rt-task-11", rt_task, (void *)10, 35, 4096, 0);
+	create_realtime_task("rt-task-12", rt_task, (void *)11, 34, 4096, 0);
+	create_realtime_task("rt-task-13", rt_task, (void *)12, 33, 4096, 0);
+	create_realtime_task("rt-task-14", rt_task, (void *)13, 32, 4096, 0);
+	create_realtime_task("rt-task-15", rt_task, (void *)14, 31, 4096, 0);
+	create_realtime_task("rt-task-16", rt_task, (void *)15, 30, 4096, 0);
+	create_realtime_task("rt-task-17", rt_task, (void *)16, 29, 4096, 0);
 }
 
 void apps_cpu1_init(void)
@@ -82,4 +102,4 @@ void test_task2(void *data)
 		mdelay(100);
 	}
 }
-//DEFINE_TASK_PERCPU("test task2", test_task2, NULL,  4096, 0);
+DEFINE_TASK_PERCPU("test task2", test_task2, NULL,  4096, 0);

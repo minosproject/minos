@@ -66,7 +66,6 @@ void set_task_sleep(struct task *task);
 struct task *get_highest_task(uint8_t group, prio_t *ready);
 void irq_enter(gp_regs *regs);
 void irq_exit(gp_regs *regs);
-void pcpu_need_resched(void);
 
 static inline struct task *get_current_task(void)
 {
@@ -81,36 +80,54 @@ static inline struct task *get_next_task(void)
 static inline void set_current_task(struct task *task)
 {
 	get_cpu_var(percpu_current_task) = task;
+	dsb();
 }
 
 static inline void set_next_task(struct task *task)
 {
 	get_cpu_var(percpu_next_task) = task;
+	dsb();
 }
 
 static inline void set_need_resched(void)
 {
 	get_cpu_var(__need_resched) = 1;
+	dsb();
 }
 
 static inline void clear_need_resched(void)
 {
 	get_cpu_var(__need_resched) = 0;
+	dsb();
 }
 
 static inline int need_resched(void)
 {
-	return get_cpu_var(__need_resched);
+	return  get_cpu_var(__need_resched);
+}
+
+static inline void dec_need_resched(void)
+{
+	get_cpu_var(__need_resched)--;
+	dsb();
+}
+
+static inline void inc_need_resched(void)
+{
+	get_cpu_var(__need_resched)++;
+	dsb();
 }
 
 static inline void inc_int_nesting(void)
 {
 	get_cpu_var(__int_nesting)++;
+	dsb();
 }
 
 static inline void dec_int_nesting(void)
 {
 	get_cpu_var(__int_nesting)--;
+	dsb();
 }
 
 static inline int int_nesting(void)
@@ -126,16 +143,24 @@ static inline int os_is_running(void)
 static inline void set_os_running(void)
 {
 	get_cpu_var(__os_running) = 1;
+	dsb();
 }
 
 static inline void set_current_prio(prio_t prio)
 {
 	os_prio_cur[smp_processor_id()] = prio;
+	dsb();
 }
 
 static inline void set_next_prio(prio_t prio)
 {
 	os_highest_rdy[smp_processor_id()] = prio;
+	dsb();
+}
+
+static inline void pcpu_need_resched(void)
+{
+	inc_need_resched();
 }
 
 #endif
