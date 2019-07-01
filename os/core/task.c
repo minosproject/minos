@@ -85,6 +85,11 @@ struct task *pid_to_task(int pid)
 	return os_task_table[pid];
 }
 
+static void soft_break(void)
+{
+	pr_info("-------------01\n");
+}
+
 static void task_timeout_handler(unsigned long data)
 {
 	struct task *task = (struct task *)data;
@@ -97,6 +102,9 @@ static void task_timeout_handler(unsigned long data)
 	 */
 	task_lock(task);
 
+	if (task->pid == 45)
+		soft_break();
+
 	if (task->delay) {
 		/* task is timeout and check its stat */
 		task->delay = 0;
@@ -107,8 +115,13 @@ static void task_timeout_handler(unsigned long data)
 		} else
 			task->pend_stat = TASK_STAT_PEND_OK;
 
-		if (!is_task_ready(task))
+		if (!is_task_ready(task)) {
 			set_task_ready(task);
+			task->stat &= TASK_STAT_RDY;
+		}
+	} else {
+		pr_warn("Wrong task stat stat-%d pend-stat-%d\n",
+				task->stat, task->pend_stat);
 	}
 
 	pcpu_need_resched();

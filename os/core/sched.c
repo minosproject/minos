@@ -114,10 +114,18 @@ void set_task_sleep(struct task *task)
 	}
 }
 
+static void soft_break1(void)
+{
+	pr_info("-------------02\n");
+}
+
 void set_task_suspend(uint32_t delay)
 {
 	unsigned long flags;
 	struct task *task = get_current_task();
+
+	if (task->pid == 45)
+		soft_break1();
 
 	task_lock_irqsave(task, flags);
 	task->delay = delay;
