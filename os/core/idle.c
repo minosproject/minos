@@ -115,8 +115,8 @@ void cpu_idle(void)
 
 	switch (pcpu->pcpu_id) {
 	case 0:
-		apps_cpu0_init();
 		create_static_tasks();
+		apps_cpu0_init();
 		os_clean();
 		break;
 	case 1:
@@ -159,6 +159,9 @@ void cpu_idle(void)
 			list_add_tail(&pcpu->sleep_list, &task->stat_list);
 	}
 	spin_unlock_irqrestore(&pcpu->lock, flags);
+
+	set_os_running();
+	local_irq_enable();
 
 	while (1) {
 		sched();

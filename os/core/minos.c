@@ -145,9 +145,6 @@ void boot_main(void *setup_data)
 
 	smp_cpus_up();
 
-	set_os_running();
-	local_irq_enable();
-
 	cpu_idle();
 }
 
@@ -172,9 +169,6 @@ void boot_secondary(void)
 	device_init_percpu();
 
 	create_idle_task();
-
-	set_os_running();
-	local_irq_enable();
 
 	cpu_idle();
 }

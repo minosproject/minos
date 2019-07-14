@@ -114,18 +114,10 @@ void set_task_sleep(struct task *task)
 	}
 }
 
-static void soft_break1(void)
-{
-	pr_info("-------------02\n");
-}
-
 void set_task_suspend(uint32_t delay)
 {
 	unsigned long flags;
 	struct task *task = get_current_task();
-
-	if (task->pid == 45)
-		soft_break1();
 
 	task_lock_irqsave(task, flags);
 	task->delay = delay;
@@ -364,12 +356,15 @@ static inline void recal_task_time_ready(struct task *task, struct pcpu *pcpu)
 		return;
 
 	now = (NOW() - task->start_ns) / 1000000;
+	now = now > CONFIG_SCHED_INTERVAL ? 0 : CONFIG_SCHED_INTERVAL - now;
+
 	if (now < 15) {
-		task->run_time = 85 + now;
+		task->run_time = CONFIG_SCHED_INTERVAL + now;
 
 		list_del(&task->stat_list);
 		list_add_tail(&pcpu->ready_list, &task->stat_list);
-	}
+	} else
+		task->run_time = now;
 }
 
 void sched(void)

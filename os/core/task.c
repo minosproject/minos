@@ -85,11 +85,6 @@ struct task *pid_to_task(int pid)
 	return os_task_table[pid];
 }
 
-static void soft_break(void)
-{
-	pr_info("-------------01\n");
-}
-
 static void task_timeout_handler(unsigned long data)
 {
 	struct task *task = (struct task *)data;
@@ -101,9 +96,6 @@ static void task_timeout_handler(unsigned long data)
 	 * this function
 	 */
 	task_lock(task);
-
-	if (task->pid == 45)
-		soft_break();
 
 	if (task->delay) {
 		/* task is timeout and check its stat */
