@@ -10,7 +10,6 @@
 DECLARE_PER_CPU(struct pcpu *, pcpu);
 DECLARE_PER_CPU(struct task *, percpu_current_task);
 DECLARE_PER_CPU(struct task *, percpu_next_task);
-DECLARE_PER_CPU(int, __need_resched);
 DECLARE_PER_CPU(int, __preempt);
 DECLARE_PER_CPU(int, __int_nesting);
 DECLARE_PER_CPU(int, __os_running);
@@ -86,35 +85,6 @@ static inline void set_current_task(struct task *task)
 static inline void set_next_task(struct task *task)
 {
 	get_cpu_var(percpu_next_task) = task;
-	dsb();
-}
-
-static inline void set_need_resched(void)
-{
-	get_cpu_var(__need_resched) = 1;
-	dsb();
-}
-
-static inline void clear_need_resched(void)
-{
-	get_cpu_var(__need_resched) = 0;
-	dsb();
-}
-
-static inline int need_resched(void)
-{
-	return  get_cpu_var(__need_resched);
-}
-
-static inline void dec_need_resched(void)
-{
-	get_cpu_var(__need_resched)--;
-	dsb();
-}
-
-static inline void inc_need_resched(void)
-{
-	get_cpu_var(__need_resched)++;
 	dsb();
 }
 

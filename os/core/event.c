@@ -26,7 +26,6 @@ static DEFINE_SPIN_LOCK(event_lock);
 
 struct event *create_event(int type, void *pdata, char *name)
 {
-	unsigned long flags;
 	struct event *event;
 
 	if (int_nesting())
@@ -42,9 +41,9 @@ struct event *create_event(int type, void *pdata, char *name)
 	event->data = pdata;
 	strncpy(event->name, name, MIN(strlen(name), OS_EVENT_NAME_SIZE));
 
-	spin_lock_irqsave(&event_lock, flags);
+	spin_lock(&event_lock);
 	list_add_tail(&event_list, &event->list);
-	spin_unlock_irqrestore(&event_lock, flags);
+	spin_unlock(&event_lock);
 
 	return event;
 }
@@ -129,6 +128,7 @@ struct task *event_highest_task_ready(struct event *ev, void *msg,
 		uint32_t msk, int pend_stat)
 {
 	struct task *task;
+	unsigned long flags = 0;
 
 	task = event_get_waiter(ev);
 
@@ -138,10 +138,10 @@ struct task *event_highest_task_ready(struct event *ev, void *msg,
 	 * the task will not remove from the waiter
 	 * list soon.
 	 */
-	task_lock(task);
+	task_lock_irqsave(task, flags);
 	event_task_remove(task, ev);
 	event_task_ready(task, msg, msk, pend_stat);
-	task_unlock(task);
+	task_unlock_irqrestore(task, flags);
 
 	return task;
 }

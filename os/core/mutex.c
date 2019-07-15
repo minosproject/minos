@@ -124,11 +124,11 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	if (invalid_mutex(m) || int_nesting() || !preempt_allowed())
 		return -EINVAL;
 
-	ticket_lock_irqsave(&m->lock, flags);
+	ticket_lock(&m->lock);
 	if (m->cnt == OS_MUTEX_AVAILABLE) {
 		m->owner = task->pid;
 		m->data = (void *)task;
-		ticket_unlock_irqrestore(&m->lock, flags);
+		ticket_unlock(&m->lock);
 		return 0;
 	}
 
@@ -152,20 +152,17 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	}
 
 	/* set the task's state and suspend the task */
-	task_lock(task);
+	task_lock_irqsave(task,flags);
 	task->stat |= TASK_STAT_MUTEX;
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->delay = timeout;
 	task->wait_event = to_event(m);
-	task_unlock(task);
+	task_unlock_irqrestore(task, flags);
 
 	event_task_wait(task, to_event(m));
-	ticket_unlock_irqrestore(&m->lock, flags);
+	ticket_unlock(&m->lock);
 
 	sched();
-
-	ticket_lock_irqsave(&m->lock, flags);
-	task_lock(task);
 
 	switch (task->pend_stat) {
 	case TASK_STAT_PEND_OK:
@@ -179,29 +176,28 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	case TASK_STAT_PEND_TO:
 	default:
 		ret = -ETIMEDOUT;
+		ticket_lock_irqsave(&m->lock, flags);
 		event_task_remove(task, (struct event *)m);
+		ticket_unlock(&m->lock);
 		break;
 	}
 
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->wait_event = 0;
-	task_unlock(task);
-	ticket_unlock_irqrestore(&m->lock, flags);
 
 	return ret;
 }
 
 int mutex_post(mutex_t *m)
 {
-	unsigned long flags;
 	struct task *task = get_current_task();
 
 	if (invalid_mutex(m) || int_nesting() || !preempt_allowed())
 		return -EPERM;
 
-	ticket_lock_irqsave(&m->lock, flags);
+	ticket_lock(&m->lock);
 	if (task != (struct task *)m->data) {
-		ticket_unlock_irqrestore(&m->lock, flags);
+		ticket_unlock(&m->lock);
 		return -EINVAL;
 	}
 
@@ -216,7 +212,7 @@ int mutex_post(mutex_t *m)
 		m->cnt = task->pid;
 		m->data = task;
 
-		ticket_unlock_irqrestore(&m->lock, flags);
+		ticket_unlock(&m->lock);
 
 		sched();
 		return 0;
@@ -224,7 +220,7 @@ int mutex_post(mutex_t *m)
 
 	m->cnt = OS_MUTEX_AVAILABLE;
 	m->data = NULL;
-	ticket_unlock_irqrestore(&m->lock, flags);
+	ticket_unlock(&m->lock);
 
 	return 0;
 }
