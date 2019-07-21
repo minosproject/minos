@@ -396,6 +396,15 @@ void sched(void)
 		set_task_sleep(cur);
 	}
 
+	/*
+	 * if the highest ready prio has already set by other
+	 * cpu just sched it TBD
+	 */
+	if (os_prio_cur[cpuid] != os_highest_rdy[cpuid]) {
+		sched_flag = 1;
+		goto __sched_new;
+	}
+
 	sched_new(pcpu);
 
 	/* check whether current pcpu need to resched */
@@ -408,6 +417,7 @@ void sched(void)
 		}
 	}
 
+__sched_new:
 	/*
 	 * if this task is a percpu task and it will sched
 	 * out not because its run time is expries, then will
@@ -458,12 +468,20 @@ void irq_exit(gp_regs *regs)
 	if (p || n || lk)
 		return;
 
-	/*
-	 * if preempt is not allowed and irq is taken from
-	 * guest, then will try to sched
-	 */
 	kernel_lock();
 
+	/*
+	 * if the task is suspend state, means next the cpu
+	 * will call sched directly, so do not sched out here
+	 */
+	if (is_task_suspend(task))
+		goto exit_0;
+
+
+	/*
+	 * if the highest prio is update by other cpu, then
+	 * sched out directly
+	 */
 	if ((os_prio_cur[cpuid] != os_highest_rdy[cpuid]))
 		goto out;
 
@@ -489,10 +507,9 @@ out:
 		switch_to_task(task, next);
 	}
 
-	kernel_unlock();
-
+exit_0:
 	clear_need_resched();
-	dsb();
+	kernel_unlock();
 }
 
 int sched_can_idle(struct pcpu *pcpu)
@@ -561,14 +578,7 @@ int resched_handler(uint32_t irq, void *data)
 		}
 	}
 
-	kernel_lock();
-
-	task = get_current_task();
-	if ((!is_task_ready(task)))
-		set_task_sleep(task);
-
 	pcpu_need_resched();
-	kernel_unlock();
 
 	return 0;
 }
