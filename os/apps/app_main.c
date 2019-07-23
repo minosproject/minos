@@ -23,10 +23,16 @@ DEFINE_MUTEX(rt_mutex);
 
 static void rt_task(void *data)
 {
+	int ret;
 	int task_id = (int)((unsigned long)data);
 
 	while (1) {
-		mutex_pend(&rt_mutex, 0);
+		ret = mutex_pend(&rt_mutex, 100);
+		if (ret) {
+			pr_err("timeout waitting for mutex\n");
+			continue;
+		}
+
 		pr_info("rt_task-%d test on cpu-%d\n",
 				task_id, smp_processor_id());
 		mdelay(100);
