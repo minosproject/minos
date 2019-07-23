@@ -22,7 +22,7 @@ struct timers {
 	spinlock_t lock;
 };
 
-#define DEFAULT_TIMER_MARGIN	(128)
+#define DEFAULT_TIMER_MARGIN	(10)
 
 void init_timer(struct timer_list *timer);
 void init_timer_on_cpu(struct timer_list *timer, int cpu);

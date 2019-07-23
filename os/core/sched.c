@@ -328,6 +328,7 @@ unsigned long sched_tick_handler(unsigned long data)
 {
 	struct task *task;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
+	unsigned long now = NOW();
 
 	task = get_current_task();
 
@@ -336,8 +337,10 @@ unsigned long sched_tick_handler(unsigned long data)
 		return 0;
 	}
 
-	if ((NOW() - task->start_ns) < (task->run_time * 1000000))
-		pr_warn("Bug happend on timer tick sched\n");
+	if ((now - task->start_ns) < (task->run_time * 1000000)) {
+		pr_warn("Bug happend on timer tick sched 0x%p 0x%p %d\n",
+				now, task->start_ns, task->run_time);
+	}
 
 	list_del(&task->stat_list);
 	list_add_tail(&pcpu->ready_list, &task->stat_list);
@@ -380,8 +383,11 @@ void sched(void)
 	if (unlikely(int_nesting()))
 		panic("os_sched can not be called in interrupt\n");
 
-	if (!preempt_allowed() || atomic_read(&cur->lock_cpu))
+	if (!preempt_allowed() || atomic_read(&cur->lock_cpu)) {
+		pr_warn("os can not sched now %d %d %d\n", preempt_allowed(),
+				atomic_read(&cur->lock_cpu), cur->prio);
 		return;
+	}
 
 	kernel_lock_irqsave(flags);
 
