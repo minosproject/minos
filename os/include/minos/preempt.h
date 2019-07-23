@@ -51,10 +51,12 @@ static void inline preempt_enable(void)
 {
 	__preempt_enable();
 
-	if (need_resched()) {
+#if 0
+	if ((!in_interrupt()) && need_resched() && os_is_running()) {
 		clear_need_resched();
 		sched();
 	}
+#endif
 }
 
 #endif

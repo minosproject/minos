@@ -91,6 +91,7 @@ void test_task(void *data)
 	while (1) {
 		pr_info("test task 1 on %d\n", smp_processor_id());
 		mdelay(100);
+		msleep(100);
 	}
 }
 DEFINE_TASK_PERCPU("test task", test_task, NULL,  4096, 0);
@@ -100,6 +101,17 @@ void test_task2(void *data)
 	while (1) {
 		pr_info("test task 2 on %d\n", smp_processor_id());
 		mdelay(100);
+		msleep(100);
 	}
 }
 DEFINE_TASK_PERCPU("test task2", test_task2, NULL,  4096, 0);
+
+void test_task3(void *data)
+{
+	while (1) {
+		pr_info("test task 3 on %d\n", smp_processor_id());
+		mdelay(100);
+		msleep(100);
+	}
+}
+DEFINE_TASK_PERCPU("test task3", test_task3, NULL,  4096, 0);
