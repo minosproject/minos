@@ -49,6 +49,7 @@ struct task *event_highest_task_ready(struct event *ev, void *msg,
 		uint32_t msk, int pend_stat);
 
 void event_del_always(struct event *ev);
+void event_init(struct event *event, int type, void *pdata, char *name);
 
 static inline int event_has_waiter(struct event *ev)
 {

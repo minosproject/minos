@@ -24,6 +24,19 @@
 static LIST_HEAD(event_list);
 static DEFINE_SPIN_LOCK(event_lock);
 
+void event_init(struct event *event, int type, void *pdata, char *name)
+{
+	event->type = type;
+	ticketlock_init(&event->lock);
+	init_list(&event->wait_list);
+	event->data = pdata;
+	strncpy(event->name, name, MIN(strlen(name), OS_EVENT_NAME_SIZE));
+
+	spin_lock(&event_lock);
+	list_add_tail(&event_list, &event->list);
+	spin_unlock(&event_lock);
+}
+
 struct event *create_event(int type, void *pdata, char *name)
 {
 	struct event *event;
@@ -35,15 +48,7 @@ struct event *create_event(int type, void *pdata, char *name)
 	if (!event)
 		return NULL;
 
-	event->type = type;
-	ticketlock_init(&event->lock);
-	init_list(&event->wait_list);
-	event->data = pdata;
-	strncpy(event->name, name, MIN(strlen(name), OS_EVENT_NAME_SIZE));
-
-	spin_lock(&event_lock);
-	list_add_tail(&event_list, &event->list);
-	spin_unlock(&event_lock);
+	event_init(event, type, pdata, name);
 
 	return event;
 }
@@ -60,9 +65,9 @@ void release_event(struct event *event)
 
 void event_task_wait(struct task *task, struct event *ev)
 {
-	if (task->prio <= OS_LOWEST_PRIO) {
+	if (is_realtime_task(task)) {
 		ev->wait_grp |= task->bity;
-		ev->wait_tbl[task->by] |= task->bx;
+		ev->wait_tbl[task->by] |= task->bitx;
 	} else
 		list_add_tail(&ev->wait_list, &task->event_list);
 }
@@ -131,6 +136,8 @@ struct task *event_highest_task_ready(struct event *ev, void *msg,
 	unsigned long flags = 0;
 
 	task = event_get_waiter(ev);
+	if (!task)
+		panic("something wrong in event_get_waiter\n");
 
 	/*
 	 * need to check whether this task has got

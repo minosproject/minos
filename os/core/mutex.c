@@ -21,14 +21,17 @@
 #include <minos/mutex.h>
 #include <minos/sched.h>
 
-#define OS_MUTEX_AVAILABLE	0xffff
-
 #define invalid_mutex(mutex)	\
 	((mutex == NULL) && (mutex->type != OS_EVENT_TYPE_MUTEX))
 
 mutex_t *mutex_create(char *name)
 {
-	return (mutex_t *)create_event(OS_EVENT_TYPE_MUTEX, NULL, name);
+	mutex_t *mutex;
+
+	mutex = (mutex_t *)create_event(OS_EVENT_TYPE_MUTEX, NULL, name);
+	mutex->cnt = OS_MUTEX_AVAILABLE;
+
+	return mutex;
 }
 
 int mutex_accept(mutex_t *mutex)
@@ -128,6 +131,10 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	if (m->cnt == OS_MUTEX_AVAILABLE) {
 		m->owner = task->pid;
 		m->data = (void *)task;
+		m->cnt = task->pid;
+
+		/* to be done  need furture design */
+		task->lock_event = to_event(m);
 		ticket_unlock(&m->lock);
 		return 0;
 	}
@@ -146,10 +153,8 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	 * task need to get two mutex, how to deal with this ?
 	 */
 	owner = (struct task *)m->data;
-	if (owner->prio > task->prio) {
-		atomic_set(&task->lock_cpu, 1);
-		task->lock_event = to_event(m);
-	}
+	if (owner->prio > task->prio)
+		atomic_set(&owner->lock_cpu, 1);
 
 	/* set the task's state and suspend the task */
 	task_lock_irqsave(task,flags);
@@ -200,6 +205,9 @@ int mutex_post(mutex_t *m)
 		ticket_unlock(&m->lock);
 		return -EINVAL;
 	}
+
+	task->lock_event = NULL;
+	atomic_set(&task->lock_cpu, 0);
 
 	/*
 	 * find the highest prio task to run, if there is
