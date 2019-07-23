@@ -101,16 +101,16 @@ static void task_timeout_handler(unsigned long data)
 		/* task is timeout and check its stat */
 		task->delay = 0;
 
+		if (!is_task_ready(task)) {
+			set_task_ready(task);
+			task->stat &= ~TASK_STAT_SUSPEND;
+		}
+
 		if (is_task_pending(task)) {
 			task->stat &= ~TASK_STAT_PEND_ANY;
 			task->pend_stat = TASK_STAT_PEND_TO;
 		} else
 			task->pend_stat = TASK_STAT_PEND_OK;
-
-		if (!is_task_ready(task)) {
-			set_task_ready(task);
-			task->stat &= TASK_STAT_RDY;
-		}
 	} else {
 		pr_warn("Wrong task stat stat-%d pend-stat-%d\n",
 				task->stat, task->pend_stat);

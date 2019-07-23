@@ -402,6 +402,7 @@ void sched(void)
 		set_task_sleep(cur);
 	}
 
+#if 0
 	/*
 	 * if the highest ready prio has already set by other
 	 * cpu just sched it TBD
@@ -410,6 +411,7 @@ void sched(void)
 		sched_flag = 1;
 		goto __sched_new;
 	}
+#endif
 
 	sched_new(pcpu);
 
@@ -423,7 +425,7 @@ void sched(void)
 		}
 	}
 
-__sched_new:
+//__sched_new:
 	/*
 	 * if this task is a percpu task and it will sched
 	 * out not because its run time is expries, then will
@@ -482,7 +484,6 @@ void irq_exit(gp_regs *regs)
 	 */
 	if (is_task_suspend(task))
 		goto exit_0;
-
 
 	/*
 	 * if the highest prio is update by other cpu, then

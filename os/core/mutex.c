@@ -29,6 +29,9 @@ mutex_t *mutex_create(char *name)
 	mutex_t *mutex;
 
 	mutex = (mutex_t *)create_event(OS_EVENT_TYPE_MUTEX, NULL, name);
+	if (!mutex)
+		return NULL;
+
 	mutex->cnt = OS_MUTEX_AVAILABLE;
 
 	return mutex;
