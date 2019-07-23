@@ -72,7 +72,6 @@ if __name__ == "__main__":
     print("")
     for key in default_config.keys():
         if default_config[key][1]:
-            print(key + " Using default [" + default_config[key][0] + "]")
             configs.append([key, default_config[key][0]])
 
     a_str = ''
@@ -94,6 +93,7 @@ if __name__ == "__main__":
             else:
                 a_str += item[1]
             a_str += '\r\n'
+        print(a_str)
         afd.write(a_str)
         afd.close()
 
