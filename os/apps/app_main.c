@@ -17,21 +17,27 @@
 #include <minos/minos.h>
 #include <minos/task.h>
 #include <minos/time.h>
+#include <minos/mutex.h>
+
+DEFINE_MUTEX(rt_mutex);
 
 static void rt_task(void *data)
 {
 	int task_id = (int)((unsigned long)data);
 
 	while (1) {
+		mutex_pend(&rt_mutex, 0);
 		pr_info("rt_task-%d test on cpu-%d\n",
 				task_id, smp_processor_id());
 		mdelay(100);
+		mutex_post(&rt_mutex);
 		msleep(100 * (task_id % 4 + 1));
 	}
 }
 
 void apps_cpu0_init(void)
 {
+	mutex_init(&rt_mutex, "rt_mutex");
 	create_realtime_task("rt-task-45", rt_task, (void *)45, 45, 4096, 0);
 	create_realtime_task("rt-task-44", rt_task, (void *)44, 44, 4096, 0);
 	create_realtime_task("rt-task-43", rt_task, (void *)43, 43, 4096, 0);
