@@ -186,7 +186,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 		ret = -ETIMEDOUT;
 		ticket_lock_irqsave(&m->lock, flags);
 		event_task_remove(task, (struct event *)m);
-		ticket_unlock(&m->lock);
+		ticket_unlock_irqrestore(&m->lock, flags);
 		break;
 	}
 

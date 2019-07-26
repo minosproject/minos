@@ -23,27 +23,24 @@ DEFINE_MUTEX(rt_mutex);
 
 static void rt_task(void *data)
 {
-	int ret;
 	int task_id = (int)((unsigned long)data);
 
 	while (1) {
-		ret = mutex_pend(&rt_mutex, 100);
-		if (ret) {
-			pr_err("timeout waitting for mutex\n");
-			continue;
-		}
-
 		pr_info("rt_task-%d test on cpu-%d\n",
 				task_id, smp_processor_id());
 		mdelay(100);
-		mutex_post(&rt_mutex);
 		msleep(100 * (task_id % 4 + 1));
 	}
 }
 
-void apps_cpu0_init(void)
+void os_init(void)
 {
 	mutex_init(&rt_mutex, "rt_mutex");
+}
+
+void apps_cpu0_init(void)
+{
+#if 0
 	create_realtime_task("rt-task-45", rt_task, (void *)45, 45, 4096, 0);
 	create_realtime_task("rt-task-44", rt_task, (void *)44, 44, 4096, 0);
 	create_realtime_task("rt-task-43", rt_task, (void *)43, 43, 4096, 0);
@@ -61,6 +58,7 @@ void apps_cpu0_init(void)
 	create_realtime_task("rt-task-31", rt_task, (void *)31, 31, 4096, 0);
 	create_realtime_task("rt-task-30", rt_task, (void *)30, 30, 4096, 0);
 	create_realtime_task("rt-task-29", rt_task, (void *)29, 29, 4096, 0);
+#endif
 }
 
 void apps_cpu1_init(void)
@@ -100,9 +98,19 @@ void apps_cpu7_init(void)
 
 void test_task(void *data)
 {
+	int ret;
+
 	while (1) {
+		ret = mutex_pend(&rt_mutex, 100);
+		if (ret) {
+			pr_err("timeout waitting for mutex\n");
+			continue;
+		}
+
 		pr_info("test task 1 on %d\n", smp_processor_id());
 		mdelay(100);
+		mutex_post(&rt_mutex);
+
 		msleep(100);
 	}
 }
@@ -110,9 +118,19 @@ DEFINE_TASK_PERCPU("test task", test_task, NULL,  4096, 0);
 
 void test_task2(void *data)
 {
+	int ret;
+
 	while (1) {
+		ret = mutex_pend(&rt_mutex, 100);
+		if (ret) {
+			pr_err("timeout waitting for mutex\n");
+			continue;
+		}
+
 		pr_info("test task 2 on %d\n", smp_processor_id());
 		mdelay(100);
+		mutex_post(&rt_mutex);
+
 		msleep(100);
 	}
 }

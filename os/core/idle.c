@@ -29,6 +29,7 @@ extern void apps_cpu4_init(void);
 extern void apps_cpu5_init(void);
 extern void apps_cpu6_init(void);
 extern void apps_cpu7_init(void);
+extern void os_init(void);
 
 static void create_static_tasks(void)
 {
@@ -115,6 +116,7 @@ void cpu_idle(void)
 
 	switch (pcpu->pcpu_id) {
 	case 0:
+		os_init();
 		create_static_tasks();
 		apps_cpu0_init();
 		os_clean();

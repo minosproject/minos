@@ -131,6 +131,7 @@ struct task_desc {
 };
 
 struct task_event {
+	int id;
 	struct task *task;
 #define TASK_EVENT_EVENT_READY		0x0
 #define TASK_EVENT_FLAG_READY		0x1
@@ -236,6 +237,9 @@ int create_vcpu_task(char *name, task_func_t func, void *arg,
 int create_task(char *name, task_func_t func,
 		void *arg, prio_t prio, uint16_t aff,
 		uint32_t stk_size, unsigned long opt);
+
+struct task_event *alloc_task_event(void);
+void release_task_event(struct task_event *event);
 
 #define task_lock(task)				\
 	do {					\

@@ -29,37 +29,64 @@ static void run_timer_softirq(struct softirq_action *h)
 	struct timer_list *timer;
 	unsigned long expires = ~0, now;
 	struct timers *timers = &get_cpu_var(timers);
-	struct list_head *entry = &timers->active;
-	struct list_head *next = timers->active.next;
+	struct list_head *entry;
+	struct list_head *next;
 
 	now = NOW();
 
-	while (next != entry) {
+	/*
+	 * need to aquire the spinlock in case of other
+	 * cpu process the list, first thing is to check
+	 * whether the timer has been canceled
+	 */
+	spin_lock(&timers->lock);
+	entry = &timers->active;
+	next = timers->active.next;
+
+	while ((next != entry) && (next != NULL)) {
 		timer = list_entry(next, struct timer_list, entry);
 		next = next->next;
 
+		/*
+		 * there may be a issue that when the next entry
+		 * has been delete from the timers list, this will cause
+		 * that not all the timer can be handled, need to be
+		 * fix later, currently only panic here for debug purpose
+		 */
+		if (next == NULL) {
+			pr_warn("next timer has been deleted\n");
+			if (expires > (now + MILLISECS(1)))
+				expires = now + MILLISECS(1);
+		}
+
 		if (timer->expires <= (now + DEFAULT_TIMER_MARGIN)) {
-			/*
-			 * should aquire the spinlock ?
-			 * TBD
-			 */
 			list_del(&timer->entry);
+
+			/*
+			 * need to release the spin lock to avoid
+			 * dead lock because on the timer handler
+			 * function the task may aquire other spinlocks
+			 */
 			timer->entry.next = NULL;
 			timer->expires = (unsigned long)~0;
 			timers->running_timer = timer;
+			spin_unlock(&timers->lock);
+
 			timer->function(timer->data);
 
-			/*
-			 * check whether this timer is add to list
-			 * again
-			 */
-			if (timer->entry.next != NULL)
-				expires = timer->expires;
-		} else {
-			if (expires > timer->expires)
-				expires = timer->expires;
+			spin_lock(&timers->lock);
 		}
+
+		/*
+		 * need to check whether the timer has been
+		 * add to timers list again
+		 */
+		if ((timer->entry.next != NULL) &&
+				(expires > timer->expires))
+			expires = timer->expires;
 	}
+
+	spin_unlock(&timers->lock);
 
 	if (expires != ((unsigned long)~0)) {
 		timers->running_expires = expires;

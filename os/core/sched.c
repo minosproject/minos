@@ -21,25 +21,6 @@
 #include <minos/softirq.h>
 #include <minos/vmodule.h>
 
-static uint8_t const os_prio_map_table[256] = {
-	0u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, /* 0x00 to 0x0F */
-	4u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, /* 0x10 to 0x1F */
-	5u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, /* 0x20 to 0x2F */
-	4u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, /* 0x30 to 0x3F */
-	6u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, /* 0x40 to 0x4F */
-	4u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, /* 0x50 to 0x5F */
-	5u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, /* 0x60 to 0x6F */
-	4u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, /* 0x70 to 0x7F */
-	7u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, /* 0x80 to 0x8F */
-	4u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, /* 0x90 to 0x9F */
-	5u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, /* 0xA0 to 0xAF */
-	4u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, /* 0xB0 to 0xBF */
-	6u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, /* 0xC0 to 0xCF */
-	4u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, /* 0xD0 to 0xDF */
-	5u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, /* 0xE0 to 0xEF */
-	4u, 0u, 1u, 0u, 2u, 0u, 1u, 0u, 3u, 0u, 1u, 0u, 2u, 0u, 1u, 0u  /* 0xF0 to 0xFF */
-};
-
 static prio_t os_rdy_grp;
 static uint64_t __os_rdy_table;
 static uint8_t *os_rdy_table;
@@ -81,7 +62,6 @@ void set_task_ready(struct task *task)
 	if (is_realtime_task(task)) {
 		os_rdy_grp |= task->bity;
 		os_rdy_table[task->by] |= task->bitx;
-		isb();
 	} else {
 		pcpu = get_cpu_var(pcpu);
 		if (pcpu->pcpu_id != task->affinity)
@@ -89,6 +69,11 @@ void set_task_ready(struct task *task)
 
 		list_del(&task->stat_list);
 		list_add(&pcpu->ready_list, &task->stat_list);
+	}
+
+	if (task->delay) {
+		del_timer(&task->delay_timer);
+		task->delay = 0;
 	}
 }
 
@@ -103,7 +88,7 @@ void set_task_sleep(struct task *task)
 		os_rdy_table[task->by] &= ~task->bitx;
 		if (os_rdy_table[task->by] == 0)
 			os_rdy_grp &= ~task->bity;
-		isb();
+		dsb();
 	} else {
 		pcpu = get_cpu_var(pcpu);
 		if (pcpu->pcpu_id != task->affinity)
@@ -131,8 +116,8 @@ struct task *get_highest_task(uint8_t group, prio_t *ready)
 {
 	uint8_t x, y;
 
-	y = os_prio_map_table[group];
-	x = os_prio_map_table[ready[y]];
+	y = ffs_table[group];
+	x = ffs_table[ready[y]];
 
 	return os_task_table[(y << 3) + x];
 }
@@ -198,8 +183,8 @@ static void sched_new(struct pcpu *pcpu)
 	memset(current_map, 0, sizeof(current_map));
 
 	for (i = 0; i < NR_CPUS; i++) {
-		y = os_prio_map_table[rdy_grp];
-		x = os_prio_map_table[rdy_table[y]];
+		y = ffs_table[rdy_grp];
+		x = ffs_table[rdy_table[y]];
 		p = (y << 3) + x;
 		ncpu_highest[i] = p;
 
@@ -248,8 +233,8 @@ static void sched_new(struct pcpu *pcpu)
 	if (__rdy_table == 0)
 		return;
 
-	y = os_prio_map_table[rdy_grp];
-	x = os_prio_map_table[rdy_table[y]];
+	y = ffs_table[rdy_grp];
+	x = ffs_table[rdy_table[y]];
 	p = (y << 3) + x;
 	os_highest_rdy[0] = p;
 	dsb();
@@ -329,17 +314,28 @@ unsigned long sched_tick_handler(unsigned long data)
 	struct task *task;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 	unsigned long now = NOW();
+	unsigned long delta;
 
 	task = get_current_task();
+	delta = now - task->start_ns;
 
 	if (task->prio != OS_PRIO_PCPU) {
 		pr_debug("wrong task type on tick handler %d\n", task->pid);
 		return 0;
 	}
 
-	if ((now - task->start_ns) < (task->run_time * 1000000)) {
-		pr_warn("Bug happend on timer tick sched 0x%p 0x%p %d\n",
-				now, task->start_ns, task->run_time);
+	/*
+	 * there is a case that when the sched timer has been
+	 * expires when switch out task, once switch to a new
+	 * task, the interrupt will be triggered, but the old
+	 * task is switch out, so directly return, do not switch
+	 * to other task
+	 */
+	if (delta < MILLISECS(task->run_time)) {
+		pr_debug("Bug happend on timer tick sched 0x%p 0x%p %d %d\n",
+				now, task->start_ns, task->run_time, delta);
+		// sched_tick_enable(MILLISECS(task->run_time) - delta);
+		return 0;
 	}
 
 	list_del(&task->stat_list);
@@ -351,7 +347,7 @@ unsigned long sched_tick_handler(unsigned long data)
 	return 0;
 }
 
-static inline void recal_task_time_ready(struct task *task, struct pcpu *pcpu)
+static inline void recal_task_run_time(struct task *task, struct pcpu *pcpu)
 {
 	unsigned long now;
 
@@ -384,7 +380,7 @@ void sched(void)
 		panic("os_sched can not be called in interrupt\n");
 
 	if (!preempt_allowed() || atomic_read(&cur->lock_cpu)) {
-		pr_warn("os can not sched now %d %d %d\n", preempt_allowed(),
+		pr_debug("os can not sched now %d %d %d\n", preempt_allowed(),
 				atomic_read(&cur->lock_cpu), cur->prio);
 		return;
 	}
@@ -402,17 +398,6 @@ void sched(void)
 		set_task_sleep(cur);
 	}
 
-#if 0
-	/*
-	 * if the highest ready prio has already set by other
-	 * cpu just sched it TBD
-	 */
-	if (os_prio_cur[cpuid] != os_highest_rdy[cpuid]) {
-		sched_flag = 1;
-		goto __sched_new;
-	}
-#endif
-
 	sched_new(pcpu);
 
 	/* check whether current pcpu need to resched */
@@ -425,20 +410,18 @@ void sched(void)
 		}
 	}
 
-//__sched_new:
 	/*
 	 * if this task is a percpu task and it will sched
 	 * out not because its run time is expries, then will
 	 * set it to the correct stat
 	 */
-	if (sched_flag || is_idle_task(cur)) {
-		if (is_task_ready(cur))
-			recal_task_time_ready(cur, pcpu);
-
+	if (sched_flag || is_idle_task(cur))
 		next = get_next_run_task(pcpu);
-	}
 
 	if (cur != next) {
+		if (is_task_ready(cur))
+			recal_task_run_time(cur, pcpu);
+
 		switch_to_task(cur, next);
 		kernel_unlock();
 		arch_switch_task_sw();
@@ -510,7 +493,7 @@ out:
 	next = get_next_run_task(pcpu);
 	if (next != task) {
 		if (is_task_ready(task))
-			recal_task_time_ready(task, pcpu);
+			recal_task_run_time(task, pcpu);
 		switch_to_task(task, next);
 	}
 

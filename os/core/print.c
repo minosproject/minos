@@ -23,6 +23,8 @@
 #include <drivers/serial.h>
 #include <minos/smp.h>
 #include <minos/time.h>
+#include <minos/task.h>
+#include <minos/sched.h>
 
 #ifndef CONFIG_LOG_LEVEL
 #define CONFIG_LOG_LEVEL	PRINT_LEVEL_INFO
@@ -82,9 +84,17 @@ int level_print(int level, char *fmt, ...)
 	char buf[512];
 	char *buffer = buf;
 	unsigned long flags;
+	int pid;
+	struct task *task;
 
 	if (level > print_level)
 		return 0;
+
+	task = get_current_task();
+	if (task && os_is_running())
+		pid = get_task_pid(task);
+	else
+		pid = 999;
 
 	/*
 	 * after to handle the level we change
@@ -96,9 +106,16 @@ int level_print(int level, char *fmt, ...)
 	buffer += get_print_time(buffer);
 	*buffer++ = ' ';
 
+	/* add the processor id to the buffer */
 	i = smp_processor_id();
 	*buffer++ = (i / 10) + '0';
 	*buffer++ = (i % 10) + '0';
+
+	/* add the task pid to the buffer */
+	*buffer++ = ' ';
+	*buffer++ = (pid / 100) + '0';
+	*buffer++ = ((pid % 100) / 10) + '0';
+	*buffer++ = (pid % 10) + '0';
 
 	*buffer++ = ']';
 	*buffer++ = ' ';

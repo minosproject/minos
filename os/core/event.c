@@ -104,7 +104,6 @@ static void event_task_ready(struct task *task, void *msg,
 	int cpuid = smp_processor_id();
 
 	if (is_realtime_task(task) || (task->affinity == cpuid)) {
-		task->delay = 0;
 		task->msg = msg;
 		task->stat &= ~msk;
 		task->pend_stat = pend_stat;
@@ -115,10 +114,11 @@ static void event_task_ready(struct task *task, void *msg,
 		 * send a ipi to let the task's pcpu to update
 		 * the task's stat
 		 */
-		tevent = malloc(sizeof(*tevent));
+		tevent = alloc_task_event();
 		if (!tevent)
 			panic("no memory for event task event\n");
 
+		memset(tevent, 0, sizeof(*tevent));
 		tevent->task = task;
 		tevent->action = TASK_EVENT_EVENT_READY;
 		tevent->msg = msg;

@@ -115,4 +115,6 @@ typedef void (*void_func_t)(void);
 #define BUG() \
 	while (1)
 
+extern uint8_t const ffs_table[256];
+
 #endif

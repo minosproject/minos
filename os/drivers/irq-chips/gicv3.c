@@ -111,7 +111,7 @@ static void gicv3_clear_pending(uint32_t irq)
 
 	spin_lock(&gicv3_lock);
 
-	if (irq >= GICV3_NR_LOCAL_IRQS) {
+	if (irq < GICV3_NR_LOCAL_IRQS) {
 		iowrite32(BIT(irq), (void *)gicr_sgi_base() + GICR_ICPENDR0);
 	} else {
 		irq = irq - 32;

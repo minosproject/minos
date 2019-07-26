@@ -27,6 +27,34 @@ struct task *os_task_table[OS_NR_TASKS];
 
 static atomic_t os_task_nr;
 
+#define NR_TASK_EVENT	32
+static DEFINE_SPIN_LOCK(task_event_lock);
+static struct task_event task_events[NR_TASK_EVENT];
+static DECLARE_BITMAP(task_event_map, NR_TASK_EVENT);
+
+struct task_event *alloc_task_event(void)
+{
+	int bit;
+	struct task_event *event = NULL;
+	unsigned long flags;
+
+	spin_lock_irqsave(&task_event_lock, flags);
+	bit = find_next_zero_bit(task_event_map, NR_TASK_EVENT, 0);
+	if (bit < NR_TASK_EVENT) {
+		set_bit(bit, task_event_map);
+		event = &task_events[bit];
+	}
+
+	spin_unlock_irqrestore(&task_event_lock, flags);
+
+	return event;
+}
+
+void release_task_event(struct task_event *event)
+{
+	clear_bit(event->id, task_event_map);
+}
+
 int alloc_pid(prio_t prio, int cpuid)
 {
 	int pid = -1;
@@ -111,12 +139,13 @@ static void task_timeout_handler(unsigned long data)
 			task->pend_stat = TASK_STAT_PEND_TO;
 		} else
 			task->pend_stat = TASK_STAT_PEND_OK;
+
+		pcpu_need_resched();
 	} else {
 		pr_warn("Wrong task stat stat-%d pend-stat-%d\n",
 				task->stat, task->pend_stat);
 	}
 
-	pcpu_need_resched();
 	task_unlock(task);
 }
 
@@ -223,7 +252,7 @@ static void task_ipi_event_handler(void *data)
 		pr_err("got invalid argument in %s\n", __func__);
 
 	task = ev->task;
-	if (task->affinity != smp_processor_id())
+	if ((task->affinity != smp_processor_id()) || !is_percpu_task(task))
 		return;
 
 	switch (ev->action) {
@@ -255,18 +284,19 @@ static void task_ipi_event_handler(void *data)
 		break;
 	}
 
-	/* set resched flag according to the current prio
+	/*
+	 * set resched flag according to the current prio
 	 * BUG - Do not free memory in interrupt, need to
 	 * fix it
 	 */
-	free(ev);
+	release_task_event(ev);
 	pcpu_need_resched();
 }
 
 int task_ipi_event(struct task *task, struct task_event *ev, int wait)
 {
-	return smp_function_call(task->affinity, (void *)ev,
-			task_ipi_event_handler, wait);
+	return smp_function_call(task->affinity,
+			task_ipi_event_handler, (void *)ev, wait);
 }
 
 int create_task(char *name, task_func_t func,
@@ -340,13 +370,12 @@ int create_task(char *name, task_func_t func,
 		 * sched is running then resched the task
 		 * otherwise send a ipi to the task
 		 */
-		if (os_is_running()) {
-			if (is_realtime_task(task))
+		if (is_realtime_task(task)) {
+			if (os_is_running())
 				sched();
-			else {
-				if (aff != smp_processor_id())
-					pcpu_resched(aff);
-			}
+		} else {
+			if (aff != smp_processor_id())
+				pcpu_resched(aff);
 		}
 	}
 
@@ -418,3 +447,14 @@ int create_vcpu_task(char *name, task_func_t func, void *arg,
 	return create_task(name, func, arg, OS_PRIO_PCPU,
 			aff, stk_size, flags & TASK_FLAGS_VCPU);
 }
+
+static int task_events_init(void)
+{
+	int i;
+
+	for (i = 0; i < NR_TASK_EVENT; i++)
+		task_events[i].id = i;
+
+	return 0;
+}
+module_initcall(task_events_init);
