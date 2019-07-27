@@ -42,7 +42,7 @@ struct event {
 struct event *create_event(int type, void *pdata, char *name);
 void release_event(struct event *event);
 void event_task_wait(struct task *task, struct event *ev);
-void event_task_remove(struct task *task, struct event *ev);
+int event_task_remove(struct task *task, struct event *ev);
 struct task *event_get_waiter(struct event *ev);
 
 struct task *event_highest_task_ready(struct event *ev, void *msg,

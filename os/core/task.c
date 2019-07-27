@@ -125,25 +125,27 @@ static void task_timeout_handler(unsigned long data)
 	 */
 	task_lock(task);
 
-	if (task->delay) {
+	if (is_task_pending(task)) {
 		/* task is timeout and check its stat */
 		task->delay = 0;
 
-		if (!is_task_ready(task)) {
-			set_task_ready(task);
-			task->stat &= ~TASK_STAT_SUSPEND;
-		}
+		set_task_ready(task);
+		task->stat &= ~TASK_STAT_SUSPEND;
 
-		if (is_task_pending(task)) {
-			task->stat &= ~TASK_STAT_PEND_ANY;
-			task->pend_stat = TASK_STAT_PEND_TO;
-		} else
-			task->pend_stat = TASK_STAT_PEND_OK;
+		task->stat &= ~TASK_STAT_PEND_ANY;
+		task->pend_stat = TASK_STAT_PEND_TO;
 
 		pcpu_need_resched();
 	} else {
-		pr_warn("Wrong task stat stat-%d pend-stat-%d\n",
-				task->stat, task->pend_stat);
+		if (task->delay) {
+			task->delay = 0;
+			set_task_ready(task);
+			task->stat &= ~TASK_STAT_SUSPEND;
+			pcpu_need_resched();
+		} else {
+			pr_warn("wrong task state s-%d ps-%d\n",
+					task->stat, task->pend_stat);
+		}
 	}
 
 	task_unlock(task);
@@ -252,32 +254,37 @@ static void task_ipi_event_handler(void *data)
 		pr_err("got invalid argument in %s\n", __func__);
 
 	task = ev->task;
-	if ((task->affinity != smp_processor_id()) || !is_percpu_task(task))
+	if ((task->affinity != smp_processor_id()) ||
+			!is_percpu_task(task)) {
+		release_task_event(ev);
 		return;
+	}
+
+	task_lock(task);
 
 	switch (ev->action) {
 	case TASK_EVENT_EVENT_READY:
 		/* if the task has been timeout then skip it */
 		if (!is_task_pending(task))
-			return;
+			break;
 
-		task->delay = 0;
 		task->msg = ev->msg;
 		task->stat &= ~ev->msk;
-		task->pend_stat = ev->pend_stat;
 		task->wait_event = NULL;
 
 		set_task_ready(task);
+		pcpu_need_resched();
 		break;
 
 	case TASK_EVENT_FLAG_READY:
 		if (!is_task_pending(task))
-			return;
+			break;
 
 		task->delay = 0;
 		task->flags_rdy = ev->flags;
 		task->stat &= ev->msk;
-		task->pend_stat = ev->pend_stat;
+
+		pcpu_need_resched();
 		break;
 
 	default:
@@ -289,8 +296,8 @@ static void task_ipi_event_handler(void *data)
 	 * BUG - Do not free memory in interrupt, need to
 	 * fix it
 	 */
+	task_unlock(task);
 	release_task_event(ev);
-	pcpu_need_resched();
 }
 
 int task_ipi_event(struct task *task, struct task_event *ev, int wait)

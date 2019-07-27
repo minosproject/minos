@@ -151,16 +151,19 @@ int mbox_post(mbox_t *m, void *pmsg)
 {
 	int ret = 0;
 	unsigned long flags;
+	struct task *task;
 
 	if (invalid_mbox(m) || !pmsg)
 		return -EINVAL;
 
 	ticket_lock_irqsave(&m->lock, flags);
 	if (event_has_waiter(to_event(m))) {
-		event_highest_task_ready((struct event *)m, pmsg,
+		task = event_highest_task_ready((struct event *)m, pmsg,
 				TASK_STAT_MBOX, TASK_STAT_PEND_OK);
-		ticket_unlock_irqrestore(&m->lock, flags);
-		sched();
+		if (task) {
+			ticket_unlock_irqrestore(&m->lock, flags);
+			sched();
+		}
 
 		return 0;
 	}

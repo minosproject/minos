@@ -172,7 +172,6 @@ static int flag_task_ready(struct flag_node *node, flag_t flags)
 			panic("no memory for flag task event\n");
 
 		tevent->msk = TASK_STAT_FLAG;
-		tevent->pend_stat = TASK_STAT_PEND_OK;
 		tevent->task = task;
 		tevent->action = TASK_EVENT_FLAG_READY;
 		tevent->flags = flags;

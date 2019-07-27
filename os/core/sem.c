@@ -187,21 +187,25 @@ int sem_pend_abort(sem_t *sem, int opt)
 int sem_post(sem_t *sem)
 {
 	unsigned long flags;
+	struct task *task;
 
 	if (invalid_sem(sem))
 		return -EINVAL;
 
 	ticket_lock_irqsave(&sem->lock, flags);
 	if (event_has_waiter(to_event(sem))) {
-		event_highest_task_ready((struct event *)sem,
+		task = event_highest_task_ready((struct event *)sem,
 				NULL, TASK_STAT_SEM, TASK_STAT_PEND_OK);
-		ticket_unlock_irqrestore(&sem->lock, flags);
-		sched();
-		return 0;
+		if (task) {
+			ticket_unlock_irqrestore(&sem->lock, flags);
+			sched();
+			return 0;
+		}
 	}
 
 	if (sem->cnt < 65535)
 		sem->cnt++;
+
 	ticket_unlock_irqrestore(&sem->lock, flags);
 
 	return 0;

@@ -87,6 +87,7 @@ struct task {
 
 	/* the event that this task hold currently */
 	atomic_t lock_cpu;
+	atomic_t event_timeout;
 	struct event *lock_event;
 	struct event *wait_event;
 
@@ -138,7 +139,6 @@ struct task_event {
 	int action;
 	void *msg;
 	uint32_t msk;
-	int pend_stat;
 	uint32_t delay;
 	flag_t flags;
 };
@@ -241,28 +241,36 @@ int create_task(char *name, task_func_t func,
 struct task_event *alloc_task_event(void);
 void release_task_event(struct task_event *event);
 
-#define task_lock(task)				\
-	do {					\
-		if (is_realtime_task(task))	\
-			kernel_lock();		\
+#define task_lock(task)					\
+	do {						\
+		if (is_realtime_task(task))		\
+			kernel_lock();			\
+		else					\
+			spin_lock(&task->lock);		\
 	} while (0)
 
 #define task_unlock(task)				\
 	do {						\
 		if (is_realtime_task(task)) 		\
 			kernel_unlock();		\
+		else					\
+			spin_unlock(&task->lock);	\
 	} while (0)
 
-#define task_lock_irqsave(task, flags)				\
-	do {							\
-		if (is_realtime_task(task)) 			\
-			kernel_lock_irqsave(flags);		\
+#define task_lock_irqsave(task, flags)			\
+	do {						\
+		if (is_realtime_task(task)) 		\
+			kernel_lock_irqsave(flags);	\
+		else					\
+			spin_unlock_irqrestore(&task->lock, flags);	\
 	} while (0)
 
-#define task_unlock_irqrestore(task, flags)					\
-	do {								\
-		if (is_realtime_task(task)) 				\
-			kernel_unlock_irqrestore(flags);		\
+#define task_unlock_irqrestore(task, flags)		\
+	do {						\
+		if (is_realtime_task(task)) 		\
+			kernel_unlock_irqrestore(flags);\
+		else					\
+			spin_unlock_irqrestore(&task->lock, flags);	\
 	} while (0)
 
 #endif

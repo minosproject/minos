@@ -72,16 +72,32 @@ void event_task_wait(struct task *task, struct event *ev)
 		list_add_tail(&ev->wait_list, &task->event_list);
 }
 
-void event_task_remove(struct task *task, struct event *ev)
+int event_task_remove(struct task *task, struct event *ev)
 {
-	if (task->prio > OS_LOWEST_PRIO) {
-		list_del(&task->event_list);
-		return;
+	int pending = is_task_pending(task);
+
+	/* if task has already timeout or deleted */
+	if ((task->prio > OS_LOWEST_PRIO)) {
+		if (task->event_list.next != NULL) {
+			list_del(&task->event_list);
+			task->event_list.next = NULL;
+
+			/* if the task is pending now then success */
+			if (pending)
+				return 0;
+		}
+
+		return -EPERM;
+	} else {
+		ev->wait_tbl[task->by] &= ~task->bitx;
+		if (ev->wait_tbl[task->by] == 0)
+			ev->wait_grp &= ~task->bity;
+
+		if (pending)
+			return 0;
 	}
 
-	ev->wait_tbl[task->by] &= ~task->bitx;
-	if (ev->wait_tbl[task->by] == 0)
-		ev->wait_grp &= ~task->bity;
+	return -EPERM;
 }
 
 struct task *event_get_waiter(struct event *ev)
@@ -97,58 +113,53 @@ struct task *event_get_waiter(struct event *ev)
 	return NULL;
 }
 
-static void event_task_ready(struct task *task, void *msg,
+static void inline event_task_ready(struct task *task, void *msg,
 		uint32_t msk, int pend_stat)
 {
-	struct task_event *tevent;
-	int cpuid = smp_processor_id();
+	task->pend_stat = pend_stat;
 
-	if (is_realtime_task(task) || (task->affinity == cpuid)) {
-		task->msg = msg;
-		task->stat &= ~msk;
-		task->pend_stat = pend_stat;
-		task->wait_event = NULL;
+	task->msg = msg;
+	task->stat &= ~msk;
+	task->wait_event = NULL;
+
+	if (task->affinity != smp_processor_id())
+		pcpu_resched(task->affinity);
+	else
 		set_task_ready(task);
-	} else {
-		/*
-		 * send a ipi to let the task's pcpu to update
-		 * the task's stat
-		 */
-		tevent = alloc_task_event();
-		if (!tevent)
-			panic("no memory for event task event\n");
-
-		memset(tevent, 0, sizeof(*tevent));
-		tevent->task = task;
-		tevent->action = TASK_EVENT_EVENT_READY;
-		tevent->msg = msg;
-		tevent->msk = msk;
-		tevent->pend_stat = pend_stat;
-
-		task_ipi_event(task, tevent, 0);
-	}
 }
 
 struct task *event_highest_task_ready(struct event *ev, void *msg,
 		uint32_t msk, int pend_stat)
 {
+	int retry = 0;
 	struct task *task;
 	unsigned long flags = 0;
 
+again:
 	task = event_get_waiter(ev);
 	if (!task)
-		panic("something wrong in event_get_waiter\n");
+		return NULL;
 
 	/*
 	 * need to check whether this task has got
 	 * timeout firstly, since even it is timeout
 	 * the task will not remove from the waiter
 	 * list soon.
+	 *
+	 * this function will race with task_timeout_handler
+	 * so checkt the pend_stat to avoid race
 	 */
 	task_lock_irqsave(task, flags);
-	event_task_remove(task, ev);
-	event_task_ready(task, msg, msk, pend_stat);
+	if (!event_task_remove(task, ev)) {
+		event_task_ready(task, msg, msk, pend_stat);
+		retry = 0;
+	} else {
+		retry = 1;
+	}
 	task_unlock_irqrestore(task, flags);
+
+	if (retry)
+		goto again;
 
 	return task;
 }

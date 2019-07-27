@@ -123,7 +123,7 @@ int mutex_del(mutex_t *mutex, int opt)
 int mutex_pend(mutex_t *m, uint32_t timeout)
 {
 	int ret;
-	unsigned long flags;
+	unsigned long flags = 0;
 	struct task *owner;
 	struct task *task = get_current_task();
 
@@ -160,7 +160,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 		atomic_set(&owner->lock_cpu, 1);
 
 	/* set the task's state and suspend the task */
-	task_lock_irqsave(task,flags);
+	task_lock_irqsave(task, flags);
 	task->stat |= TASK_STAT_MUTEX;
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->delay = timeout;
@@ -217,9 +217,9 @@ int mutex_post(mutex_t *m)
 	 * no task, then set the mutex is available else
 	 * resched
 	 */
-	if (event_has_waiter(to_event(m))) {
-		task = event_highest_task_ready((struct event *)m, NULL,
-				TASK_STAT_MUTEX, TASK_STAT_PEND_OK);
+	task = event_highest_task_ready((struct event *)m, NULL,
+			TASK_STAT_MUTEX, TASK_STAT_PEND_OK);
+	if (task) {
 		m->cnt = task->pid;
 		m->data = task;
 

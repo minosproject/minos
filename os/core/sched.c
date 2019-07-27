@@ -101,7 +101,7 @@ void set_task_sleep(struct task *task)
 
 void set_task_suspend(uint32_t delay)
 {
-	unsigned long flags;
+	unsigned long flags = 0;
 	struct task *task = get_current_task();
 
 	task_lock_irqsave(task, flags);
