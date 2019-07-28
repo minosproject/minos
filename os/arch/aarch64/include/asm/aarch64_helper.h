@@ -331,6 +331,7 @@ DEFINE_RENAME_SYSREG_READ_FUNC(ich_vtr_el2, ICH_VTR_EL2)
 #define read_current_el()	read_CurrentEl()
 
 #define dsb()			dsbsy()
+#define dmb()			dmbsy()
 
 #define read_midr()		read_midr_el1()
 

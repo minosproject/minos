@@ -161,8 +161,9 @@ static void task_init(struct task *task, char *name,
 
 	task->flags = opt;
 	task->pid = pid;
-
 	task->prio = prio;
+
+	isb();
 
 	if (prio <= OS_LOWEST_PRIO) {
 		task->by = prio >> 3;

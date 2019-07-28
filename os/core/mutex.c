@@ -127,6 +127,8 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	struct task *owner;
 	struct task *task = get_current_task();
 
+	dmb();
+
 	if (invalid_mutex(m) || int_nesting() || !preempt_allowed())
 		return -EINVAL;
 

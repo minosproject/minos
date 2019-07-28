@@ -11,9 +11,24 @@ DECLARE_PER_CPU(int, __need_resched);
 DECLARE_PER_CPU(int, __int_nesting);
 DECLARE_PER_CPU(int, __os_running);
 
-#define __preempt_disable()	get_cpu_var(__preempt)++
-#define __preempt_enable()	get_cpu_var(__preempt)--
-#define preempt_allowed()	(!get_cpu_var(__preempt))
+#define __preempt_disable() \
+	do { \
+		get_cpu_var(__preempt)++; \
+		dsb(); \
+	} while (0)
+
+#define __preempt_enable() \
+	do { \
+		get_cpu_var(__preempt)--; \
+		dsb(); \
+	} while (0)
+
+static inline int preempt_allowed(void)
+{
+	dmb();
+
+	return (!get_cpu_var(__preempt));
+}
 
 static inline void set_need_resched(void)
 {
@@ -58,6 +73,8 @@ static inline void dec_int_nesting(void)
 
 static inline int int_nesting(void)
 {
+	dmb();
+
 	return get_cpu_var(__int_nesting);
 }
 
@@ -75,7 +92,6 @@ static inline void set_os_running(void)
 static void inline preempt_enable(void)
 {
 	__preempt_enable();
-	dsb();
 
 	if (preempt_allowed()) {
 		if ((!int_nesting()) && need_resched() && os_is_running()) {
@@ -88,7 +104,6 @@ static void inline preempt_enable(void)
 static void inline preempt_disable(void)
 {
 	__preempt_disable();
-	dsb();
 }
 
 #endif
