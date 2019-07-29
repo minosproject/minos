@@ -13,7 +13,7 @@ void dump_stack(gp_regs *regs, unsigned long *stack);
 	if ((condition)) {		 \
 		do {			 \
 			panic("BUG_ON"); \
-		} while (1); 		 \
+		} while (0); 		 \
 	}
 
 #endif

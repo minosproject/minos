@@ -2,6 +2,7 @@
 #define _MINOS_TYPES_H_
 
 #include <asm/asm_types.h>
+#include <asm/barrier.h>
 #include <minos/compiler.h>
 
 typedef __u32	u32;

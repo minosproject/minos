@@ -76,25 +76,21 @@ static inline struct task *get_next_task(void)
 static inline void set_current_task(struct task *task)
 {
 	get_cpu_var(percpu_current_task) = task;
-	dsb();
 }
 
 static inline void set_next_task(struct task *task)
 {
 	get_cpu_var(percpu_next_task) = task;
-	dsb();
 }
 
 static inline void set_current_prio(prio_t prio)
 {
 	os_prio_cur[smp_processor_id()] = prio;
-	dsb();
 }
 
 static inline void set_next_prio(prio_t prio)
 {
 	os_highest_rdy[smp_processor_id()] = prio;
-	dsb();
 }
 
 static inline void pcpu_need_resched(void)

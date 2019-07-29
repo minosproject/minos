@@ -25,21 +25,17 @@ DECLARE_PER_CPU(int, __os_running);
 
 static inline int preempt_allowed(void)
 {
-	dmb();
-
 	return (!get_cpu_var(__preempt));
 }
 
 static inline void set_need_resched(void)
 {
 	get_cpu_var(__need_resched) = 1;
-	dsb();
 }
 
 static inline void clear_need_resched(void)
 {
 	get_cpu_var(__need_resched) = 0;
-	dsb();
 }
 
 static inline int need_resched(void)
@@ -50,31 +46,25 @@ static inline int need_resched(void)
 static inline void dec_need_resched(void)
 {
 	get_cpu_var(__need_resched)--;
-	dsb();
 }
 
 static inline void inc_need_resched(void)
 {
 	get_cpu_var(__need_resched)++;
-	dsb();
 }
 
 static inline void inc_int_nesting(void)
 {
 	get_cpu_var(__int_nesting)++;
-	dsb();
 }
 
 static inline void dec_int_nesting(void)
 {
 	get_cpu_var(__int_nesting)--;
-	dsb();
 }
 
 static inline int int_nesting(void)
 {
-	dmb();
-
 	return get_cpu_var(__int_nesting);
 }
 
@@ -86,7 +76,6 @@ static inline int os_is_running(void)
 static inline void set_os_running(void)
 {
 	get_cpu_var(__os_running) = 1;
-	dsb();
 }
 
 static void inline preempt_enable(void)
