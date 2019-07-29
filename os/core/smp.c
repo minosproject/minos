@@ -27,6 +27,7 @@ uint64_t *smp_affinity_id;
 phy_addr_t smp_holding_address[CONFIG_NR_CPUS];
 
 cpumask_t cpu_online;
+static int cpus_all_up;
 
 struct smp_call {
 	smp_function fn;
@@ -60,6 +61,11 @@ static void inline smp_call_unlock(struct smp_call *call)
 {
 	call->flags &= ~SMP_CALL_LOCKED;
 	dsb();
+}
+
+int is_cpus_all_up(void)
+{
+	return cpus_all_up;
 }
 
 int smp_function_call(int cpu, smp_function fn, void *data, int wait)
@@ -144,17 +150,20 @@ void smp_cpus_up(void)
 		}
 
 		pr_info("waiting 2 seconds for cpu-%d up\n", i);
-		while ((smp_affinity_id[i] == 0) && (cnt < 20)) {
-			mdelay(100);
+		while ((smp_affinity_id[i] == 0) && (cnt < 2000)) {
+			mdelay(1);
 			cnt++;
 		}
 
 		if (smp_affinity_id[i] == 0) {
-			pr_debug("cpu-%d is up with affinity id 0x%p\n",
+			pr_err("cpu-%d is not up with affinity id 0x%p\n",
 					i, smp_affinity_id[i]);
 		} else
 			cpumask_set_cpu(i, &cpu_online);
 	}
+
+	cpus_all_up = 1;
+	wmb();
 }
 
 void smp_init(void)

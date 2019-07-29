@@ -154,6 +154,20 @@ void boot_secondary(void)
 
 	pr_info("cpu-%d is up\n", cpuid);
 
+	/*
+	 * need wait for all cpus up then excuted below
+	 * task, otherwise the mem content hold by different
+	 * cpu may be different because the cache issue
+	 *
+	 * eg: the cpu1 called create_idle_task and the
+	 * idle task is created sucessfully but at the same
+	 * time the cpu2 is powered off
+	 *
+	 * waitting for all the cpu power on
+	 */
+	while (!is_cpus_all_up())
+		mb();
+
 	early_init_percpu();
 
 	arch_init_percpu();

@@ -19,6 +19,7 @@ extern cpumask_t cpu_online;
 typedef void (*smp_function)(void *);
 
 void smp_cpus_up(void);
+int is_cpus_all_up(void);
 void smp_init(void);
 int smp_function_call(int cpu, smp_function fn,
 		void *data, int wait);
