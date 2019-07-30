@@ -35,7 +35,7 @@ static inline void ticket_lock(ticketlock_t *tl)
 	mb();
 
 	while (ticket != atomic_read(&tl->ticket_in_service))
-		dsb();
+		mb();
 }
 
 static inline void ticket_unlock(ticketlock_t *tl)
@@ -44,8 +44,8 @@ static inline void ticket_unlock(ticketlock_t *tl)
 
 	ticket = atomic_read(&tl->ticket_in_service);
 	atomic_set(&tl->ticket_in_service, ticket + 1);
-	mb();
 	preempt_enable();
+	mb();
 }
 
 #define ticket_lock_irqsave(l, flags) \

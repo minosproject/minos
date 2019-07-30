@@ -3,6 +3,7 @@
 
 #include <minos/percpu.h>
 #include <minos/atomic.h>
+#include <minos/print.h>
 
 extern void sched(void);
 
@@ -94,6 +95,7 @@ static void inline preempt_enable(void)
 static void inline preempt_disable(void)
 {
 	__preempt_disable();
+	mb();
 }
 
 #endif

@@ -32,6 +32,15 @@ void dump_stack(gp_regs *regs, unsigned long *stack)
 	unsigned long flags;
 
 	spin_lock_irqsave(&dump_lock, flags);
+	/*
+	 * first dump some percpu data to show the stat
+	 * of the cpu such as premeept need_resched etc...
+	 */
+	pr_fatal("preempt:%d need_resche:%d int_nesting:%d os_running:%d\n",
+			preempt_allowed(), need_resched(),
+			int_nesting(), os_is_running());
+	rmb();
+
 	arch_dump_stack(regs, stack);
 	spin_unlock_irqrestore(&dump_lock, flags);
 }

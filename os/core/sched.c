@@ -305,10 +305,9 @@ void switch_to_task(struct task *cur, struct task *next)
 	else
 		prio = next->prio;
 
-	wmb();
-
 	os_prio_cur[cpuid] = prio;
 	set_next_task(next);
+	mb();
 }
 
 unsigned long sched_tick_handler(unsigned long data)

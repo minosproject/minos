@@ -131,8 +131,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 
 	if (invalid_mutex(m) || int_nesting() || !preempt_allowed())
 		return -EINVAL;
-
-	rmb();
+	mb();
 
 	ticket_lock(&m->lock);
 	if (m->cnt == OS_MUTEX_AVAILABLE) {
@@ -184,7 +183,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 		break;
 
 	case TASK_STAT_PEND_ABORT:
-		ret = EABORT;
+		ret = -EABORT;
 		break;
 
 	case TASK_STAT_PEND_TO:
@@ -230,6 +229,7 @@ int mutex_post(mutex_t *m)
 	if (task) {
 		m->cnt = task->pid;
 		m->data = task;
+		m->owner = task->pid;
 		mb();
 
 		ticket_unlock(&m->lock);
@@ -240,6 +240,7 @@ int mutex_post(mutex_t *m)
 
 	m->cnt = OS_MUTEX_AVAILABLE;
 	m->data = NULL;
+	m->owner = 0;
 	mb();
 
 	ticket_unlock(&m->lock);
