@@ -49,6 +49,8 @@ int mutex_accept(mutex_t *mutex)
 	if(int_nesting())
 		return -EPERM;
 
+	rmb();
+
 	/* if the mutex is avaliable now, lock it */
 	ticket_lock_irqsave(&mutex->lock, flags);
 	if (mutex->cnt == OS_MUTEX_AVAILABLE) {
@@ -127,16 +129,18 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	struct task *owner;
 	struct task *task = get_current_task();
 
-	dmb();
-
 	if (invalid_mutex(m) || int_nesting() || !preempt_allowed())
 		return -EINVAL;
+
+	rmb();
 
 	ticket_lock(&m->lock);
 	if (m->cnt == OS_MUTEX_AVAILABLE) {
 		m->owner = task->pid;
 		m->data = (void *)task;
 		m->cnt = task->pid;
+
+		wmb();
 
 		/* to be done  need furture design */
 		task->lock_event = to_event(m);
@@ -205,6 +209,8 @@ int mutex_post(mutex_t *m)
 	if (invalid_mutex(m) || int_nesting() || !preempt_allowed())
 		return -EPERM;
 
+	rmb();
+
 	ticket_lock(&m->lock);
 	if (task != (struct task *)m->data) {
 		ticket_unlock(&m->lock);
@@ -224,6 +230,7 @@ int mutex_post(mutex_t *m)
 	if (task) {
 		m->cnt = task->pid;
 		m->data = task;
+		mb();
 
 		ticket_unlock(&m->lock);
 
@@ -233,6 +240,8 @@ int mutex_post(mutex_t *m)
 
 	m->cnt = OS_MUTEX_AVAILABLE;
 	m->data = NULL;
+	mb();
+
 	ticket_unlock(&m->lock);
 
 	return 0;

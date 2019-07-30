@@ -382,7 +382,7 @@ void sched(void)
 		panic("os_sched can not be called in interrupt\n");
 
 	if (!preempt_allowed() || atomic_read(&cur->lock_cpu)) {
-		pr_debug("os can not sched now %d %d %d\n", preempt_allowed(),
+		pr_warn("os can not sched now %d %d %d\n", preempt_allowed(),
 				atomic_read(&cur->lock_cpu), cur->prio);
 		return;
 	}
@@ -456,7 +456,7 @@ void irq_exit(gp_regs *regs)
 	p = !preempt_allowed();
 	n = !need_resched();
 	lk = atomic_read(&task->lock_cpu);
-	dsb();
+	rmb();
 
 	if (p || n || lk)
 		return;

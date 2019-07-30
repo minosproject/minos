@@ -14,13 +14,11 @@ DECLARE_PER_CPU(int, __os_running);
 #define __preempt_disable() \
 	do { \
 		get_cpu_var(__preempt)++; \
-		dsb(); \
 	} while (0)
 
 #define __preempt_enable() \
 	do { \
 		get_cpu_var(__preempt)--; \
-		dsb(); \
 	} while (0)
 
 static inline int preempt_allowed(void)
@@ -82,12 +80,15 @@ static void inline preempt_enable(void)
 {
 	__preempt_enable();
 
-	if (preempt_allowed()) {
-		if ((!int_nesting()) && need_resched() && os_is_running()) {
+#if 0
+	if (preempt_allowed() && need_resched()) {
+		if ((!int_nesting()) && os_is_running()) {
 			clear_need_resched();
 			sched();
 		}
 	}
+#endif
+	mb();
 }
 
 static void inline preempt_disable(void)

@@ -37,3 +37,14 @@ void percpus_init(void)
 			(size_t)(&__percpu_section_size) * i;
 	}
 }
+
+static int percpu_module_init(void)
+{
+	int i;
+
+	for (i = 0; i < CONFIG_NR_CPUS; i++)
+		pr_info("percpu offset [%d] - 0x%x\n", i, percpu_offset[i]);
+
+	return 0;
+}
+early_initcall(percpu_module_init);
