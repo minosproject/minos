@@ -377,12 +377,14 @@ void sched(void)
 	struct task *next = cur;
 	int cpuid = smp_processor_id();
 
+	mb();
+
 	if (unlikely(int_nesting()))
 		panic("os_sched can not be called in interrupt\n");
 
-	if (!preempt_allowed() || atomic_read(&cur->lock_cpu)) {
-		pr_warn("os can not sched now %d %d %d\n", preempt_allowed(),
-				atomic_read(&cur->lock_cpu), cur->prio);
+	if ((!preempt_allowed()) || atomic_read(&cur->lock_cpu)) {
+		pr_warn("os can not sched now %d %d\n", preempt_allowed(),
+				atomic_read(&cur->lock_cpu));
 		return;
 	}
 
@@ -419,6 +421,8 @@ void sched(void)
 	if (sched_flag || is_idle_task(cur))
 		next = get_next_run_task(pcpu);
 
+	mb();
+
 	if (cur != next) {
 		if (is_task_ready(cur))
 			recal_task_run_time(cur, pcpu);
@@ -452,10 +456,10 @@ void irq_exit(gp_regs *regs)
 	 * if preempt is disabled or current task lock
 	 * the cpu just return
 	 */
+	mb();
 	p = !preempt_allowed();
 	n = !need_resched();
 	lk = atomic_read(&task->lock_cpu);
-	rmb();
 
 	if (p || n || lk)
 		return;
@@ -466,15 +470,17 @@ void irq_exit(gp_regs *regs)
 	 * if the task is suspend state, means next the cpu
 	 * will call sched directly, so do not sched out here
 	 */
-	if (is_task_suspend(task))
+	if (!is_task_ready(task))
 		goto exit_0;
 
+#if 0
 	/*
 	 * if the highest prio is update by other cpu, then
 	 * sched out directly
 	 */
 	if ((os_prio_cur[cpuid] != os_highest_rdy[cpuid]))
 		goto out;
+#endif
 
 	sched_new(pcpu);
 
@@ -492,6 +498,7 @@ out:
 	 * to sched to anther task
 	 */
 	next = get_next_run_task(pcpu);
+	mb();
 	if (next != task) {
 		if (is_task_ready(task))
 			recal_task_run_time(task, pcpu);

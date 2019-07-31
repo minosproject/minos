@@ -36,6 +36,7 @@ func smp_processor_id
 	mov	x3, #CONFIG_NR_CPUS_CLUSTER0
 	mul	x2, x2, x3
 	add	x0, x2, x1
+	dsb	sy
 	ret
 endfunc smp_processor_id
 

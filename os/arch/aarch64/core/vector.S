@@ -105,6 +105,7 @@ arch_switch_task_sw:
 	str	x0, [sp, #-8]!
 	mrs	x0, esr_el2
 	str	x0, [sp, #-8]!
+	dsb	sy
 
 	mrs	x0, daif
 	mrs	x1, nzcv
@@ -114,6 +115,7 @@ arch_switch_task_sw:
 	str	x0, [sp, #-8]!
 
 	str	x30, [sp, #-8]!
+	dsb	sy
 
 	ldr	x5, =per_cpu_percpu_current_task
 	ldr	x4, =per_cpu_percpu_next_task
@@ -167,6 +169,7 @@ arch_switch_task_sw:
 	ldp     x26, x27, [sp], #16
 	ldp     x28, x29, [sp], #16
 	ldr	x30, [sp], #8
+	isb
 	eret
 	.cfi_endproc
 
@@ -196,6 +199,7 @@ __sync_handler:
 	str	x0, [sp, #-8]!
 	mrs	x0, elr_el2
 	str	x0, [sp, #-8]!
+	dsb	sy
 
 	mov	x0, sp
 	bl	sync_c_handler			// go to the c handler
@@ -223,6 +227,7 @@ __sync_handler:
 	ldp     x26, x27, [sp], #16
 	ldp     x28, x29, [sp], #16
 	ldr	x30, [sp], #8
+	isb
 	eret
 	.cfi_endproc
 
@@ -320,5 +325,6 @@ __switch_to_task:
 	ldp     x26, x27, [sp], #16
 	ldp     x28, x29, [sp], #16
 	ldr	x30, [sp], #8
+	isb
 	eret
 	.cfi_endproc

@@ -58,8 +58,8 @@ func atomic_add_return
 	add	w2, w2, w0
 	stlxr	w3, w2, [x1]
 	cbnz	w3, 3b
-	dmb	ish
 	mov	w0, w2
+	dsb	sy
 	ret
 endfunc atomic_add_return
 
@@ -69,8 +69,8 @@ func atomic_sub_return
 	sub	w2, w2, w0
 	stxr	w3, w2, [x1]
 	cbnz	w3, 4b
-	dmb	ish
 	mov	w0, w2
+	dsb	sy
 	ret
 endfunc atomic_sub_return
 
@@ -80,8 +80,8 @@ func atomic_add_return_old
 	add	w2, w2, w0
 	stlxr	w3, w2, [x1]
 	cbnz	w3, 3b
-	dmb	ish
 	sub	w0, w2, w0
+	dsb	sy
 	ret
 endfunc atomic_add_return_old
 
@@ -91,7 +91,7 @@ func atomic_sub_return_old
 	sub	w2, w2, w0
 	stxr	w3, w2, [x1]
 	cbnz	w3, 4b
-	dmb	ish
 	add	w0, w2, w0
+	dsb	sy
 	ret
 endfunc atomic_sub_return_old

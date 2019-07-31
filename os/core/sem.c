@@ -152,8 +152,9 @@ int sem_pend_abort(sem_t *sem, int opt)
 {
 	int nbr_tasks = 0;
 	unsigned long flags;
+	struct task *task;
 
-	if (invalid_sem(sem) || int_nesting() || preempt_allowed())
+	if (invalid_sem(sem) || int_nesting() || !preempt_allowed())
 		return -EINVAL;
 
 	ticket_lock_irqsave(&sem->lock, flags);
@@ -161,16 +162,18 @@ int sem_pend_abort(sem_t *sem, int opt)
 		switch (opt) {
 		case OS_PEND_OPT_BROADCAST:
 			while (event_has_waiter((struct event *)sem)) {
-				event_highest_task_ready((struct event *)sem,
+				task = event_highest_task_ready((struct event *)sem,
 					NULL, TASK_STAT_SEM, TASK_STAT_PEND_ABORT);
-				nbr_tasks++;
+				if (task)
+					nbr_tasks++;
 			}
 			break;
 		case OS_PEND_OPT_NONE:
 		default:
-			event_highest_task_ready((struct event *)sem,
+			task = event_highest_task_ready((struct event *)sem,
 				NULL, TASK_STAT_SEM, TASK_STAT_PEND_OK);
-			nbr_tasks++;
+			if (task)
+				nbr_tasks++;
 			break;
 		}
 

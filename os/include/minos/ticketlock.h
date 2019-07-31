@@ -30,6 +30,7 @@ static inline void ticket_lock(ticketlock_t *tl)
 {
 	int ticket;
 
+	rmb();
 	preempt_disable();
 	ticket = atomic_inc_return_old(&tl->next_ticket);
 	mb();
@@ -42,6 +43,7 @@ static inline void ticket_unlock(ticketlock_t *tl)
 {
 	int ticket;
 
+	rmb();
 	ticket = atomic_read(&tl->ticket_in_service);
 	atomic_set(&tl->ticket_in_service, ticket + 1);
 	preempt_enable();

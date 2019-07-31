@@ -49,8 +49,6 @@ int mutex_accept(mutex_t *mutex)
 	if(int_nesting())
 		return -EPERM;
 
-	rmb();
-
 	/* if the mutex is avaliable now, lock it */
 	ticket_lock_irqsave(&mutex->lock, flags);
 	if (mutex->cnt == OS_MUTEX_AVAILABLE) {
@@ -131,7 +129,6 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 
 	if (invalid_mutex(m) || int_nesting() || !preempt_allowed())
 		return -EINVAL;
-	mb();
 
 	ticket_lock(&m->lock);
 	if (m->cnt == OS_MUTEX_AVAILABLE) {
@@ -208,10 +205,9 @@ int mutex_post(mutex_t *m)
 	if (invalid_mutex(m) || int_nesting() || !preempt_allowed())
 		return -EPERM;
 
-	rmb();
-
 	ticket_lock(&m->lock);
 	if (task != (struct task *)m->data) {
+		pr_err("mutex-%s not belong to this task\n", m->name);
 		ticket_unlock(&m->lock);
 		return -EINVAL;
 	}
