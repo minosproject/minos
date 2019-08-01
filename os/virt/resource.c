@@ -17,13 +17,13 @@
 #include <minos/minos.h>
 #include <minos/list.h>
 #include <minos/of.h>
-#include <minos/vm.h>
-#include <minos/vdev.h>
-#include <minos/virq_chip.h>
+#include <virt/vm.h>
+#include <virt/vdev.h>
+#include <virt/virq_chip.h>
 #include <minos/mm.h>
-#include <minos/vmm.h>
+#include <virt/vmm.h>
 #include <minos/irq.h>
-#include <minos/mailbox.h>
+#include <virt/mailbox.h>
 
 static void *virqchip_start;
 static void *virqchip_end;
@@ -79,7 +79,7 @@ static void *create_vm_irqchip_of(struct device_node *node, void *arg)
 	return node;
 }
 
-int get_device_irq_index(struct vm *vm, struct device_node *node,
+int vm_get_device_irq_index(struct vm *vm, struct device_node *node,
 		uint32_t *irq, unsigned long *flags, int index)
 {
 	int irq_cells, len, i;

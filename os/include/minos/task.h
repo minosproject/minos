@@ -6,6 +6,11 @@
 #include <config/config.h>
 #include <minos/timer.h>
 
+#ifdef CONFIG_VIRT
+struct vm;
+struct vcpu;
+#endif
+
 /* the max realtime task will be 64 */
 #define OS_NR_TASKS		512
 #define OS_REALTIME_TASK	64
@@ -38,6 +43,7 @@
 #define TASK_STAT_FLAG          0x20  /* Pending on event flag group */
 #define TASK_STAT_MULTI         0x80  /* Pending on multiple events */
 #define TASK_STAT_RUNNING	0x100 /* Task is running */
+#define TASK_STAT_STOPPED	0x200
 
 #define TASK_STAT_PEND_ANY      (TASK_STAT_SEM | TASK_STAT_MBOX | TASK_STAT_Q | TASK_STAT_MUTEX | TASK_STAT_FLAG)
 
@@ -116,7 +122,11 @@ struct task {
 
 	char name[TASK_NAME_SIZE + 1];
 
-	void *pdata;		/* pointer to the vcpu data */
+#ifdef CONFIG_VIRT
+	struct vcpu *vcpu;
+	struct vm *vm;
+#endif
+	void *pdata;
 	void *arch_data;	/* arch data to this task */
 	void **context;
 } __align_cache_line;

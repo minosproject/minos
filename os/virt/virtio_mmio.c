@@ -15,16 +15,18 @@
  */
 
 #include <minos/minos.h>
-#include <minos/vmm.h>
+#include <virt/vmm.h>
 #include <minos/mm.h>
 #include <minos/bitmap.h>
-#include <minos/virtio.h>
+#include <virt/virtio.h>
 #include <asm/io.h>
 #include <minos/sched.h>
-#include <minos/vdev.h>
-#include <minos/virq.h>
+#include <virt/vdev.h>
+#include <virt/virq.h>
 #include <common/virtio_mmio.h>
-#include <minos/resource.h>
+#include <virt/resource.h>
+#include <virt/vmcs.h>
+#include <minos/of.h>
 
 #define vdev_to_virtio(vd) \
 	container_of(vd, struct virtio_device, vdev)
@@ -183,7 +185,7 @@ static void *virtio_create_device(struct vm *vm, struct device_node *node)
 	if (ret || (size == 0))
 		return NULL;
 
-	ret = get_device_irq_index(vm, node, &irq, &flags, 0);
+	ret = vm_get_device_irq_index(vm, node, &irq, &flags, 0);
 	if (ret)
 		return NULL;
 

@@ -2,7 +2,7 @@
 #define _MINOS_VGICV3_H_
 
 #include <minos/smp.h>
-#include <minos/vdev.h>
+#include <virt/vdev.h>
 
 struct vgic_gicd {
 	uint32_t gicd_ctlr;

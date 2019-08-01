@@ -1,7 +1,7 @@
 #ifndef __MINOS_VIRQ_H__
 #define __MINOS_VIRQ_H__
 
-#include <minos/vcpu.h>
+#include <virt/vm.h>
 #include <minos/cpumask.h>
 #include <config/config.h>
 

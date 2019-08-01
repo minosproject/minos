@@ -22,6 +22,48 @@
 
 #define OF_MAX_DEEPTH	5
 
+int fdt_n_size_cells(void *dtb, int node)
+{
+	fdt32_t *v;
+	int parent, child = node;
+
+	parent = fdt_parent_offset(dtb, child);
+
+	do {
+		if (parent >= 0)
+			child = parent;
+		v = (fdt32_t *)fdt_getprop(dtb, child, "#size-cells", NULL);
+		if (v)
+			return fdt32_to_cpu(*v);
+
+		parent = fdt_parent_offset(dtb, child);
+	} while (parent >= 0);
+
+	return 2;
+}
+
+int fdt_n_addr_cells(void *dtb, int node)
+{
+	fdt32_t *v;
+	int parent, child = node;
+
+	parent = fdt_parent_offset(dtb, child);
+
+	do {
+		if (parent >= 0)
+			child = parent;
+		v = (fdt32_t *)fdt_getprop(dtb, child, "#address-cells", NULL);
+		if (v)
+			return fdt32_to_cpu(*v);
+
+		parent = fdt_parent_offset(dtb, child);
+	} while (parent >= 0);
+
+	return 2;
+}
+
+
+
 static inline void *__of_getprop(void *dtb, int node,
 		char *attr, int *len)
 {

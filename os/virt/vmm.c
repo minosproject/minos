@@ -15,8 +15,7 @@
  */
 
 #include <minos/minos.h>
-#include <minos/vm.h>
-#include <minos/vcpu.h>
+#include <virt/vm.h>
 #include <minos/mmu.h>
 
 extern unsigned char __el2_ttb0_pgd;
@@ -341,7 +340,7 @@ int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size)
 		if (!block)
 			goto free_vm_memory;
 
-		block->vmid = vm->vmid;
+		// block->vmid = vm->vmid;
 		list_add_tail(&mm->block_list, &block->list);
 		mm->mem_free -= MEM_BLOCK_SIZE;
 	}
@@ -459,8 +458,10 @@ int vm_mm_init(struct vm *vm)
 	struct memory_region *region;
 
 	list_for_each_entry(region, &mem_list, list) {
+#if 0
 		if (region->vmid != vm->vmid)
 			continue;
+#endif
 
 		create_guest_mapping(vm, region->vir_base,
 				region->phy_base, region->size, 0);

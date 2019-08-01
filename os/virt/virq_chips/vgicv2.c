@@ -24,11 +24,12 @@
 #include <minos/cpumask.h>
 #include <minos/irq.h>
 #include <minos/sched.h>
-#include <minos/virq.h>
-#include <minos/vdev.h>
-#include <minos/resource.h>
-#include <minos/virq_chip.h>
+#include <virt/virq.h>
+#include <virt/vdev.h>
+#include <virt/resource.h>
+#include <virt/virq_chip.h>
 #include "vgic.h"
+#include <minos/of.h>
 
 struct vgicv2_dev {
 	struct vdev vdev;
@@ -240,7 +241,7 @@ void vgicv2_send_sgi(struct vcpu *vcpu, uint32_t sgi_value)
 	struct vm *vm = vcpu->vm;
 	struct vcpu *target;
 
-	cpumask_clear(&cpumask);
+	cpumask_clearall(&cpumask);
 	list = (sgi_value >> 16) & 0xff;
 	sgi = sgi_value & 0xf;
 	mode = (sgi_value >> 24) & 0x3;
@@ -630,7 +631,7 @@ static struct virq_chip *vgicv2_virqchip_init(struct vm *vm,
 VIRQCHIP_DECLARE(gic400_virqchip, gicv2_match_table,
 		vgicv2_virqchip_init);
 
-static void gicv2_state_restore(struct vcpu *vcpu, void *context)
+static void gicv2_state_restore(struct task *task, void *context)
 {
 	int i;
 	struct gicv2_context *c = (struct gicv2_context *)context;
@@ -644,7 +645,7 @@ static void gicv2_state_restore(struct vcpu *vcpu, void *context)
 	isb();
 }
 
-static void gicv2_state_init(struct vcpu *vcpu, void *context)
+static void gicv2_state_init(struct task *task, void *context)
 {
 	struct gicv2_context *c = (struct gicv2_context *)context;
 
@@ -652,7 +653,7 @@ static void gicv2_state_init(struct vcpu *vcpu, void *context)
 	c->hcr = 1;
 }
 
-static void gicv2_state_save(struct vcpu *vcpu, void *context)
+static void gicv2_state_save(struct task *task, void *context)
 {
 	int i;
 	struct gicv2_context *c = (struct gicv2_context *)context;
@@ -669,15 +670,14 @@ static void gicv2_state_save(struct vcpu *vcpu, void *context)
 	isb();
 }
 
-static void gicv2_state_resume(struct vcpu *vcpu, void *context)
+static void gicv2_state_resume(struct task *task, void *context)
 {
-	gicv2_state_init(vcpu, context);
+	gicv2_state_init(task, context);
 }
 
 static int gicv2_vmodule_init(struct vmodule *vmodule)
 {
 	vmodule->context_size = sizeof(struct gicv2_context);
-	vmodule->pdata = NULL;
 	vmodule->state_init = gicv2_state_init;
 	vmodule->state_save = gicv2_state_save;
 	vmodule->state_restore = gicv2_state_restore;
@@ -703,7 +703,7 @@ int vgicv2_init(uint64_t *data, int len)
 	vtr = readl_relaxed((void *)vgicv2_info.gich_base + GICH_VTR);
 	gicv2_nr_lrs = (vtr & 0x3f) + 1;
 
-	register_vcpu_vmodule("gicv2", gicv2_vmodule_init);
+	register_task_vmodule("gicv2", gicv2_vmodule_init);
 
 	return 0;
 }

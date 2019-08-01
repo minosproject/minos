@@ -1,4 +1,16 @@
 obj-y				+= resource.o
+obj-y				+= hypercall.o
+obj-y				+= os.o
+obj-y				+= os_linux.o
+obj-y				+= vcpu.o
+obj-y				+= vcpu.o
+obj-y				+= vdev.o
+obj-y				+= virq.o
+obj-y				+= vm.o
+obj-y				+= vmcs.o
+obj-y				+= vmm.o
+obj-y				+= mailbox.o
+obj-y				+= vm_dt.o
 obj-y				+= virq_chips/
 obj-$(CONFIG_VIRTIO_MMIO)	+= virtio_mmio.o
 obj-$(CONFIG_VRTC_PL031)	+= vrtc.o

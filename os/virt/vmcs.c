@@ -15,10 +15,11 @@
  */
 
 #include <minos/minos.h>
-#include <minos/vcpu.h>
+#include <virt/vm.h>
 #include <minos/sched.h>
-#include <minos/virq.h>
+#include <virt/virq.h>
 #include <minos/irq.h>
+#include <virt/vmcs.h>
 
 int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 		unsigned long *result, int nonblock)
@@ -71,7 +72,7 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 	 * virq to the vcpu0 of the vm0
 	 */
 	vmcs->host_index++;
-	dsb();
+	mb();
 
 	if (send_virq_to_vm(vm0, vcpu->vmcs_irq)) {
 		pr_err("vmcs failed to send virq for vm-%d\n",
@@ -79,6 +80,7 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 		vmcs->host_index--;
 		vmcs->trap_ret = -EPERM;
 		vmcs->trap_result = 0;
+		mb();
 		return -EFAULT;
 	}
 

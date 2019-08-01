@@ -1,7 +1,7 @@
 #ifndef __MINOS_VIRTIO_H__
 #define __MINOS_VIRTIO_H__
 
-#include <minos/vdev.h>
+#include <virt/vdev.h>
 
 struct vm;
 

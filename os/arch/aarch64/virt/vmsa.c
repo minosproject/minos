@@ -20,7 +20,8 @@
 #include <minos/task.h>
 #include <minos/vmodule.h>
 #include <asm/arch.h>
-#include <minos/vmm.h>
+#include <virt/vmm.h>
+#include <virt/vm.h>
 
 /*
  * a - Non-shareable
@@ -127,7 +128,7 @@ int el2_stage2_init(void)
 
 	return 0;
 }
-arch_early_initcall(el2_stage2_init);
+early_initcall(el2_stage2_init);
 
 static void vmsa_state_init(struct task *task, void *context)
 {
@@ -188,7 +189,6 @@ static int vmsa_valid_for_task(struct task *task)
 static int vmsa_vmodule_init(struct vmodule *vmodule)
 {
 	vmodule->context_size = sizeof(struct vmsa_context);
-	vmodule->pdata = NULL;
 	vmodule->state_init = vmsa_state_init;
 	vmodule->state_save = vmsa_state_save;
 	vmodule->state_restore = vmsa_state_restore;

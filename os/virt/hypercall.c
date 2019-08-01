@@ -17,11 +17,11 @@
 #include <minos/minos.h>
 #include <asm/svccc.h>
 #include <minos/sched.h>
-#include <minos/vm.h>
-#include <minos/hypercall.h>
-#include <minos/virq.h>
-#include <minos/virtio.h>
-#include <minos/vmcs.h>
+#include <virt/vm.h>
+#include <virt/hypercall.h>
+#include <virt/virq.h>
+#include <virt/virtio.h>
+#include <virt/vmcs.h>
 
 static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 {

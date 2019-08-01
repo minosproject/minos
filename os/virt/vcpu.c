@@ -20,13 +20,13 @@
 #include <config/config.h>
 #include <minos/mm.h>
 #include <minos/bitmap.h>
-#include <minos/os.h>
-#include <minos/vm.h>
-#include <minos/vcpu.h>
+#include <virt/os.h>
+#include <virt/vm.h>
 #include <minos/vmodule.h>
-#include <minos/virq.h>
-#include <minos/vmm.h>
-#include <minos/vdev.h>
+#include <virt/virq.h>
+#include <virt/vmm.h>
+#include <virt/vdev.h>
+#include <virt/vmcs.h>
 
 extern unsigned char __vm_start;
 extern unsigned char __vm_end;
@@ -66,7 +66,9 @@ void vcpu_online(struct vcpu *vcpu)
 		return;
 	}
 
+#if 0
 	set_vcpu_ready(vcpu);
+#endif
 }
 
 int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
@@ -93,7 +95,7 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 		return -ENOENT;
 	}
 
-	if (vcpu->state == VCPU_STAT_STOPPED) {
+	if (vcpu->task->stat == TASK_STAT_STOPPED) {
 		pr_info("vcpu-%d of vm-%d power on from vm suspend 0x%p\n",
 				vcpu->vcpu_id, vcpu->vm->vmid, entry);
 		os->ops->vcpu_power_on(vcpu, entry);
@@ -108,13 +110,13 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 
 int vcpu_can_idle(struct vcpu *vcpu)
 {
-	if (in_interrupt)
+	if (int_nesting())
 		return 0;
 
 	if (vcpu_has_irq(vcpu))
 		return 0;
 
-	if (vcpu->state != VCPU_STAT_RUNNING)
+	if (vcpu->task->stat != TASK_STAT_RUNNING)
 		return 0;
 
 	return 1;
@@ -131,7 +133,9 @@ void vcpu_idle(struct vcpu *vcpu)
 			return;
 		}
 
+#if 0
 		set_vcpu_suspend(vcpu);
+#endif
 		spin_unlock_irqrestore(&vcpu->idle_lock, flags);
 		sched();
 	}
@@ -156,9 +160,10 @@ int vcpu_off(struct vcpu *vcpu)
 	 * force set the vcpu to suspend state then sched
 	 * out
 	 */
+#if 0
 	set_vcpu_state(vcpu, VCPU_STAT_STOPPED);
 	sched();
-
+#endif
 	return 0;
 }
 
@@ -255,12 +260,11 @@ struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id)
 static void release_vcpu(struct vcpu *vcpu)
 {
 	if (vcpu->vmodule_context)
-		vcpu_vmodules_deinit(vcpu);
+		task_vmodules_deinit(vcpu->task);
 
 	if (vcpu->vmcs_irq >= 0)
 		release_hvm_virq(vcpu->vmcs_irq);
 
-	free(vcpu->stack_origin - vcpu->stack_size);
 	free(vcpu->virq_struct);
 	free(vcpu);
 }
@@ -268,7 +272,6 @@ static void release_vcpu(struct vcpu *vcpu)
 static struct vcpu *alloc_vcpu(size_t size)
 {
 	struct vcpu *vcpu;
-	void *stack_base = NULL;
 
 	vcpu = malloc(sizeof(*vcpu));
 	if (!vcpu)
@@ -279,21 +282,10 @@ static struct vcpu *alloc_vcpu(size_t size)
 	if (!vcpu->virq_struct)
 		goto free_vcpu;
 
-	if (size) {
-		stack_base = (void *)get_free_pages(PAGE_NR(size));
-		if (!stack_base)
-			goto free_virq_struct;
-	}
-
-	vcpu->stack_size = size;
-	vcpu->stack_base = stack_base + size;
-	vcpu->stack_origin = vcpu->stack_base;
 	vcpu->vmcs_irq = -1;
 
 	return vcpu;
 
-free_virq_struct:
-	free(vcpu->virq_struct);
 free_vcpu:
 	free(vcpu);
 
@@ -305,7 +297,7 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 	char name[64];
 	struct vcpu *vcpu;
 
-	vcpu = alloc_vcpu(VCPU_DEFAULT_STACK_SIZE);
+	vcpu = alloc_vcpu(0);
 	if (!vcpu)
 		return NULL;
 
@@ -313,7 +305,6 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 	vcpu->vm = vm;
 
 	vcpu->affinity = vm->vcpu_affinity[vcpu_id];
-	vcpu->state = VCPU_STAT_STOPPED;
 	vcpu->is_idle = 0;
 
 	init_list(&vcpu->list);
@@ -343,11 +334,13 @@ int vm_vcpus_init(struct vm *vm)
 		pr_info("vm-%d vcpu-%d affnity to pcpu-%d\n",
 				vm->vmid, vcpu->vcpu_id, vcpu->affinity);
 
+#if 0
 		/* only when the vm is offline state do this */
 		if (vm->state == VM_STAT_OFFLINE)
 			pcpu_add_vcpu(vcpu->affinity, vcpu);
+#endif
 
-		vcpu_vmodules_init(vcpu);
+		task_vmodules_init(vcpu->task);
 		vm->os->ops->vcpu_init(vcpu);
 
 		if (!vm_is_native(vm)) {
@@ -388,9 +381,9 @@ int vcpu_reset(struct vcpu *vcpu)
 	if (!vcpu)
 		return -EINVAL;
 
-	vcpu_vmodules_reset(vcpu);
+	task_vmodules_reset(vcpu->task);
 	vcpu_virq_struct_reset(vcpu);
-	sched_reset_vcpu(vcpu);
+	// sched_reset_vcpu(vcpu);
 
 	return 0;
 }
@@ -466,7 +459,9 @@ void vcpu_power_off_call(void *data)
 		return;
 	}
 
-	set_vcpu_state(vcpu, VCPU_STAT_STOPPED);
+#if 0
+	set_task_stopped(vcpu->task);
+#endif
 
 	/*
 	 * *********** Note ****************
@@ -476,7 +471,7 @@ void vcpu_power_off_call(void *data)
 	 * new vcpu
 	 */
 	if (vcpu == get_current_vcpu())
-		sched_new();
+		sched();
 
 	pr_info("power off vcpu-%d-%d done\n", get_vmid(vcpu),
 			get_vcpu_id(vcpu));
@@ -495,7 +490,8 @@ int vcpu_power_off(struct vcpu *vcpu, int timeout)
 		return smp_function_call(vcpu->affinity,
 				vcpu_power_off_call, (void *)vcpu, 1);
 	} else {
-		set_vcpu_state(vcpu, VCPU_STAT_STOPPED);
+		set_task_suspend(0);
+		sched();
 		pr_info("power off vcpu-%d-%d done\n", get_vmid(vcpu),
 				get_vcpu_id(vcpu));
 	}

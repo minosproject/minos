@@ -24,11 +24,12 @@
 #include <minos/irq.h>
 #include <asm/vgicv3.h>
 #include <minos/sched.h>
-#include <minos/virq.h>
-#include <minos/vdev.h>
-#include <minos/resource.h>
-#include <minos/virq_chip.h>
+#include <virt/virq.h>
+#include <virt/vdev.h>
+#include <virt/resource.h>
+#include <virt/virq_chip.h>
 #include "vgic.h"
+#include <minos/of.h>
 
 #define vdev_to_vgic(vdev) \
 	(struct vgicv3_dev *)container_of(vdev, struct vgicv3_dev, vdev)
@@ -71,7 +72,7 @@ void vgicv3_send_sgi(struct vcpu *vcpu, unsigned long sgi_value)
 	}
 
 	mode = sgi_value & (1UL << 40) ? SGI_TO_OTHERS : SGI_TO_LIST;
-	cpumask_clear(&cpumask);
+	cpumask_clearall(&cpumask);
 
 	if (mode == SGI_TO_LIST) {
 		tmp = sgi_value & 0xffff;
@@ -832,7 +833,7 @@ static void gicv3_save_aprn(struct gicv3_context *c, uint32_t count)
 	}
 }
 
-static void gicv3_state_save(struct vcpu *vcpu, void *context)
+static void gicv3_state_save(struct task *task, void *context)
 {
 	struct gicv3_context *c = (struct gicv3_context *)context;
 
@@ -906,7 +907,7 @@ static void gicv3_restore_lrs(struct gicv3_context *c, uint32_t count)
 	}
 }
 
-static void gicv3_state_restore(struct vcpu *vcpu, void *context)
+static void gicv3_state_restore(struct task *task, void *context)
 {
 	struct gicv3_context *c = (struct gicv3_context *)context;
 
@@ -918,7 +919,7 @@ static void gicv3_state_restore(struct vcpu *vcpu, void *context)
 	dsb();
 }
 
-static void gicv3_state_init(struct vcpu *vcpu, void *context)
+static void gicv3_state_init(struct task *task, void *context)
 {
 	struct gicv3_context *c = (struct gicv3_context *)context;
 
@@ -928,15 +929,14 @@ static void gicv3_state_init(struct vcpu *vcpu, void *context)
 	c->ich_hcr_el2 = GICH_HCR_EN;
 }
 
-static void gicv3_state_resume(struct vcpu *vcpu, void *context)
+static void gicv3_state_resume(struct task *task, void *context)
 {
-	gicv3_state_init(vcpu, context);
+	gicv3_state_init(task, context);
 }
 
 static int gicv3_vmodule_init(struct vmodule *vmodule)
 {
 	vmodule->context_size = sizeof(struct gicv3_context);
-	vmodule->pdata = NULL;
 	vmodule->state_init = gicv3_state_init;
 	vmodule->state_save = gicv3_state_save;
 	vmodule->state_restore = gicv3_state_restore;
@@ -962,7 +962,7 @@ int vgicv3_init(uint64_t *data, int len)
 	gicv3_nr_lr = (val & 0x3f) + 1;
 	gicv3_nr_pr = ((val >> 29) & 0x7) + 1;
 
-	register_vcpu_vmodule("gicv3-vmodule", gicv3_vmodule_init);
+	register_task_vmodule("gicv3-vmodule", gicv3_vmodule_init);
 
 	return 0;
 }

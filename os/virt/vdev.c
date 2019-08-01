@@ -15,9 +15,10 @@
  */
 
 #include <minos/minos.h>
-#include <minos/vdev.h>
-#include <minos/virq.h>
 #include <minos/sched.h>
+#include <virt/vdev.h>
+#include <virt/virq.h>
+#include <virt/vmcs.h>
 
 void vdev_set_name(struct vdev *vdev, char *name)
 {

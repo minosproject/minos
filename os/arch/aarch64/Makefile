@@ -46,6 +46,7 @@ endif
 # Default value
 head-y		:= arch/aarch64/core/boot.o
 
-core-y		+= arch/aarch64/core/
-core-y		+= arch/aarch64/lib/
-core-y		+= arch/aarch64/lds/
+core-y			+= arch/aarch64/core/
+core-y			+= arch/aarch64/lib/
+core-y			+= arch/aarch64/lds/
+core-$(CONFIG_VIRT)	+= arch/aarch64/virt/

@@ -4,7 +4,7 @@
 #include <minos/types.h>
 #include <minos/mm.h>
 #include <minos/mmu.h>
-#include <minos/vm_mmap.h>
+#include <virt/vm_mmap.h>
 
 struct vm;
 

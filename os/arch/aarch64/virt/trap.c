@@ -15,7 +15,7 @@
  */
 
 #include <asm/aarch64_helper.h>
-#include <minos/vcpu.h>
+#include <virt/vm.h>
 #include <asm/exception.h>
 #include <minos/minos.h>
 #include <minos/smp.h>
@@ -25,7 +25,13 @@
 #include <minos/irq.h>
 #include <asm/svccc.h>
 #include <asm/vtimer.h>
-#include <minos/vdev.h>
+#include <virt/vdev.h>
+
+extern unsigned char __sync_desc_start;
+extern unsigned char __sync_desc_end;
+extern void sync_from_lower_EL_handler(gp_regs *data);
+
+static struct sync_desc *sync_descs[MAX_SYNC_TYPE] __align_cache_line;
 
 static inline void inject_virtual_abort(void)
 {
@@ -491,3 +497,15 @@ out:
 
 	enter_to_guest(get_current_vcpu(), NULL);
 }
+
+static int aarch64_sync_init(void)
+{
+	struct sync_desc *desc;
+
+	section_for_each_item(__sync_desc_start, __sync_desc_end, desc) {
+		sync_descs[desc->type] = desc;
+	}
+
+	return 0;
+}
+arch_initcall(aarch64_sync_init);

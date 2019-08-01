@@ -18,6 +18,10 @@
 #include <minos/vmodule.h>
 #include <minos/task.h>
 
+#ifdef CONFIG_VIRT
+#include <virt/vm.h>
+#endif
+
 struct vfp_context {
 	uint64_t regs[64] __align(16);
 #ifdef CONFIG_VIRT
@@ -37,7 +41,7 @@ static void vfp_state_save(struct task *task, void *context)
 	struct vfp_context *c = (struct vfp_context *)context;
 
 #ifdef CONFIG_VIRT
-	if (vm_is_32bit((task->vm))
+	if (vm_is_32bit(task_to_vm(task)))
 		c->fpexc32_el2 = read_sysreg32(FPEXC32_EL2);
 #endif
 
@@ -68,7 +72,7 @@ static void vfp_state_restore(struct task *task, void *context)
 	struct vfp_context *c = (struct vfp_context *)context;
 
 #ifdef CONFIG_VIRT
-	if (vm_is_32bit(task->vm))
+	if (vm_is_32bit(task_to_vm(task)))
 		write_sysreg(c->fpexc32_el2, FPEXC32_EL2);
 #endif
 

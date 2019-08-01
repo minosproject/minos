@@ -22,6 +22,10 @@
 #include <libfdt/libfdt.h>
 #include <minos/mmu.h>
 
+#ifdef CONFIG_VIRT
+#include <virt/vm.h>
+#endif
+
 static int fvp_time_init(void)
 {
 	io_remap(0x2a430000, 0x2a430000, 64 * 1024);

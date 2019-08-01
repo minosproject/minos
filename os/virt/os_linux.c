@@ -17,8 +17,11 @@
 #include <minos/minos.h>
 #include <minos/sched.h>
 #include <minos/arch.h>
-#include <minos/os.h>
+#include <virt/os.h>
+#include <virt/vm.h>
 #include <minos/init.h>
+
+extern void arch_init_vcpu(struct vcpu *vcpu, void *entry, void *arg);
 
 static void linux_vcpu_init(struct vcpu *vcpu)
 {
@@ -26,8 +29,8 @@ static void linux_vcpu_init(struct vcpu *vcpu)
 
 	/* fill the dtb address to x0 */
 	if (get_vcpu_id(vcpu) == 0) {
-		arch_init_vcpu(vcpu, (void *)vcpu->vm->entry_point);
-		regs = (gp_regs *)vcpu->stack_base;
+		arch_init_vcpu(vcpu, (void *)vcpu->vm->entry_point, NULL);
+		regs = (gp_regs *)vcpu->task->stack_base;
 
 		if (vm_is_64bit(vcpu->vm))
 			regs->x0 = (uint64_t)vcpu->vm->setup_data;
@@ -45,8 +48,8 @@ static void linux_vcpu_power_on(struct vcpu *vcpu, unsigned long entry)
 {
 	gp_regs *regs;
 
-	arch_init_vcpu(vcpu, (void *)entry);
-	regs = (gp_regs *)vcpu->stack_base;
+	arch_init_vcpu(vcpu, (void *)entry, NULL);
+	regs = (gp_regs *)vcpu->task->stack_base;
 
 	regs->elr_elx = entry;
 	regs->x0 = 0;

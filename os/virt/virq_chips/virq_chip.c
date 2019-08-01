@@ -16,12 +16,12 @@
 
 #include <minos/minos.h>
 #include <minos/irq.h>
-#include <minos/virq.h>
 #include <minos/of.h>
 #include <minos/mm.h>
-#include <minos/vcpu.h>
-#include <minos/virq_chip.h>
 #include <minos/spinlock.h>
+#include <virt/vm.h>
+#include <virt/virq.h>
+#include <virt/virq_chip.h>
 
 static int virqchip_enter_to_guest(void *item, void *data)
 {

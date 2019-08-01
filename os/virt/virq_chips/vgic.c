@@ -15,9 +15,9 @@
  */
 
 #include <minos/minos.h>
-#include <minos/virq.h>
+#include <virt/virq.h>
 #include <minos/of.h>
-#include <minos/virq_chip.h>
+#include <virt/virq_chip.h>
 
 /*
  * The following cases are considered software programming

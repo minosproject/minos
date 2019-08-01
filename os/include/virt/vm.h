@@ -8,10 +8,11 @@
 #include <minos/types.h>
 #include <minos/list.h>
 #include <config/config.h>
-#include <minos/vmm.h>
+#include <virt/vmm.h>
 #include <minos/errno.h>
 #include <common/hypervisor.h>
 #include <minos/task.h>
+#include <minos/sched.h>
 
 #define VM_MAX_VCPU		CONFIG_NR_CPUS
 
@@ -23,12 +24,51 @@
 #define VM_STAT_SUSPEND		(2)
 #define VM_STAT_REBOOT		(3)
 
-struct vcpu;
+#define VCPU_MAX_LOCAL_IRQS		(32)
+#define CONFIG_VCPU_MAX_ACTIVE_IRQS	(16)
+
+#define VCPU_NAME_SIZE		(64)
+
+#define VCPU_SCHED_REASON_HIRQ	0x0
+#define VCPU_SCHED_REASON_VIRQ	0x1
+
 struct os;
+struct vm;
+struct virq_struct;
 struct virq_chip;
 
 extern struct list_head vm_list;
 extern struct list_head mem_list;
+
+struct vcpu {
+	uint32_t vcpu_id;
+	struct vm *vm;
+	struct task *task;
+	struct vcpu *next;
+
+	/*
+	 * member to record the irq list which the
+	 * vcpu is handling now
+	 */
+	struct virq_struct *virq_struct;
+	volatile int state;
+
+	uint32_t affinity;
+	uint8_t is_idle;
+	uint8_t resched;
+
+	struct list_head list;
+	char name[VCPU_NAME_SIZE];
+	void *sched_data;
+
+	spinlock_t idle_lock;
+
+	void **vmodule_context;
+	void *arch_data;
+
+	struct vmcs *vmcs;
+	int vmcs_irq;
+} __align_cache_line;
 
 struct vm {
 	int vmid;
@@ -67,6 +107,74 @@ extern struct vm *vms[CONFIG_MAX_VM];
 
 #define vm_for_each_vcpu(vm, vcpu)	\
 	for (vcpu = vm->vcpus[0]; vcpu != NULL; vcpu = vcpu->next)
+
+static int inline get_vcpu_id(struct vcpu *vcpu)
+{
+	return vcpu->vcpu_id;
+}
+
+static int inline get_vmid(struct vcpu *vcpu)
+{
+	return (vcpu->vm->vmid);
+}
+
+static int inline vcpu_affinity(struct vcpu *vcpu)
+{
+	return vcpu->affinity;
+}
+
+static inline struct vm *vcpu_to_vm(struct vcpu *vcpu)
+{
+	return vcpu->vm;
+}
+
+static inline struct vcpu *task_to_vcpu(struct task *task)
+{
+	return task->vcpu;
+}
+
+static inline struct vcpu *get_current_vcpu(void)
+{
+	return task_to_vcpu(get_current_task());
+}
+
+static inline struct vm *task_to_vm(struct task *task)
+{
+	return task->vm;
+}
+
+static inline struct vm* get_current_vm(void)
+{
+	return task_to_vm(get_current_task());
+}
+
+struct vcpu *get_vcpu_in_vm(struct vm *vm, uint32_t vcpu_id);
+struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id);
+
+struct vcpu *create_idle_vcpu(void);
+int vm_vcpus_init(struct vm *vm);
+
+void vcpu_idle(struct vcpu *vcpu);
+int vcpu_reset(struct vcpu *vcpu);
+int vcpu_suspend(struct vcpu *vcpu, gp_regs *c,
+		uint32_t state, unsigned long entry);
+int vcpu_off(struct vcpu *vcpu);
+void vcpu_online(struct vcpu *vcpu);
+int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
+		unsigned long entry, unsigned long unsed);
+int vcpu_power_off(struct vcpu *vcpu, int timeout);
+
+static inline void exit_from_guest(struct vcpu *vcpu, gp_regs *regs)
+{
+	do_hooks((void *)vcpu, (void *)regs,
+			MINOS_HOOK_TYPE_EXIT_FROM_GUEST);
+}
+
+static inline void enter_to_guest(struct vcpu *vcpu, gp_regs *regs)
+{
+	do_hooks((void *)vcpu, (void *)regs,
+			MINOS_HOOK_TYPE_ENTER_TO_GUEST);
+}
 
 void vm_mm_struct_init(struct vm *vm);
 

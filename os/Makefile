@@ -169,6 +169,7 @@ drivers-y	:= drivers/ platform/
 external-y	:= external/
 libs-y		:=
 
+-include include/config/auto.conf
 drivers-$(CONFIG_VIRT) += virt/
 
 # The arch Makefile can set ARCH_{CPP,A,C}FLAGS to override the default

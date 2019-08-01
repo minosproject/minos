@@ -17,8 +17,8 @@
 #include <minos/minos.h>
 #include <minos/irq.h>
 #include <minos/sched.h>
-#include <minos/virq.h>
-#include <minos/virq_chip.h>
+#include <virt/virq.h>
+#include <virt/virq_chip.h>
 
 static DEFINE_SPIN_LOCK(hvm_irq_lock);
 
@@ -39,7 +39,9 @@ get_virq_desc(struct vcpu *vcpu, uint32_t virq)
 static void inline virq_kick_vcpu(struct vcpu *vcpu,
 		struct virq_desc *desc)
 {
+#if 0
 	kick_vcpu(vcpu);
+#endif
 }
 
 static int inline __send_virq(struct vcpu *vcpu, struct virq_desc *desc)

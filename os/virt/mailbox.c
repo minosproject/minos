@@ -15,13 +15,13 @@
  */
 
 #include <minos/minos.h>
-#include <minos/mailbox.h>
+#include <virt/mailbox.h>
 #include <asm/svccc.h>
-#include <minos/hypercall.h>
-#include <minos/vmm.h>
-#include <minos/vm.h>
+#include <virt/hypercall.h>
+#include <virt/vmm.h>
+#include <virt/vm.h>
 #include <minos/sched.h>
-#include <minos/virq.h>
+#include <virt/virq.h>
 
 #define MAX_MAILBOX_NR	CONFIG_MAX_MAILBOX_NR
 #define MAILBOX_MAGIC	0xabcdefeeUL

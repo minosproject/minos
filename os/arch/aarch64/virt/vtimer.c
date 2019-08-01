@@ -22,7 +22,7 @@
 #include <minos/timer.h>
 #include <minos/irq.h>
 #include <minos/sched.h>
-#include <minos/virq.h>
+#include <virt/virq.h>
 
 static uint32_t __hw_virtual_irq;
 static uint32_t	__hw_phy_irq;
@@ -52,7 +52,7 @@ static void virt_timer_expire_function(unsigned long data)
 	send_virq_to_vcpu(vtimer->vcpu, vtimer->virq);
 }
 
-static void vtimer_state_restore(struct vcpu *vcpu, void *context)
+static void vtimer_state_restore(struct task *task, void *context)
 {
 	struct vtimer_context *c = (struct vtimer_context *)context;
 	struct vtimer *vtimer = &c->virt_timer;
@@ -65,8 +65,9 @@ static void vtimer_state_restore(struct vcpu *vcpu, void *context)
 	dsb();
 }
 
-static void vtimer_state_save(struct vcpu *vcpu, void *context)
+static void vtimer_state_save(struct task *task, void *context)
 {
+	struct vcpu *vcpu = task->vcpu;
 	struct vtimer_context *c = (struct vtimer_context *)context;
 	struct vtimer *vtimer = &c->virt_timer;
 
@@ -75,7 +76,7 @@ static void vtimer_state_save(struct vcpu *vcpu, void *context)
 	write_sysreg32(vtimer->cnt_ctl & ~CNT_CTL_ENABLE, CNTV_CTL_EL0);
 	vtimer->cnt_cval = read_sysreg64(CNTV_CVAL_EL0);
 
-	if (vcpu->state == VCPU_STAT_STOPPED)
+	if (task->stat == TASK_STAT_STOPPED)
 		return;
 
 	if ((vtimer->cnt_ctl & CNT_CTL_ENABLE) &&
@@ -88,9 +89,10 @@ static void vtimer_state_save(struct vcpu *vcpu, void *context)
 	dsb();
 }
 
-static void vtimer_state_init(struct vcpu *vcpu, void *context)
+static void vtimer_state_init(struct task *task, void *context)
 {
 	struct vtimer *vtimer;
+	struct vcpu *vcpu = task->vcpu;
 	struct vtimer_context *c = (struct vtimer_context *)context;
 
 	if (get_vcpu_id(vcpu) == 0)
@@ -124,7 +126,7 @@ static void vtimer_state_init(struct vcpu *vcpu, void *context)
 	vtimer->cnt_cval = 0;
 }
 
-static void vtimer_state_deinit(struct vcpu *vcpu, void *context)
+static void vtimer_state_deinit(struct task *task, void *context)
 {
 	struct vtimer_context *c = (struct vtimer_context *)context;
 
@@ -138,7 +140,7 @@ static void vtimer_handle_cntp_ctl(gp_regs *regs,
 	uint32_t v;
 	struct vtimer *vtimer;
 	struct vtimer_context *c = (struct vtimer_context *)
-		get_vmodule_data_by_id(get_current_vcpu(), vtimer_vmodule_id);
+		get_vmodule_data_by_id(get_current_task(), vtimer_vmodule_id);
 	unsigned long ns;
 
 	get_access_vtimer(vtimer, c, access);
@@ -169,7 +171,7 @@ static void vtimer_handle_cntp_tval(gp_regs *regs,
 	unsigned long now;
 	unsigned long ticks;
 	struct vtimer_context *c = (struct vtimer_context *)
-		get_vmodule_data_by_id(get_current_vcpu(), vtimer_vmodule_id);
+		get_vmodule_data_by_id(get_current_task(), vtimer_vmodule_id);
 
 	get_access_vtimer(vtimer, c, access);
 	now = get_sys_ticks() - c->offset;
@@ -194,7 +196,7 @@ static void vtimer_handle_cntp_cval(gp_regs *regs,
 {
 	struct vtimer *vtimer;
 	struct vtimer_context *c = (struct vtimer_context *)
-		get_vmodule_data_by_id(get_current_vcpu(), vtimer_vmodule_id);
+		get_vmodule_data_by_id(get_current_task(), vtimer_vmodule_id);
 	unsigned long ns;
 
 	get_access_vtimer(vtimer, c, access);
@@ -266,7 +268,6 @@ static inline int vtimer_phy_mem_handler(gp_regs *regs, int read,
 static int vtimer_vmodule_init(struct vmodule *vmodule)
 {
 	vmodule->context_size = sizeof(struct vtimer_context);
-	vmodule->pdata = NULL;
 	vmodule->state_init = vtimer_state_init;
 	vmodule->state_save = vtimer_state_save;
 	vmodule->state_restore = vtimer_state_restore;
@@ -281,7 +282,7 @@ int arch_vtimer_init(uint32_t virtual_irq, uint32_t phy_irq)
 {
 	__hw_virtual_irq = virtual_irq;
 	__hw_phy_irq = phy_irq;
-	register_vcpu_vmodule("vtimer_module", vtimer_vmodule_init);
+	register_task_vmodule("vtimer_module", vtimer_vmodule_init);
 
 	return 0;
 }

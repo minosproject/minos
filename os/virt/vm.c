@@ -15,18 +15,16 @@
  */
 
 #include <minos/minos.h>
-#include <minos/vcpu.h>
-#include <minos/vm.h>
-#include <minos/vcpu.h>
-#include <minos/vmm.h>
-#include <minos/os.h>
+#include <virt/vmm.h>
+#include <virt/os.h>
 #include <minos/sched.h>
-#include <minos/vdev.h>
+#include <virt/vdev.h>
 #include <minos/pm.h>
 #include <minos/of.h>
 #include <minos/vmodule.h>
-#include <minos/resource.h>
+#include <virt/resource.h>
 #include <common/gvm.h>
+#include <virt/vmcs.h>
 
 static struct vmtag *vmtags = NULL;
 static int nr_static_vms;
@@ -161,7 +159,9 @@ static int __vm_power_off(struct vm *vm, void *args)
 		if (ret)
 			pr_warn("power off vcpu-%d failed\n",
 					vcpu->vcpu_id);
+#if 0
 		pcpu_remove_vcpu(vcpu->affinity, vcpu);
+#endif
 	}
 
 	if (args == NULL) {
@@ -319,7 +319,7 @@ static int vm_resume(struct vm *vm)
 		if (get_vcpu_id(vcpu) == 0)
 			continue;
 
-		resume_vcpu_vmodule_state(vcpu);
+		resume_task_vmodule_state(vcpu->task);
 	}
 
 	do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_RESUME_VM);
@@ -343,13 +343,13 @@ static int __vm_suspend(struct vm *vm)
 		if (get_vcpu_id(vcpu) == 0)
 			continue;
 
-		if (vcpu->state != VCPU_STAT_STOPPED) {
+		if (vcpu->task->stat != TASK_STAT_STOPPED) {
 			pr_err("vcpu-%d is not suspend vm suspend fail\n",
 					get_vcpu_id(vcpu));
 			return -EINVAL;
 		}
 
-		suspend_vcpu_vmodule_state(vcpu);
+		suspend_task_vmodule_state(vcpu->task);
 	}
 
 	vm->state = VM_STAT_SUSPEND;
@@ -359,7 +359,7 @@ static int __vm_suspend(struct vm *vm)
 	/* call the hooks for suspend */
 	do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_SUSPEND_VM);
 
-	set_vcpu_suspend(get_current_vcpu());
+	set_task_suspend(0);
 	sched();
 
 	/* vm is resumed */

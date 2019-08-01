@@ -15,13 +15,15 @@
  */
 
 #include <minos/minos.h>
-#include <minos/vdev.h>
+#include <virt/vdev.h>
 #include <asm/io.h>
 #include <minos/irq.h>
 #include <minos/timer.h>
 #include <common/gvm.h>
 #include <minos/time.h>
-#include <minos/resource.h>
+#include <virt/resource.h>
+#include <virt/vmcs.h>
+#include <minos/of.h>
 
 #define	RTC_DR		0x00		/* Data read register */
 #define	RTC_MR		0x04		/* Match register */
@@ -256,7 +258,7 @@ static void *vrtc_init(struct vm *vm, struct device_node *node)
 	if (ret || (size == 0))
 		return NULL;
 
-	ret = get_device_irq_index(vm, node, &irq, &flags, 0);
+	ret = vm_get_device_irq_index(vm, node, &irq, &flags, 0);
 	if (ret)
 		return NULL;
 

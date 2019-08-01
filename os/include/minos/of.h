@@ -8,6 +8,8 @@ typedef fdt16_t of16_t;
 typedef fdt32_t of32_t;
 typedef fdt64_t of64_t;
 
+#define MAX_DTB_SIZE	(MEM_BLOCK_SIZE)
+
 #define OF_MAX_ADDR_CELLS	4
 #define OF_BAD_ADDR		((u64)-1)
 
@@ -76,6 +78,9 @@ int of_get_phandle(struct device_node *node);
 
 struct device_node *
 of_find_node_by_name(struct device_node *root, char *name);
+
+int fdt_n_size_cells(void *dtb, int node);
+int fdt_n_addr_cells(void *dtb, int node);
 
 static inline int of_get_u64_array(struct device_node *node,
 		char *attr, uint64_t *array, int len)

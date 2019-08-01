@@ -4,7 +4,7 @@
 #include <minos/types.h>
 #include <minos/list.h>
 #include <asm/arch.h>
-#include <minos/virq.h>
+#include <virt/virq.h>
 #include <minos/device_id.h>
 
 #define VDEV_NAME_SIZE	(15)

@@ -16,40 +16,17 @@
 
 #include <minos/minos.h>
 #include <minos/mm.h>
-#include <minos/vmm.h>
+#include <virt/vmm.h>
 #include <libfdt/libfdt.h>
-#include <minos/vm.h>
+#include <virt/vm.h>
 #include <minos/platform.h>
 #include <minos/of.h>
 #include <config/config.h>
-#include <minos/virq_chip.h>
+#include <virt/virq_chip.h>
+#include <common/hypervisor.h>
 
-void fdt_vm0_init(struct vm *vm)
-{
-	void *fdt = vm->setup_data;
-
-	if (!fdt)
-		panic("vm0 do not have correct dtb image\n");
-
-	fdt_open_into(fdt, fdt, MAX_DTB_SIZE);
-	if(fdt_check_header(fdt)) {
-		pr_err("invaild dtb after open into\n");
-		return;
-	}
-
-	fdt_setup_minos(vm);
-	fdt_setup_cmdline(vm);
-	fdt_setup_cpu(vm);
-	fdt_setup_memory(vm);
-	fdt_setup_other(vm);
-
-	if (platform->setup_hvm)
-		platform->setup_hvm(vm, dtb);
-
-	fdt_pack(dtb);
-	flush_dcache_range((unsigned long)dtb, MAX_DTB_SIZE);
-	destroy_host_mapping((unsigned long)dtb, MAX_DTB_SIZE);
-}
+void *dtb;
+struct vmtag *vmtags;
 
 static int fdt_setup_other(struct vm *vm)
 {
@@ -214,7 +191,11 @@ static int fdt_setup_memory(struct vm *vm)
 	size = 0;
 
 	list_for_each_entry(region, &mem_list, list) {
+#if 0
 		if (region->vmid == 0) {
+#else
+		if (1) {
+#endif
 			pr_info("add memory region to vm0 0x%p 0x%p\n",
 					region->phy_base, region->size);
 			mstart = region->phy_base;
@@ -433,8 +414,7 @@ int fdt_parse_vm_info(void)
 	for (len = 0; len < nr_vm; len++) {
 		if (vmtags[len].mem_size != 0) {
 			split_memory_region(vmtags[len].mem_base,
-					vmtags[len].mem_size,
-					vmtags[len].vmid);
+					vmtags[len].mem_size);
 		}
 	}
 
@@ -443,4 +423,31 @@ int fdt_parse_vm_info(void)
 	//set_vmtags_to(vmtags, nr_vm);
 
 	return 0;
+}
+
+void fdt_vm0_init(struct vm *vm)
+{
+	void *fdt = vm->setup_data;
+
+	if (!fdt)
+		panic("vm0 do not have correct dtb image\n");
+
+	fdt_open_into(fdt, fdt, MAX_DTB_SIZE);
+	if(fdt_check_header(fdt)) {
+		pr_err("invaild dtb after open into\n");
+		return;
+	}
+
+	fdt_setup_minos(vm);
+	fdt_setup_cmdline(vm);
+	fdt_setup_cpu(vm);
+	fdt_setup_memory(vm);
+	fdt_setup_other(vm);
+
+	if (platform->setup_hvm)
+		platform->setup_hvm(vm, dtb);
+
+	fdt_pack(dtb);
+	flush_dcache_range((unsigned long)dtb, MAX_DTB_SIZE);
+	destroy_host_mapping((unsigned long)dtb, MAX_DTB_SIZE);
 }

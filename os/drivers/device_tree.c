@@ -21,51 +21,9 @@
 #include <minos/of.h>
 #include <config/config.h>
 
-#define MAX_DTB_SIZE	(MEM_BLOCK_SIZE)
-
 static void *dtb = NULL;
 static size_t dtb_size;
 struct device_node *hv_node;
-
-static int fdt_n_size_cells(void *dtb, int node)
-{
-	fdt32_t *v;
-	int parent, child = node;
-
-	parent = fdt_parent_offset(dtb, child);
-
-	do {
-		if (parent >= 0)
-			child = parent;
-		v = (fdt32_t *)fdt_getprop(dtb, child, "#size-cells", NULL);
-		if (v)
-			return fdt32_to_cpu(*v);
-
-		parent = fdt_parent_offset(dtb, child);
-	} while (parent >= 0);
-
-	return 2;
-}
-
-static int fdt_n_addr_cells(void *dtb, int node)
-{
-	fdt32_t *v;
-	int parent, child = node;
-
-	parent = fdt_parent_offset(dtb, child);
-
-	do {
-		if (parent >= 0)
-			child = parent;
-		v = (fdt32_t *)fdt_getprop(dtb, child, "#address-cells", NULL);
-		if (v)
-			return fdt32_to_cpu(*v);
-
-		parent = fdt_parent_offset(dtb, child);
-	} while (parent >= 0);
-
-	return 2;
-}
 
 int fdt_spin_table_init(phy_addr_t *smp_holding)
 {

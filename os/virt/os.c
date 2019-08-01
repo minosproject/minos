@@ -16,7 +16,8 @@
 
 #include <minos/minos.h>
 #include <minos/sched.h>
-#include <minos/os.h>
+#include <virt/os.h>
+#include <virt/vm.h>
 
 LIST_HEAD(os_list);
 struct os *default_os;
