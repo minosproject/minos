@@ -17,6 +17,8 @@
 #include <asm/aarch64_common.h>
 #include <asm/asm_marco.S>
 
+	.global __atomic_set
+	.global __atomic_get
 	.global atomic_add
 	.global atomic_sub
 	.global atomic_add_return
@@ -33,6 +35,19 @@
 	 *       : x - exclusive
 	 * stlr stxr stlrb stlrh stxrh etc
 	 */
+
+func __atomic_set
+	stlr	w0, [x1]
+	nop
+	ret
+endfunc __atomic_set
+
+func __atomic_get
+	ldr	w1, [x0]
+	mov	w0, w1
+	nop
+	ret
+endfunc __atomic_get
 
 func atomic_add
 1:
@@ -56,7 +71,7 @@ func atomic_add_return
 3:
 	ldxr	w2, [x1]
 	add	w2, w2, w0
-	stlxr	w3, w2, [x1]
+	stxr	w3, w2, [x1]
 	cbnz	w3, 3b
 	mov	w0, w2
 	dsb	sy
@@ -76,9 +91,9 @@ endfunc atomic_sub_return
 
 func atomic_add_return_old
 3:
-	ldxr	w2, [x1]
+	ldaxr	w2, [x1]
 	add	w2, w2, w0
-	stlxr	w3, w2, [x1]
+	stxr	w3, w2, [x1]
 	cbnz	w3, 3b
 	sub	w0, w2, w0
 	dsb	sy

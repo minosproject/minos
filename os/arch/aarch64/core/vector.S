@@ -135,7 +135,8 @@ arch_switch_task_sw:
 	add	x5, x5, x2
 	add	x4, x4, x2
 	ldr	x0, [x5]		// x0 is current running task
-	ldr	x1, [x4]		// x4 is next running task
+	ldr	x1, [x4]		// x1 is next running task
+	dsb	sy
 
 	mov	x2, sp
 	str	x2, [x0]
@@ -144,7 +145,9 @@ arch_switch_task_sw:
 	mov	sp, x2
 
 	str	x1, [x5]		// current = next
-	dsb sy
+	dsb 	sy
+
+	bl	switch_to_task
 
 	//restore_gp_regs
 	ldr	x0, [sp], #8
@@ -202,6 +205,7 @@ __sync_handler:
 	dsb	sy
 
 	mov	x0, sp
+
 	bl	sync_c_handler			// go to the c handler
 
 	//restore_gp_regs
@@ -282,12 +286,6 @@ __irq_handler:
 	ldr	x0, [x5]		// x0 is current running task
 	ldr	x1, [x4]		// x4 is next running task
 	dsb	sy
-
-	//stp	x4, x5, [sp, #-16]!
-	//stp	x0, x1, [sp, #-16]!
-	//bl	switch_to_task
-	//ldp	x0, x1, [sp], #16
-	//ldp	x4, x5, [sp], #16
 
 	cmp	x0, x1
 	beq	__switch_to_task

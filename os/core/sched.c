@@ -270,8 +270,8 @@ void switch_to_task(struct task *cur, struct task *next)
 	int cpuid = smp_processor_id();
 	prio_t prio;
 
+	/* save the task contex for the current task */
 	save_task_context(cur);
-	restore_task_context(next);
 
 	/*
 	 * check the current task's stat and do some action
@@ -286,6 +286,18 @@ void switch_to_task(struct task *cur, struct task *next)
 		}
 	}
 
+	/* set the current prio to the highest ready */
+	if (is_idle_task(next))
+		prio = OS_PRIO_PCPU;
+	else
+		prio = next->prio;
+
+	os_prio_cur[cpuid] = prio;
+	mb();
+
+	/* release the kernel lock now */
+	kernel_unlock();
+
 	/*
 	 * if the next running task prio is OS_PRIO_PCPU, it
 	 * need to enable the sched timer for fifo task sched
@@ -298,16 +310,7 @@ void switch_to_task(struct task *cur, struct task *next)
 		sched_tick_disable();
 
 	do_hooks((void *)next, NULL, OS_HOOK_TASK_SWITCH_TO);
-
-	/* set the current prio to the highest ready */
-	if (is_idle_task(next))
-		prio = OS_PRIO_PCPU;
-	else
-		prio = next->prio;
-
-	os_prio_cur[cpuid] = prio;
-	set_next_task(next);
-	mb();
+	restore_task_context(next);
 }
 
 unsigned long sched_tick_handler(unsigned long data)
@@ -401,6 +404,8 @@ void sched(void)
 		set_task_sleep(cur);
 	}
 
+	mb();
+
 	sched_new(pcpu);
 
 	/* check whether current pcpu need to resched */
@@ -427,8 +432,10 @@ void sched(void)
 		if (is_task_ready(cur))
 			recal_task_run_time(cur, pcpu);
 
-		switch_to_task(cur, next);
-		kernel_unlock();
+		pr_info("switch to new task %d in sched\n", next->pid);
+		set_next_task(next);
+		mb();
+
 		arch_switch_task_sw();
 		local_irq_restore(flags);
 	} else
@@ -472,7 +479,6 @@ void irq_exit(gp_regs *regs)
 	 */
 	if (!is_task_ready(task))
 		goto exit_0;
-
 #if 0
 	/*
 	 * if the highest prio is update by other cpu, then
@@ -491,7 +497,9 @@ void irq_exit(gp_regs *regs)
 		}
 	}
 
-out:
+//out:
+	clear_need_resched();
+
 	/*
 	 * if need sched or the current task is idle, then
 	 * try to get the next task to check whether need
@@ -500,13 +508,18 @@ out:
 	next = get_next_run_task(pcpu);
 	mb();
 	if (next != task) {
+		pr_info("switch to new task %d in irq_exit\n", next->pid);
 		if (is_task_ready(task))
 			recal_task_run_time(task, pcpu);
+
+		set_next_task(next);
 		switch_to_task(task, next);
+		mb();
+
+		return;
 	}
 
 exit_0:
-	clear_need_resched();
 	kernel_unlock();
 }
 

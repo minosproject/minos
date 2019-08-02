@@ -22,20 +22,19 @@ typedef struct ticketlock {
 
 static inline void ticketlock_init(ticketlock_t *tl)
 {
-	atomic_set(&tl->next_ticket, 0);
-	atomic_set(&tl->ticket_in_service, 0);
+	__atomic_set(0, &tl->next_ticket);
+	__atomic_set(0, &tl->ticket_in_service);
 }
 
 static inline void ticket_lock(ticketlock_t *tl)
 {
 	int ticket;
 
-	rmb();
 	preempt_disable();
-	ticket = atomic_inc_return_old(&tl->next_ticket);
+	ticket = atomic_add_return_old(1, &tl->next_ticket);
 	mb();
 
-	while (ticket != atomic_read(&tl->ticket_in_service))
+	while (ticket != __atomic_get(&tl->ticket_in_service))
 		mb();
 }
 
@@ -43,11 +42,10 @@ static inline void ticket_unlock(ticketlock_t *tl)
 {
 	int ticket;
 
-	rmb();
-	ticket = atomic_read(&tl->ticket_in_service);
-	atomic_set(&tl->ticket_in_service, ticket + 1);
-	preempt_enable();
+	ticket = __atomic_get(&tl->ticket_in_service);
 	mb();
+	__atomic_set(ticket + 1, &tl->ticket_in_service);
+	preempt_enable();
 }
 
 #define ticket_lock_irqsave(l, flags) \

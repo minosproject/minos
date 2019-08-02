@@ -7,6 +7,8 @@ typedef struct {
 
 #define ATOMIC_INIT(v) { (v) }
 
+void __atomic_set(int i, atomic_t *t);
+int __atomic_get(atomic_t *t);
 void atomic_add(int i, atomic_t *t);
 void atomic_sub(int i, atomic_t *t);
 int atomic_add_return(int i, atomic_t *t);
