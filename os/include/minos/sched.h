@@ -8,8 +8,9 @@
 #include <minos/task.h>
 
 DECLARE_PER_CPU(struct pcpu *, pcpu);
-DECLARE_PER_CPU(struct task *, percpu_current_task);
-DECLARE_PER_CPU(struct task *, percpu_next_task);
+
+extern struct task *__current_tasks[NR_CPUS];
+extern struct task *__next_tasks[NR_CPUS];
 
 extern prio_t os_highest_rdy[NR_CPUS];
 extern prio_t os_prio_cur[NR_CPUS];
@@ -65,22 +66,34 @@ void irq_exit(gp_regs *regs);
 
 static inline struct task *get_current_task(void)
 {
-	return get_cpu_var(percpu_current_task);
+	struct task *task;
+
+	task = __current_tasks[smp_processor_id()];
+	rmb();
+
+	return task;
 }
 
 static inline struct task *get_next_task(void)
 {
-	return get_cpu_var(percpu_next_task);
+	struct task *task;
+
+	task = __next_tasks[smp_processor_id()];
+	rmb();
+
+	return task;
 }
 
 static inline void set_current_task(struct task *task)
 {
-	get_cpu_var(percpu_current_task) = task;
+	__current_tasks[smp_processor_id()] = task;
+	wmb();
 }
 
 static inline void set_next_task(struct task *task)
 {
-	get_cpu_var(percpu_next_task) = task;
+	__next_tasks[smp_processor_id()] = task;
+	wmb();
 }
 
 static inline void set_current_prio(prio_t prio)

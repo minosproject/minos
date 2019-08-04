@@ -32,12 +32,13 @@ extern struct task *os_task_table[OS_NR_TASKS];
 static struct pcpu pcpus[NR_CPUS];
 
 DEFINE_PER_CPU(struct pcpu *, pcpu);
-DEFINE_PER_CPU(struct task *, percpu_current_task);
-DEFINE_PER_CPU(struct task *, percpu_next_task);
 DEFINE_PER_CPU(int, __need_resched);
 DEFINE_PER_CPU(int, __preempt);
 DEFINE_PER_CPU(int, __int_nesting);
 DEFINE_PER_CPU(int, __os_running);
+
+struct task *__current_tasks[NR_CPUS];
+struct task *__next_tasks[NR_CPUS];
 
 extern void sched_tick_disable(void);
 extern void sched_tick_enable(unsigned long exp);

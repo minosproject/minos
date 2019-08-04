@@ -24,70 +24,26 @@
 	.global __sync_handler
 	.global arch_switch_task_sw
 
-.macro save_gp_regs
-	stp	x29, x30, [sp, #-16]!
-	stp	x27, x28, [sp, #-16]!
-	stp	x25, x26, [sp, #-16]!
-	stp	x23, x24, [sp, #-16]!
-	stp	x21, x22, [sp, #-16]!
-	stp	x19, x20, [sp, #-16]!
-	stp	x17, x18, [sp, #-16]!
-	stp     x15, x16, [sp, #-16]!
-	stp     x13, x14, [sp, #-16]!
-	stp     x11, x12, [sp, #-16]!
-	stp     x9, x10, [sp, #-16]!
-	stp     x7, x8, [sp, #-16]!
-	stp     x5, x6, [sp, #-16]!
-	stp     x3, x4, [sp, #-16]!
-	stp     x1, x2, [sp, #-16]!
-	str	x0, [sp, #-8]!
-	mrs	x0, esr_el2
-	str	x0, [sp, #-8]!
-	mrs	x0, spsr_el2
-	str	x0, [sp, #-8]!
-	mrs	x0, elr_el2
-	str	x0, [sp, #-8]!
-.endm
+arg0		.req	x0
+arg1		.req	x1
+arg2		.req	x2
+arg3		.req	x3
+arg4		.req	x4
+arg5		.req	x5
+arg6		.req	x6
+arg7		.req	x7
 
-.macro restore_gp_regs
-	ldr	x0, [sp], #8
-	msr	elr_el2, x0
-	ldr	x0, [sp], #8
-	msr	spsr_el2, x0
-	mov	x30, x0
-	ldr	x0, [sp], #8
-	msr	esr_el2, x0
-	ldp     x0, x1, [sp], #16
-	ldp     x2, x3, [sp], #16
-	ldp     x4, x5, [sp], #16
-	ldp     x6, x7, [sp], #16
-	ldp     x8, x9, [sp], #16
-	ldp     x10, x11, [sp], #16
-	ldp     x12, x13, [sp], #16
-	ldp     x14, x15, [sp], #16
-	ldp     x16, x17, [sp], #16
-	ldp     x18, x19, [sp], #16
-	ldp     x20, x21, [sp], #16
-	ldp     x22, x23, [sp], #16
-	ldp     x24, x25, [sp], #16
-	ldp     x26, x27, [sp], #16
-	ldp     x28, x29, [sp], #16
+cpuid		.req	x10
+ct_addr		.req	x11	/* current task address */
+nt_addr		.req	x12	/* next task address */
+ct		.req	x13	/* current task */
+nt		.req	x14	/* next task */
 
-	and	x30, x30, #0xf
-	cmp	x30, #0x9
-	bne	1f
-	ldr	x30, [sp], #8
-	msr	elr_el2, x30
-	eret
-1:
-	ldr	x30, [sp], #8
-.endm
 
 	.type arch_switch_task_sw "function"
 	.cfi_startproc
 arch_switch_task_sw:
-	//save_gp_regs
-	stp	x29, x30, [sp, #-16]!
+	stp	x29, x30, [sp, #-16]!	/* save the register to current stack */
 	stp	x27, x28, [sp, #-16]!
 	stp	x25, x26, [sp, #-16]!
 	stp	x23, x24, [sp, #-16]!
@@ -117,45 +73,53 @@ arch_switch_task_sw:
 	str	x30, [sp, #-8]!
 	dsb	sy
 
-	ldr	x5, =per_cpu_percpu_current_task
-	ldr	x4, =per_cpu_percpu_next_task
-	mrs	x1, mpidr_el1
-	ubfx	x8, x1, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
-	ubfx	x9, x1, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
-	mov	x10, #CONFIG_NR_CPUS_CLUSTER0
-	mul	x2, x9, x10
-	add	x1, x2, x8
-	ldr	x2, =percpu_offset
-	ldr	x3, [x2]
-	sub	x5, x5, x3
-	sub	x4, x4, x3
-	lsl	x1, x1, #3
-	add	x2, x2, x1
-	ldr	x2, [x2]
-	add	x5, x5, x2
-	add	x4, x4, x2
-	ldr	x0, [x5]		// x0 is current running task
-	ldr	x1, [x4]		// x1 is next running task
+	mrs	arg4, MPIDR_EL1		/* get the cpuid */
+#ifdef	CONFIG_MPIDR_SHIFT
+	ubfx    arg1, arg4, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
+	ubfx    arg2, arg4, #MPIDR_EL1_AFF2_LSB, #MPIDR_EL1_AFF_WIDTH
+#else
+	ubfx    arg1, arg4, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
+	ubfx    arg2, arg4, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
+#endif
+	mov	arg3, #CONFIG_NR_CPUS_CLUSTER0
+	mul	arg2, arg2, arg3
+	add	cpuid, arg2, arg1
+
+	lsl	arg1, cpuid, #3
+	ldr	arg5, =__current_tasks	/* get the next task */
+	dsb	ld
+	add	ct_addr, arg5, arg1
+	ldr	ct, [ct_addr]
+	dsb	ld
+
+	ldr	arg5, =__next_tasks
+	dsb	ld
+	add	nt_addr, arg5, arg1
+	ldr	nt, [nt_addr]
+
+	mov	arg2, sp		/* save the current stack to task */
+	str	arg2, [ct]
+	dsb	st
+
+	str	nt, [ct_addr]		/* current = next */
+	dsb	st
+
+	mov	arg0, ct
+	mov	arg1, nt
+	ldr	arg2, [nt]		/* load the stack of next stack */
+	mov	sp, arg2
 	dsb	sy
 
-	mov	x2, sp
-	str	x2, [x0]
-
-	ldr	x2, [x1]
-	mov	sp, x2
-
-	str	x1, [x5]		// current = next
-	dsb 	sy
-
 	bl	switch_to_task
+	dsb	sy
 
-	//restore_gp_regs
-	ldr	x0, [sp], #8
+	ldr	x0, [sp], #8		/* restore the register */
 	msr	elr_el2, x0
 	ldr	x0, [sp], #8
 	msr	spsr_el2, x0
 	ldr	x0, [sp], #8
 	msr	esr_el2, x0
+	isb
 	ldp     x0, x1, [sp], #16
 	ldp     x2, x3, [sp], #16
 	ldp     x4, x5, [sp], #16
@@ -172,7 +136,7 @@ arch_switch_task_sw:
 	ldp     x26, x27, [sp], #16
 	ldp     x28, x29, [sp], #16
 	ldr	x30, [sp], #8
-	isb
+	dsb	sy
 	eret
 	.cfi_endproc
 
@@ -205,8 +169,8 @@ __sync_handler:
 	dsb	sy
 
 	mov	x0, sp
-
 	bl	sync_c_handler			// go to the c handler
+	dsb	sy
 
 	//restore_gp_regs
 	ldr	x0, [sp], #8
@@ -215,6 +179,7 @@ __sync_handler:
 	msr	spsr_el2, x0
 	ldr	x0, [sp], #8
 	msr	esr_el2, x0
+	isb
 	ldp     x0, x1, [sp], #16
 	ldp     x2, x3, [sp], #16
 	ldp     x4, x5, [sp], #16
@@ -231,15 +196,14 @@ __sync_handler:
 	ldp     x26, x27, [sp], #16
 	ldp     x28, x29, [sp], #16
 	ldr	x30, [sp], #8
-	isb
+	dsb	sy
 	eret
 	.cfi_endproc
 
 	.type __irq_handler "function"
 	.cfi_startproc
 __irq_handler:
-	//save_gp_regs
-	stp	x29, x30, [sp, #-16]!
+	stp	x29, x30, [sp, #-16]!	/* save the register for current task */
 	stp	x27, x28, [sp, #-16]!
 	stp	x25, x26, [sp, #-16]!
 	stp	x23, x24, [sp, #-16]!
@@ -261,52 +225,64 @@ __irq_handler:
 	str	x0, [sp, #-8]!
 	mrs	x0, elr_el2
 	str	x0, [sp, #-8]!
-
-	/* can not call sched() in irq handler */
-	mov	x0, sp
-	bl	irq_c_handler
-
-	ldr	x5, =per_cpu_percpu_current_task
-	ldr	x4, =per_cpu_percpu_next_task
-	mrs	x1, mpidr_el1
-	ubfx	x8, x1, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
-	ubfx	x9, x1, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
-	mov	x10, #CONFIG_NR_CPUS_CLUSTER0
-	mul	x2, x9, x10
-	add	x1, x2, x8
-	ldr	x2, =percpu_offset
-	ldr	x3, [x2]
-	sub	x5, x5, x3
-	sub	x4, x4, x3
-	lsl	x1, x1, #3
-	add	x2, x2, x1
-	ldr	x2, [x2]
-	add	x5, x5, x2
-	add	x4, x4, x2
-	ldr	x0, [x5]		// x0 is current running task
-	ldr	x1, [x4]		// x4 is next running task
 	dsb	sy
 
-	cmp	x0, x1
+	mrs	arg4, MPIDR_EL1		/* get the cpuid */
+#ifdef	CONFIG_MPIDR_SHIFT
+	ubfx    arg1, arg4, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
+	ubfx    arg2, arg4, #MPIDR_EL1_AFF2_LSB, #MPIDR_EL1_AFF_WIDTH
+#else
+	ubfx    arg1, arg4, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
+	ubfx    arg2, arg4, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
+#endif
+	mov	arg3, #CONFIG_NR_CPUS_CLUSTER0
+	mul	arg2, arg2, arg3
+	add	cpuid, arg2, arg1
+
+	ldr	arg5, =__current_tasks
+	dsb	ld
+	lsl	arg1, cpuid, #3
+	add	ct_addr, arg5, arg1
+	ldr	ct, [ct_addr]
+	dsb	ld
+
+	ldr	arg1, =__irq_stack_end	/* get the irq stack of the current cpu */
+	sub	arg1, arg1, cpuid, lsl #13
+
+	mov	arg0, sp
+	str	arg0, [ct]		/* store the current task's stack */
+	dsb	st
+
+	mov	sp, arg1		/* switch to the irq task */
+	bl	irq_c_handler		/* call the c irq handler */
+
+	ldr	arg5, =__next_tasks	/* check whether need to switch to a new task */
+	dsb	ld
+	lsl	arg1, cpuid, #3
+	add	nt_addr, arg5, arg1
+	ldr	nt, [nt_addr]
+	dsb	ld
+
+	ldr	arg2, [ct]		/* load the stack of the current task */
+	dsb	ld
+
+	cmp	ct, nt
 	beq	__switch_to_task
 
-	mov	x2, sp
-	str	x2, [x0]		// save the stack to the stack base
-
-	ldr	x2, [x1]
-	mov	sp, x2			// load the sp from the next task
-
-	str	x1, [x5]		// current task = next task
+	ldr	arg2, [nt]
+	str	nt, [ct_addr]		/* current task = next task */
 	dsb 	sy
 
 __switch_to_task:
-	//restore_gp_regs
+	mov	sp, arg2		/* load the task's stack */
+
 	ldr	x0, [sp], #8
 	msr	elr_el2, x0
 	ldr	x0, [sp], #8
 	msr	spsr_el2, x0
 	ldr	x0, [sp], #8
 	msr	esr_el2, x0
+	isb
 	ldp     x0, x1, [sp], #16
 	ldp     x2, x3, [sp], #16
 	ldp     x4, x5, [sp], #16
@@ -323,6 +299,6 @@ __switch_to_task:
 	ldp     x26, x27, [sp], #16
 	ldp     x28, x29, [sp], #16
 	ldr	x30, [sp], #8
-	isb
+	dsb	sy
 	eret
 	.cfi_endproc

@@ -215,6 +215,13 @@ SECTIONS
 		__el2_stack_end = .;
 	}
 
+	.irq_stack : {
+		. = ALIGN(64);
+		__irq_stack_start = .;
+		. = . + (CONFIG_NR_CPUS * CONFIG_EXCEPTION_SIZE);
+		__irq_stack_end = .;
+	}
+
 	.el2_ttb0_pgd : {
 		. = ALIGN(4096);
 		__el2_ttb0_pgd = .;
