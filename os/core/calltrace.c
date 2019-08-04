@@ -47,7 +47,7 @@ void dump_stack(gp_regs *regs, unsigned long *stack)
 
 static void panic_other_cpu(void *data)
 {
-	pr_fatal("[Panic called by other cpu]");
+	pr_fatal("[Panic called by other cpu]\n");
 	dump_stack(NULL, NULL);
 
 	for (;;)

@@ -65,6 +65,18 @@ void apps_cpu0_init(void)
 	create_realtime_task("rt-task-31", rt_task, (void *)31, 31, 4096, 0);
 	create_realtime_task("rt-task-30", rt_task, (void *)30, 30, 4096, 0);
 	create_realtime_task("rt-task-29", rt_task, (void *)29, 29, 4096, 0);
+	create_realtime_task("rt-task-28", rt_task, (void *)28, 28, 4096, 0);
+	create_realtime_task("rt-task-27", rt_task, (void *)27, 27, 4096, 0);
+	create_realtime_task("rt-task-26", rt_task, (void *)26, 26, 4096, 0);
+	create_realtime_task("rt-task-25", rt_task, (void *)25, 25, 4096, 0);
+	create_realtime_task("rt-task-24", rt_task, (void *)24, 24, 4096, 0);
+	create_realtime_task("rt-task-23", rt_task, (void *)23, 23, 4096, 0);
+	create_realtime_task("rt-task-22", rt_task, (void *)22, 22, 4096, 0);
+	create_realtime_task("rt-task-21", rt_task, (void *)21, 21, 4096, 0);
+	create_realtime_task("rt-task-20", rt_task, (void *)20, 20, 4096, 0);
+	create_realtime_task("rt-task-19", rt_task, (void *)19, 19, 4096, 0);
+	create_realtime_task("rt-task-18", rt_task, (void *)18, 18, 4096, 0);
+	create_realtime_task("rt-task-17", rt_task, (void *)17, 17, 4096, 0);
 #endif
 }
 

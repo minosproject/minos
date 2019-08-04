@@ -128,7 +128,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	struct task *task = get_current_task();
 
 	if (invalid_mutex(m) || int_nesting() || !preempt_allowed())
-		return -EINVAL;
+		panic("mutex pend error\n");
 
 	ticket_lock(&m->lock);
 	if (m->cnt == OS_MUTEX_AVAILABLE) {
@@ -194,6 +194,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->wait_event = 0;
+	mb();
 
 	return ret;
 }

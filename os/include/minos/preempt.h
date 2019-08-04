@@ -89,14 +89,12 @@ static void inline preempt_enable(void)
 		}
 	}
 #endif
-	mb();
 	pr_info("#### %d\n", get_cpu_var(__preempt));
 }
 
 static void inline preempt_disable(void)
 {
 	__preempt_disable();
-	mb();
 	pr_info("#### %d\n", get_cpu_var(__preempt));
 }
 

@@ -51,41 +51,43 @@ endfunc __atomic_get
 
 func atomic_add
 1:
-	ldxr	w2, [x1]
+	ldaxr	w2, [x1]
 	add	w2, w2, w0
 	stxr	w3, w2, [x1]
+	nop
 	cbnz	w3, 1b
 	ret
 endfunc atomic_add
 
 func atomic_sub
 2:
-	ldxr	w2, [x1]
+	ldaxr	w2, [x1]
 	sub	w2, w2, w0
 	stxr	w3, w2, [x1]
+	nop
 	cbnz	w3, 2b
 	ret
 endfunc atomic_sub
 
 func atomic_add_return
 3:
-	ldxr	w2, [x1]
+	ldaxr	w2, [x1]
 	add	w2, w2, w0
 	stxr	w3, w2, [x1]
+	nop
 	cbnz	w3, 3b
 	mov	w0, w2
-	dsb	sy
 	ret
 endfunc atomic_add_return
 
 func atomic_sub_return
 4:
-	ldxr	w2, [x1]
+	ldaxr	w2, [x1]
 	sub	w2, w2, w0
 	stxr	w3, w2, [x1]
+	nop
 	cbnz	w3, 4b
 	mov	w0, w2
-	dsb	sy
 	ret
 endfunc atomic_sub_return
 
@@ -94,19 +96,19 @@ func atomic_add_return_old
 	ldaxr	w2, [x1]
 	add	w2, w2, w0
 	stxr	w3, w2, [x1]
+	nop
 	cbnz	w3, 3b
 	sub	w0, w2, w0
-	dsb	sy
 	ret
 endfunc atomic_add_return_old
 
 func atomic_sub_return_old
 4:
-	ldxr	w2, [x1]
+	ldaxr	w2, [x1]
 	sub	w2, w2, w0
 	stxr	w3, w2, [x1]
+	nop
 	cbnz	w3, 4b
 	add	w0, w2, w0
-	dsb	sy
 	ret
 endfunc atomic_sub_return_old
