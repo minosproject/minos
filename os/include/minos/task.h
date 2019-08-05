@@ -127,7 +127,7 @@ void release_task_event(struct task_event *event);
 		if (is_realtime_task(task)) 		\
 			kernel_lock_irqsave(flags);	\
 		else					\
-			spin_unlock_irqrestore(&task->lock, flags);	\
+			spin_lock_irqsave(&task->lock, flags);	\
 	} while (0)
 
 #define task_unlock_irqrestore(task, flags)		\
