@@ -20,7 +20,7 @@
 #include <minos/mm.h>
 #include <minos/task.h>
 #include <minos/sched.h>
-#include <minos/ticketlock.h>
+#include <minos/spinlock.h>
 
 #define invalid_flag(f) \
 	((f == NULL) || (f->type != OS_EVENT_TYPE_FLAG))
@@ -39,7 +39,7 @@ struct flag_grp *flag_create(flag_t flags)
 	fg->type = OS_EVENT_TYPE_FLAG;
 	fg->flags = flags;
 	init_list(&fg->wait_list);
-	ticketlock_init(&fg->lock);
+	spin_lock_init(&fg->lock);
 
 	return fg;
 }
@@ -121,7 +121,7 @@ flag_t flag_accept(struct flag_grp *grp, flag_t flags, int wait_type)
 	} else
 		consume = 0;
 
-	ticket_lock_irqsave(&grp->lock, irq);
+	spin_lock_irqsave(&grp->lock, irq);
 
 	switch (wait_type) {
 	case FLAG_WAIT_SET_ALL:
@@ -141,7 +141,7 @@ flag_t flag_accept(struct flag_grp *grp, flag_t flags, int wait_type)
 		break;
 	}
 
-	ticket_unlock_irqrestore(&grp->lock, irq);
+	spin_unlock_irqrestore(&grp->lock, irq);
 	return flags_rdy;
 }
 
@@ -192,7 +192,7 @@ int flag_del(struct flag_grp *grp, int opt)
 	if (int_nesting() || invalid_flag(grp))
 		return -EINVAL;
 
-	ticket_lock_irqsave(&grp->lock, irq);
+	spin_lock_irqsave(&grp->lock, irq);
 
 	if (!is_list_empty(&grp->wait_list))
 		tasks_waiting = 1;
@@ -215,7 +215,7 @@ int flag_del(struct flag_grp *grp, int opt)
 		}
 
 		free(grp);
-		ticket_unlock_irqrestore(&grp->lock, irq);
+		spin_unlock_irqrestore(&grp->lock, irq);
 
 		if (tasks_waiting)
 			sched();
@@ -225,7 +225,7 @@ int flag_del(struct flag_grp *grp, int opt)
 		break;
 	}
 
-	ticket_unlock_irqrestore(&grp->lock, irq);
+	spin_unlock_irqrestore(&grp->lock, irq);
 	return ret;
 }
 
@@ -271,7 +271,7 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 	} else
 		consume = 0;
 
-	ticket_lock_irqsave(&grp->lock, irq);
+	spin_lock_irqsave(&grp->lock, irq);
 
 	switch (wait_type) {
 	case FLAG_WAIT_SET_ALL:
@@ -292,16 +292,16 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 	}
 
 	if (flags_rdy) {
-		ticket_unlock_irqrestore(&grp->lock, irq);
+		spin_unlock_irqrestore(&grp->lock, irq);
 		return flags_rdy;
 	}
 
 	flag_block(grp, &node, flags, wait_type, timeout);
-	ticket_unlock_irqrestore(&grp->lock, irq);
+	spin_unlock_irqrestore(&grp->lock, irq);
 
 	sched();
 
-	ticket_lock_irqsave(&grp->lock, irq);
+	spin_lock_irqsave(&grp->lock, irq);
 	task_lock(task);
 
 	if (task->pend_stat != TASK_STAT_PEND_OK) {
@@ -330,7 +330,7 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 	}
 
 	task_unlock(task);
-	ticket_unlock_irqrestore(&grp->lock, irq);
+	spin_unlock_irqrestore(&grp->lock, irq);
 
 	return flags_rdy;
 }
@@ -359,7 +359,7 @@ flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt)
 	if (invalid_flag(grp) || (opt > FLAG_SET))
 		return -EINVAL;
 
-	ticket_lock_irqsave(&grp->lock, irq);
+	spin_lock_irqsave(&grp->lock, irq);
 	switch (opt) {
 	case FLAG_CLR:
 		grp->flags &= ~flags;
@@ -405,19 +405,19 @@ flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt)
 			}
 
 		default:
-			ticket_unlock_irqrestore(&grp->lock, irq);
+			spin_unlock_irqrestore(&grp->lock, irq);
 			return 0;
 		}
 	}
 
-	ticket_unlock_irqrestore(&grp->lock, irq);
+	spin_unlock_irqrestore(&grp->lock, irq);
 
 	if (need_sched)
 		sched();
 
-	ticket_lock_irqsave(&grp->lock, irq);
+	spin_lock_irqsave(&grp->lock, irq);
 	flags_rdy = grp->flags;
-	ticket_unlock_irqrestore(&grp->lock, irq);
+	spin_unlock_irqrestore(&grp->lock, irq);
 
 	return flags_rdy;
 }

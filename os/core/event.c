@@ -27,7 +27,7 @@ static DEFINE_SPIN_LOCK(event_lock);
 void event_init(struct event *event, int type, void *pdata, char *name)
 {
 	event->type = type;
-	ticketlock_init(&event->lock);
+	spin_lock_init(&event->lock);
 	init_list(&event->wait_list);
 	event->data = pdata;
 	strncpy(event->name, name, MIN(strlen(name), OS_EVENT_NAME_SIZE));

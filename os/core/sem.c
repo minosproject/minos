@@ -19,7 +19,6 @@
 #include <minos/task.h>
 #include <minos/sem.h>
 #include <minos/sched.h>
-#include <minos/ticketlock.h>
 
 #define invalid_sem(sem) \
 	((sem == NULL) || (sem->type != OS_EVENT_TYPE_MBOX))
@@ -43,11 +42,11 @@ uint32_t sem_accept(sem_t *sem)
 	if (invalid_sem(sem))
 		return -EINVAL;
 
-	ticket_lock_irqsave(&sem->lock, flags);
+	spin_lock_irqsave(&sem->lock, flags);
 	cnt = sem->cnt;
 	if (cnt > 0)
 		sem->cnt--;
-	ticket_unlock_irqrestore(&sem->lock, flags);
+	spin_unlock_irqrestore(&sem->lock, flags);
 
 	return cnt;
 }
@@ -64,7 +63,7 @@ int sem_del(sem_t *sem, int opt)
 	if (int_nesting())
 		return -EPERM;
 
-	ticket_lock_irqsave(&sem->lock, flags);
+	spin_lock_irqsave(&sem->lock, flags);
 	if (event_has_waiter((struct event *)sem))
 		tasks_waiting = 1;
 	else
@@ -73,7 +72,7 @@ int sem_del(sem_t *sem, int opt)
 	switch (opt) {
 	case OS_DEL_NO_PEND:
 		if (tasks_waiting == 0) {
-			ticket_unlock_irqrestore(&sem->lock, flags);
+			spin_unlock_irqrestore(&sem->lock, flags);
 			release_event(to_event(sem));
 			return 0;
 		} else
@@ -82,7 +81,7 @@ int sem_del(sem_t *sem, int opt)
 
 	case OS_DEL_ALWAYS:
 		event_del_always((struct event *)sem);
-		ticket_unlock_irqrestore(&sem->lock, flags);
+		spin_unlock_irqrestore(&sem->lock, flags);
 		release_event(to_event(sem));
 
 		if (tasks_waiting)
@@ -105,10 +104,10 @@ int sem_pend(sem_t *sem, uint32_t timeout)
 	if (invalid_sem(sem) || int_nesting() || preempt_allowed())
 		return -EINVAL;
 
-	ticket_lock_irqsave(&sem->lock, flags);
+	spin_lock_irqsave(&sem->lock, flags);
 	if (sem->cnt > 0) {
 		sem->cnt--;
-		ticket_unlock_irqrestore(&sem->lock, flags);
+		spin_unlock_irqrestore(&sem->lock, flags);
 		return 0;
 	}
 
@@ -120,11 +119,11 @@ int sem_pend(sem_t *sem, uint32_t timeout)
 	task_unlock(task);
 
 	event_task_wait(task, (struct event *)sem);
-	ticket_unlock_irqrestore(&sem->lock, flags);
+	spin_unlock_irqrestore(&sem->lock, flags);
 
 	sched();
 
-	ticket_lock_irqsave(&sem->lock, flags);
+	spin_lock_irqsave(&sem->lock, flags);
 	task_lock(task);
 	switch (task->pend_stat) {
 	case TASK_STAT_PEND_OK:
@@ -143,7 +142,7 @@ int sem_pend(sem_t *sem, uint32_t timeout)
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->wait_event = NULL;
 	task_unlock(task);
-	ticket_unlock_irqrestore(&sem->lock, flags);
+	spin_unlock_irqrestore(&sem->lock, flags);
 
 	return ret;
 }
@@ -157,7 +156,7 @@ int sem_pend_abort(sem_t *sem, int opt)
 	if (invalid_sem(sem) || int_nesting() || !preempt_allowed())
 		return -EINVAL;
 
-	ticket_lock_irqsave(&sem->lock, flags);
+	spin_lock_irqsave(&sem->lock, flags);
 	if (event_has_waiter((struct event *)sem)) {
 		switch (opt) {
 		case OS_PEND_OPT_BROADCAST:
@@ -177,13 +176,13 @@ int sem_pend_abort(sem_t *sem, int opt)
 			break;
 		}
 
-		ticket_unlock_irqrestore(&sem->lock, flags);
+		spin_unlock_irqrestore(&sem->lock, flags);
 		sched();
 
 		return nbr_tasks;
 	}
 
-	ticket_unlock_irqrestore(&sem->lock, flags);
+	spin_unlock_irqrestore(&sem->lock, flags);
 	return 0;
 }
 
@@ -195,12 +194,12 @@ int sem_post(sem_t *sem)
 	if (invalid_sem(sem))
 		return -EINVAL;
 
-	ticket_lock_irqsave(&sem->lock, flags);
+	spin_lock_irqsave(&sem->lock, flags);
 	if (event_has_waiter(to_event(sem))) {
 		task = event_highest_task_ready((struct event *)sem,
 				NULL, TASK_STAT_SEM, TASK_STAT_PEND_OK);
 		if (task) {
-			ticket_unlock_irqrestore(&sem->lock, flags);
+			spin_unlock_irqrestore(&sem->lock, flags);
 			sched();
 			return 0;
 		}
@@ -209,7 +208,7 @@ int sem_post(sem_t *sem)
 	if (sem->cnt < 65535)
 		sem->cnt++;
 
-	ticket_unlock_irqrestore(&sem->lock, flags);
+	spin_unlock_irqrestore(&sem->lock, flags);
 
 	return 0;
 }

@@ -19,7 +19,6 @@
 #include <minos/task.h>
 #include <minos/sched.h>
 #include <minos/mm.h>
-#include <minos/ticketlock.h>
 
 #define invalid_queue(qt) \
 	((qt == NULL) || (qt->type != OS_EVENT_TYPE_Q))
@@ -83,7 +82,7 @@ int queue_del(queue_t *qt, int opt)
 	if (int_nesting())
 		return -EPERM;
 
-	ticket_lock_irqsave(&qt->lock, flags);
+	spin_lock_irqsave(&qt->lock, flags);
 
 	if (event_has_waiter(to_event(qt)))
 		tasks_waiting = 1;
@@ -93,7 +92,7 @@ int queue_del(queue_t *qt, int opt)
 	switch (opt) {
 	case OS_DEL_NO_PEND:
 		if (tasks_waiting == 0) {
-			ticket_unlock_irqrestore(&qt->lock, flags);
+			spin_unlock_irqrestore(&qt->lock, flags);
 			queue_free(qt);
 			return 0;
 		}
@@ -101,7 +100,7 @@ int queue_del(queue_t *qt, int opt)
 
 	case OS_DEL_ALWAYS:
 		event_del_always(to_event(qt));
-		ticket_unlock_irqrestore(&qt->lock, flags);
+		spin_unlock_irqrestore(&qt->lock, flags);
 		queue_free(qt);
 
 		if (tasks_waiting)
@@ -113,7 +112,7 @@ int queue_del(queue_t *qt, int opt)
 		break;
 	}
 
-	ticket_unlock_irqrestore(&qt->lock, flags);
+	spin_unlock_irqrestore(&qt->lock, flags);
 	return ret;
 }
 
@@ -155,13 +154,13 @@ void *queue_accept(queue_t *qt)
 	if (invalid_queue(qt))
 		return NULL;
 
-	ticket_lock_irqsave(&qt->lock, flags);
+	spin_lock_irqsave(&qt->lock, flags);
 
 	q = (struct queue *)qt->data;
 	if (q->q_cnt > 0)
 		pmsg = queue_pop(q);
 
-	ticket_unlock_irqrestore(&qt->lock, flags);
+	spin_unlock_irqrestore(&qt->lock, flags);
 
 	return pmsg;
 }
@@ -174,12 +173,12 @@ int queue_flush(queue_t *qt)
 	if (invalid_queue(qt))
 		return -EINVAL;
 
-	ticket_lock_irqsave(&qt->lock, flags);
+	spin_lock_irqsave(&qt->lock, flags);
 	q = (struct queue *)qt->data;
 	q->q_in = q->q_start;
 	q->q_out = q->q_start;
 	q->q_cnt = 0;
-	ticket_unlock_irqrestore(&qt->lock, flags);
+	spin_unlock_irqrestore(&qt->lock, flags);
 
 	return 0;
 }
@@ -194,11 +193,11 @@ void *queue_pend(queue_t *qt, uint32_t timeout)
 	if (invalid_queue(qt) || int_nesting() || !preempt_allowed())
 		return NULL;
 
-	ticket_lock_irqsave(&qt->lock, flags);
+	spin_lock_irqsave(&qt->lock, flags);
 	q = (struct queue *)qt->data;
 	if (q->q_cnt > 0) {
 		pmsg = queue_pop(q);
-		ticket_unlock_irqrestore(&qt->lock, flags);
+		spin_unlock_irqrestore(&qt->lock, flags);
 		return pmsg;
 	}
 
@@ -211,11 +210,11 @@ void *queue_pend(queue_t *qt, uint32_t timeout)
 	task_unlock(task);
 
 	event_task_wait(task, to_event(qt));
-	ticket_unlock_irqrestore(&qt->lock, flags);
+	spin_unlock_irqrestore(&qt->lock, flags);
 
 	sched();
 
-	ticket_lock_irqsave(&qt->lock, flags);
+	spin_lock_irqsave(&qt->lock, flags);
 	task_lock(task);
 
 	switch (task->pend_stat) {
@@ -239,7 +238,7 @@ void *queue_pend(queue_t *qt, uint32_t timeout)
 	task->msg = NULL;
 
 	task_unlock(task);
-	ticket_unlock_irqrestore(&qt->lock, flags);
+	spin_unlock_irqrestore(&qt->lock, flags);
 
 	return pmsg;
 }
@@ -252,7 +251,7 @@ int queue_post_abort(queue_t *qt, int opt)
 	if (invalid_queue(qt) || int_nesting() || preempt_allowed())
 		return -EINVAL;
 
-	ticket_lock_irqsave(&qt->lock, flags);
+	spin_lock_irqsave(&qt->lock, flags);
 	if (event_has_waiter(to_event(qt))) {
 		switch(opt) {
 		case OS_PEND_OPT_BROADCAST:
@@ -272,13 +271,13 @@ int queue_post_abort(queue_t *qt, int opt)
 			break;
 		}
 
-		ticket_unlock_irqrestore(&qt->lock, flags);
+		spin_unlock_irqrestore(&qt->lock, flags);
 		sched();
 
 		return nbr_tasks;
 	}
 
-	ticket_unlock_irqrestore(&qt->lock, flags);
+	spin_unlock_irqrestore(&qt->lock, flags);
 	return nbr_tasks;
 }
 
@@ -290,11 +289,11 @@ static int __queue_post(queue_t *qt, void *pmsg, int front)
 	if (invalid_queue(qt) || !pmsg)
 		return -EINVAL;
 
-	ticket_lock_irqsave(&qt->lock, flags);
+	spin_lock_irqsave(&qt->lock, flags);
 	if (event_has_waiter(to_event(qt))) {
 		event_highest_task_ready(to_event(qt), pmsg,
 				TASK_STAT_Q, TASK_STAT_PEND_OK);
-		ticket_unlock_irqrestore(&qt->lock, flags);
+		spin_unlock_irqrestore(&qt->lock, flags);
 
 		sched();
 		return 0;
@@ -302,7 +301,7 @@ static int __queue_post(queue_t *qt, void *pmsg, int front)
 
 	q = (struct queue *)qt->data;
 	if (q->q_cnt >= q->q_size) {
-		ticket_unlock_irqrestore(&qt->lock, flags);
+		spin_unlock_irqrestore(&qt->lock, flags);
 		return -ENOSPC;
 	}
 
@@ -311,7 +310,7 @@ static int __queue_post(queue_t *qt, void *pmsg, int front)
 	else
 		queue_push(q, pmsg);
 
-	ticket_unlock_irqrestore(&qt->lock, flags);
+	spin_unlock_irqrestore(&qt->lock, flags);
 
 	return 0;
 }
@@ -335,7 +334,7 @@ int queue_post_opt(queue_t *qt, int opt, void *pmsg)
 	if (invalid_queue(qt) || !pmsg)
 		return -EINVAL;
 
-	ticket_lock_irqsave(&qt->lock, flags);
+	spin_lock_irqsave(&qt->lock, flags);
 	if (event_has_waiter(to_event(qt))) {
 		if (opt & OS_POST_OPT_BROADCAST) {
 			while (event_has_waiter(to_event(qt))) {
@@ -350,7 +349,7 @@ int queue_post_opt(queue_t *qt, int opt, void *pmsg)
 		}
 
 		if (nr_task) {
-			ticket_unlock_irqrestore(&qt->lock, flags);
+			spin_unlock_irqrestore(&qt->lock, flags);
 			if ((opt & OS_POST_OPT_NO_SCHED) == 0)
 				sched();
 
@@ -360,7 +359,7 @@ int queue_post_opt(queue_t *qt, int opt, void *pmsg)
 
 	q = (struct queue *)qt->data;
 	if (q->q_cnt >= q->q_size) {
-		ticket_unlock_irqrestore(&qt->lock, flags);
+		spin_unlock_irqrestore(&qt->lock, flags);
 		return -ENOSPC;
 	}
 
@@ -369,6 +368,6 @@ int queue_post_opt(queue_t *qt, int opt, void *pmsg)
 	else
 		queue_push(q, pmsg);
 
-	ticket_unlock_irqrestore(&qt->lock, flags);
+	spin_unlock_irqrestore(&qt->lock, flags);
 	return 0;
 }

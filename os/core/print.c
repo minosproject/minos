@@ -18,7 +18,7 @@
 #include <minos/varlist.h>
 #include <minos/string.h>
 #include <minos/print.h>
-#include <minos/spinlock.h>
+#include <minos/preempt.h>
 #include <config/config.h>
 #include <drivers/serial.h>
 #include <minos/smp.h>

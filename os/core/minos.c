@@ -45,7 +45,7 @@ extern int virt_init(void);
 
 struct list_head hook_lists[MINOS_HOOK_TYPE_UNKNOWN];
 
-DEFINE_TICKET_LOCK(__kernel_lock);
+DEFINE_SPIN_LOCK(__kernel_lock);
 DEFINE_PER_CPU(int, error_code);
 
 static void hooks_init(void)

@@ -15,11 +15,11 @@
  */
 
 #include <minos/minos.h>
-#include <minos/task.h>
 #include <minos/sched.h>
 #include <minos/mm.h>
 #include <minos/atomic.h>
 #include <minos/vmodule.h>
+#include <minos/task.h>
 
 static DEFINE_SPIN_LOCK(pid_lock);
 static DECLARE_BITMAP(pid_map, OS_NR_TASKS);
@@ -31,6 +31,10 @@ static atomic_t os_task_nr;
 static DEFINE_SPIN_LOCK(task_event_lock);
 static struct task_event task_events[NR_TASK_EVENT];
 static DECLARE_BITMAP(task_event_map, NR_TASK_EVENT);
+
+/* idle task needed be static defined */
+static struct task idle_tasks[NR_CPUS];
+static DEFINE_PER_CPU(struct task *, idle_task);
 
 struct task_event *alloc_task_event(void)
 {
@@ -185,6 +189,8 @@ static void task_init(struct task *task, char *name,
 
 	if (task->prio == OS_PRIO_IDLE)
 		task->flags |= TASK_FLAGS_IDLE;
+
+	spin_lock_init(&task->lock);
 
 	init_timer_on_cpu(&task->delay_timer, aff);
 	task->delay_timer.function = task_timeout_handler;
@@ -403,11 +409,17 @@ int create_idle_task(void)
 	if (pid < -1)
 		panic("can not create task, PID error\n");
 
-	task = __create_task("idle", NULL, NULL,
-			OS_PRIO_IDLE, pid, aff, 0, 0);
+	task = get_cpu_var(idle_task);
 	if (!task)
-		panic("can not create idle task for pcpu%d\n", aff);
+		panic("error to get idle task\n");
 
+	os_task_table[pid] = task;
+	atomic_inc(&os_task_nr);
+	task_init(task, "idle-task", NULL, NULL,
+			OS_PRIO_IDLE, pid, aff, 0, 0);
+	task_vmodules_init(task);
+
+	/* reinit the task's stack information */
 	task->stack_size = TASK_DEFAULT_STACK_SIZE;
 	task->stack_origin = el2_stack_base -
 		(aff << CONFIG_IDLE_TASK_STACK_SHIFT);
@@ -427,6 +439,27 @@ int create_idle_task(void)
 
 	return 0;
 }
+
+/*
+ * for preempt_disable and preempt_enable need
+ * to set the current task at boot stage
+ */
+static int tasks_early_init(void)
+{
+	int i;
+	struct task *task;
+
+	for (i = 0; i < NR_CPUS; i++) {
+		task = &idle_tasks[i];
+		memset(task, 0, sizeof(*task));
+		get_per_cpu(idle_task, i) = task;
+		__current_tasks[i] = task;
+		__next_tasks[i] = task;
+	}
+
+	return 0;
+}
+early_initcall(tasks_early_init);
 
 int create_percpu_task(char *name, task_func_t func, void *arg,
 		size_t stk_size, unsigned long flags)

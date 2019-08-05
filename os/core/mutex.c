@@ -17,7 +17,6 @@
 #include <minos/minos.h>
 #include <minos/event.h>
 #include <minos/task.h>
-#include <minos/ticketlock.h>
 #include <minos/mutex.h>
 #include <minos/sched.h>
 
@@ -50,14 +49,14 @@ int mutex_accept(mutex_t *mutex)
 		return -EPERM;
 
 	/* if the mutex is avaliable now, lock it */
-	ticket_lock_irqsave(&mutex->lock, flags);
+	spin_lock_irqsave(&mutex->lock, flags);
 	if (mutex->cnt == OS_MUTEX_AVAILABLE) {
 		mutex->owner = task->pid;
 		mutex->data = task;
 		mutex->cnt = task->prio;
 		ret = 0;
 	}
-	ticket_unlock_irqrestore(&mutex->lock, flags);
+	spin_unlock_irqrestore(&mutex->lock, flags);
 
 	return ret;
 }
@@ -72,7 +71,7 @@ int mutex_del(mutex_t *mutex, int opt)
 	if (invalid_mutex(mutex))
 		return -EINVAL;
 
-	ticket_lock_irqsave(&mutex->lock, flags);
+	spin_lock_irqsave(&mutex->lock, flags);
 
 	if (event_has_waiter(to_event(mutex)))
 		tasks_waiting = 1;
@@ -85,7 +84,7 @@ int mutex_del(mutex_t *mutex, int opt)
 			pr_err("can not delete mutex task waitting for it\n");
 			ret = -EPERM;
 		} else {
-			ticket_unlock_irqrestore(&mutex->lock, flags);
+			spin_unlock_irqrestore(&mutex->lock, flags);
 			release_event(to_event(mutex));
 			return 0;
 		}
@@ -104,7 +103,7 @@ int mutex_del(mutex_t *mutex, int opt)
 		}
 
 		event_del_always(to_event(mutex));
-		ticket_unlock_irqrestore(&mutex->lock, flags);
+		spin_unlock_irqrestore(&mutex->lock, flags);
 		release_event(to_event(mutex));
 
 		if (tasks_waiting)
@@ -116,7 +115,7 @@ int mutex_del(mutex_t *mutex, int opt)
 		break;
 	}
 
-	ticket_unlock_irqrestore(&mutex->lock, flags);
+	spin_unlock_irqrestore(&mutex->lock, flags);
 	return ret;
 }
 
@@ -130,7 +129,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	if (invalid_mutex(m) || int_nesting() || !preempt_allowed())
 		panic("mutex pend error\n");
 
-	ticket_lock(&m->lock);
+	spin_lock(&m->lock);
 	if (m->cnt == OS_MUTEX_AVAILABLE) {
 		m->owner = task->pid;
 		m->data = (void *)task;
@@ -140,7 +139,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 
 		/* to be done  need furture design */
 		task->lock_event = to_event(m);
-		ticket_unlock(&m->lock);
+		spin_unlock(&m->lock);
 		return 0;
 	}
 
@@ -172,7 +171,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	task_unlock_irqrestore(task, flags);
 
 	event_task_wait(task, to_event(m));
-	ticket_unlock(&m->lock);
+	spin_unlock(&m->lock);
 
 	sched();
 
@@ -188,9 +187,9 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	case TASK_STAT_PEND_TO:
 	default:
 		ret = -ETIMEDOUT;
-		ticket_lock_irqsave(&m->lock, flags);
+		spin_lock_irqsave(&m->lock, flags);
 		event_task_remove(task, (struct event *)m);
-		ticket_unlock_irqrestore(&m->lock, flags);
+		spin_unlock_irqrestore(&m->lock, flags);
 		break;
 	}
 
@@ -208,10 +207,10 @@ int mutex_post(mutex_t *m)
 	if (invalid_mutex(m) || int_nesting() || !preempt_allowed())
 		return -EPERM;
 
-	ticket_lock(&m->lock);
+	spin_lock(&m->lock);
 	if (task != (struct task *)m->data) {
 		pr_err("mutex-%s not belong to this task\n", m->name);
-		ticket_unlock(&m->lock);
+		spin_unlock(&m->lock);
 		return -EINVAL;
 	}
 
@@ -231,7 +230,7 @@ int mutex_post(mutex_t *m)
 		m->owner = task->pid;
 		mb();
 
-		ticket_unlock(&m->lock);
+		spin_unlock(&m->lock);
 
 		sched();
 		return 0;
@@ -242,7 +241,7 @@ int mutex_post(mutex_t *m)
 	m->owner = 0;
 	mb();
 
-	ticket_unlock(&m->lock);
+	spin_unlock(&m->lock);
 
 	return 0;
 }

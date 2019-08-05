@@ -12,8 +12,8 @@
 #include <minos/init.h>
 #include <minos/arch.h>
 #include <minos/calltrace.h>
-#include <minos/ticketlock.h>
 #include <minos/time.h>
+#include <minos/preempt.h>
 
 #define section_for_each_item_addr(__start_addr, __end_addr, __var)            \
 	size_t _i, _cnt;                                                       \
@@ -28,7 +28,7 @@
 	section_for_each_item_addr((unsigned long)&(__start),                  \
 				    (unsigned long)&(__end), __var)
 
-extern ticketlock_t __kernel_lock;
+extern spinlock_t __kernel_lock;
 
 DECLARE_PER_CPU(int, error_code);
 
@@ -71,9 +71,9 @@ static inline void set_error_code(int code)
 	get_cpu_var(error_code) = code;
 }
 
-#define kernel_lock_irqsave(flags)	ticket_lock_irqsave(&__kernel_lock, flags)
-#define kernel_unlock_irqrestore(flags) ticket_unlock_irqrestore(&__kernel_lock, flags)
-#define kernel_lock()			ticket_lock(&__kernel_lock)
-#define kernel_unlock()			ticket_unlock(&__kernel_lock)
+#define kernel_lock_irqsave(flags)	spin_lock_irqsave(&__kernel_lock, flags)
+#define kernel_unlock_irqrestore(flags) spin_unlock_irqrestore(&__kernel_lock, flags)
+#define kernel_lock()			__spin_lock(&__kernel_lock)
+#define kernel_unlock()			__spin_unlock(&__kernel_lock)
 
 #endif

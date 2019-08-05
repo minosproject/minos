@@ -27,7 +27,7 @@ static void rt_task(void *data)
 	int task_id = (int)((unsigned long)data);
 
 	while (1) {
-		ret = mutex_pend(&rt_mutex, 100);
+//		ret = mutex_pend(&rt_mutex, 100);
 		if (ret) {
 			pr_info("wait mutex timeout\n");
 			continue;
@@ -35,7 +35,7 @@ static void rt_task(void *data)
 		pr_info("rt_task-%d test on cpu-%d\n",
 				task_id, smp_processor_id());
 		mdelay(100);
-		mutex_post(&rt_mutex);
+//		mutex_post(&rt_mutex);
 		msleep(100 * (task_id % 4 + 1));
 	}
 }
@@ -47,7 +47,7 @@ void os_init(void)
 
 void apps_cpu0_init(void)
 {
-#if 1
+#if 0
 	create_realtime_task("rt-task-45", rt_task, (void *)45, 45, 4096, 0);
 	create_realtime_task("rt-task-44", rt_task, (void *)44, 44, 4096, 0);
 	create_realtime_task("rt-task-43", rt_task, (void *)43, 43, 4096, 0);

@@ -5,48 +5,66 @@
 #ifndef _MINOS_SPINLOCK_H_
 #define _MINOS_SPINLOCK_H_
 
-#include <asm/arch.h>
 #include <minos/preempt.h>
-
-typedef struct spinlock {
-	volatile uint32_t lock;
-} spinlock_t;
 
 #define DEFINE_SPIN_LOCK(name)	\
 	spinlock_t name = {	\
-		.lock = 0,	\
+		.next_ticket = { \
+			.value = 0 \
+		}, \
+		.ticket_in_service = { \
+			.value = 0 \
+		} \
 	}
-
-extern void arch_spin_lock(spinlock_t *lock);
-extern void arch_spin_unlock(spinlock_t *lock);
 
 static void inline spin_lock_init(spinlock_t *lock)
 {
-	lock->lock = 0;
+	__atomic_set(0, &lock->next_ticket);
+	__atomic_set(0, &lock->ticket_in_service);
 }
 
-static void inline spin_lock(spinlock_t *lock)
+static void inline __spin_lock(spinlock_t *lock)
 {
-	preempt_disable();
-	arch_spin_lock(lock);
+	int ticket;
+
+	ticket = atomic_add_return_old(1, &lock->next_ticket);
+	mb();
+
+	while (ticket != __atomic_get(&lock->ticket_in_service))
+		mb();
 }
 
-static void inline spin_unlock(spinlock_t *lock)
+static void inline __spin_unlock(spinlock_t *lock)
 {
-	arch_spin_unlock(lock);
-	preempt_enable();
+	int ticket;
+
+	ticket = __atomic_get(&lock->ticket_in_service);
+	__atomic_set(ticket + 1, &lock->ticket_in_service);
+	mb();
 }
+
+#define spin_lock(l) \
+	do { \
+		preempt_disable(); \
+		__spin_lock(l); \
+	} while (0)
+
+#define spin_unlock(l)	\
+	do { \
+		__spin_unlock(l); \
+		preempt_enable(); \
+	} while (0)
 
 #define spin_lock_irqsave(l, flags) \
 	do { \
 		flags = arch_save_irqflags(); \
 		arch_disable_local_irq(); \
-		arch_spin_lock(l); \
+		__spin_lock(l); \
 	} while (0)
 
 #define spin_unlock_irqrestore(l, flags) \
 	do { \
-		arch_spin_unlock(l); \
+		__spin_unlock(l); \
 		arch_restore_irqflags(flags); \
 	} while (0)
 

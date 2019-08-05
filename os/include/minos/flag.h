@@ -1,7 +1,7 @@
 #ifndef __MINOS_FLAG_H__
 #define __MINOS_FLAG_H__
 
-typedef uint32_t flag_t;
+#include <minos/spinlock.h>
 
 #define FLAG_WAIT_CLR_ALL       0
 #define FLAG_WAIT_CLR_AND       0
@@ -21,7 +21,7 @@ struct flag_grp {
 	int type;
 	struct list_head wait_list;
 	flag_t flags;
-	ticketlock_t lock;
+	spinlock_t lock;
 };
 
 struct flag_node {

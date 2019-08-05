@@ -118,4 +118,6 @@ typedef void (*void_func_t)(void);
 
 extern uint8_t const ffs_table[256];
 
+typedef uint32_t flag_t;
+
 #endif
