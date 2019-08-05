@@ -157,9 +157,11 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	 * finish it work, but there is a big problem, if the
 	 * task need to get two mutex, how to deal with this ?
 	 */
+#if 0
 	owner = (struct task *)m->data;
 	if (owner->prio > task->prio)
 		atomic_set(&owner->lock_cpu, 1);
+#endif
 
 	/* set the task's state and suspend the task */
 	task_lock_irqsave(task, flags);

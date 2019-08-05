@@ -7,24 +7,14 @@
 
 extern void sched(void);
 
-DECLARE_PER_CPU(int, __preempt);
+DECLARE_PER_CPU(atomic_t, __preempt);
 DECLARE_PER_CPU(int, __need_resched);
 DECLARE_PER_CPU(int, __int_nesting);
 DECLARE_PER_CPU(int, __os_running);
 
-#define __preempt_disable() \
-	do { \
-		get_cpu_var(__preempt)++; \
-	} while (0)
-
-#define __preempt_enable() \
-	do { \
-		get_cpu_var(__preempt)--; \
-	} while (0)
-
 static inline int preempt_allowed(void)
 {
-	return (!get_cpu_var(__preempt));
+	return (!__atomic_get(&get_cpu_var(__preempt)));
 }
 
 static inline void set_need_resched(void)
@@ -79,8 +69,8 @@ static inline void set_os_running(void)
 
 static void inline preempt_enable(void)
 {
-	__preempt_enable();
-
+	atomic_dec(&get_cpu_var(__preempt));
+	barrier();
 #if 0
 	if (preempt_allowed() && need_resched()) {
 		if ((!int_nesting()) && os_is_running()) {
@@ -89,13 +79,14 @@ static void inline preempt_enable(void)
 		}
 	}
 #endif
-	pr_info("#### %d\n", get_cpu_var(__preempt));
+	pr_info("#### %d\n", __atomic_get(&get_cpu_var(__preempt)));
 }
 
 static void inline preempt_disable(void)
 {
-	__preempt_disable();
-	pr_info("#### %d\n", get_cpu_var(__preempt));
+	atomic_inc(&get_cpu_var(__preempt));
+	barrier();
+	pr_info("#### %d\n", __atomic_get(&get_cpu_var(__preempt)));
 }
 
 #endif

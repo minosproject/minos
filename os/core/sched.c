@@ -33,7 +33,7 @@ static struct pcpu pcpus[NR_CPUS];
 
 DEFINE_PER_CPU(struct pcpu *, pcpu);
 DEFINE_PER_CPU(int, __need_resched);
-DEFINE_PER_CPU(int, __preempt);
+DEFINE_PER_CPU(atomic_t, __preempt);
 DEFINE_PER_CPU(int, __int_nesting);
 DEFINE_PER_CPU(int, __os_running);
 
