@@ -101,9 +101,6 @@ arch_switch_task_sw:
 	str	arg2, [ct]
 	dsb	st
 
-	str	nt, [ct_addr]		/* current = next */
-	dsb	st
-
 	mov	arg0, ct
 	mov	arg1, nt
 	ldr	arg2, [nt]		/* load the stack of next stack */
@@ -112,6 +109,9 @@ arch_switch_task_sw:
 
 	bl	switch_to_task
 	dsb	sy
+
+	str	nt, [ct_addr]		/* current = next */
+	dsb	st
 
 	ldr	x0, [sp], #8		/* restore the register */
 	msr	elr_el2, x0

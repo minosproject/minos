@@ -10,6 +10,7 @@
 
 struct timer_list {
 	int cpu;
+	atomic_t del_request;
 	struct list_head entry;
 	unsigned long expires;
 	void (*function)(unsigned long);

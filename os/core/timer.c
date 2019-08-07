@@ -39,7 +39,7 @@ static void run_timer_softirq(struct softirq_action *h)
 	 * cpu process the list, first thing is to check
 	 * whether the timer has been canceled
 	 */
-	spin_lock(&timers->lock);
+	raw_spin_lock(&timers->lock);
 	entry = &timers->active;
 	next = timers->active.next;
 
@@ -54,9 +54,16 @@ static void run_timer_softirq(struct softirq_action *h)
 		 * fix later, currently only panic here for debug purpose
 		 */
 		if (next == NULL) {
-			pr_warn("next timer has been deleted\n");
+			panic("next timer has been deleted\n");
 			if (expires > (now + MILLISECS(1)))
 				expires = now + MILLISECS(1);
+		}
+
+		if (atomic_read(&timer->del_request)) {
+			pr_info("timer has been deleted\n");
+			list_del(&timer->entry);
+			timer->entry.next = NULL;
+			continue;
 		}
 
 		if (timer->expires <= (now + DEFAULT_TIMER_MARGIN)) {
@@ -70,11 +77,11 @@ static void run_timer_softirq(struct softirq_action *h)
 			timer->entry.next = NULL;
 			timer->expires = (unsigned long)~0;
 			timers->running_timer = timer;
-			spin_unlock(&timers->lock);
+			raw_spin_unlock(&timers->lock);
 
 			timer->function(timer->data);
 
-			spin_lock(&timers->lock);
+			raw_spin_lock(&timers->lock);
 		}
 
 		/*
@@ -86,7 +93,7 @@ static void run_timer_softirq(struct softirq_action *h)
 			expires = timer->expires;
 	}
 
-	spin_unlock(&timers->lock);
+	raw_spin_unlock(&timers->lock);
 
 	if (expires != ((unsigned long)~0)) {
 		timers->running_expires = expires;
@@ -131,6 +138,7 @@ static int __mod_timer(struct timer_list *timer)
 
 	detach_timer(timers, timer);
 	list_add_tail(&timers->active, &timer->entry);
+	atomic_set(&timer->del_request, 0);
 
 	/*
 	 * reprogram the timer for next event do not
@@ -204,12 +212,22 @@ int del_timer(struct timer_list *timer)
 	unsigned long flags;
 	struct timers *timers = timer->timers;
 
-	if (timer->entry.next == NULL)
+	if (!timer_pending(timer))
 		return 0;
 
-	spin_lock_irqsave(&timers->lock, flags);
-	detach_timer(timers, timer);
-	spin_unlock_irqrestore(&timers->lock, flags);
+	/*
+	 * if the timer is running on the same cpu
+	 * delete it directly otherwise set the del_request
+	 * bit
+	 */
+	if (timer->cpu == smp_processor_id()) {
+		spin_lock_irqsave(&timers->lock, flags);
+		detach_timer(timers, timer);
+		spin_unlock_irqrestore(&timers->lock, flags);
+	} else {
+		atomic_set(&timer->del_request, 1);
+		wmb();
+	}
 
 	return 0;
 }

@@ -17,6 +17,7 @@
 #include <minos/minos.h>
 #include <asm/arch.h>
 #include <minos/smp.h>
+#include <minos/irq.h>
 
 static unsigned long *allsyms_address;
 static unsigned int *allsyms_offset;
@@ -60,6 +61,12 @@ void __panic(gp_regs *regs, char *fmt, ...)
 	va_list arg;
 	int printed;
 	char buffer[512];
+
+	/*
+	 * disable local irq panic will directly called
+	 * by the code
+	 */
+	local_irq_disable();
 
 	va_start(arg, fmt);
 	printed = vsprintf(buffer, fmt, arg);
