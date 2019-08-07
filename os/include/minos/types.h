@@ -120,4 +120,13 @@ extern uint8_t const ffs_table[256];
 
 typedef uint32_t flag_t;
 
+typedef struct {
+	int value;
+} atomic_t;
+
+typedef struct spinlock {
+	atomic_t next_ticket;
+	atomic_t ticket_in_service;
+} spinlock_t;
+
 #endif

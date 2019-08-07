@@ -1,9 +1,10 @@
-#ifndef __OS_DEF_H__
-#define __OS_DEF_H__
+#ifndef __TASK_DEF_H__
+#define __TASK_DEF_H__
 
 #include <minos/types.h>
 #include <minos/list.h>
 #include <minos/atomic.h>
+#include <minos/timer.h>
 
 #ifdef CONFIG_VIRT
 struct vm;
@@ -54,42 +55,7 @@ struct vcpu;
 
 typedef void (*task_func_t)(void *data);
 struct flag_node;
-
-typedef struct spinlock {
-	atomic_t next_ticket;
-	atomic_t ticket_in_service;
-} spinlock_t;
-
-struct timer_list {
-	int cpu;
-	struct list_head entry;
-	unsigned long expires;
-	void (*function)(unsigned long);
-	unsigned long data;
-	struct timers *timers;
-};
-
-#define OS_EVENT_NAME_SIZE	31
-
-struct event {
-	uint8_t type;				/* event type */
-	uint16_t owner;				/* event owner the pid */
-	uint16_t cnt;				/* event cnt */
-	void *data;				/* event pdata for transfer */
-	spinlock_t lock;			/* the lock of the event for smp */
-	prio_t wait_grp;			/* realtime task waiting on this event */
-	prio_t wait_tbl[OS_RDY_TBL_SIZE];	/* wait bitmap */
-	struct list_head wait_list;		/* non realtime task waitting list */
-	struct list_head list;			/* link to the all event that created */
-	char name[OS_EVENT_NAME_SIZE];		/* event name */
-};
-
-struct timers {
-	struct list_head active;
-	unsigned long running_expires;
-	struct timer_list *running_timer;
-	spinlock_t lock;
-};
+struct event;
 
 struct task {
 	void *stack_base;

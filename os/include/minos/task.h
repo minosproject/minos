@@ -4,7 +4,7 @@
 #include <minos/minos.h>
 #include <minos/flag.h>
 #include <config/config.h>
-#include <minos/os_def.h>
+#include <minos/task_def.h>
 
 extern struct task *os_task_table[OS_NR_TASKS];
 
@@ -111,7 +111,7 @@ void release_task_event(struct task_event *event);
 		if (is_realtime_task(task))		\
 			kernel_lock();			\
 		else					\
-			__spin_lock(&task->lock);	\
+			raw_spin_lock(&task->lock);	\
 	} while (0)
 
 #define task_unlock(task)				\
@@ -119,7 +119,7 @@ void release_task_event(struct task_event *event);
 		if (is_realtime_task(task)) 		\
 			kernel_unlock();		\
 		else					\
-			__spin_unlock(&task->lock);	\
+			raw_spin_unlock(&task->lock);	\
 	} while (0)
 
 #define task_lock_irqsave(task, flags)			\

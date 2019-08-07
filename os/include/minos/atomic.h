@@ -1,10 +1,6 @@
 #ifndef _MINOS_ATOMIC_H_
 #define _MINOS_ATOMIC_H_
 
-typedef struct {
-	int value;
-} atomic_t;
-
 #define ATOMIC_INIT(v) { (v) }
 
 void __atomic_set(int i, atomic_t *t);

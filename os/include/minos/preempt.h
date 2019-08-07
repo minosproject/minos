@@ -5,7 +5,7 @@
 #include <minos/atomic.h>
 #include <minos/print.h>
 #include <minos/smp.h>
-#include <minos/os_def.h>
+#include <minos/task_def.h>
 
 extern struct task *__current_tasks[NR_CPUS];
 extern struct task *__next_tasks[NR_CPUS];

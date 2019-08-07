@@ -73,7 +73,7 @@ static inline void set_error_code(int code)
 
 #define kernel_lock_irqsave(flags)	spin_lock_irqsave(&__kernel_lock, flags)
 #define kernel_unlock_irqrestore(flags) spin_unlock_irqrestore(&__kernel_lock, flags)
-#define kernel_lock()			__spin_lock(&__kernel_lock)
-#define kernel_unlock()			__spin_unlock(&__kernel_lock)
+#define kernel_lock()			raw_spin_lock(&__kernel_lock)
+#define kernel_unlock()			raw_spin_unlock(&__kernel_lock)
 
 #endif
