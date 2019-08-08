@@ -27,7 +27,6 @@
 #include <minos/softirq.h>
 #include <minos/platform.h>
 #include <config/version.h>
-#include <minos/ticketlock.h>
 
 extern void softirq_init(void);
 extern void init_timers(void);

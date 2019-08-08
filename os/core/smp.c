@@ -143,7 +143,7 @@ void smp_cpus_up(void)
 		cnt = 0;
 		affinity = cpuid_to_affinity(i);
 
-		ret = smp_cpu_up(affinity, CONFIG_MINOS_START_ADDRESS);
+		ret = smp_cpu_up(affinity, CONFIG_MINOS_ENTRY_ADDRESS);
 		if (ret) {
 			pr_fatal("failed to bring up cpu-%d\n", i);
 			continue;

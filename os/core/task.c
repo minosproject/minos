@@ -159,15 +159,24 @@ static void task_init(struct task *task, char *name,
 		void *stack, void *arg, prio_t prio,
 		int pid, int aff,size_t stk_size, unsigned long opt)
 {
-	task->stack_base = task->stack_origin = stack;
-	task->stack_size = stk_size;
-	task->udata = arg;
+	struct task_info *ti;
 
+	if (stack) {
+		task->stack_origin = stack - sizeof(struct task_info);
+		task->stack_base = task->stack_origin;
+		task->stack_size = stk_size;
+
+		/* init the thread_info */
+		ti = (struct task_info *)task->stack_origin;
+		ti->task = task;
+		ti->preempt_count = 0;
+		ti->cpu = aff;
+	}
+
+	task->udata = arg;
 	task->flags = opt;
 	task->pid = pid;
 	task->prio = prio;
-
-	isb();
 
 	if (prio <= OS_LOWEST_PRIO) {
 		task->by = prio >> 3;
@@ -205,6 +214,8 @@ static struct task *__create_task(char *name, task_func_t func,
 	struct task *task;
 	void *stack = NULL;
 
+	stk_size = 8192;
+
 	/* now create the task and init it */
 	task = zalloc(sizeof(*task));
 	if (!task) {
@@ -216,7 +227,7 @@ static struct task *__create_task(char *name, task_func_t func,
 	if (stk_size) {
 #ifdef CONFIG_STACK_PAGE_ALIGN
 		stk_size = BALIGN(stk_size, PAGE_SIZE);
-		stack = get_free_pages(PAGE_NR(stk_size));
+		stack = __get_free_pages(PAGE_NR(stk_size), PAGE_NR(stk_size));
 #else
 		stk_size = BALIGN(stk_size, sizeof(unsigned long));
 		stack = malloc(stk_size);
@@ -401,8 +412,6 @@ int create_idle_task(void)
 	int pid;
 	struct task *task;
 	int aff = smp_processor_id();
-	extern unsigned char __el2_stack_end;
-	void *el2_stack_base = (void *)&__el2_stack_end;
 	struct pcpu *pcpu = get_per_cpu(pcpu, aff);
 
 	pid = alloc_pid(OS_PRIO_IDLE, aff);
@@ -421,8 +430,9 @@ int create_idle_task(void)
 
 	/* reinit the task's stack information */
 	task->stack_size = TASK_DEFAULT_STACK_SIZE;
-	task->stack_origin = el2_stack_base -
-		(aff << CONFIG_IDLE_TASK_STACK_SHIFT);
+	task->stack_origin = (void *)current_sp() -
+		sizeof(struct task_info);
+
 	task->stat = TASK_STAT_RUNNING;
 	task->flags |= TASK_FLAGS_IDLE;
 
@@ -430,9 +440,6 @@ int create_idle_task(void)
 
 	/* call the hooks for the idle task */
 	task_create_hook(task);
-
-	set_current_task(task);
-	set_next_task(task);
 
 	set_current_prio(OS_PRIO_PCPU);
 	set_next_prio(OS_PRIO_PCPU);
@@ -448,6 +455,10 @@ static int tasks_early_init(void)
 {
 	int i;
 	struct task *task;
+	struct task_info *ti;
+	extern struct task *__current_tasks[NR_CPUS];
+	extern struct task *__next_tasks[NR_CPUS];
+	unsigned long stack_base = CONFIG_MINOS_ENTRY_ADDRESS;
 
 	for (i = 0; i < NR_CPUS; i++) {
 		task = &idle_tasks[i];
@@ -455,6 +466,15 @@ static int tasks_early_init(void)
 		get_per_cpu(idle_task, i) = task;
 		__current_tasks[i] = task;
 		__next_tasks[i] = task;
+
+		/* init the task info for the thread */
+		ti = (struct task_info *)(stack_base -
+				sizeof(struct task_info));
+		ti->task = task;
+		ti->cpu = i;
+		ti->preempt_count = 0;
+
+		stack_base -= CONFIG_TASK_STACK_SIZE;
 	}
 
 	return 0;

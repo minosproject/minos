@@ -227,6 +227,10 @@ __irq_handler:
 	str	x0, [sp, #-8]!
 	dsb	sy
 
+	mov	arg0, sp
+	bl	irq_c_handler		/* call the c irq handler */
+	nop
+
 	mrs	arg4, MPIDR_EL1		/* get the cpuid */
 #ifdef	CONFIG_MPIDR_SHIFT
 	ubfx    arg1, arg4, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
@@ -247,14 +251,15 @@ __irq_handler:
 	dsb	ld
 
 	ldr	arg1, =__irq_stack_end	/* get the irq stack of the current cpu */
-	sub	arg1, arg1, cpuid, lsl #13
+	sub	arg1, arg1, cpuid, lsl #CONFIG_TASK_STACK_SHIFT
 
 	mov	arg0, sp
 	str	arg0, [ct]		/* store the current task's stack */
 	dsb	st
 
-	mov	sp, arg1		/* switch to the irq task */
-	bl	irq_c_handler		/* call the c irq handler */
+	mov	sp, arg1
+	mov	arg0, ct
+	bl	irq_handler_return	/* to check whether need switch to a new task */
 
 	ldr	arg5, =__next_tasks	/* check whether need to switch to a new task */
 	dsb	ld

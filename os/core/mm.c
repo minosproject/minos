@@ -194,8 +194,7 @@ static void parse_system_regions(void)
 
 	/* need to split the hypervisor's memory from the system
 	 * then just add host region to the mem section */
-	split_memory_region(CONFIG_MINOS_START_ADDRESS,
-			CONFIG_MINOS_RAM_SIZE);
+	split_memory_region(CONFIG_MINOS_START_ADDRESS, CONFIG_MINOS_RAM_SIZE);
 
 	list_for_each_entry(region, &mem_list, list)
 		add_memory_section(region->vir_base, region->size);
@@ -253,7 +252,7 @@ static int mem_sections_init(void)
 	struct mem_section *section = NULL;
 	struct mem_section tmp_section;
 	struct mem_section *boot_section = NULL;
-	unsigned long code_base = (unsigned long)&__code_start;
+	unsigned long code_base = CONFIG_MINOS_START_ADDRESS;
 	struct mem_block *block;
 
 	mem_start = (unsigned long)bootmem_end;
@@ -1188,6 +1187,7 @@ int split_memory_region(vir_addr_t base, size_t size)
 	struct memory_region *region, *n, *tmp;
 
 	pr_info("SPLIT MEM 0x%x 0x%x\n", base, size);
+
 	if ((size == 0))
 		return -EINVAL;
 

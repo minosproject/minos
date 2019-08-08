@@ -51,7 +51,7 @@ struct vcpu;
 #define TASK_STAT_PEND_TO       1u  /* Pending timed out */
 #define TASK_STAT_PEND_ABORT    2u  /* Pending aborted */
 
-#define TASK_DEFAULT_STACK_SIZE CONFIG_TASK_DEFAULT_STACK_SIZE
+#define TASK_DEFAULT_STACK_SIZE CONFIG_TASK_STACK_SIZE
 
 typedef void (*task_func_t)(void *data);
 struct flag_node;
@@ -91,8 +91,6 @@ struct task {
 	prio_t bity;
 
 	/* the event that this task hold currently */
-	int preempt;
-	atomic_t lock_cpu;
 	atomic_t event_timeout;
 	struct event *lock_event;
 	struct event *wait_event;
@@ -130,6 +128,16 @@ struct task {
 	void *arch_data;	/* arch data to this task */
 	void **context;
 } __align_cache_line;
+
+/*
+ * this task_info is stored at the top of the task's
+ * stack
+ */
+struct task_info {
+	int cpu;
+	int preempt_count;
+	struct task *task;
+};
 
 struct task_desc {
 	char *name;

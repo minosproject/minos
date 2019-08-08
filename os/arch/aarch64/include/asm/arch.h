@@ -4,8 +4,9 @@
 #include <minos/types.h>
 #include <asm/aarch64_helper.h>
 #include <config/config.h>
+#include <minos/task_def.h>
 
-struct task;
+#define SP_SIZE	 CONFIG_TASK_STACK_SIZE
 
 typedef struct aarch64_regs {
 	uint64_t elr_elx;
@@ -152,6 +153,18 @@ static inline uint64_t cpuid_to_affinity(int cpuid)
 		return (aff1 << MPIDR_EL1_AFF1_LSB) + aff0;
 	}
 #endif
+}
+
+register unsigned long __task_info asm ("sp");
+
+static inline unsigned long current_sp(void)
+{
+	return ((__task_info + SP_SIZE) & ~(SP_SIZE - 1));
+}
+
+static inline struct task_info *current_task_info(void)
+{
+	return (struct task_info *)(current_sp() - sizeof(struct task_info));
 }
 
 static inline void flush_all_tlb_host(void)

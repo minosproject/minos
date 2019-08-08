@@ -97,10 +97,8 @@ int mutex_del(mutex_t *mutex, int opt)
 		 * by the task after it has been locked.
 		 */
 		task = (struct task *)mutex->data;
-		if (task != NULL) {
-			atomic_set(&task->lock_cpu, 1);
+		if (task != NULL)
 			task->lock_event = NULL;
-		}
 
 		event_del_always(to_event(mutex));
 		spin_unlock_irqrestore(&mutex->lock, flags);
@@ -123,7 +121,6 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 {
 	int ret;
 	unsigned long flags = 0;
-	struct task *owner;
 	struct task *task = get_current_task();
 
 	if (invalid_mutex(m) || int_nesting() || !preempt_allowed())
@@ -156,11 +153,6 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	 * finish it work, but there is a big problem, if the
 	 * task need to get two mutex, how to deal with this ?
 	 */
-#if 0
-	owner = (struct task *)m->data;
-	if (owner->prio > task->prio)
-		atomic_set(&owner->lock_cpu, 1);
-#endif
 
 	/* set the task's state and suspend the task */
 	task_lock_irqsave(task, flags);
@@ -215,7 +207,6 @@ int mutex_post(mutex_t *m)
 	}
 
 	task->lock_event = NULL;
-	atomic_set(&task->lock_cpu, 0);
 
 	/*
 	 * find the highest prio task to run, if there is

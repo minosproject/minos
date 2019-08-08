@@ -137,4 +137,6 @@
 
 #define LEVEL_SHIFT		(1)
 
+#define TASK_INFO_SIZE		(16)
+
 #endif

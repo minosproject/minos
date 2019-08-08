@@ -7,8 +7,6 @@
 #include <config/config.h>
 #include <minos/cpumask.h>
 
-#define NR_CPUS		CONFIG_NR_CPUS
-
 #define for_all_cpu(cpu)	\
 	for (cpu = 0; cpu < NR_CPUS; cpu++)
 

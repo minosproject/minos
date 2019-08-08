@@ -3,7 +3,7 @@
 ENTRY(_start)
 SECTIONS
 {
-	.vectors CONFIG_MINOS_START_ADDRESS:
+	.vectors CONFIG_MINOS_ENTRY_ADDRESS:
 	{
 		/*
 		 * put all asm code into this section
@@ -207,13 +207,6 @@ SECTIONS
 	}
 	__config_data_end = .;
 	. = ALIGN(16);
-
-	.el2_stack : {
-		. = ALIGN(64);
-		__el2_stack = .;
-		. = . + (CONFIG_NR_CPUS * CONFIG_IDLE_VCPU_STACK_SIZE);
-		__el2_stack_end = .;
-	}
 
 	.irq_stack : {
 		. = ALIGN(64);

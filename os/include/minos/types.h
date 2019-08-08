@@ -4,6 +4,7 @@
 #include <asm/asm_types.h>
 #include <asm/barrier.h>
 #include <minos/compiler.h>
+#include <config/config.h>
 
 typedef __u32	u32;
 typedef __s32	s32;
@@ -115,6 +116,8 @@ typedef void (*void_func_t)(void);
 
 #define BUG() \
 	while (1)
+
+#define NR_CPUS		CONFIG_NR_CPUS
 
 extern uint8_t const ffs_table[256];
 

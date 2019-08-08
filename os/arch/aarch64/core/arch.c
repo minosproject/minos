@@ -96,7 +96,6 @@ static void dump_register(gp_regs *regs)
 void arch_dump_stack(gp_regs *regs, unsigned long *stack)
 {
 	struct task *task = get_current_task();
-	extern unsigned char __el2_stack_end;
 	unsigned long stack_base;
 	unsigned long fp, lr = 0;
 
@@ -105,8 +104,7 @@ void arch_dump_stack(gp_regs *regs, unsigned long *stack)
 				get_task_pid(task), get_task_prio(task), task->name);
 		stack_base = (unsigned long)task->stack_origin;
 	} else {
-		stack_base = (unsigned long)&__el2_stack_end -
-			(smp_processor_id() << CONFIG_IDLE_VCPU_STACK_SHIFT);
+		stack_base = current_sp() - sizeof(struct task_info);
 	}
 
 	dump_register(regs);

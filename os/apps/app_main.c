@@ -23,7 +23,7 @@ DEFINE_MUTEX(rt_mutex);
 
 static void rt_task(void *data)
 {
-	int ret;
+	int ret = 0;
 	int task_id = (int)((unsigned long)data);
 
 	while (1) {

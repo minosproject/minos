@@ -33,7 +33,6 @@ static struct pcpu pcpus[NR_CPUS];
 
 DEFINE_PER_CPU(struct pcpu *, pcpu);
 DEFINE_PER_CPU(int, __need_resched);
-DEFINE_PER_CPU(atomic_t, __preempt);
 DEFINE_PER_CPU(int, __int_nesting);
 DEFINE_PER_CPU(int, __os_running);
 
@@ -42,6 +41,12 @@ struct task *__next_tasks[NR_CPUS];
 
 extern void sched_tick_disable(void);
 extern void sched_tick_enable(unsigned long exp);
+
+static void inline set_next_task(struct task *task, int cpuid)
+{
+	__next_tasks[cpuid] = task;
+	wmb();
+}
 
 void pcpu_resched(int pcpu_id)
 {
@@ -374,25 +379,23 @@ static inline void recal_task_run_time(struct task *task, struct pcpu *pcpu)
 void sched(void)
 {
 	int i;
+	int cpuid;
 	struct pcpu *pcpu;
 	unsigned long flags;
 	int sched_flag = 0;
 	struct task *cur = get_current_task();
 	struct task *next = cur;
-	int cpuid = smp_processor_id();
 
-	mb();
-
-	if (unlikely(int_nesting()))
-		panic("os_sched can not be called in interrupt\n");
-
-	if ((!preempt_allowed()) || atomic_read(&cur->lock_cpu)) {
-		pr_warn("os can not sched now %d %d\n", preempt_allowed(),
-				atomic_read(&cur->lock_cpu));
+	if ((!preempt_allowed())) {
+		panic("os can not sched now preempt disabled\n");
 		return;
 	}
 
 	kernel_lock_irqsave(flags);
+
+	cpuid = smp_processor_id();
+	if (unlikely(int_nesting()))
+		panic("os_sched can not be called in interrupt\n");
 
 	/*
 	 * need to check whether the current task is to
@@ -404,8 +407,6 @@ void sched(void)
 		sched_flag = 1;
 		set_task_sleep(cur);
 	}
-
-	mb();
 
 	sched_new(pcpu);
 
@@ -433,10 +434,9 @@ void sched(void)
 		if (is_task_ready(cur))
 			recal_task_run_time(cur, pcpu);
 
-		pr_info("switch to new task %d in sched\n", next->pid);
-		set_next_task(next);
-		mb();
+	//	pr_info("switch to new task %d in sched\n", next->pid);
 
+		set_next_task(next, cpuid);
 		arch_switch_task_sw();
 		local_irq_restore(flags);
 	} else
@@ -449,27 +449,19 @@ void irq_enter(gp_regs *regs)
 			MINOS_HOOK_TYPE_ENTER_IRQ);
 }
 
-void irq_exit(gp_regs *regs)
+void irq_handler_return(struct task *task)
 {
-	int i;
-	int p, n, lk;
-	struct task *task = get_current_task();
+	int i, p, n;
 	struct task *next = task;
 	int cpuid = smp_processor_id();
 	struct pcpu *pcpu = get_per_cpu(pcpu, cpuid);
+	struct task_info *ti;
 
-	irq_softirq_exit();
-
-	/*
-	 * if preempt is disabled or current task lock
-	 * the cpu just return
-	 */
-	mb();
-	p = !preempt_allowed();
+	ti = (struct task_info *)task->stack_origin;
+	p = ti->preempt_count;
 	n = !need_resched();
-	lk = atomic_read(&task->lock_cpu);
 
-	if (p || n || lk)
+	if (p || n)
 		return;
 
 	kernel_lock();
@@ -498,7 +490,6 @@ void irq_exit(gp_regs *regs)
 		}
 	}
 
-//out:
 	clear_need_resched();
 
 	/*
@@ -509,11 +500,11 @@ void irq_exit(gp_regs *regs)
 	next = get_next_run_task(pcpu);
 	mb();
 	if (next != task) {
-		pr_info("switch to new task %d in irq_exit\n", next->pid);
+		//pr_info("switch to new task %d in irq_exit\n", next->pid);
 		if (is_task_ready(task))
 			recal_task_run_time(task, pcpu);
 
-		set_next_task(next);
+		set_next_task(next, cpuid);
 		switch_to_task(task, next);
 		mb();
 
@@ -521,7 +512,14 @@ void irq_exit(gp_regs *regs)
 	}
 
 exit_0:
+	clear_need_resched();
 	kernel_unlock();
+
+}
+
+void irq_exit(gp_regs *regs)
+{
+	irq_softirq_exit();
 }
 
 int sched_can_idle(struct pcpu *pcpu)

@@ -30,7 +30,7 @@ _start:
 	/* interrupt disabled mmu/dcache/icache off */
 	msr	daifset, #2
 	b	do_start
-	.quad   CONFIG_MINOS_START_ADDRESS	     /* Image load offset from start of RAM */
+	.quad   CONFIG_MINOS_ENTRY_ADDRESS	     /* Image load offset from start of RAM */
         .quad   __code_end - _start		     /* reserved */
         .quad   0				     /* reserved */
         .quad   0				     /* reserved */
@@ -75,8 +75,9 @@ do_start:
 	dsb	sy
 
 	/* each idle task will have 8k stack */
-	ldr	x0, =__el2_stack_end
-	sub	x0, x0, x19, lsl #CONFIG_IDLE_VCPU_STACK_SHIFT
+	ldr	x0, =CONFIG_MINOS_ENTRY_ADDRESS
+	sub	x0, x0, x19, lsl #CONFIG_TASK_STACK_SHIFT
+	sub	x0, x0, #TASK_INFO_SIZE
 	mov	sp, x0
 
 	ldr	x1, =el2_vectors

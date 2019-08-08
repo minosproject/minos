@@ -4,11 +4,8 @@
 #include <minos/percpu.h>
 #include <minos/atomic.h>
 #include <minos/print.h>
-#include <minos/smp.h>
+#include <asm/arch.h>
 #include <minos/task_def.h>
-
-extern struct task *__current_tasks[NR_CPUS];
-extern struct task *__next_tasks[NR_CPUS];
 
 extern prio_t os_highest_rdy[NR_CPUS];
 extern prio_t os_prio_cur[NR_CPUS];
@@ -19,34 +16,7 @@ DECLARE_PER_CPU(int, __os_running);
 
 static inline struct task *get_current_task(void)
 {
-	struct task *task;
-
-	task = __current_tasks[smp_processor_id()];
-	rmb();
-
-	return task;
-}
-
-static inline struct task *get_next_task(void)
-{
-	struct task *task;
-
-	task = __next_tasks[smp_processor_id()];
-	rmb();
-
-	return task;
-}
-
-static inline void set_current_task(struct task *task)
-{
-	__current_tasks[smp_processor_id()] = task;
-	wmb();
-}
-
-static inline void set_next_task(struct task *task)
-{
-	__next_tasks[smp_processor_id()] = task;
-	wmb();
+	return current_task_info()->task;
 }
 
 static inline void set_current_prio(prio_t prio)
@@ -58,8 +28,6 @@ static inline void set_next_prio(prio_t prio)
 {
 	os_highest_rdy[smp_processor_id()] = prio;
 }
-
-
 
 static inline void set_need_resched(void)
 {
@@ -118,16 +86,12 @@ static inline void set_os_running(void)
 
 static inline int preempt_allowed(void)
 {
-	struct task *task = get_current_task();
-
-	return (!task->preempt);
+	return !current_task_info()->preempt_count;
 }
 
 static void inline preempt_enable(void)
 {
-	struct task *task = get_current_task();
-
-	task->preempt--;
+	current_task_info()->preempt_count--;
 	wmb();
 
 #if 0
@@ -138,16 +102,12 @@ static void inline preempt_enable(void)
 		}
 	}
 #endif
-	pr_info("#### %d\n", task->preempt);
 }
 
 static void inline preempt_disable(void)
 {
-	struct task *task = get_current_task();
-
-	task->preempt++;
+	current_task_info()->preempt_count++;
 	wmb();
-	pr_info("#### %d\n", task->preempt);
 }
 
 #endif
