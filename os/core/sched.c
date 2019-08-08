@@ -32,8 +32,6 @@ extern struct task *os_task_table[OS_NR_TASKS];
 static struct pcpu pcpus[NR_CPUS];
 
 DEFINE_PER_CPU(struct pcpu *, pcpu);
-DEFINE_PER_CPU(int, __need_resched);
-DEFINE_PER_CPU(int, __int_nesting);
 DEFINE_PER_CPU(int, __os_running);
 
 struct task *__current_tasks[NR_CPUS];
@@ -352,7 +350,7 @@ unsigned long sched_tick_handler(unsigned long data)
 	list_add_tail(&pcpu->ready_list, &task->stat_list);
 	task->run_time = CONFIG_TASK_RUN_TIME;
 
-	pcpu_need_resched();
+	set_need_resched();
 
 	return 0;
 }
@@ -387,15 +385,13 @@ void sched(void)
 	struct task *next = cur;
 
 	if ((!preempt_allowed())) {
-		panic("os can not sched now preempt disabled\n");
+		pr_err("os can not sched now preempt disabled\n");
 		return;
 	}
 
 	kernel_lock_irqsave(flags);
 
 	cpuid = smp_processor_id();
-	if (unlikely(int_nesting()))
-		panic("os_sched can not be called in interrupt\n");
 
 	/*
 	 * need to check whether the current task is to
@@ -433,8 +429,6 @@ void sched(void)
 	if (cur != next) {
 		if (is_task_ready(cur))
 			recal_task_run_time(cur, pcpu);
-
-	//	pr_info("switch to new task %d in sched\n", next->pid);
 
 		set_next_task(next, cpuid);
 		arch_switch_task_sw();
@@ -500,7 +494,6 @@ void irq_handler_return(struct task *task)
 	next = get_next_run_task(pcpu);
 	mb();
 	if (next != task) {
-		//pr_info("switch to new task %d in irq_exit\n", next->pid);
 		if (is_task_ready(task))
 			recal_task_run_time(task, pcpu);
 
@@ -588,7 +581,7 @@ int resched_handler(uint32_t irq, void *data)
 		}
 	}
 
-	pcpu_need_resched();
+	set_need_resched();
 
 	return 0;
 }

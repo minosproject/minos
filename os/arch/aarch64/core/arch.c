@@ -126,7 +126,7 @@ void arch_dump_stack(gp_regs *regs, unsigned long *stack)
 	do {
 		print_symbol(lr);
 
-		if ((fp < (stack_base - TASK_DEFAULT_STACK_SIZE))
+		if ((fp < (stack_base - TASK_STACK_SIZE))
 				|| (fp >= stack_base))
 				break;
 

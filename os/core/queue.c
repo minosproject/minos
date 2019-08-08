@@ -28,9 +28,6 @@ queue_t *queue_create(int size, char *name)
 	queue_t *qt;
 	struct queue *q;
 
-	if (int_nesting())
-		return NULL;
-
 	q = zalloc(sizeof(*q));
 	if (!q)
 		return NULL;
@@ -78,9 +75,6 @@ int queue_del(queue_t *qt, int opt)
 
 	if (invalid_queue(qt))
 		return -EINVAL;
-
-	if (int_nesting())
-		return -EPERM;
 
 	spin_lock_irqsave(&qt->lock, flags);
 
@@ -190,8 +184,10 @@ void *queue_pend(queue_t *qt, uint32_t timeout)
 	unsigned long flags;
 	struct task *task;
 
-	if (invalid_queue(qt) || int_nesting() || !preempt_allowed())
+	if (invalid_queue(qt))
 		return NULL;
+
+	might_sleep();
 
 	spin_lock_irqsave(&qt->lock, flags);
 	q = (struct queue *)qt->data;
@@ -248,8 +244,10 @@ int queue_post_abort(queue_t *qt, int opt)
 	unsigned long flags;
 	int nbr_tasks = 0;
 
-	if (invalid_queue(qt) || int_nesting() || preempt_allowed())
+	if (invalid_queue(qt))
 		return -EINVAL;
+
+	might_sleep();
 
 	spin_lock_irqsave(&qt->lock, flags);
 	if (event_has_waiter(to_event(qt))) {

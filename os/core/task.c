@@ -139,13 +139,13 @@ static void task_timeout_handler(unsigned long data)
 		task->stat &= ~TASK_STAT_PEND_ANY;
 		task->pend_stat = TASK_STAT_PEND_TO;
 
-		pcpu_need_resched();
+		set_need_resched();
 	} else {
 		if (task->delay) {
 			task->delay = 0;
 			set_task_ready(task);
 			task->stat &= ~TASK_STAT_SUSPEND;
-			pcpu_need_resched();
+			set_need_resched();
 		} else {
 			pr_warn("wrong task state s-%d ps-%d\n",
 					task->stat, task->pend_stat);
@@ -214,8 +214,6 @@ static struct task *__create_task(char *name, task_func_t func,
 	struct task *task;
 	void *stack = NULL;
 
-	stk_size = 8192;
-
 	/* now create the task and init it */
 	task = zalloc(sizeof(*task));
 	if (!task) {
@@ -225,13 +223,8 @@ static struct task *__create_task(char *name, task_func_t func,
 
 	/* allocate the stack for this task */
 	if (stk_size) {
-#ifdef CONFIG_STACK_PAGE_ALIGN
 		stk_size = BALIGN(stk_size, PAGE_SIZE);
 		stack = __get_free_pages(PAGE_NR(stk_size), PAGE_NR(stk_size));
-#else
-		stk_size = BALIGN(stk_size, sizeof(unsigned long));
-		stack = malloc(stk_size);
-#endif
 		if (stack == NULL) {
 			pr_err("no more memory for task stack\n");
 			free(task);
@@ -291,7 +284,7 @@ static void task_ipi_event_handler(void *data)
 		task->wait_event = NULL;
 
 		set_task_ready(task);
-		pcpu_need_resched();
+		set_need_resched();
 		break;
 
 	case TASK_EVENT_FLAG_READY:
@@ -302,7 +295,7 @@ static void task_ipi_event_handler(void *data)
 		task->flags_rdy = ev->flags;
 		task->stat &= ev->msk;
 
-		pcpu_need_resched();
+		set_need_resched();
 		break;
 
 	default:
@@ -325,16 +318,13 @@ int task_ipi_event(struct task *task, struct task_event *ev, int wait)
 }
 
 int create_task(char *name, task_func_t func,
-		void *arg, prio_t prio, uint16_t aff,
-		uint32_t stk_size, unsigned long opt)
+		void *arg, prio_t prio,
+		uint16_t aff, unsigned long opt)
 {
 	int pid = -1;
 	struct task *task;
 	unsigned long flags;
 	struct pcpu *pcpu;
-
-	if (int_nesting())
-		return -EFAULT;
 
 	if ((aff >= NR_CPUS) && (aff != PCPU_AFF_NONE))
 		return -EINVAL;
@@ -344,7 +334,7 @@ int create_task(char *name, task_func_t func,
 		return -ENOPID;
 
 	task = __create_task(name, func, arg, prio,
-			pid, aff, stk_size, opt);
+			pid, aff, TASK_STACK_SIZE, opt);
 	if (!task) {
 		release_pid(pid);
 		pid = -ENOPID;
@@ -429,7 +419,7 @@ int create_idle_task(void)
 	task_vmodules_init(task);
 
 	/* reinit the task's stack information */
-	task->stack_size = TASK_DEFAULT_STACK_SIZE;
+	task->stack_size = TASK_STACK_SIZE;
 	task->stack_origin = (void *)current_sp() -
 		sizeof(struct task_info);
 
@@ -474,39 +464,41 @@ static int tasks_early_init(void)
 		ti->cpu = i;
 		ti->preempt_count = 0;
 
-		stack_base -= CONFIG_TASK_STACK_SIZE;
+		stack_base -= TASK_STACK_SIZE;
 	}
 
 	return 0;
 }
 early_initcall(tasks_early_init);
 
-int create_percpu_task(char *name, task_func_t func, void *arg,
-		size_t stk_size, unsigned long flags)
+int create_percpu_task(char *name, task_func_t func,
+		void *arg, unsigned long flags)
 {
 	int cpu, ret = 0;
 
 	for_each_online_cpu(cpu) {
-		ret = create_task(name, func, arg, OS_PRIO_PCPU,
-				cpu, stk_size, flags);
-		if (ret < 0)
-			pr_err("create [%s] fail on cpu%d\n", name, cpu);
+		ret = create_task(name, func, arg,
+				OS_PRIO_PCPU, cpu, flags);
+		if (ret < 0) {
+			pr_err("create [%s] fail on cpu%d\n",
+					name, cpu);
+		}
 	}
 
 	return 0;
 }
 
 int create_realtime_task(char *name, task_func_t func, void *arg,
-		prio_t prio, size_t stk_size, unsigned long flags)
+		prio_t prio, unsigned long flags)
 {
-	return create_task(name, func, arg, prio, 0, stk_size, flags);
+	return create_task(name, func, arg, prio, 0, flags);
 }
 
-int create_vcpu_task(char *name, task_func_t func, void *arg,
-		int aff, size_t stk_size, unsigned long flags)
+int create_vcpu_task(char *name, task_func_t func,
+		void *arg, int aff, unsigned long flags)
 {
 	return create_task(name, func, arg, OS_PRIO_PCPU,
-			aff, stk_size, flags & TASK_FLAGS_VCPU);
+			aff, flags & TASK_FLAGS_VCPU);
 }
 
 static int task_events_init(void)

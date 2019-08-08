@@ -45,9 +45,6 @@ int mutex_accept(mutex_t *mutex)
 	if (invalid_mutex(mutex))
 		return -EPERM;
 
-	if(int_nesting())
-		return -EPERM;
-
 	/* if the mutex is avaliable now, lock it */
 	spin_lock_irqsave(&mutex->lock, flags);
 	if (mutex->cnt == OS_MUTEX_AVAILABLE) {
@@ -123,8 +120,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	unsigned long flags = 0;
 	struct task *task = get_current_task();
 
-	if (invalid_mutex(m) || int_nesting() || !preempt_allowed())
-		panic("mutex pend error\n");
+	might_sleep();
 
 	spin_lock(&m->lock);
 	if (m->cnt == OS_MUTEX_AVAILABLE) {
@@ -196,7 +192,7 @@ int mutex_post(mutex_t *m)
 {
 	struct task *task = get_current_task();
 
-	if (invalid_mutex(m) || int_nesting() || !preempt_allowed())
+	if (invalid_mutex(m))
 		return -EPERM;
 
 	spin_lock(&m->lock);

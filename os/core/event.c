@@ -41,9 +41,6 @@ struct event *create_event(int type, void *pdata, char *name)
 {
 	struct event *event;
 
-	if (int_nesting())
-		return NULL;
-
 	event = zalloc(sizeof(struct event));
 	if (!event)
 		return NULL;

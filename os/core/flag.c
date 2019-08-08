@@ -29,9 +29,6 @@ struct flag_grp *flag_create(flag_t flags)
 {
 	struct flag_grp *fg;
 
-	if (int_nesting())
-		return NULL;
-
 	fg = zalloc(sizeof(*fg));
 	if (fg)
 		return NULL;
@@ -189,7 +186,7 @@ int flag_del(struct flag_grp *grp, int opt)
 	struct flag_node *pnode, *n;
 	unsigned long irq;
 
-	if (int_nesting() || invalid_flag(grp))
+	if (invalid_flag(grp))
 		return -EINVAL;
 
 	spin_lock_irqsave(&grp->lock, irq);
@@ -261,8 +258,10 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 	int result, consume;
 	struct task *task = get_current_task();
 
-	if (invalid_flag(grp) || int_nesting() || !preempt_allowed())
+	if (invalid_flag(grp))
 		return 0;
+
+	might_sleep();
 
 	result = wait_type & FLAG_CONSUME;
 	if (result) {

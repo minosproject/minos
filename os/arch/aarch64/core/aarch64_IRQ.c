@@ -20,13 +20,7 @@
 
 void irq_c_handler(gp_regs *regs)
 {
-	inc_int_nesting();
-
 	irq_enter(regs);
-
 	do_irq_handler();
-
 	irq_exit(regs);
-
-	dec_int_nesting();
 }

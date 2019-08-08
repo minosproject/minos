@@ -60,9 +60,6 @@ int sem_del(sem_t *sem, int opt)
 	if (invalid_sem(sem))
 		return -EINVAL;
 
-	if (int_nesting())
-		return -EPERM;
-
 	spin_lock_irqsave(&sem->lock, flags);
 	if (event_has_waiter((struct event *)sem))
 		tasks_waiting = 1;
@@ -101,8 +98,10 @@ int sem_pend(sem_t *sem, uint32_t timeout)
 	unsigned long flags;
 	struct task *task = get_current_task();
 
-	if (invalid_sem(sem) || int_nesting() || preempt_allowed())
+	if (invalid_sem(sem))
 		return -EINVAL;
+
+	might_sleep();
 
 	spin_lock_irqsave(&sem->lock, flags);
 	if (sem->cnt > 0) {
@@ -153,8 +152,10 @@ int sem_pend_abort(sem_t *sem, int opt)
 	unsigned long flags;
 	struct task *task;
 
-	if (invalid_sem(sem) || int_nesting() || !preempt_allowed())
+	if (invalid_sem(sem))
 		return -EINVAL;
+
+	might_sleep();
 
 	spin_lock_irqsave(&sem->lock, flags);
 	if (event_has_waiter((struct event *)sem)) {

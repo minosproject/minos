@@ -48,35 +48,35 @@ void os_init(void)
 void apps_cpu0_init(void)
 {
 #if 1
-	create_realtime_task("rt-task-45", rt_task, (void *)45, 45, 4096, 0);
-	create_realtime_task("rt-task-44", rt_task, (void *)44, 44, 4096, 0);
-	create_realtime_task("rt-task-43", rt_task, (void *)43, 43, 4096, 0);
-	create_realtime_task("rt-task-42", rt_task, (void *)42, 42, 4096, 0);
-	create_realtime_task("rt-task-41", rt_task, (void *)41, 41, 4096, 0);
-	create_realtime_task("rt-task-40", rt_task, (void *)40, 40, 4096, 0);
-	create_realtime_task("rt-task-39", rt_task, (void *)39, 39, 4096, 0);
-	create_realtime_task("rt-task-38", rt_task, (void *)38, 38, 4096, 0);
-	create_realtime_task("rt-task-37", rt_task, (void *)37, 37, 4096, 0);
-	create_realtime_task("rt-task-36", rt_task, (void *)36, 36, 4096, 0);
-	create_realtime_task("rt-task-35", rt_task, (void *)35, 35, 4096, 0);
-	create_realtime_task("rt-task-34", rt_task, (void *)34, 34, 4096, 0);
-	create_realtime_task("rt-task-33", rt_task, (void *)33, 33, 4096, 0);
-	create_realtime_task("rt-task-32", rt_task, (void *)32, 32, 4096, 0);
-	create_realtime_task("rt-task-31", rt_task, (void *)31, 31, 4096, 0);
-	create_realtime_task("rt-task-30", rt_task, (void *)30, 30, 4096, 0);
-	create_realtime_task("rt-task-29", rt_task, (void *)29, 29, 4096, 0);
-	create_realtime_task("rt-task-28", rt_task, (void *)28, 28, 4096, 0);
-	create_realtime_task("rt-task-27", rt_task, (void *)27, 27, 4096, 0);
-	create_realtime_task("rt-task-26", rt_task, (void *)26, 26, 4096, 0);
-	create_realtime_task("rt-task-25", rt_task, (void *)25, 25, 4096, 0);
-	create_realtime_task("rt-task-24", rt_task, (void *)24, 24, 4096, 0);
-	create_realtime_task("rt-task-23", rt_task, (void *)23, 23, 4096, 0);
-	create_realtime_task("rt-task-22", rt_task, (void *)22, 22, 4096, 0);
-	create_realtime_task("rt-task-21", rt_task, (void *)21, 21, 4096, 0);
-	create_realtime_task("rt-task-20", rt_task, (void *)20, 20, 4096, 0);
-	create_realtime_task("rt-task-19", rt_task, (void *)19, 19, 4096, 0);
-	create_realtime_task("rt-task-18", rt_task, (void *)18, 18, 4096, 0);
-	create_realtime_task("rt-task-17", rt_task, (void *)17, 17, 4096, 0);
+	create_realtime_task("rt-task-45", rt_task, (void *)45, 45, 0);
+	create_realtime_task("rt-task-44", rt_task, (void *)44, 44, 0);
+	create_realtime_task("rt-task-43", rt_task, (void *)43, 43, 0);
+	create_realtime_task("rt-task-42", rt_task, (void *)42, 42, 0);
+	create_realtime_task("rt-task-41", rt_task, (void *)41, 41, 0);
+	create_realtime_task("rt-task-40", rt_task, (void *)40, 40, 0);
+	create_realtime_task("rt-task-39", rt_task, (void *)39, 39, 0);
+	create_realtime_task("rt-task-38", rt_task, (void *)38, 38, 0);
+	create_realtime_task("rt-task-37", rt_task, (void *)37, 37, 0);
+	create_realtime_task("rt-task-36", rt_task, (void *)36, 36, 0);
+	create_realtime_task("rt-task-35", rt_task, (void *)35, 35, 0);
+	create_realtime_task("rt-task-34", rt_task, (void *)34, 34, 0);
+	create_realtime_task("rt-task-33", rt_task, (void *)33, 33, 0);
+	create_realtime_task("rt-task-32", rt_task, (void *)32, 32, 0);
+	create_realtime_task("rt-task-31", rt_task, (void *)31, 31, 0);
+	create_realtime_task("rt-task-30", rt_task, (void *)30, 30, 0);
+	create_realtime_task("rt-task-29", rt_task, (void *)29, 29, 0);
+	create_realtime_task("rt-task-28", rt_task, (void *)28, 28, 0);
+	create_realtime_task("rt-task-27", rt_task, (void *)27, 27, 0);
+	create_realtime_task("rt-task-26", rt_task, (void *)26, 26, 0);
+	create_realtime_task("rt-task-25", rt_task, (void *)25, 25, 0);
+	create_realtime_task("rt-task-24", rt_task, (void *)24, 24, 0);
+	create_realtime_task("rt-task-23", rt_task, (void *)23, 23, 0);
+	create_realtime_task("rt-task-22", rt_task, (void *)22, 22, 0);
+	create_realtime_task("rt-task-21", rt_task, (void *)21, 21, 0);
+	create_realtime_task("rt-task-20", rt_task, (void *)20, 20, 0);
+	create_realtime_task("rt-task-19", rt_task, (void *)19, 19, 0);
+	create_realtime_task("rt-task-18", rt_task, (void *)18, 18, 0);
+	create_realtime_task("rt-task-17", rt_task, (void *)17, 17, 0);
 #endif
 }
 
@@ -133,7 +133,7 @@ void test_task(void *data)
 		msleep(100);
 	}
 }
-DEFINE_TASK_PERCPU("test task", test_task, NULL,  4096, 0);
+DEFINE_TASK_PERCPU("test task", test_task, NULL, 0);
 
 void test_task2(void *data)
 {
@@ -153,7 +153,7 @@ void test_task2(void *data)
 		msleep(100);
 	}
 }
-DEFINE_TASK_PERCPU("test task2", test_task2, NULL,  4096, 0);
+DEFINE_TASK_PERCPU("test task2", test_task2, NULL, 0);
 
 void test_task3(void *data)
 {
@@ -163,4 +163,4 @@ void test_task3(void *data)
 		msleep(100);
 	}
 }
-DEFINE_TASK_PERCPU("test task3", test_task3, NULL,  4096, 0);
+DEFINE_TASK_PERCPU("test task3", test_task3, NULL, 0);

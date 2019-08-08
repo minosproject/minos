@@ -51,7 +51,7 @@ struct vcpu;
 #define TASK_STAT_PEND_TO       1u  /* Pending timed out */
 #define TASK_STAT_PEND_ABORT    2u  /* Pending aborted */
 
-#define TASK_DEFAULT_STACK_SIZE CONFIG_TASK_STACK_SIZE
+#define TASK_STACK_SIZE		CONFIG_TASK_STACK_SIZE
 
 typedef void (*task_func_t)(void *data);
 struct flag_node;
@@ -136,29 +136,11 @@ struct task {
 struct task_info {
 	int cpu;
 	int preempt_count;
-	struct task *task;
-};
-
-struct task_desc {
-	char *name;
-	task_func_t func;
-	void *arg;
-	prio_t prio;
-	uint16_t aff;
-	uint32_t stk_size;
 	unsigned long flags;
+	struct task *task;
 };
 
-struct task_event {
-	int id;
-	struct task *task;
-#define TASK_EVENT_EVENT_READY		0x0
-#define TASK_EVENT_FLAG_READY		0x1
-	int action;
-	void *msg;
-	uint32_t msk;
-	uint32_t delay;
-	flag_t flags;
-};
+#define TIF_NEED_RESCHED	0
+#define __TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
 
 #endif

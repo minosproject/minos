@@ -52,9 +52,6 @@ int mbox_del(mbox_t *m, int opt)
 	if (invalid_mbox(m))
 		return -EINVAL;
 
-	if (int_nesting())
-		return -EPERM;
-
 	spin_lock_irqsave(&m->lock, flags);
 	if (m->wait_grp || (!is_list_empty(&m->wait_list)))
 		tasks_waiting = 1;
@@ -95,8 +92,10 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 	struct task *task;
 	unsigned long flags;
 
-	if (invalid_mbox(m) || int_nesting() || !preempt_allowed())
+	if (invalid_mbox(m))
 		return NULL;
+
+	might_sleep();
 
 	spin_lock_irqsave(&m->lock, flags);
 

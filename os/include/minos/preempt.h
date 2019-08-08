@@ -5,13 +5,12 @@
 #include <minos/atomic.h>
 #include <minos/print.h>
 #include <asm/arch.h>
+#include <minos/bitops.h>
 #include <minos/task_def.h>
 
 extern prio_t os_highest_rdy[NR_CPUS];
 extern prio_t os_prio_cur[NR_CPUS];
 
-DECLARE_PER_CPU(int, __need_resched);
-DECLARE_PER_CPU(int, __int_nesting);
 DECLARE_PER_CPU(int, __os_running);
 
 static inline struct task *get_current_task(void)
@@ -31,56 +30,38 @@ static inline void set_next_prio(prio_t prio)
 
 static inline void set_need_resched(void)
 {
-	get_cpu_var(__need_resched) = 1;
+	set_bit(TIF_NEED_RESCHED, &current_task_info()->flags);
 }
 
 static inline void clear_need_resched(void)
 {
-	get_cpu_var(__need_resched) = 0;
+	clear_bit(TIF_NEED_RESCHED, &current_task_info()->flags);
 }
 
 static inline int need_resched(void)
 {
-	return  get_cpu_var(__need_resched);
-}
-
-static inline void dec_need_resched(void)
-{
-	get_cpu_var(__need_resched)--;
-}
-
-static inline void inc_need_resched(void)
-{
-	get_cpu_var(__need_resched)++;
-}
-
-static inline void pcpu_need_resched(void)
-{
-	inc_need_resched();
-}
-
-static inline void inc_int_nesting(void)
-{
-	get_cpu_var(__int_nesting)++;
-}
-
-static inline void dec_int_nesting(void)
-{
-	get_cpu_var(__int_nesting)--;
-}
-
-static inline int int_nesting(void)
-{
-	return get_cpu_var(__int_nesting);
+	return  (current_task_info()->flags & __TIF_NEED_RESCHED);
 }
 
 static inline int os_is_running(void)
 {
-	return get_cpu_var(__os_running);
+	int running = 0;
+	unsigned long flags;
+
+	local_irq_save(flags);
+	running = get_cpu_var(__os_running);
+	local_irq_restore(flags);
+
+	return running;
 }
 
 static inline void set_os_running(void)
 {
+	/*
+	 * os running is set before the irq is enable
+	 * so do not need to aquire lock or disable the
+	 * interrupt here
+	 */
 	get_cpu_var(__os_running) = 1;
 }
 
@@ -93,21 +74,17 @@ static void inline preempt_enable(void)
 {
 	current_task_info()->preempt_count--;
 	wmb();
-
-#if 0
-	if (preempt_allowed() && need_resched()) {
-		if ((!int_nesting()) && os_is_running()) {
-			clear_need_resched();
-			sched();
-		}
-	}
-#endif
 }
 
 static void inline preempt_disable(void)
 {
 	current_task_info()->preempt_count++;
 	wmb();
+}
+
+static void inline might_sleep(void)
+{
+
 }
 
 #endif
