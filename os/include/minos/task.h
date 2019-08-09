@@ -112,6 +112,16 @@ static inline int is_task_ready(struct task *task)
 			(task->stat == TASK_STAT_RUNNING));
 }
 
+static inline int task_is_32bit(struct task *task)
+{
+	return !!(task->flags & TASK_FLAGS_32BIT);
+}
+
+static inline int task_is_64bit(struct task *task)
+{
+	return !(task->flags & TASK_FLAGS_32BIT);
+}
+
 int alloc_pid(prio_t prio, int cpuid);
 void release_pid(int pid);
 int task_ipi_event(struct task *task, struct task_event *ev, int wait);

@@ -66,7 +66,6 @@ void arch_init_vcpu(struct vcpu *vcpu, void *entry, void *arg)
 {
 	struct task *task = vcpu->task;
 	gp_regs *regs;
-	struct vm *vm = vcpu->vm;
 
 	regs = stack_to_gp_regs(task->stack_origin);
 	memset(regs, 0, sizeof(gp_regs));
@@ -74,7 +73,7 @@ void arch_init_vcpu(struct vcpu *vcpu, void *entry, void *arg)
 
 	regs->elr_elx = (uint64_t)entry;
 
-	if (vm_is_64bit(vm))
+	if (task_is_64bit(vcpu->task))
 		regs->spsr_elx = AARCH64_SPSR_EL1h | \
 				AARCH64_SPSR_F | \
 				AARCH64_SPSR_I | \
@@ -115,10 +114,10 @@ static void aarch64_system_state_init(struct task *task, void *c)
 		     HCR_EL2_TSC | HCR_EL2_TACR | HCR_EL2_AMO | \
 		     HCR_EL2_VM;
 
-	if (vm_is_64bit(task_to_vm(task)))
+	if (task_is_64bit(task))
 		context->hcr_el2 |= HCR_EL2_RW;
 
-	context->vmpidr = 0x00000000 | get_vcpu_id(task->vcpu);
+	context->vmpidr = 0x00000000 | get_vcpu_id(task_to_vcpu(task));
 	context->vpidr = 0x410fc050;	/* arm fvp */
 }
 
@@ -155,7 +154,7 @@ static void aarch64_system_state_save(struct task *task, void *c)
 	context->afsr0 = read_sysreg(AFSR0_EL1);
 	context->afsr1 = read_sysreg(AFSR1_EL1);
 
-	if (vm_is_32bit(task->vm)) {
+	if (task_is_32bit(task)) {
 		//context->teecr = read_sysreg32(TEECR32_EL1);
 		//context->teehbr = read_sysreg32(TEEHBR32_EL1);
 		context->dacr32_el2 = read_sysreg32(DACR32_EL2);
@@ -190,7 +189,7 @@ static void aarch64_system_state_restore(struct task *task, void *c)
 	write_sysreg(context->afsr0, AFSR0_EL1);
 	write_sysreg(context->afsr1, AFSR1_EL1);
 
-	if (vm_is_32bit(task->vm)) {
+	if (task_is_32bit(task)) {
 		//write_sysreg(context->teecr, TEECR32_EL1);
 		//write_sysreg(context->teehbr, TEEHBR32_EL1);
 		write_sysreg(context->dacr32_el2, DACR32_EL2);

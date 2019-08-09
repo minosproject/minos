@@ -132,7 +132,7 @@ early_initcall(el2_stage2_init);
 
 static void vmsa_state_init(struct task *task, void *context)
 {
-	struct vm *vm = task->vm;
+	struct vm *vm = task_to_vm(task);
 	struct vmsa_context *c = (struct vmsa_context *)context;
 
 	c->vtcr_el2 = generate_vtcr_el2();
@@ -193,6 +193,7 @@ static int vmsa_vmodule_init(struct vmodule *vmodule)
 	vmodule->state_save = vmsa_state_save;
 	vmodule->state_restore = vmsa_state_restore;
 	vmodule->state_resume = vmsa_state_resume;
+	vmodule->valid_for_task = vmsa_valid_for_task;
 
 	return 0;
 }

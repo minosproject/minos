@@ -41,7 +41,7 @@ static void vfp_state_save(struct task *task, void *context)
 	struct vfp_context *c = (struct vfp_context *)context;
 
 #ifdef CONFIG_VIRT
-	if (vm_is_32bit(task_to_vm(task)))
+	if (task_is_32bit(task))
 		c->fpexc32_el2 = read_sysreg32(FPEXC32_EL2);
 #endif
 
@@ -72,7 +72,7 @@ static void vfp_state_restore(struct task *task, void *context)
 	struct vfp_context *c = (struct vfp_context *)context;
 
 #ifdef CONFIG_VIRT
-	if (vm_is_32bit(task_to_vm(task)))
+	if (task_is_32bit(task))
 		write_sysreg(c->fpexc32_el2, FPEXC32_EL2);
 #endif
 

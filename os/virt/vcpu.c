@@ -110,9 +110,6 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 
 int vcpu_can_idle(struct vcpu *vcpu)
 {
-	if (int_nesting())
-		return 0;
-
 	if (vcpu_has_irq(vcpu))
 		return 0;
 

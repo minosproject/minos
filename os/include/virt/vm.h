@@ -130,7 +130,7 @@ static inline struct vm *vcpu_to_vm(struct vcpu *vcpu)
 
 static inline struct vcpu *task_to_vcpu(struct task *task)
 {
-	return task->vcpu;
+	return (struct vcpu *)task->pdata;
 }
 
 static inline struct vcpu *get_current_vcpu(void)
@@ -140,7 +140,7 @@ static inline struct vcpu *get_current_vcpu(void)
 
 static inline struct vm *task_to_vm(struct task *task)
 {
-	return task->vm;
+	return get_current_vcpu()->vm;
 }
 
 static inline struct vm* get_current_vm(void)
@@ -192,16 +192,6 @@ static inline struct vm *get_vm_by_id(uint32_t vmid)
 		return NULL;
 
 	return vms[vmid];
-}
-
-static inline int vm_is_32bit(struct vm *vm)
-{
-	return !(vm->flags & VM_FLAGS_64BIT);
-}
-
-static inline int vm_is_64bit(struct vm *vm)
-{
-	return !!(vm->flags & VM_FLAGS_64BIT);
 }
 
 static inline int vm_is_hvm(struct vm *vm)

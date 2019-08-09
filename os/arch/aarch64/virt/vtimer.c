@@ -67,7 +67,6 @@ static void vtimer_state_restore(struct task *task, void *context)
 
 static void vtimer_state_save(struct task *task, void *context)
 {
-	struct vcpu *vcpu = task->vcpu;
 	struct vtimer_context *c = (struct vtimer_context *)context;
 	struct vtimer *vtimer = &c->virt_timer;
 
@@ -92,7 +91,7 @@ static void vtimer_state_save(struct task *task, void *context)
 static void vtimer_state_init(struct task *task, void *context)
 {
 	struct vtimer *vtimer;
-	struct vcpu *vcpu = task->vcpu;
+	struct vcpu *vcpu = task_to_vcpu(task);
 	struct vtimer_context *c = (struct vtimer_context *)context;
 
 	if (get_vcpu_id(vcpu) == 0)

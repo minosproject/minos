@@ -32,7 +32,7 @@ static void linux_vcpu_init(struct vcpu *vcpu)
 		arch_init_vcpu(vcpu, (void *)vcpu->vm->entry_point, NULL);
 		regs = (gp_regs *)vcpu->task->stack_base;
 
-		if (vm_is_64bit(vcpu->vm))
+		if (task_is_64bit(vcpu->task))
 			regs->x0 = (uint64_t)vcpu->vm->setup_data;
 		else {
 			regs->x0 = 0;
