@@ -135,6 +135,11 @@
 #define LOC_SHIFT		(24)
 #define CLIDR_FIELD_WIDTH	(3)
 
+#define DAIF_F_BIT		6
+#define DAIF_I_BIT		7
+#define DAIF_A_BIT		8
+#define DAIF_D_BIT		9
+
 #define LEVEL_SHIFT		(1)
 
 #define TASK_INFO_SIZE		(24)

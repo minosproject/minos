@@ -114,6 +114,7 @@ struct irq_domain {
 
 #define local_irq_enable() arch_enable_local_irq()
 #define local_irq_disable() arch_disable_local_irq()
+#define irq_disabled()	arch_irq_disabled()
 
 int irq_init(void);
 int irq_secondary_init(void);

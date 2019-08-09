@@ -17,13 +17,9 @@
 #include <minos/minos.h>
 #include <minos/task.h>
 #include <minos/sched.h>
+#include <minos/irq.h>
 
 DEFINE_SPIN_LOCK(__kernel_lock);
-
-int irq_disabled(void)
-{
-	return 1;
-}
 
 void __might_sleep(const char *file, int line, int preempt_offset)
 {

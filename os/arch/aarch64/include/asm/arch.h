@@ -60,12 +60,17 @@ typedef struct aarch64_regs {
 
 static inline unsigned long arch_save_irqflags(void)
 {
-	return	read_daif();
+	return read_daif();
 }
 
 static inline void arch_restore_irqflags(unsigned long flags)
 {
 	write_daif(flags);
+}
+
+static inline int arch_irq_disabled(void)
+{
+	return (read_daif() & (1 << DAIF_I_BIT));
 }
 
 #define local_irq_save(flag) \
