@@ -82,9 +82,4 @@ static void inline preempt_disable(void)
 	wmb();
 }
 
-static void inline might_sleep(void)
-{
-
-}
-
 #endif

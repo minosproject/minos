@@ -168,9 +168,7 @@ static void task_init(struct task *task, char *name,
 
 		/* init the thread_info */
 		ti = (struct task_info *)task->stack_origin;
-		ti->task = task;
-		ti->preempt_count = 0;
-		ti->cpu = aff;
+		TASK_INFO_INIT(ti, task, aff);
 	}
 
 	task->udata = arg;
@@ -460,10 +458,7 @@ static int tasks_early_init(void)
 		/* init the task info for the thread */
 		ti = (struct task_info *)(stack_base -
 				sizeof(struct task_info));
-		ti->task = task;
-		ti->cpu = i;
-		ti->preempt_count = 0;
-
+		TASK_INFO_INIT(ti, task, i);
 		stack_base -= TASK_STACK_SIZE;
 	}
 

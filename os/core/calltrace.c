@@ -40,7 +40,6 @@ void dump_stack(gp_regs *regs, unsigned long *stack)
 	pr_fatal("preempt:%d need_resche:%d os_running:%d\n",
 			preempt_allowed(), need_resched(),
 			os_is_running());
-	rmb();
 
 	arch_dump_stack(regs, stack);
 	spin_unlock_irqrestore(&dump_lock, flags);

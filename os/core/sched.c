@@ -453,19 +453,22 @@ void irq_handler_return(struct task *task)
 
 	ti = (struct task_info *)task->stack_origin;
 	p = ti->preempt_count;
-	n = !need_resched();
+	n = !(ti->flags & __TIF_NEED_RESCHED);
 
 	if (p || n)
 		return;
 
 	kernel_lock();
 
+	clear_bit(TIF_NEED_RESCHED, &ti->flags);
+
 	/*
 	 * if the task is suspend state, means next the cpu
 	 * will call sched directly, so do not sched out here
 	 */
 	if (!is_task_ready(task))
-		goto exit_0;
+		goto out;
+
 #if 0
 	/*
 	 * if the highest prio is update by other cpu, then
@@ -484,7 +487,6 @@ void irq_handler_return(struct task *task)
 		}
 	}
 
-	clear_need_resched();
 
 	/*
 	 * if need sched or the current task is idle, then
@@ -504,10 +506,8 @@ void irq_handler_return(struct task *task)
 		return;
 	}
 
-exit_0:
-	clear_need_resched();
+out:
 	kernel_unlock();
-
 }
 
 void irq_exit(gp_regs *regs)

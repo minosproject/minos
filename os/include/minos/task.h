@@ -29,6 +29,14 @@ struct task_event {
 	flag_t flags;
 };
 
+#define TASK_INFO_INIT(__ti, task, c) \
+	do {		\
+		__ti->cpu = c; \
+		__ti->task = task; \
+		__ti->preempt_count = 0; \
+		__ti->flags = 0; \
+	} while (0)
+
 #define DEFINE_TASK(nn, f, a, p, af, fl) \
 	static const struct task_desc __used \
 	task_desc_##f __section(.__task_desc) = { \
