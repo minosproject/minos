@@ -42,51 +42,6 @@ extern int vmodules_init(void);
 extern int virt_init(void);
 #endif
 
-struct list_head hook_lists[MINOS_HOOK_TYPE_UNKNOWN];
-
-DEFINE_SPIN_LOCK(__kernel_lock);
-DEFINE_PER_CPU(int, error_code);
-
-static void hooks_init(void)
-{
-	int i;
-
-	for (i = 0; i < MINOS_HOOK_TYPE_UNKNOWN; i++)
-		init_list(&hook_lists[i]);
-}
-
-int register_hook(hook_func_t fn, enum hook_type type)
-{
-	struct hook *hook;
-
-	if ((fn == NULL) || (type >= MINOS_HOOK_TYPE_UNKNOWN)) {
-		pr_err("Hook info is invaild\n");
-		return -EINVAL;
-	}
-
-	hook = malloc(sizeof(*hook));
-	if (!hook)
-		return -ENOMEM;
-
-	memset(hook, 0, sizeof(*hook));
-	hook->fn = fn;
-
-	list_add_tail(&hook_lists[type], &hook->list);
-
-	return 0;
-}
-
-int do_hooks(void *item, void *context, enum hook_type type)
-{
-	int err = 0;
-	struct hook *hook;
-
-	list_for_each_entry(hook, &hook_lists[type], list)
-		err += hook->fn(item, context);
-
-	return err;
-}
-
 void boot_main(void *setup_data)
 {
 	allsymbols_init();
@@ -109,8 +64,6 @@ void boot_main(void *setup_data)
 	early_init_percpu();
 
 	mm_init();
-
-	hooks_init();
 
 	arch_init();
 	arch_init_percpu();

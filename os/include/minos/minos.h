@@ -14,6 +14,8 @@
 #include <minos/calltrace.h>
 #include <minos/time.h>
 #include <minos/preempt.h>
+#include <minos/hook.h>
+#include <minos/current.h>
 
 #define section_for_each_item_addr(__start_addr, __end_addr, __var)            \
 	size_t _i, _cnt;                                                       \
@@ -30,50 +32,38 @@
 
 extern spinlock_t __kernel_lock;
 
-DECLARE_PER_CPU(int, error_code);
-
-typedef int (*hook_func_t)(void *item, void *contex);
-
-enum hook_type {
-	MINOS_HOOK_TYPE_EXIT_FROM_GUEST = 0,
-	MINOS_HOOK_TYPE_ENTER_TO_GUEST,
-	MINOS_HOOK_TYPE_CREATE_VM,
-	MINOS_HOOK_TYPE_CREATE_VM_VDEV,
-	MINOS_HOOK_TYPE_DESTROY_VM,
-	MINOS_HOOK_TYPE_SUSPEND_VM,
-	MINOS_HOOK_TYPE_RESUME_VM,
-	MINOS_HOOK_TYPE_ENTER_IRQ,
-	OS_HOOK_TASK_SWITCH_TO,
-	OS_HOOK_CREATE_TASK,
-	MINOS_HOOK_TYPE_UNKNOWN,
-};
-
-struct hook {
-	hook_func_t fn;
-	struct list_head list;
-};
-
-int do_hooks(void *item, void *context, enum hook_type type);
-int register_hook(hook_func_t fn, enum hook_type type);
+void __might_sleep(const char *file, int line, int preempt_offset);
 
 static inline int taken_from_guest(gp_regs *regs)
 {
 	return arch_taken_from_guest(regs);
 }
 
-static inline int get_error_code(void)
-{
-	return get_cpu_var(error_code);
-}
-
-static inline void set_error_code(int code)
-{
-	get_cpu_var(error_code) = code;
-}
-
 #define kernel_lock_irqsave(flags)	spin_lock_irqsave(&__kernel_lock, flags)
 #define kernel_unlock_irqrestore(flags) spin_unlock_irqrestore(&__kernel_lock, flags)
 #define kernel_lock()			raw_spin_lock(&__kernel_lock)
 #define kernel_unlock()			raw_spin_unlock(&__kernel_lock)
+
+#define WARN(condition, format...) ({						\
+	int __ret_warn_on = !!(condition);				\
+	if (unlikely(__ret_warn_on))					\
+		pr_warn(format);					\
+	unlikely(__ret_warn_on);					\
+})
+
+#define WARN_ONCE(condition, format...)	({			\
+	static bool __section(.data.unlikely) __warned;		\
+	int __ret_warn_once = !!(condition);			\
+								\
+	if (unlikely(__ret_warn_once))				\
+		if (WARN(!__warned, format)) 			\
+			__warned = true;			\
+	unlikely(__ret_warn_once);				\
+})
+
+#define might_sleep() \
+	do { \
+		__might_sleep(__FILE__, __LINE__, 0); \
+	} while (0)
 
 #endif

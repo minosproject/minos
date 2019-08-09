@@ -26,3 +26,5 @@ obj-y += queue.o
 obj-y += mbox.o
 obj-y += flag.o
 obj-y += delay.o
+obj-y += core.o
+obj-y += hook.o

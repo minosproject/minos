@@ -6,11 +6,6 @@
 #include <minos/atomic.h>
 #include <minos/timer.h>
 
-#ifdef CONFIG_VIRT
-struct vm;
-struct vcpu;
-#endif
-
 /* the max realtime task will be 64 */
 #define OS_NR_TASKS		512
 #define OS_REALTIME_TASK	64
@@ -120,11 +115,7 @@ struct task {
 
 	char name[TASK_NAME_SIZE + 1];
 
-#ifdef CONFIG_VIRT
-	struct vcpu *vcpu;
-	struct vm *vm;
-#endif
-	void *pdata;
+	void *pdata;		/* connect to the vcpu */
 	void *arch_data;	/* arch data to this task */
 	void **context;
 } __align_cache_line;
@@ -141,6 +132,9 @@ struct task_info {
 };
 
 #define TIF_NEED_RESCHED	0
+#define TIF_32BIT		1
+
 #define __TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
+#define __TIF_32BIT		(1 << TIF_32BIT)
 
 #endif
