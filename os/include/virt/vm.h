@@ -51,20 +51,11 @@ struct vcpu {
 	 * vcpu is handling now
 	 */
 	struct virq_struct *virq_struct;
-	volatile int state;
-
-	uint32_t affinity;
-	uint8_t is_idle;
-	uint8_t resched;
 
 	struct list_head list;
-	char name[VCPU_NAME_SIZE];
 	void *sched_data;
 
 	spinlock_t idle_lock;
-
-	void **vmodule_context;
-	void *arch_data;
 
 	struct vmcs *vmcs;
 	int vmcs_irq;

@@ -438,11 +438,12 @@ int virt_init(void)
 	int i;
 	struct vm *vm;
 
-	if ((vmtags == NULL) || (nr_static_vms == 0))
-		panic("no vm config found\n");
-
-	vmodules_init();
 	virqs_init();
+
+	if ((vmtags == NULL) || (nr_static_vms == 0)) {
+		pr_info("no vm config found\n");
+		return -EINVAL;
+	}
 
 	for (i = 0; i < nr_static_vms; i++) {
 		vm = create_vm(&vmtags[i]);

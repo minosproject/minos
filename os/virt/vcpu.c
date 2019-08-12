@@ -256,8 +256,13 @@ struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id)
 
 static void release_vcpu(struct vcpu *vcpu)
 {
+	if (vcpu->task)
+		release_task(vcpu->task);
+
+#if 0
 	if (vcpu->vmodule_context)
 		task_vmodules_deinit(vcpu->task);
+#endif
 
 	if (vcpu->vmcs_irq >= 0)
 		release_hvm_virq(vcpu->vmcs_irq);
@@ -266,21 +271,19 @@ static void release_vcpu(struct vcpu *vcpu)
 	free(vcpu);
 }
 
-static struct vcpu *alloc_vcpu(size_t size)
+static struct vcpu *alloc_vcpu(void)
 {
 	struct vcpu *vcpu;
 
-	vcpu = malloc(sizeof(*vcpu));
+	vcpu = zalloc(sizeof(*vcpu));
 	if (!vcpu)
 		return NULL;
 
-	memset(vcpu, 0, sizeof(*vcpu));
-	vcpu->virq_struct = malloc(sizeof(struct virq_struct));
+	vcpu->virq_struct = zalloc(sizeof(struct virq_struct));
 	if (!vcpu->virq_struct)
 		goto free_vcpu;
 
 	vcpu->vmcs_irq = -1;
-
 	return vcpu;
 
 free_vcpu:
@@ -293,21 +296,29 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 {
 	char name[64];
 	struct vcpu *vcpu;
+	struct task *task;
+
+	/* generate the name of the vcpu task */
+	memset(name, 0, 64);
+	sprintf(name, "%s-vcpu-%d", vm->name, vcpu_id);
+	task = create_vcpu_task(name, vm->entry_point, NULL,
+			vm->vcpu_affinity[vcpu_id], 0);
+	if (!task)
+		return NULL;
 
 	vcpu = alloc_vcpu(0);
-	if (!vcpu)
+	if (!vcpu) {
+		release_task(task);
 		return NULL;
+	}
+
+	task->pdata = vcpu;
+	vcpu->task = task;
 
 	vcpu->vcpu_id = vcpu_id;
 	vcpu->vm = vm;
 
-	vcpu->affinity = vm->vcpu_affinity[vcpu_id];
-	vcpu->is_idle = 0;
-
 	init_list(&vcpu->list);
-	memset(name, 0, 64);
-	sprintf(name, "%s-vcpu-%d", vm->name, vcpu_id);
-	strncpy(vcpu->name, name, sizeof(vcpu->name) - 1);
 
 	vcpu_virq_struct_init(vcpu);
 	vm->vcpus[vcpu_id] = vcpu;
@@ -537,7 +548,7 @@ struct vm *create_vm(struct vmtag *vme)
 		goto release_vm;
 	}
 
-	if (do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_CREATE_VM)) {
+	if (do_hooks((void *)vm, NULL, OS_HOOK_TYPE_CREATE_VM)) {
 		pr_err("create vm failed in hook function\n");
 		goto release_vm;
 	}
