@@ -264,6 +264,11 @@ static inline int vtimer_phy_mem_handler(gp_regs *regs, int read,
 	return 0;
 }
 
+static int vtimer_valid_for_task(struct task *task)
+{
+	return !!(task->flags & TASK_FLAGS_VCPU);
+}
+
 static int vtimer_vmodule_init(struct vmodule *vmodule)
 {
 	vmodule->context_size = sizeof(struct vtimer_context);
@@ -272,6 +277,7 @@ static int vtimer_vmodule_init(struct vmodule *vmodule)
 	vmodule->state_restore = vtimer_state_restore;
 	vmodule->state_deinit = vtimer_state_deinit;
 	vmodule->state_reset = vtimer_state_deinit;
+	vmodule->valid_for_task = vtimer_valid_for_task;
 	vtimer_vmodule_id = vmodule->id;
 
 	return 0;

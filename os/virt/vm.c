@@ -486,8 +486,10 @@ static int vcpu_affinity_init(void)
 {
 	struct vm *vm0 = get_vm_by_id(0);
 
-	if (!vm0)
-		panic("vm0 is not created\n");
+	if (!vm0) {
+		pr_warn("vm0 is not created\n");
+		return -EINVAL;
+	}
 
 	e_base_current = e_base = vm0->vcpu_nr;
 	e_nr = NR_CPUS - vm0->vcpu_nr;

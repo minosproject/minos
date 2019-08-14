@@ -165,6 +165,7 @@ static int __fdt_parse_memory_info(int node, char *attr)
 
 static void __fdt_parse_memreserve(void)
 {
+#if 0
 	int count, i, ret;
 	uint64_t address, size;
 
@@ -182,9 +183,12 @@ static void __fdt_parse_memreserve(void)
 		add_memory_region(address, size, MEMORY_REGION_F_RSV);
 	}
 
+	/* reserve the dtb memory */
 	size = fdt_totalsize(dtb);
-	add_memory_region((uint64_t)dtb, size, MEMORY_REGION_F_RSV);
 	pr_info("DTB - 0x%x ---> 0x%x\n", (unsigned long)dtb, size);
+	size = BALIGN(size, PAGE_SIZE);
+	add_memory_region((uint64_t)dtb, size, MEMORY_REGION_F_RSV);
+#endif
 }
 
 int fdt_parse_memory_info(void)

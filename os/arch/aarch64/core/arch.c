@@ -101,12 +101,11 @@ void arch_dump_stack(gp_regs *regs, unsigned long *stack)
 
 	if ((task) && !(is_idle_task(task))) {
 		pr_fatal("current task: pid:%d prio:%d name:%s\n",
-				get_task_pid(task), get_task_prio(task), task->name);
-		stack_base = (unsigned long)task->stack_origin;
-	} else {
-		stack_base = current_sp() - sizeof(struct task_info);
+				get_task_pid(task), get_task_prio(task),
+				task->name);
 	}
 
+	stack_base = current_sp() - sizeof(struct task_info);
 	dump_register(regs);
 
 	if (!stack) {

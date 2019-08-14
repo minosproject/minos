@@ -87,7 +87,7 @@ void boot_main(void *setup_data)
 	vmodules_init();
 
 #ifdef CONFIG_VIRT
-	virt_init();
+	//virt_init();
 #endif
 
 	device_init();

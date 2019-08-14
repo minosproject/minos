@@ -168,8 +168,11 @@ static int add_memory_section(unsigned long mem_base, size_t size)
 	mem_base = BALIGN(mem_base, MEM_BLOCK_SIZE);
 	real_size = mem_end - mem_base;
 
-	if (real_size == 0)
-		return -EINVAL;
+	/* if the memory is smaller than BLOCK_SIZE */
+	if ((real_size == 0) && (size > 0)) {
+		add_slab_mem(mem_base, size);
+		return 0;
+	}
 
 	ms->phy_base = mem_base;
 	ms->size = real_size;
@@ -192,12 +195,14 @@ static void parse_system_regions(void)
 {
 	struct memory_region *region;
 
-	/* need to split the hypervisor's memory from the system
-	 * then just add host region to the mem section */
 	split_memory_region(CONFIG_MINOS_START_ADDRESS, CONFIG_MINOS_RAM_SIZE, 0);
 
-	list_for_each_entry(region, &mem_list, list)
+	list_for_each_entry(region, &mem_list, list) {
+		if (region->flags != 0)
+			continue;
+
 		add_memory_section(region->vir_base, region->size);
+	}
 }
 
 static unsigned long blocks_bitmap_init(unsigned long base)
