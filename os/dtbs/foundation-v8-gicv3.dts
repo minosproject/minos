@@ -257,21 +257,6 @@
 		clock-frequency = <0x5f5e100>;
 	};
 
-	timer@2a810000 {
-		compatible = "arm,armv7-timer-mem";
-		reg = <0x0 0x2a810000 0x0 0x10000>;
-		clock-frequency = <0x5f5e100>;
-		#address-cells = <0x2>;
-		#size-cells = <0x2>;
-		ranges;
-
-		frame@2a830000 {
-			frame-number = <0x1>;
-			interrupts = <0x0 0x1a 0x4>;
-			reg = <0x0 0x2a830000 0x0 0x10000>;
-		};
-	};
-
 	pmu {
 		compatible = "arm,armv8-pmuv3";
 		interrupts = <0x0 0x3c 0x4 0x0 0x3d 0x4 0x0 0x3e 0x4 0x0 0x3f 0x4>;
@@ -340,62 +325,6 @@
 				#size-cells = <0x1>;
 				ranges = <0x0 0x3 0x0 0x200000>;
 
-				sysreg@10000 {
-					compatible = "arm,vexpress-sysreg";
-					reg = <0x10000 0x1000>;
-					gpio-controller;
-					#gpio-cells = <0x2>;
-					linux,phandle = <0x10>;
-					phandle = <0x10>;
-				};
-
-				sysctl@20000 {
-					compatible = "arm,sp810", "arm,primecell";
-					reg = <0x20000 0x1000>;
-					clocks = <0xd 0xe 0xf>;
-					clock-names = "refclk", "timclk", "apb_pclk";
-					#clock-cells = <0x1>;
-					clock-output-names = "timerclken0", "timerclken1", "timerclken2", "timerclken3";
-					linux,phandle = <0x12>;
-					phandle = <0x12>;
-				};
-
-				aaci@40000 {
-					compatible = "arm,pl041", "arm,primecell";
-					reg = <0x40000 0x1000>;
-					interrupts = <0x0 0xb 0x4>;
-					clocks = <0xf>;
-					clock-names = "apb_pclk";
-				};
-
-				mmci@50000 {
-					compatible = "arm,pl180", "arm,primecell";
-					reg = <0x50000 0x1000>;
-					interrupts = <0x0 0x9 0x4 0x0 0xa 0x4>;
-					cd-gpios = <0x10 0x0 0x0>;
-					wp-gpios = <0x10 0x1 0x0>;
-					max-frequency = <0xb71b00>;
-					vmmc-supply = <0x11>;
-					clocks = <0xf 0xf>;
-					clock-names = "mclk", "apb_pclk";
-				};
-
-				kmi@60000 {
-					compatible = "arm,pl050", "arm,primecell";
-					reg = <0x60000 0x1000>;
-					interrupts = <0x0 0xc 0x4>;
-					clocks = <0xf 0xf>;
-					clock-names = "KMIREFCLK", "apb_pclk";
-				};
-
-				kmi@70000 {
-					compatible = "arm,pl050", "arm,primecell";
-					reg = <0x70000 0x1000>;
-					interrupts = <0x0 0xd 0x4>;
-					clocks = <0xf 0xf>;
-					clock-names = "KMIREFCLK", "apb_pclk";
-				};
-
 				uart@90000 {
 					compatible = "arm,pl011", "arm,primecell";
 					reg = <0x90000 0x1000>;
@@ -428,114 +357,7 @@
 					clock-names = "uartclk", "apb_pclk";
 				};
 
-				wdt@f0000 {
-					compatible = "arm,sp805", "arm,primecell";
-					reg = <0xf0000 0x1000>;
-					interrupts = <0x0 0x0 0x4>;
-					clocks = <0xd 0xf>;
-					clock-names = "wdogclk", "apb_pclk";
-				};
-
-				timer@110000 {
-					compatible = "arm,sp804", "arm,primecell";
-					reg = <0x110000 0x1000>;
-					interrupts = <0x0 0x2 0x4>;
-					clocks = <0x12 0x0 0x12 0x1 0xf>;
-					clock-names = "timclken1", "timclken2", "apb_pclk";
-				};
-
-				timer@120000 {
-					compatible = "arm,sp804", "arm,primecell";
-					reg = <0x120000 0x1000>;
-					interrupts = <0x0 0x3 0x4>;
-					clocks = <0x12 0x2 0x12 0x3 0xf>;
-					clock-names = "timclken1", "timclken2", "apb_pclk";
-				};
-
-				rtc@170000 {
-					compatible = "arm,pl031", "arm,primecell";
-					reg = <0x170000 0x1000>;
-					interrupts = <0x0 0x4 0x4>;
-					clocks = <0xf>;
-					clock-names = "apb_pclk";
-				};
-
-				clcd@1f0000 {
-					compatible = "arm,pl111", "arm,primecell";
-					reg = <0x1f0000 0x1000>;
-					interrupts = <0x0 0xe 0x4>;
-					clocks = <0x13 0xf>;
-					clock-names = "clcdclk", "apb_pclk";
-					mode = "XVGA";
-					use_dma = <0x0>;
-					framebuffer = <0x18000000 0x180000>;
-				};
-
-				virtio_block@130000 {
-					compatible = "virtio,mmio";
-					reg = <0x130000 0x1000>;
-					interrupts = <0x0 0x2a 0x4>;
-				};
 			};
-
-			fixedregulator {
-				compatible = "regulator-fixed";
-				regulator-name = "3V3";
-				regulator-min-microvolt = <0x325aa0>;
-				regulator-max-microvolt = <0x325aa0>;
-				regulator-always-on;
-				linux,phandle = <0x11>;
-				phandle = <0x11>;
-			};
-
-			mcc {
-				compatible = "arm,vexpress,config-bus", "simple-bus";
-				arm,vexpress,config-bridge = <0x10>;
-
-				osc {
-					compatible = "arm,vexpress-osc";
-					arm,vexpress-sysreg,func = <0x1 0x1>;
-					freq-range = <0x16a6570 0x3c8eee0>;
-					#clock-cells = <0x0>;
-					clock-output-names = "v2m:oscclk1";
-					linux,phandle = <0x13>;
-					phandle = <0x13>;
-				};
-
-				muxfpga {
-					compatible = "arm,vexpress-muxfpga";
-					arm,vexpress-sysreg,func = <0x7 0x0>;
-				};
-
-				dvimode {
-					compatible = "arm,vexpress-dvimode";
-					arm,vexpress-sysreg,func = <0xb 0x0>;
-				};
-			};
-		};
-	};
-
-	panels {
-
-		panel {
-			compatible = "panel";
-			mode = "XVGA";
-			refresh = <0x3c>;
-			xres = <0x400>;
-			yres = <0x300>;
-			pixclock = <0x3d84>;
-			left_margin = <0x98>;
-			right_margin = <0x30>;
-			upper_margin = <0x17>;
-			lower_margin = <0x3>;
-			hsync_len = <0x68>;
-			vsync_len = <0x4>;
-			sync = <0x0>;
-			vmode = "FB_VMODE_NONINTERLACED";
-			tim2 = "TIM2_BCD", "TIM2_IPC";
-			cntl = "CNTL_LCDTFT", "CNTL_BGR", "CNTL_LCDVCOMP(1)";
-			caps = "CLCD_CAP_5551", "CLCD_CAP_565", "CLCD_CAP_888";
-			bpp = <0x10>;
 		};
 	};
 };
