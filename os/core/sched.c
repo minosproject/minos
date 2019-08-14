@@ -21,6 +21,10 @@
 #include <minos/softirq.h>
 #include <minos/vmodule.h>
 
+#ifdef CONFIG_VIRT
+#include <virt/vm.h>
+#endif
+
 static prio_t os_rdy_grp;
 static uint64_t __os_rdy_table;
 static uint8_t *os_rdy_table;
@@ -51,6 +55,41 @@ void pcpu_resched(int pcpu_id)
 	send_sgi(CONFIG_MINOS_RESCHED_IRQ, pcpu_id);
 }
 
+static void smp_set_task_ready(void *data)
+{
+	struct task *task = data;
+	struct pcpu *pcpu = get_cpu_var(pcpu);
+
+	if ((current == data) || (is_task_ready(task)))
+		return;
+
+	task->stat = TASK_STAT_RDY;
+	list_del(&task->stat_list);
+	list_add(&pcpu->ready_list, &task->stat_list);
+
+	if (task->delay) {
+		del_timer(&task->delay_timer);
+		task->delay = 0;
+	}
+}
+
+static void smp_set_task_suspend(void *data)
+{
+	struct task *task = data;
+	struct pcpu *pcpu = get_cpu_var(pcpu);
+
+	if ((current == data) || (!is_task_ready(task)))
+		return;
+
+	/*
+	 * fix me - when the task is pending to wait
+	 * a mutex or sem, how to deal ?
+	 */
+	task->stat |= TASK_STAT_SUSPEND;
+	list_del(&task->stat_list);
+	list_add(&pcpu->sleep_list, &task->stat_list);
+}
+
 void set_task_ready(struct task *task)
 {
 	struct pcpu *pcpu;
@@ -68,8 +107,11 @@ void set_task_ready(struct task *task)
 		os_rdy_table[task->by] |= task->bitx;
 	} else {
 		pcpu = get_cpu_var(pcpu);
-		if (pcpu->pcpu_id != task->affinity)
-			panic("can not ready task by other cpu\n");
+		if (pcpu->pcpu_id != task->affinity) {
+			smp_function_call(task->affinity, smp_set_task_ready,
+					(void *)task, 0);
+			return;
+		}
 
 		list_del(&task->stat_list);
 		list_add(&pcpu->ready_list, &task->stat_list);
@@ -95,8 +137,11 @@ void set_task_sleep(struct task *task)
 		dsb();
 	} else {
 		pcpu = get_cpu_var(pcpu);
-		if (pcpu->pcpu_id != task->affinity)
-			panic("can not sleep task by other cpu\n");
+		if (pcpu->pcpu_id != task->affinity) {
+			smp_function_call(task->affinity, smp_set_task_suspend,
+					(void *)task, 0);
+			return;
+		}
 
 		list_del(&task->stat_list);
 		list_add(&pcpu->sleep_list, &task->stat_list);
@@ -315,6 +360,11 @@ void switch_to_task(struct task *cur, struct task *next)
 
 	do_hooks((void *)next, NULL, OS_HOOK_TASK_SWITCH_TO);
 	restore_task_context(next);
+
+#ifdef CONFIG_VIRT
+	if (next->flags & TASK_FLAGS_VCPU)
+		enter_to_guest((struct vcpu *)next->pdata, NULL);
+#endif
 }
 
 unsigned long sched_tick_handler(unsigned long data)
@@ -440,7 +490,12 @@ void sched(void)
 void irq_enter(gp_regs *regs)
 {
 	do_hooks(get_current_task(), (void *)regs,
-			MINOS_HOOK_TYPE_ENTER_IRQ);
+			OS_HOOK_TYPE_ENTER_IRQ);
+
+#ifdef CONFIG_VIRT
+	if (taken_from_guest(regs))
+		exit_from_guest(get_current_vcpu(), regs);
+#endif
 }
 
 void irq_handler_return(struct task *task)

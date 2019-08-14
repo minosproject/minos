@@ -25,12 +25,10 @@
 #include <virt/virq_chip.h>
 #include <common/hypervisor.h>
 
-void *dtb;
-struct vmtag *vmtags;
-
 static int fdt_setup_other(struct vm *vm)
 {
 	int node;
+	void *dtb = vm->setup_data;
 
 	/* delete the vms node which no longer use */
 	node = fdt_path_offset(dtb, "/vms");
@@ -47,6 +45,7 @@ static int fdt_setup_minos(struct vm *vm)
 	size_t size;
 	int vspi_nr = vm->vspi_nr;
 	struct virq_chip *vc = vm->virq_chip;
+	void *dtb = vm->setup_data;
 
 	node = fdt_path_offset(dtb, "/minos");
 	if (node < 0) {
@@ -87,6 +86,7 @@ static int fdt_setup_cmdline(struct vm *vm)
 	int node, len, chosen_node;
 	char *new_cmdline;
 	char buf[512];
+	void *dtb = vm->setup_data;
 
 	chosen_node = fdt_path_offset(dtb, "/chosen");
 	if (chosen_node < 0) {
@@ -129,6 +129,7 @@ static int fdt_setup_cpu(struct vm *vm)
 {
 	int offset, node, i;
 	char name[16];
+	void *dtb = vm->setup_data;
 
 	/*
 	 * delete unused vcpu for hvm
@@ -163,9 +164,8 @@ static int fdt_setup_memory(struct vm *vm)
 	int offset, size;
 	int size_cell, address_cell;
 	uint32_t *args, *tmp;
-	struct memory_region *region;
 	unsigned long mstart, msize;
-
+	void *dtb = vm->setup_data;
 
 	offset = of_get_node_by_name(dtb, 0, "memory");
 	if (offset < 0) {
@@ -189,36 +189,26 @@ static int fdt_setup_memory(struct vm *vm)
 		return -ENOMEM;
 
 	size = 0;
+	mstart = vm->mm.mem_base;
+	msize = vm->mm.mem_size;
+	pr_info("add memory region to vm0 0x%p 0x%p\n", mstart, msize);
 
-	list_for_each_entry(region, &mem_list, list) {
-#if 0
-		if (region->vmid == 0) {
-#else
-		if (1) {
-#endif
-			pr_info("add memory region to vm0 0x%p 0x%p\n",
-					region->phy_base, region->size);
-			mstart = region->phy_base;
-			msize = region->size;
+	if (address_cell == 1) {
+		*args++ = cpu_to_fdt32(mstart);
+		size++;
+	} else {
+		*args++ = cpu_to_fdt32(mstart >> 32);
+		*args++ = cpu_to_fdt32(mstart);
+		size += 2;
+	}
 
-			if (address_cell == 1) {
-				*args++ = cpu_to_fdt32(mstart);
-				size ++;
-			} else {
-				*args++ = cpu_to_fdt32(mstart >> 32);
-				*args++ = cpu_to_fdt32(mstart);
-				size += 2;
-			}
-
-			if (size_cell ==  1) {
-				*args++ = cpu_to_fdt32(msize);
-				size++;
-			} else {
-				*args++ = cpu_to_fdt32(msize >> 32);
-				*args++ = cpu_to_fdt32(msize);
-				size += 2;
-			}
-		}
+	if (size_cell ==  1) {
+		*args++ = cpu_to_fdt32(msize);
+		size++;
+	} else {
+		*args++ = cpu_to_fdt32(msize >> 32);
+		*args++ = cpu_to_fdt32(msize);
+		size += 2;
 	}
 
 	fdt_setprop(dtb, offset, "reg", (void *)tmp, size * 4);
@@ -227,210 +217,12 @@ static int fdt_setup_memory(struct vm *vm)
 	return 0;
 }
 
-static int __fdt_parse_vm_info(int node, struct vmtag *vmtags)
-{
-	char *type;
-	fdt32_t *v;
-	int child, index = 1, vmid, len;
-	struct vmtag *tag;
-	uint64_t array[2];
-
-	if ((node <= 0) || !vmtags)
-		return -EINVAL;
-
-	fdt_for_each_subnode(child, dtb, node) {
-		type = (char *)fdt_getprop(dtb, child, "device_type", &len);
-		if (!type)
-			continue;
-		if (strcmp(type, "virtual_machine") != 0)
-			continue;
-
-		v = (fdt32_t *)fdt_getprop(dtb, child, "vmid", &len);
-		if (!v)
-			continue;
-
-		vmid = fdt32_to_cpu(*v);
-		if (vmid == 0)
-			tag = &vmtags[0];
-		else
-			tag = &vmtags[index++];
-
-		tag->vmid = vmid;
-		tag->flags |= VM_FLAGS_64BIT;
-
-		__of_get_string(dtb, child, "vm_name", tag->name, 32);
-		__of_get_string(dtb, child, "type", tag->os_type, 16);
-		__of_get_u32_array(dtb, child, "vcpus",
-				(uint32_t *)&tag->nr_vcpu, 1);
-		__of_get_u64_array(dtb, child, "entry",
-				(uint64_t *)&tag->entry, 1);
-		__of_get_u32_array(dtb, child, "vcpu_affinity",
-				tag->vcpu_affinity, tag->nr_vcpu);
-		__of_get_u32_array(dtb, child, "setup_data",
-				(uint32_t *)&tag->setup_data, 1);
-		__of_get_u64_array(dtb, child, "memory", array, 2);
-		tag->mem_base = array[0];
-		tag->mem_size = array[1];
-
-		if (__of_get_bool(dtb, child, "vm_32bit"))
-			tag->flags &= ~VM_FLAGS_64BIT;
-
-	}
-
-	return 0;
-}
-
-static void parse_vm0_info(struct vmtag *tag, char *str)
-{
-	char *pos, *val, len;
-	unsigned long value;
-
-	pos = strchr(str, '=');
-	if (pos == NULL)
-		return;
-
-	val = pos + 1;
-	if (*val == 0)
-		return;
-	*pos = 0;
-
-	if (strcmp(str, "vcpus") == 0) {
-		value = strtoul((const char *)val, NULL, 10);
-		tag->nr_vcpu = value;
-	} else if (strcmp(str, "mem_base") == 0) {
-		value = strtoul((const char *)val, NULL, 16);
-		tag->mem_base = value;
-	} else if (strcmp(str, "mem_size") == 0) {
-		value = strtoul((const char *)val, NULL, 16);
-		tag->mem_size = value;
-	} else if (strcmp(str, "entry") == 0) {
-		value = strtoul((const char *)val, NULL, 16);
-		tag->entry = (void *)value;
-	} else if (strcmp(str, "type") == 0) {
-		len = strlen(val);
-		len = MIN(len, 15);
-		strncpy(tag->os_type, val, len);
-		*(tag->name + len) = 0;
-	} else if (strcmp(str, "name") == 0) {
-		len = strlen(val);
-		len = MIN(len, 15);
-		strncpy(tag->name, val, len);
-		*(tag->name + len) = 0;
-	} else {
-		pr_warn("unknown vmo argument in cmdline %s\n", str);
-		return;
-	}
-
-	pr_info("vm0-%s from cmdline is %s\n", str, val);
-}
-
-static int parse_vm0_from_cmdline(struct vmtag *tag)
-{
-	char *str;
-	char buf[512];
-	int len;
-	char *cmdline = of_get_cmdline(dtb);
-
-	if (!cmdline)
-		return -ENOENT;
-
-	do {
-		str = strchr(cmdline, ' ');
-		if (str == NULL) {
-			if (strncmp(cmdline, "minos.vm0.", 10) == 0)
-				parse_vm0_info(tag, cmdline);
-			else
-				break;
-		} else {
-			len = str - cmdline;
-			if ((len == 0) || len > 511)
-				goto repeat;
-
-			if (strncmp(cmdline, "minos.vm0.", 10) == 0) {
-				strncpy(buf, cmdline + 10, len - 10);
-				buf[len - 10] = 0;
-				parse_vm0_info(tag, buf);
-			}
-		}
-repeat:
-		cmdline = str + 1;
-	} while ((str != NULL) && (*str != 0));
-
-	return 0;
-}
-
-int fdt_parse_vm_info(void)
-{
-	char *type;
-	fdt32_t *data;
-	int nr_vm = 0, node, child, len, has_vm0 = 0;
-
-	/*
-	 * vm0 must be always enabled for the hypervisor
-	 * first get the vm information from the dtb vms
-	 * area, if no vm mentioned, then get the vm0 info
-	 * from the cmdline. if not then panic
-	 */
-	node = fdt_path_offset(dtb, "/vms");
-	if (node > 0) {
-		fdt_for_each_subnode(child, dtb, node) {
-			type = (char *)fdt_getprop(dtb,
-					child, "device_type", &len);
-			if (!type)
-				continue;
-			if (strcmp(type, "virtual_machine") != 0)
-				continue;
-
-			data = (fdt32_t *)fdt_getprop(dtb,
-					child, "vmid", &len);
-			if (data) {
-				if (fdt32_to_cpu(*data) == 0)
-					has_vm0++;
-				nr_vm++;
-			}
-		}
-
-		if (has_vm0 == 0)
-			nr_vm++;
-		else if (has_vm0 > 1)
-			panic("detect mutiple vm0 information at the dtb\n");
-
-		vmtags = alloc_boot_mem(sizeof(struct vmtag) * nr_vm);
-		if (!vmtags)
-			panic("no more memory for vmtags\n");
-		memset(vmtags, 0, sizeof(struct vmtag) * nr_vm);
-		__fdt_parse_vm_info(node, vmtags);
-	}
-
-	/* vmtags[0] must always be vm0 */
-	parse_vm0_from_cmdline(&vmtags[0]);
-
-	/*
-	 * here all the vm information has been parsed from
-	 * cmdline or the dtb, the next thing is to delete
-	 * the memory region which alloctate to the vm from
-	 * the system memory region
-	 */
-	for (len = 0; len < nr_vm; len++) {
-		if (vmtags[len].mem_size != 0) {
-			split_memory_region(vmtags[len].mem_base,
-					vmtags[len].mem_size, 0);
-		}
-	}
-
-	/* finally tell the system vmtags is ok */
-	vmtags[0].setup_data = dtb;
-	//set_vmtags_to(vmtags, nr_vm);
-
-	return 0;
-}
-
-void fdt_vm0_init(struct vm *vm)
+void fdt_vm_init(struct vm *vm)
 {
 	void *fdt = vm->setup_data;
 
-	if (!fdt)
-		panic("vm0 do not have correct dtb image\n");
+	create_host_mapping((vir_addr_t)fdt, (phy_addr_t)fdt,
+			MEM_BLOCK_SIZE, 0);
 
 	fdt_open_into(fdt, fdt, MAX_DTB_SIZE);
 	if(fdt_check_header(fdt)) {
@@ -438,16 +230,18 @@ void fdt_vm0_init(struct vm *vm)
 		return;
 	}
 
-	fdt_setup_minos(vm);
+	if (vm_is_hvm(vm))
+		fdt_setup_minos(vm);
+
 	fdt_setup_cmdline(vm);
 	fdt_setup_cpu(vm);
 	fdt_setup_memory(vm);
 	fdt_setup_other(vm);
 
-	if (platform->setup_hvm)
-		platform->setup_hvm(vm, dtb);
+	if (platform->setup_hvm && vm_is_hvm(vm))
+		platform->setup_hvm(vm, fdt);
 
-	fdt_pack(dtb);
-	flush_dcache_range((unsigned long)dtb, MAX_DTB_SIZE);
-	destroy_host_mapping((unsigned long)dtb, MAX_DTB_SIZE);
+	fdt_pack(fdt);
+	flush_dcache_range((unsigned long)fdt, MAX_DTB_SIZE);
+	destroy_host_mapping((unsigned long)fdt, MAX_DTB_SIZE);
 }

@@ -244,7 +244,9 @@ static struct task *__create_task(char *name, task_func_t func,
 
 	task_init(task, name, stack, arg, prio,
 			pid, aff, stk_size, opt);
-	task_vmodules_init(task);
+
+	if (!(task->flags & TASK_FLAGS_VCPU))
+		task_vmodules_init(task);
 
 	return task;
 }
@@ -313,6 +315,11 @@ int task_ipi_event(struct task *task, struct task_event *ev, int wait)
 {
 	return smp_function_call(task->affinity,
 			task_ipi_event_handler, (void *)ev, wait);
+}
+
+int release_task(struct task *task)
+{
+	return 0;
 }
 
 int create_task(char *name, task_func_t func,
@@ -493,7 +500,7 @@ int create_vcpu_task(char *name, task_func_t func,
 		void *arg, int aff, unsigned long flags)
 {
 	return create_task(name, func, arg, OS_PRIO_PCPU,
-			aff, flags & TASK_FLAGS_VCPU);
+			aff, flags | TASK_FLAGS_VCPU);
 }
 
 static int task_events_init(void)

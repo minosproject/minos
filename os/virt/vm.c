@@ -26,11 +26,8 @@
 #include <common/gvm.h>
 #include <virt/vmcs.h>
 
-static struct vmtag *vmtags = NULL;
-static int nr_static_vms;
-
 extern void virqs_init(void);
-extern void fdt_vm0_init(struct vm *vm);
+extern void fdt_vm_init(struct vm *vm);
 
 static int e_base;
 static int f_base;
@@ -322,7 +319,7 @@ static int vm_resume(struct vm *vm)
 		resume_task_vmodule_state(vcpu->task);
 	}
 
-	do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_RESUME_VM);
+	do_hooks((void *)vm, NULL, OS_HOOK_TYPE_RESUME_VM);
 	trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
 			VMTRAP_REASON_VM_RESUMED, 0, NULL);
 
@@ -357,7 +354,7 @@ static int __vm_suspend(struct vm *vm)
 			VMTRAP_REASON_VM_SUSPEND, 0, NULL);
 
 	/* call the hooks for suspend */
-	do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_SUSPEND_VM);
+	do_hooks((void *)vm, NULL, OS_HOOK_TYPE_SUSPEND_VM);
 
 	set_task_suspend(0);
 	sched();
@@ -383,14 +380,6 @@ int vm_suspend(int vmid)
 	return __vm_suspend(vm);
 }
 
-void set_vmtags_to(struct vmtag *tags, int count)
-{
-	if (!tags || (count == 0))
-		panic("incorrect vmtags or count %d\n", count);
-
-	vmtags = tags;
-	nr_static_vms = count;
-}
 
 int vm_create_host_vdev(struct vm *vm)
 {
@@ -419,43 +408,86 @@ out:
 
 static int vm_create_resource(struct vm *vm)
 {
+	/*
+	 * first map the dtb address to the hypervisor, here
+	 * map these memory as read only
+	 */
+	create_host_mapping((vir_addr_t)vm->setup_data,
+			(phy_addr_t)vm->setup_data, MEM_BLOCK_SIZE, VM_RO);
+
 	if (of_data(vm->setup_data)) {
 		vm->flags |= VM_FLAGS_SETUP_OF;
-		return create_vm_resource_of(vm, vm->setup_data);
+		create_vm_resource_of(vm, vm->setup_data);
 	}
 
-	return -EINVAL;
+	destroy_host_mapping((vir_addr_t)vm->setup_data, MEM_BLOCK_SIZE);
+
+	return 0;
 }
 
-static void setup_hvm(struct vm *vm)
+static void setup_vm(struct vm *vm)
 {
 	if (vm->flags & VM_FLAGS_SETUP_OF)
-		fdt_vm0_init(vm);
+		fdt_vm_init(vm);
+}
+
+static void *create_vm_of(struct device_node *node, void *arg)
+{
+	int ret;
+	void *vm;
+	struct vmtag vmtag;
+
+	if (node->class != DT_CLASS_VM)
+		return NULL;
+
+	ret = parse_vm_info_of(node, &vmtag);
+	if (ret)
+		return NULL;
+
+	pr_info("**** create new vm ****\n");
+	pr_info("    vmid: %d\n", vmtag.vmid);
+	pr_info("    name: %s\n", vmtag.name);
+	pr_info("    os_type: %s\n", vmtag.os_type);
+	pr_info("    nr_vcpu: %d\n", vmtag.nr_vcpu);
+	pr_info("    memory: 0x%x 0x%x\n", vmtag.mem_base, vmtag.mem_size);
+	pr_info("    entry: 0x%p\n", vmtag.entry);
+	pr_info("    setup_data: 0x%p\n", vmtag.setup_data);
+	pr_info("    flags: 0x%x\n", vmtag.flags);
+	pr_info("    affinity: %d %d %d %d %d %d %d %d\n",
+			vmtag.vcpu_affinity[0], vmtag.vcpu_affinity[1],
+			vmtag.vcpu_affinity[2], vmtag.vcpu_affinity[3],
+			vmtag.vcpu_affinity[4], vmtag.vcpu_affinity[5],
+			vmtag.vcpu_affinity[6], vmtag.vcpu_affinity[7]);
+
+	vm = (void *)create_vm(&vmtag);
+	if (!vm)
+		pr_err("create vm-%d failed\n", vmtag.vmid);
+
+	return vm;
+}
+
+static void parse_and_create_vms(void)
+{
+#ifdef CONFIG_DEVICE_TREE
+	of_iterate_all_node_loop(hv_node, create_vm_of, NULL);
+#endif
 }
 
 int virt_init(void)
 {
-	int i;
 	struct vm *vm;
 
 	virqs_init();
 
-	if ((vmtags == NULL) || (nr_static_vms == 0)) {
-		pr_info("no vm config found\n");
-		return -EINVAL;
-	}
-
-	for (i = 0; i < nr_static_vms; i++) {
-		vm = create_vm(&vmtags[i]);
-		if (!vm)
-			pr_err("create VM(%d):%s failed\n", i,
-				 vmtags[i].name);
-	}
+	/* parse the vm information from dtb */
+	parse_and_create_vms();
 
 	/* check whether VM0 has been create correctly */
 	vm = get_vm_by_id(0);
-	if (!vm)
-		panic("vm0 has not been create correctly\n");
+	if (!vm) {
+		pr_err("vm0 has not been create correctly\n");
+		return -ENOENT;
+	}
 
 	/*
 	 * parsing all the memory/irq and resource
@@ -472,9 +504,7 @@ int virt_init(void)
 		vm_mm_init(vm);
 		vm_create_resource(vm);
 		vm_vcpus_init(vm);
-
-		if (vm->vmid == 0)
-			setup_hvm(vm);
+		setup_vm(vm);
 
 		vm->state = VM_STAT_ONLINE;
 	}

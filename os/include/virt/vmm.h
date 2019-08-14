@@ -9,6 +9,7 @@
 struct vm;
 
 int vm_mm_init(struct vm *vm);
+void vm_mm_struct_init(struct vm *vm, unsigned long base, size_t size);
 
 int map_vm_memory(struct vm *vm, unsigned long vir_base,
 		unsigned long phy_base, size_t size, int type);

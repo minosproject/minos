@@ -17,13 +17,13 @@
 #include <minos/minos.h>
 #include <minos/mm.h>
 
-static struct list_head hook_lists[MINOS_HOOK_TYPE_UNKNOWN];
+static struct list_head hook_lists[OS_HOOK_TYPE_UNKNOWN];
 
 static int hooks_init(void)
 {
 	int i;
 
-	for (i = 0; i < MINOS_HOOK_TYPE_UNKNOWN; i++)
+	for (i = 0; i < OS_HOOK_TYPE_UNKNOWN; i++)
 		init_list(&hook_lists[i]);
 
 	return 0;
@@ -34,7 +34,7 @@ int register_hook(hook_func_t fn, enum hook_type type)
 {
 	struct hook *hook;
 
-	if ((fn == NULL) || (type >= MINOS_HOOK_TYPE_UNKNOWN)) {
+	if ((fn == NULL) || (type >= OS_HOOK_TYPE_UNKNOWN)) {
 		pr_err("Hook info is invaild\n");
 		return -EINVAL;
 	}

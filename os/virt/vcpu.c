@@ -27,6 +27,7 @@
 #include <virt/vmm.h>
 #include <virt/vdev.h>
 #include <virt/vmcs.h>
+#include <minos/task.h>
 
 extern unsigned char __vm_start;
 extern unsigned char __vm_end;
@@ -56,18 +57,27 @@ out:
 	return vmid;
 }
 
+static inline void set_vcpu_ready(struct vcpu *vcpu)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	set_task_ready(vcpu->task);
+	local_irq_restore(flags);
+}
+
+static inline void set_vcpu_suspend(struct vcpu *vcpu)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	set_task_sleep(vcpu->task);
+	local_irq_restore(flags);
+}
+
 void vcpu_online(struct vcpu *vcpu)
 {
-	int cpuid = smp_processor_id();
-
-	if (vcpu_affinity(vcpu) != cpuid) {
-		pcpu_resched(vcpu_affinity(vcpu));
-		return;
-	}
-
-#if 0
 	set_vcpu_ready(vcpu);
-#endif
 }
 
 int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
@@ -129,9 +139,8 @@ void vcpu_idle(struct vcpu *vcpu)
 			return;
 		}
 
-#if 0
-		set_vcpu_suspend(vcpu);
-#endif
+		set_task_sleep(vcpu->task);
+
 		spin_unlock_irqrestore(&vcpu->idle_lock, flags);
 		sched();
 	}
@@ -156,10 +165,11 @@ int vcpu_off(struct vcpu *vcpu)
 	 * force set the vcpu to suspend state then sched
 	 * out
 	 */
-#if 0
-	set_vcpu_state(vcpu, VCPU_STAT_STOPPED);
+	vcpu->task->stat = TASK_STAT_STOPPED;
+	set_task_sleep(vcpu->task);
+
 	sched();
-#endif
+
 	return 0;
 }
 
@@ -219,7 +229,7 @@ static struct vm *__create_vm(struct vmtag *vme)
 	vm->state = VM_STAT_OFFLINE;
 	init_list(&vm->vdev_list);
 	memcpy(vm->vcpu_affinity, vme->vcpu_affinity,
-			sizeof(uint8_t) * VM_MAX_VCPU);
+			sizeof(uint32_t) * VM_MAX_VCPU);
 	vm->flags |= vme->flags;
 
 	vms[vme->vmid] = vm;
@@ -255,15 +265,8 @@ struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id)
 
 static void release_vcpu(struct vcpu *vcpu)
 {
-#if 0
 	if (vcpu->task)
 		release_task(vcpu->task);
-#endif
-
-#if 0
-	if (vcpu->vmodule_context)
-		task_vmodules_deinit(vcpu->task);
-#endif
 
 	if (vcpu->vmcs_irq >= 0)
 		release_hvm_virq(vcpu->vmcs_irq);
@@ -305,22 +308,24 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 	sprintf(name, "%s-vcpu-%d", vm->name, vcpu_id);
 	pid = create_vcpu_task(name, vm->entry_point, NULL,
 			vm->vcpu_affinity[vcpu_id], 0);
-	if (pid)
+	if (pid < 0)
 		return NULL;
 
 	task = pid_to_task(pid);
 
 	vcpu = alloc_vcpu();
 	if (!vcpu) {
-		//release_task(task);
+		release_task(task);
 		return NULL;
 	}
 
 	task->pdata = vcpu;
 	vcpu->task = task;
-
 	vcpu->vcpu_id = vcpu_id;
 	vcpu->vm = vm;
+
+	if (!(vm->flags & VM_FLAGS_64BIT))
+		task->flags &= TASK_FLAGS_32BIT;
 
 	init_list(&vcpu->list);
 
@@ -339,21 +344,16 @@ int vm_vcpus_init(struct vm *vm)
 {
 	struct vcpu *vcpu;
 
-	if (!vm)
-		return -EINVAL;
-
 	vm_for_each_vcpu(vm, vcpu) {
 		pr_info("vm-%d vcpu-%d affnity to pcpu-%d\n",
-				vm->vmid, vcpu->vcpu_id, vcpu->task->affinity);
-
-#if 0
-		/* only when the vm is offline state do this */
-		if (vm->state == VM_STAT_OFFLINE)
-			pcpu_add_vcpu(vcpu->affinity, vcpu);
-#endif
+				vm->vmid, vcpu->vcpu_id, vcpu_affinity(vcpu));
 
 		task_vmodules_init(vcpu->task);
 		vm->os->ops->vcpu_init(vcpu);
+
+		/* only when the vm is offline state do this */
+		if (vm->state == VM_STAT_OFFLINE)
+			set_vcpu_ready(vcpu);
 
 		if (!vm_is_native(vm)) {
 			vcpu->vmcs->host_index = 0;
@@ -395,7 +395,6 @@ int vcpu_reset(struct vcpu *vcpu)
 
 	task_vmodules_reset(vcpu->task);
 	vcpu_virq_struct_reset(vcpu);
-	// sched_reset_vcpu(vcpu);
 
 	return 0;
 }
@@ -471,9 +470,8 @@ void vcpu_power_off_call(void *data)
 		return;
 	}
 
-#if 0
-	set_task_stopped(vcpu->task);
-#endif
+	vcpu->task->stat = TASK_STAT_STOPPED;
+	set_task_sleep(vcpu->task);
 
 	/*
 	 * *********** Note ****************
@@ -502,10 +500,12 @@ int vcpu_power_off(struct vcpu *vcpu, int timeout)
 		return smp_function_call(vcpu->task->affinity,
 				vcpu_power_off_call, (void *)vcpu, 1);
 	} else {
-		set_task_suspend(0);
-		sched();
+		vcpu->task->stat = TASK_STAT_STOPPED;
+		set_vcpu_suspend(vcpu);
+
 		pr_info("power off vcpu-%d-%d done\n", get_vmid(vcpu),
 				get_vcpu_id(vcpu));
+		sched();
 	}
 
 	return 0;
@@ -525,14 +525,9 @@ struct vm *create_vm(struct vmtag *vme)
 		if (vme->vmid == VMID_INVALID)
 			return NULL;
 	} else {
-		spin_lock(&vms_lock);
-		if (test_bit(vme->vmid, vmid_bitmap)) {
-			spin_unlock(&vms_lock);
+		if (test_and_set_bit(vme->vmid, vmid_bitmap))
 			return NULL;
-		}
 
-		set_bit(vme->vmid, vmid_bitmap);
-		spin_unlock(&vms_lock);
 		native = 1;
 	}
 
@@ -543,7 +538,7 @@ struct vm *create_vm(struct vmtag *vme)
 	if (native)
 		vm->flags |= VM_FLAGS_NATIVE;
 
-	vm_mm_struct_init(vm);
+	vm_mm_struct_init(vm, vme->mem_base, vme->mem_size);
 
 	ret = create_vcpus(vm);
 	if (ret) {

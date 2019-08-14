@@ -144,6 +144,7 @@ int create_task(char *name, task_func_t func,
 		void *arg, prio_t prio, uint16_t aff,
 		unsigned long opt);
 
+int release_task(struct task *task);
 struct task_event *alloc_task_event(void);
 void release_task_event(struct task_event *event);
 struct task *pid_to_task(int pid);

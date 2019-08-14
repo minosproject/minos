@@ -79,6 +79,33 @@ static void *create_vm_irqchip_of(struct device_node *node, void *arg)
 	return node;
 }
 
+int parse_vm_info_of(struct device_node *node, struct vmtag *vmtag)
+{
+	uint64_t memory[2];
+
+	/* 64bit virtual machine default */
+	memset(vmtag, 0, sizeof(*vmtag));
+	vmtag->flags |= VM_FLAGS_64BIT;
+
+	of_get_u32_array(node, "vmid", &vmtag->vmid, 1);
+	of_get_string(node, "vm_name", vmtag->name, 32);
+	of_get_string(node, "type", vmtag->os_type, 16);
+	of_get_u32_array(node, "vcpus", (uint32_t *)&vmtag->nr_vcpu, 1);
+	of_get_u64_array(node, "entry", (uint64_t *)&vmtag->entry, 1);
+	of_get_u32_array(node, "vcpu_affinity",
+			vmtag->vcpu_affinity, vmtag->nr_vcpu);
+	of_get_u64_array(node, "setup_data", (uint64_t *)&vmtag->setup_data, 1);
+
+	of_get_u64_array(node, "memory", memory, 2);
+	vmtag->mem_base = memory[0];
+	vmtag->mem_size = memory[1];
+
+	if (of_get_bool(node, "vm_32bit"))
+		vmtag->flags &= ~VM_FLAGS_64BIT;
+
+	return 0;
+}
+
 int vm_get_device_irq_index(struct vm *vm, struct device_node *node,
 		uint32_t *irq, unsigned long *flags, int index)
 {
@@ -278,10 +305,7 @@ int create_vm_resource_of(struct vm *vm, void *data)
 	if (!vm)
 		return -EINVAL;
 
-	if (vm_is_hvm(vm))
-		node = hv_node;
-	else
-		node = of_parse_device_tree(data);
+	node = of_parse_device_tree(data);
 	if (!node) {
 		pr_err("invaild setup data for vm-%d\n", vm->vmid);
 		return -EINVAL;
@@ -302,9 +326,6 @@ int create_vm_resource_of(struct vm *vm, void *data)
 
 	/* here we can free all the device node to save memory */
 	of_release_all_node(node);
-	if (vm_is_hvm(vm))
-		hv_node = NULL;
-
 	return 0;
 }
 

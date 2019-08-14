@@ -385,7 +385,7 @@ phy_addr_t get_vm_memblock_address(struct vm *vm, unsigned long a)
 	return 0;
 }
 
-void vm_mm_struct_init(struct vm *vm)
+void vm_mm_struct_init(struct vm *vm, unsigned long mbase, size_t msize)
 {
 	struct mm_struct *mm = &vm->mm;
 
@@ -394,6 +394,8 @@ void vm_mm_struct_init(struct vm *vm)
 	mm->head = NULL;
 	mm->pgd_base = 0;
 	spin_lock_init(&mm->lock);
+	mm->mem_base = mbase;
+	mm->mem_size = mm->mem_free = msize;
 
 	mm->pgd_base = alloc_pgd();
 	if (mm->pgd_base == 0) {
@@ -455,17 +457,11 @@ void *vm_map_shmem(struct vm *vm, void *phy, uint32_t size,
 
 int vm_mm_init(struct vm *vm)
 {
-	struct memory_region *region;
+	struct mm_struct *mm = &vm->mm;
 
-	list_for_each_entry(region, &mem_list, list) {
-#if 0
-		if (region->vmid != vm->vmid)
-			continue;
-#endif
-
-		create_guest_mapping(vm, region->vir_base,
-				region->phy_base, region->size, 0);
-	}
+	/* just mapping the physical memory for guest */
+	create_guest_mapping(vm, mm->mem_base,
+			mm->mem_base, mm->mem_size, 0);
 
 	return 0;
 }

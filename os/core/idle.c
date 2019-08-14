@@ -20,6 +20,7 @@
 #include <minos/platform.h>
 #include <minos/irq.h>
 #include <minos/mm.h>
+#include <minos/of.h>
 
 extern void apps_cpu0_init(void);
 extern void apps_cpu1_init(void);
@@ -97,6 +98,10 @@ static void os_clean(void)
 	extern unsigned char __init_start;
 	extern unsigned char __init_end;
 	unsigned long size;
+
+#ifdef CONFIG_DEVICE_TREE
+	of_release_all_node(hv_node);
+#endif
 
 	size = (unsigned long)&__init_end -
 		(unsigned long)&__init_start;

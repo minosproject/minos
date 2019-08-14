@@ -66,7 +66,7 @@ struct vm {
 	uint32_t vcpu_nr;
 	int state;
 	unsigned long flags;
-	uint8_t vcpu_affinity[VM_MAX_VCPU];
+	uint32_t vcpu_affinity[VM_MAX_VCPU];
 	void *entry_point;
 	void *setup_data;
 	char name[VM_NAME_SIZE];
@@ -131,7 +131,9 @@ static inline struct vcpu *get_current_vcpu(void)
 
 static inline struct vm *task_to_vm(struct task *task)
 {
-	return get_current_vcpu()->vm;
+	struct vcpu *vcpu = (struct vcpu *)task->pdata;
+
+	return vcpu->vm;
 }
 
 static inline struct vm* get_current_vm(void)
@@ -157,17 +159,13 @@ int vcpu_power_off(struct vcpu *vcpu, int timeout);
 
 static inline void exit_from_guest(struct vcpu *vcpu, gp_regs *regs)
 {
-	do_hooks((void *)vcpu, (void *)regs,
-			MINOS_HOOK_TYPE_EXIT_FROM_GUEST);
+	do_hooks((void *)vcpu, (void *)regs, OS_HOOK_TYPE_EXIT_FROM_GUEST);
 }
 
 static inline void enter_to_guest(struct vcpu *vcpu, gp_regs *regs)
 {
-	do_hooks((void *)vcpu, (void *)regs,
-			MINOS_HOOK_TYPE_ENTER_TO_GUEST);
+	do_hooks((void *)vcpu, (void *)regs, OS_HOOK_TYPE_ENTER_TO_GUEST);
 }
-
-void vm_mm_struct_init(struct vm *vm);
 
 struct vm *create_vm(struct vmtag *vme);
 int create_new_vm(struct vmtag *tag);

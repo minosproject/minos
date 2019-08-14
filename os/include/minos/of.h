@@ -48,6 +48,7 @@ int __of_get_string(void *, int, char *, char *, int);
 int __of_get_bool(void *dtb, int node, char *attr);
 char *of_get_cmdline(void *dtb);
 
+int of_get_bool(struct device_node *node, char *attr);
 void *of_getprop(struct device_node *node, char *attr, int *len);
 int of_get_node_by_name(void *data, int pnode, char *str);
 const char *__of_get_compatible(void *dtb, int node);

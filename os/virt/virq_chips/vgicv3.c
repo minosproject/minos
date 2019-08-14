@@ -726,7 +726,7 @@ struct virq_chip *vgicv3_virqchip_init(struct vm *vm,
 	if (ret || (gicd_size == 0) || (gicr_size == 0))
 		return NULL;
 
-	pr_err("vgicv3 address 0x%x 0x%x 0x%x 0x%x\n",
+	pr_info("vgicv3 address 0x%x 0x%x 0x%x 0x%x\n",
 				gicd_base, gicd_size,
 				gicr_base, gicr_size);
 

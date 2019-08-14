@@ -141,6 +141,11 @@ int __of_get_bool(void *dtb, int node, char *attr)
 	return (prop != NULL);
 }
 
+int of_get_bool(struct device_node *node, char *attr)
+{
+	return __of_get_bool(node->data, node->offset, attr);
+}
+
 int __of_get_string(void *dtb, int node, char *attr, char *str, int len)
 {
 	char *s;
@@ -274,7 +279,7 @@ static int of_parse_dt_class(struct device_node *node)
 			node->class = DT_CLASS_MEMORY;
 		else if (strcmp(type, "pci") == 0)
 			node->class = DT_CLASS_PCI_BUS;
-		else if (strcmp(type, "virtual_machine"))
+		else if (strcmp(type, "virtual_machine") == 0)
 			node->class = DT_CLASS_VM;
 		else
 			node->class = DT_CLASS_OTHER;
