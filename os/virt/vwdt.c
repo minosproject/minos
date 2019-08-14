@@ -287,7 +287,7 @@ static void *vwdt_init(struct vm *vm, struct device_node *node)
 	dev->vdev.deinit = vwdt_deinit;
 	dev->vdev.reset = vwdt_reset;
 
-	init_timer_on_cpu(&dev->wdt_timer, vcpu->affinity);
+	init_timer_on_cpu(&dev->wdt_timer, vcpu->task->affinity);
 	dev->wdt_timer.function = vwdt_timer_expire;
 	dev->wdt_timer.data = (unsigned long)dev;
 

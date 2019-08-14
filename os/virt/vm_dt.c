@@ -414,7 +414,7 @@ int fdt_parse_vm_info(void)
 	for (len = 0; len < nr_vm; len++) {
 		if (vmtags[len].mem_size != 0) {
 			split_memory_region(vmtags[len].mem_base,
-					vmtags[len].mem_size);
+					vmtags[len].mem_size, 0);
 		}
 	}
 

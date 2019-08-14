@@ -122,6 +122,11 @@ static inline int task_is_64bit(struct task *task)
 	return !(task->flags & TASK_FLAGS_32BIT);
 }
 
+static inline int task_is_vcpu(struct task *task)
+{
+	return (task->flags & TASK_FLAGS_VCPU);
+}
+
 int alloc_pid(prio_t prio, int cpuid);
 void release_pid(int pid);
 int task_ipi_event(struct task *task, struct task_event *ev, int wait);
@@ -141,6 +146,7 @@ int create_task(char *name, task_func_t func,
 
 struct task_event *alloc_task_event(void);
 void release_task_event(struct task_event *event);
+struct task *pid_to_task(int pid);
 
 #define task_lock(task)					\
 	do {						\

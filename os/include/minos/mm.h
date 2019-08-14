@@ -5,8 +5,6 @@
 #include <minos/spinlock.h>
 #include <minos/memattr.h>
 
-struct memtag;
-
 struct mem_block {
 	unsigned long phy_base;
 	uint16_t flags;
@@ -30,15 +28,18 @@ struct page {
 	struct page *next;
 } __packed__;
 
+#define MEMORY_REGION_F_RSV	(1 << 0)
+
 struct memory_region {
+	uint32_t flags;
 	phy_addr_t phy_base;
 	vir_addr_t vir_base;
 	size_t size;
 	struct list_head list;
 };
 
-int add_memory_region(uint64_t base, uint64_t size);
-int split_memory_region(vir_addr_t base, size_t size);
+int add_memory_region(uint64_t base, uint64_t size, uint32_t flags);
+int split_memory_region(vir_addr_t base, size_t size, uint32_t flags);
 
 int mm_init(void);
 void *malloc(size_t size);

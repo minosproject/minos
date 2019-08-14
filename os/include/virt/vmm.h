@@ -8,7 +8,6 @@
 
 struct vm;
 
-int register_memory_region(struct memtag *res);
 int vm_mm_init(struct vm *vm);
 
 int map_vm_memory(struct vm *vm, unsigned long vir_base,

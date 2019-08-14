@@ -111,7 +111,7 @@ static int inline get_vmid(struct vcpu *vcpu)
 
 static int inline vcpu_affinity(struct vcpu *vcpu)
 {
-	return vcpu->affinity;
+	return vcpu->task->affinity;
 }
 
 static inline struct vm *vcpu_to_vm(struct vcpu *vcpu)

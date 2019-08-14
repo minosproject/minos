@@ -275,7 +275,7 @@ static void *vrtc_init(struct vm *vm, struct device_node *node)
 	dev->vdev.deinit = vrtc_deinit;
 	dev->vdev.reset = vrtc_reset;
 
-	init_timer_on_cpu(&dev->alarm_timer, vcpu->affinity);
+	init_timer_on_cpu(&dev->alarm_timer, vcpu->task->affinity);
 	dev->alarm_timer.function = vrtc_alarm_function;
 	dev->alarm_timer.data = (unsigned long)dev;
 

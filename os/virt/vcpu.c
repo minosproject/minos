@@ -60,9 +60,8 @@ void vcpu_online(struct vcpu *vcpu)
 {
 	int cpuid = smp_processor_id();
 
-	if (vcpu->affinity != cpuid) {
-		vcpu->resched = 1;
-		pcpu_resched(vcpu->affinity);
+	if (vcpu_affinity(vcpu) != cpuid) {
+		pcpu_resched(vcpu_affinity(vcpu));
 		return;
 	}
 
@@ -256,8 +255,10 @@ struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id)
 
 static void release_vcpu(struct vcpu *vcpu)
 {
+#if 0
 	if (vcpu->task)
 		release_task(vcpu->task);
+#endif
 
 #if 0
 	if (vcpu->vmodule_context)
@@ -294,6 +295,7 @@ free_vcpu:
 
 static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 {
+	int pid;
 	char name[64];
 	struct vcpu *vcpu;
 	struct task *task;
@@ -301,14 +303,16 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 	/* generate the name of the vcpu task */
 	memset(name, 0, 64);
 	sprintf(name, "%s-vcpu-%d", vm->name, vcpu_id);
-	task = create_vcpu_task(name, vm->entry_point, NULL,
+	pid = create_vcpu_task(name, vm->entry_point, NULL,
 			vm->vcpu_affinity[vcpu_id], 0);
-	if (!task)
+	if (pid)
 		return NULL;
 
-	vcpu = alloc_vcpu(0);
+	task = pid_to_task(pid);
+
+	vcpu = alloc_vcpu();
 	if (!vcpu) {
-		release_task(task);
+		//release_task(task);
 		return NULL;
 	}
 
@@ -340,7 +344,7 @@ int vm_vcpus_init(struct vm *vm)
 
 	vm_for_each_vcpu(vm, vcpu) {
 		pr_info("vm-%d vcpu-%d affnity to pcpu-%d\n",
-				vm->vmid, vcpu->vcpu_id, vcpu->affinity);
+				vm->vmid, vcpu->vcpu_id, vcpu->task->affinity);
 
 #if 0
 		/* only when the vm is offline state do this */
@@ -419,7 +423,7 @@ void destroy_vm(struct vm *vm)
 			vdev->deinit(vdev);
 	}
 
-	do_hooks((void *)vm, NULL, MINOS_HOOK_TYPE_DESTROY_VM);
+	do_hooks((void *)vm, NULL, OS_HOOK_TYPE_DESTROY_VM);
 
 	if (vm->vcpus) {
 		for (i = 0; i < vm->vcpu_nr; i++) {
@@ -461,9 +465,9 @@ void vcpu_power_off_call(void *data)
 	if (!vcpu)
 		return;
 
-	if (vcpu->affinity != smp_processor_id()) {
+	if (vcpu_affinity(vcpu) != smp_processor_id()) {
 		pr_err("vcpu-%s do not belong to this pcpu\n",
-				vcpu->name);
+				vcpu->task->name);
 		return;
 	}
 
@@ -492,10 +496,10 @@ int vcpu_power_off(struct vcpu *vcpu, int timeout)
 	if (!vcpu)
 		return -EINVAL;
 
-	if (vcpu->affinity != cpuid) {
+	if (vcpu->task->affinity != cpuid) {
 		pr_debug("call vcpu_power_off_call for vcpu-%s\n",
-				vcpu->name);
-		return smp_function_call(vcpu->affinity,
+				vcpu->task->name);
+		return smp_function_call(vcpu->task->affinity,
 				vcpu_power_off_call, (void *)vcpu, 1);
 	} else {
 		set_task_suspend(0);

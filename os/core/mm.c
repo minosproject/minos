@@ -194,7 +194,7 @@ static void parse_system_regions(void)
 
 	/* need to split the hypervisor's memory from the system
 	 * then just add host region to the mem section */
-	split_memory_region(CONFIG_MINOS_START_ADDRESS, CONFIG_MINOS_RAM_SIZE);
+	split_memory_region(CONFIG_MINOS_START_ADDRESS, CONFIG_MINOS_RAM_SIZE, 0);
 
 	list_for_each_entry(region, &mem_list, list)
 		add_memory_section(region->vir_base, region->size);
@@ -1155,7 +1155,7 @@ int has_enough_memory(size_t size)
 	return (free_blocks >= (size >> MEM_BLOCK_SHIFT));
 }
 
-int add_memory_region(uint64_t base, uint64_t size)
+int add_memory_region(uint64_t base, uint64_t size, uint32_t flags)
 {
 	struct memory_region *region;
 
@@ -1170,9 +1170,10 @@ int add_memory_region(uint64_t base, uint64_t size)
 	region->vir_base = base;
 	region->phy_base = base;
 	region->size = size;
+	region->flags = flags;
 
-	pr_info("ADD MEM : 0x%x -> 0x%x 0x%x\n", region->vir_base,
-		region->phy_base, region->size);
+	pr_info("ADD MEM : 0x%x -> 0x%x 0x%x %d\n", region->vir_base,
+		region->phy_base, region->size, region->flags);
 
 	init_list(&region->list);
 	list_add_tail(&mem_list, &region->list);
@@ -1180,7 +1181,7 @@ int add_memory_region(uint64_t base, uint64_t size)
 	return 0;
 }
 
-int split_memory_region(vir_addr_t base, size_t size)
+int split_memory_region(vir_addr_t base, size_t size, uint32_t flags)
 {
 	vir_addr_t start, end;
 	vir_addr_t new_end = base + size;
@@ -1215,6 +1216,7 @@ int split_memory_region(vir_addr_t base, size_t size)
 			init_list(&n->list);
 			n->vir_base = n->phy_base = new_end;
 			n->size = end - new_end;
+			n->flags = region->flags;
 			list_add_tail(&mem_list, &n->list);
 			region->size = base - start;
 		} else if ((base > start) && (end == new_end)) {
@@ -1232,12 +1234,13 @@ int split_memory_region(vir_addr_t base, size_t size)
 		init_list(&tmp->list);
 		tmp->vir_base = tmp->phy_base = base;
 		tmp->size = size;
+		tmp->flags = region->flags;
 		list_add_tail(&mem_list, &tmp->list);
 
 		return 0;
 	}
 
-	add_memory_region(base, size);
+	add_memory_region(base, size, flags);
 	return 0;
 }
 

@@ -481,7 +481,7 @@ static int __request_virq(struct vcpu *vcpu, struct virq_desc *desc,
 		irq_set_affinity(hwirq, vcpu_affinity(vcpu));
 		virq_set_hw(desc);
 		request_irq(hwirq, guest_irq_handler, IRQ_FLAGS_VCPU,
-				vcpu->name, (void *)desc);
+				vcpu->task->name, (void *)desc);
 		irq_mask(desc->hno);
 	} else
 		virq_clear_hw(desc);
@@ -699,6 +699,6 @@ static int virq_destroy_vm(void *item, void *data)
 
 void virqs_init(void)
 {
-	register_hook(virq_create_vm, MINOS_HOOK_TYPE_CREATE_VM);
-	register_hook(virq_destroy_vm, MINOS_HOOK_TYPE_DESTROY_VM);
+	register_hook(virq_create_vm, OS_HOOK_TYPE_CREATE_VM);
+	register_hook(virq_destroy_vm, OS_HOOK_TYPE_DESTROY_VM);
 }

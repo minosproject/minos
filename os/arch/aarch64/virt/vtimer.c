@@ -102,7 +102,7 @@ static void vtimer_state_init(struct task *task, void *context)
 
 	vtimer = &c->virt_timer;
 	vtimer->vcpu = vcpu;
-	init_timer_on_cpu(&vtimer->timer, vcpu->affinity);
+	init_timer_on_cpu(&vtimer->timer, vcpu->task->affinity);
 	vtimer->timer.function = virt_timer_expire_function;
 	vtimer->timer.data = (unsigned long)vtimer;
 	if(vm_is_native(vcpu->vm))
@@ -114,7 +114,7 @@ static void vtimer_state_init(struct task *task, void *context)
 
 	vtimer = &c->phy_timer;
 	vtimer->vcpu = vcpu;
-	init_timer_on_cpu(&vtimer->timer, vcpu->affinity);
+	init_timer_on_cpu(&vtimer->timer, vcpu->task->affinity);
 	vtimer->timer.function = phys_timer_expire_function;
 	vtimer->timer.data = (unsigned long)vtimer;
 	if (vm_is_native(vcpu->vm))
