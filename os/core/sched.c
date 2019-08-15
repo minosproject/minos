@@ -440,20 +440,25 @@ void sched(void)
 		return;
 	}
 
-	kernel_lock_irqsave(flags);
-
-	cpuid = smp_processor_id();
+	preempt_disable();
+	task_lock_irqsave(cur, flags);
 
 	/*
 	 * need to check whether the current task is to
 	 * pending on some thing or suspend, then call
 	 * sched_new to get the next run task
 	 */
+	cpuid = smp_processor_id();
 	pcpu = get_per_cpu(pcpu, cpuid);
 	if (!task_is_ready(cur)) {
 		sched_flag = 1;
 		set_task_sleep(cur);
 	}
+	task_unlock_irqrestore(cur, flags);
+
+	/* now need to lock the whole kernel */
+	kernel_lock_irqsave(flags);
+	preempt_enable();
 
 	sched_new(pcpu);
 

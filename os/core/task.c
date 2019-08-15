@@ -138,20 +138,18 @@ static void task_timeout_handler(unsigned long data)
 
 		task->stat &= ~TASK_STAT_PEND_ANY;
 		task->pend_stat = TASK_STAT_PEND_TO;
-
-		set_need_resched();
 	} else {
 		if (task->delay) {
 			task->delay = 0;
 			set_task_ready(task);
 			task->stat &= ~TASK_STAT_SUSPEND;
-			set_need_resched();
 		} else {
 			pr_warn("wrong task state s-%d ps-%d\n",
 					task->stat, task->pend_stat);
 		}
 	}
 
+	set_need_resched();
 	task_unlock(task);
 }
 
