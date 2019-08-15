@@ -259,7 +259,7 @@ __irq_handler:
 
 	mov	sp, arg1
 	mov	arg0, ct
-	bl	irq_handler_return	/* to check whether need switch to a new task */
+	bl	irq_return_handler	/* to check whether need switch to a new task */
 
 	ldr	arg5, =__next_tasks	/* check whether need to switch to a new task */
 	dsb	ld

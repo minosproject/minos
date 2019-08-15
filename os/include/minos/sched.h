@@ -26,9 +26,9 @@ struct pcpu {
 	 * by all cpus in the system, when access this
 	 * it need to using lock to avoid race condition
 	 */
+	spinlock_t lock;
 	struct list_head task_list;
 	struct list_head new_list;
-	spinlock_t lock;
 
 	/*
 	 * link to the task for the pcpu and the
@@ -38,11 +38,14 @@ struct pcpu {
 	 */
 	struct list_head ready_list;
 	struct list_head sleep_list;
-
 	struct task *idle_task;
 
-	uint64_t resched_ipi_send;
-	uint64_t resched_ipi_down;
+	int local_rdy_tasks;
+
+	void (*sched)(struct pcpu *pcpu, struct task *cur);
+	void (*irq_return_handler)(struct pcpu *pcpu, struct task *cur);
+	void (*switch_to_task)(struct pcpu *pcpu,
+			struct task *cur, struct task *next);
 };
 
 void pcpus_init(void);

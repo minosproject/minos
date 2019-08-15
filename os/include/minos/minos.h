@@ -39,10 +39,17 @@ static inline int taken_from_guest(gp_regs *regs)
 	return arch_taken_from_guest(regs);
 }
 
+#ifdef CONFIG_OS_REALTIME_CORE0
+#define kernel_lock_irqsave(flags)	local_irq_save(flags)
+#define kernel_unlock_irqrestore(flags) local_irq_restore(flags)
+#define kernel_lock()
+#define kernel_unlock()
+#else
 #define kernel_lock_irqsave(flags)	spin_lock_irqsave(&__kernel_lock, flags)
 #define kernel_unlock_irqrestore(flags) spin_unlock_irqrestore(&__kernel_lock, flags)
 #define kernel_lock()			raw_spin_lock(&__kernel_lock)
 #define kernel_unlock()			raw_spin_unlock(&__kernel_lock)
+#endif
 
 #define WARN(condition, format...) ({						\
 	int __ret_warn_on = !!(condition);				\
