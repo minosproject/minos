@@ -358,9 +358,9 @@ void switch_to_task(struct task *cur, struct task *next)
 	} else
 		sched_tick_disable();
 
-	do_hooks((void *)next, NULL, OS_HOOK_TASK_SWITCH_TO);
 	restore_task_context(next);
 
+	do_hooks((void *)next, NULL, OS_HOOK_TASK_SWITCH_TO);
 #ifdef CONFIG_VIRT
 	if (next->flags & TASK_FLAGS_VCPU)
 		enter_to_guest((struct vcpu *)next->pdata, NULL);
@@ -511,7 +511,7 @@ void irq_handler_return(struct task *task)
 	n = !(ti->flags & __TIF_NEED_RESCHED);
 
 	if (p || n)
-		return;
+		goto exit;
 
 	kernel_lock();
 
@@ -563,6 +563,11 @@ void irq_handler_return(struct task *task)
 
 out:
 	kernel_unlock();
+exit:
+#ifdef CONFIG_VIRT
+	if (next->flags & TASK_FLAGS_VCPU)
+		enter_to_guest((struct vcpu *)next->pdata, NULL);
+#endif
 }
 
 void irq_exit(gp_regs *regs)

@@ -62,6 +62,7 @@ static inline void set_vcpu_ready(struct vcpu *vcpu)
 	unsigned long flags;
 
 	local_irq_save(flags);
+	vcpu->task->stat = TASK_STAT_RDY;
 	set_task_ready(vcpu->task);
 	local_irq_restore(flags);
 }
