@@ -229,7 +229,7 @@ int virtual_timer_irq_handler(uint32_t irq, void *data)
 	 * since the pending request vtimer irq is set to
 	 * the timer
 	 */
-	if (!task_is_vcpu(vcpu->task)) {
+	if (vcpu && (!task_is_vcpu(vcpu->task))) {
 		write_sysreg32(0, CNTV_CTL_EL0);
 		return 0;
 	}
