@@ -27,7 +27,7 @@ void __might_sleep(const char *file, int line, int preempt_offset)
 			"do not call blocking ops when !TASK_RUNNING; "
 			"state=%d", current->stat);
 
-	if (preempt_allowed() && !irq_disabled() && !is_idle_task(current))
+	if (preempt_allowed() && !irq_disabled() && !task_is_idle(current))
 		return;
 
 	pr_err("BUG: sleeping function called from invalid context at %s:%d\n",

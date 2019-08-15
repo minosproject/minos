@@ -151,7 +151,7 @@ static int flag_task_ready(struct flag_node *node, flag_t flags)
 
 	task = node->task;
 
-	if (is_realtime_task(task) || (task->affinity == cpuid)) {
+	if (task_is_realtime(task) || (task->affinity == cpuid)) {
 		task_lock(task);
 		task->delay = 0;
 		task->flags_rdy = flags;

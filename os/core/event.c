@@ -62,7 +62,7 @@ void release_event(struct event *event)
 
 void event_task_wait(struct task *task, struct event *ev)
 {
-	if (is_realtime_task(task)) {
+	if (task_is_realtime(task)) {
 		ev->wait_grp |= task->bity;
 		ev->wait_tbl[task->by] |= task->bitx;
 	} else
@@ -71,7 +71,7 @@ void event_task_wait(struct task *task, struct event *ev)
 
 int event_task_remove(struct task *task, struct event *ev)
 {
-	int pending = is_task_pending(task);
+	int pending = task_is_pending(task);
 
 	/* if task has already timeout or deleted */
 	if ((task->prio > OS_LOWEST_PRIO)) {

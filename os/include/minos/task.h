@@ -70,7 +70,7 @@ struct task_event {
 		.flags = fl		\
 	}
 
-static int inline is_idle_task(struct task *task)
+static int inline task_is_idle(struct task *task)
 {
 	return (task->prio == OS_PRIO_IDLE);
 }
@@ -85,28 +85,28 @@ static inline prio_t get_task_prio(struct task *task)
 	return task->prio;
 }
 
-static inline int is_realtime_task(struct task *task)
+static inline int task_is_realtime(struct task *task)
 {
 	return (task->prio <= OS_LOWEST_PRIO);
 }
 
-static inline int is_percpu_task(struct task *task)
+static inline int task_is_percpu(struct task *task)
 {
 	return (task->prio == OS_PRIO_PCPU);
 }
 
-static inline int is_task_pending(struct task *task)
+static inline int task_is_pending(struct task *task)
 {
 	return ((task->stat & TASK_STAT_PEND_ANY) !=
 			TASK_STAT_RDY);
 }
 
-static inline int is_task_suspend(struct task *task)
+static inline int task_is_suspend(struct task *task)
 {
 	return !!(task->stat & TASK_STAT_SUSPEND);
 }
 
-static inline int is_task_ready(struct task *task)
+static inline int task_is_ready(struct task *task)
 {
 	return ((task->stat == TASK_STAT_RDY) ||
 			(task->stat == TASK_STAT_RUNNING));
@@ -151,7 +151,7 @@ struct task *pid_to_task(int pid);
 
 #define task_lock(task)					\
 	do {						\
-		if (is_realtime_task(task))		\
+		if (task_is_realtime(task))		\
 			kernel_lock();			\
 		else					\
 			raw_spin_lock(&task->lock);	\
@@ -159,7 +159,7 @@ struct task *pid_to_task(int pid);
 
 #define task_unlock(task)				\
 	do {						\
-		if (is_realtime_task(task)) 		\
+		if (task_is_realtime(task)) 		\
 			kernel_unlock();		\
 		else					\
 			raw_spin_unlock(&task->lock);	\
@@ -167,7 +167,7 @@ struct task *pid_to_task(int pid);
 
 #define task_lock_irqsave(task, flags)			\
 	do {						\
-		if (is_realtime_task(task)) 		\
+		if (task_is_realtime(task)) 		\
 			kernel_lock_irqsave(flags);	\
 		else					\
 			spin_lock_irqsave(&task->lock, flags);	\
@@ -175,7 +175,7 @@ struct task *pid_to_task(int pid);
 
 #define task_unlock_irqrestore(task, flags)		\
 	do {						\
-		if (is_realtime_task(task)) 		\
+		if (task_is_realtime(task)) 		\
 			kernel_unlock_irqrestore(flags);\
 		else					\
 			spin_unlock_irqrestore(&task->lock, flags);	\

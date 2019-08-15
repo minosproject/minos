@@ -60,7 +60,7 @@ static void smp_set_task_ready(void *data)
 	struct task *task = data;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	if ((current == data) || (is_task_ready(task)))
+	if ((current == data) || (task_is_ready(task)))
 		return;
 
 	task->stat = TASK_STAT_RDY;
@@ -78,7 +78,7 @@ static void smp_set_task_suspend(void *data)
 	struct task *task = data;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	if ((current == data) || (!is_task_ready(task)))
+	if ((current == data) || (!task_is_ready(task)))
 		return;
 
 	/*
@@ -99,10 +99,10 @@ void set_task_ready(struct task *task)
 	 * 1 - kernel sched lock is locked
 	 * 2 - the interrupt is disabled
 	 */
-	if (is_idle_task(task))
+	if (task_is_idle(task))
 		return;
 
-	if (is_realtime_task(task)) {
+	if (task_is_realtime(task)) {
 		os_rdy_grp |= task->bity;
 		os_rdy_table[task->by] |= task->bitx;
 	} else {
@@ -127,10 +127,10 @@ void set_task_sleep(struct task *task)
 {
 	struct pcpu *pcpu;
 
-	if (is_idle_task(task))
+	if (task_is_idle(task))
 		return;
 
-	if (is_realtime_task(task)) {
+	if (task_is_realtime(task)) {
 		os_rdy_table[task->by] &= ~task->bitx;
 		if (os_rdy_table[task->by] == 0)
 			os_rdy_grp &= ~task->bity;
@@ -328,7 +328,7 @@ void switch_to_task(struct task *cur, struct task *next)
 	 * to the sleep list of its affinity pcpu, then
 	 * check whether it suspend time is set or not
 	 */
-	if (!is_task_ready(cur)) {
+	if (!task_is_ready(cur)) {
 		if (cur->delay) {
 			mod_timer(&cur->delay_timer,
 				NOW() + MILLISECS(cur->delay));
@@ -336,7 +336,7 @@ void switch_to_task(struct task *cur, struct task *next)
 	}
 
 	/* set the current prio to the highest ready */
-	if (is_idle_task(next))
+	if (task_is_idle(next))
 		prio = OS_PRIO_PCPU;
 	else
 		prio = next->prio;
@@ -352,7 +352,7 @@ void switch_to_task(struct task *cur, struct task *next)
 	 * need to enable the sched timer for fifo task sched
 	 * otherwise disable it.
 	 */
-	if (is_percpu_task(next)) {
+	if (task_is_percpu(next)) {
 		sched_tick_enable(MILLISECS(next->run_time));
 		next->start_ns = NOW();
 	} else
@@ -409,7 +409,7 @@ static inline void recal_task_run_time(struct task *task, struct pcpu *pcpu)
 {
 	unsigned long now;
 
-	if (!is_percpu_task(task))
+	if (!task_is_percpu(task))
 		return;
 
 	now = (NOW() - task->start_ns) / 1000000;
@@ -449,7 +449,7 @@ void sched(void)
 	 * sched_new to get the next run task
 	 */
 	pcpu = get_per_cpu(pcpu, cpuid);
-	if (!is_task_ready(cur)) {
+	if (!task_is_ready(cur)) {
 		sched_flag = 1;
 		set_task_sleep(cur);
 	}
@@ -471,13 +471,13 @@ void sched(void)
 	 * out not because its run time is expries, then will
 	 * set it to the correct stat
 	 */
-	if (sched_flag || is_idle_task(cur))
+	if (sched_flag || task_is_idle(cur))
 		next = get_next_run_task(pcpu);
 
 	mb();
 
 	if (cur != next) {
-		if (is_task_ready(cur))
+		if (task_is_ready(cur))
 			recal_task_run_time(cur, pcpu);
 
 		set_next_task(next, cpuid);
@@ -521,7 +521,7 @@ void irq_handler_return(struct task *task)
 	 * if the task is suspend state, means next the cpu
 	 * will call sched directly, so do not sched out here
 	 */
-	if (!is_task_ready(task))
+	if (!task_is_ready(task))
 		goto out;
 
 #if 0
@@ -551,7 +551,7 @@ void irq_handler_return(struct task *task)
 	next = get_next_run_task(pcpu);
 	mb();
 	if (next != task) {
-		if (is_task_ready(task))
+		if (task_is_ready(task))
 			recal_task_run_time(task, pcpu);
 
 		set_next_task(next, cpuid);

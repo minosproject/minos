@@ -129,7 +129,7 @@ static void task_timeout_handler(unsigned long data)
 	 */
 	task_lock(task);
 
-	if (is_task_pending(task)) {
+	if (task_is_pending(task)) {
 		/* task is timeout and check its stat */
 		task->delay = 0;
 
@@ -266,7 +266,7 @@ static void task_ipi_event_handler(void *data)
 
 	task = ev->task;
 	if ((task->affinity != smp_processor_id()) ||
-			!is_percpu_task(task)) {
+			!task_is_percpu(task)) {
 		release_task_event(ev);
 		return;
 	}
@@ -276,7 +276,7 @@ static void task_ipi_event_handler(void *data)
 	switch (ev->action) {
 	case TASK_EVENT_EVENT_READY:
 		/* if the task has been timeout then skip it */
-		if (!is_task_pending(task))
+		if (!task_is_pending(task))
 			break;
 
 		task->msg = ev->msg;
@@ -288,7 +288,7 @@ static void task_ipi_event_handler(void *data)
 		break;
 
 	case TASK_EVENT_FLAG_READY:
-		if (!is_task_pending(task))
+		if (!task_is_pending(task))
 			break;
 
 		task->delay = 0;
@@ -379,7 +379,7 @@ int create_task(char *name, task_func_t func,
 		 * percpu task has already added the the
 		 * ready list
 		 */
-		if (is_realtime_task(task)) {
+		if (task_is_realtime(task)) {
 			kernel_lock_irqsave(flags);
 			set_task_ready(task);
 			kernel_unlock_irqrestore(flags);
@@ -390,7 +390,7 @@ int create_task(char *name, task_func_t func,
 		 * sched is running then resched the task
 		 * otherwise send a ipi to the task
 		 */
-		if (is_realtime_task(task)) {
+		if (task_is_realtime(task)) {
 			if (os_is_running())
 				sched();
 		} else {

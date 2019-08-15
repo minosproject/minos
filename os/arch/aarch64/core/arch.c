@@ -99,7 +99,7 @@ void arch_dump_stack(gp_regs *regs, unsigned long *stack)
 	unsigned long stack_base;
 	unsigned long fp, lr = 0;
 
-	if ((task) && !(is_idle_task(task))) {
+	if ((task) && !(task_is_idle(task))) {
 		pr_fatal("current task: pid:%d prio:%d name:%s\n",
 				get_task_pid(task), get_task_prio(task),
 				task->name);
