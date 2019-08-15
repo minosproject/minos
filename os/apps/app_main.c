@@ -47,7 +47,7 @@ void os_init(void)
 
 void apps_cpu0_init(void)
 {
-#if 0
+#if 1
 	create_realtime_task("rt-task-45", rt_task, (void *)45, 45, 0);
 	create_realtime_task("rt-task-44", rt_task, (void *)44, 44, 0);
 	create_realtime_task("rt-task-43", rt_task, (void *)43, 43, 0);
@@ -133,7 +133,7 @@ void test_task(void *data)
 		msleep(100);
 	}
 }
-//DEFINE_TASK_PERCPU("test task", test_task, NULL, 0);
+DEFINE_TASK_PERCPU("test task", test_task, NULL, 0);
 
 void test_task2(void *data)
 {
@@ -153,7 +153,7 @@ void test_task2(void *data)
 		msleep(100);
 	}
 }
-//DEFINE_TASK_PERCPU("test task2", test_task2, NULL, 0);
+DEFINE_TASK_PERCPU("test task2", test_task2, NULL, 0);
 
 void test_task3(void *data)
 {
@@ -163,4 +163,4 @@ void test_task3(void *data)
 		msleep(100);
 	}
 }
-//DEFINE_TASK_PERCPU("test task3", test_task3, NULL, 0);
+DEFINE_TASK_PERCPU("test task3", test_task3, NULL, 0);
