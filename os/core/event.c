@@ -119,10 +119,7 @@ static void inline event_task_ready(struct task *task, void *msg,
 	task->stat &= ~msk;
 	task->wait_event = NULL;
 
-	if (task->affinity != smp_processor_id())
-		pcpu_resched(task->affinity);
-	else
-		set_task_ready(task);
+	set_task_ready(task);
 }
 
 struct task *event_highest_task_ready(struct event *ev, void *msg,

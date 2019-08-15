@@ -19,8 +19,6 @@
 #include <minos/sched.h>
 #include <minos/irq.h>
 
-DEFINE_SPIN_LOCK(__kernel_lock);
-
 void __might_sleep(const char *file, int line, int preempt_offset)
 {
 	WARN_ONCE(current->stat != TASK_STAT_RUNNING,

@@ -25,6 +25,8 @@
 #include <virt/vm.h>
 #endif
 
+DEFINE_SPIN_LOCK(__kernel_lock);
+
 static prio_t os_rdy_grp;
 static uint64_t __os_rdy_table;
 static uint8_t *os_rdy_table;
@@ -134,7 +136,6 @@ void set_task_sleep(struct task *task)
 		os_rdy_table[task->by] &= ~task->bitx;
 		if (os_rdy_table[task->by] == 0)
 			os_rdy_grp &= ~task->bity;
-		dsb();
 	} else {
 		pcpu = get_cpu_var(pcpu);
 		if (pcpu->pcpu_id != task->affinity) {
