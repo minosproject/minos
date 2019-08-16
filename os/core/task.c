@@ -143,9 +143,6 @@ static void task_timeout_handler(unsigned long data)
 			task->delay = 0;
 			set_task_ready(task);
 			task->stat &= ~TASK_STAT_SUSPEND;
-		} else {
-			pr_warn("wrong task state s-%d ps-%d\n",
-					task->stat, task->pend_stat);
 		}
 	}
 

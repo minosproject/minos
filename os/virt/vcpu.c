@@ -167,7 +167,7 @@ int vcpu_off(struct vcpu *vcpu)
 	 * out
 	 */
 	vcpu->task->stat = TASK_STAT_STOPPED;
-	set_task_sleep(vcpu->task);
+	set_vcpu_suspend(vcpu);
 
 	sched();
 
@@ -460,6 +460,7 @@ void destroy_vm(struct vm *vm)
 
 void vcpu_power_off_call(void *data)
 {
+	int old_stat;
 	struct vcpu *vcpu = (struct vcpu *)data;
 
 	if (!vcpu)
@@ -471,8 +472,17 @@ void vcpu_power_off_call(void *data)
 		return;
 	}
 
+
+	old_stat = vcpu->task->stat;
 	vcpu->task->stat = TASK_STAT_STOPPED;
-	set_task_sleep(vcpu->task);
+
+	/* if the vcpu is current vcpu, sched will set it stat */
+	if ((old_stat != TASK_STAT_RDY) && (old_stat != TASK_STAT_RUNNING) &&
+			vcpu != get_current_vcpu())
+		set_vcpu_suspend(vcpu);
+
+	pr_info("power off vcpu-%d-%d done\n", get_vmid(vcpu),
+			get_vcpu_id(vcpu));
 
 	/*
 	 * *********** Note ****************
@@ -483,27 +493,25 @@ void vcpu_power_off_call(void *data)
 	 */
 	if (vcpu == get_current_vcpu())
 		sched();
-
-	pr_info("power off vcpu-%d-%d done\n", get_vmid(vcpu),
-			get_vcpu_id(vcpu));
 }
 
 int vcpu_power_off(struct vcpu *vcpu, int timeout)
 {
+	/*
+	 * since the vcpu will not sched on other
+	 * cpus which its affinity, so the this
+	 * function can called directly
+	 */
 	int cpuid = smp_processor_id();
 
-	if (!vcpu)
-		return -EINVAL;
-
-	if (vcpu->task->affinity != cpuid) {
+	if (vcpu_affinity(vcpu) != cpuid) {
 		pr_debug("call vcpu_power_off_call for vcpu-%s\n",
 				vcpu->task->name);
 		return smp_function_call(vcpu->task->affinity,
 				vcpu_power_off_call, (void *)vcpu, 1);
 	} else {
+		/* just set it stat then force sched to another task */
 		vcpu->task->stat = TASK_STAT_STOPPED;
-		set_vcpu_suspend(vcpu);
-
 		pr_info("power off vcpu-%d-%d done\n", get_vmid(vcpu),
 				get_vcpu_id(vcpu));
 		sched();

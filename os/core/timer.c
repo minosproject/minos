@@ -60,7 +60,7 @@ static void run_timer_softirq(struct softirq_action *h)
 		}
 
 		if (atomic_read(&timer->del_request)) {
-			pr_info("timer has been deleted\n");
+			pr_debug("timer has been deleted\n");
 			list_del(&timer->entry);
 			timer->entry.next = NULL;
 			continue;

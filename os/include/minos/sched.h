@@ -38,6 +38,7 @@ struct pcpu {
 	 */
 	struct list_head ready_list;
 	struct list_head sleep_list;
+	struct list_head stop_list;
 	struct task *idle_task;
 
 	int local_rdy_tasks;
@@ -60,5 +61,6 @@ void set_task_sleep(struct task *task);
 struct task *get_highest_task(uint8_t group, prio_t *ready);
 void irq_enter(gp_regs *regs);
 void irq_exit(gp_regs *regs);
+void sched_task(struct task *task);
 
 #endif

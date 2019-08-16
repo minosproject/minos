@@ -29,6 +29,8 @@ struct task_event {
 	flag_t flags;
 };
 
+#define task_info(task)	((struct task_info *)task->stack_origin)
+
 #define TASK_INFO_INIT(__ti, task, c) \
 	do {		\
 		__ti->cpu = c; \
@@ -149,16 +151,6 @@ struct task_event *alloc_task_event(void);
 void release_task_event(struct task_event *event);
 struct task *pid_to_task(int pid);
 
-#ifdef CONFIG_OS_REALTIME_CORE0
-#define task_lock(task)		raw_spin_lock(&task->lock)
-#define task_unlock(task)	raw_spin_unlock(&task->lock);
-
-#define task_lock_irqsave(task, flags) \
-	spin_lock_irqsave(&task->lock, falgs)
-
-#define task_unlock_irqrestore(task, flags) \
-	spin_unlock_irqrestore(&task->lock, flags)
-#else
 #define task_lock(task)					\
 	do {						\
 		if (task_is_realtime(task))		\
@@ -190,6 +182,5 @@ struct task *pid_to_task(int pid);
 		else					\
 			spin_unlock_irqrestore(&task->lock, flags);	\
 	} while (0)
-#endif
 
 #endif

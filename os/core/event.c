@@ -74,7 +74,7 @@ int event_task_remove(struct task *task, struct event *ev)
 	int pending = task_is_pending(task);
 
 	/* if task has already timeout or deleted */
-	if ((task->prio > OS_LOWEST_PRIO)) {
+	if (!task_is_realtime(task)) {
 		if (task->event_list.next != NULL) {
 			list_del(&task->event_list);
 			task->event_list.next = NULL;

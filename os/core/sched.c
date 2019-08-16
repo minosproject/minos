@@ -73,6 +73,7 @@ static void smp_set_task_ready(void *data)
 	task->stat = TASK_STAT_RDY;
 	list_del(&task->stat_list);
 	list_add(&pcpu->ready_list, &task->stat_list);
+	pcpu->local_rdy_tasks++;
 
 	if (task->delay) {
 		del_timer(&task->delay_timer);
@@ -95,6 +96,7 @@ static void smp_set_task_suspend(void *data)
 	task->stat |= TASK_STAT_SUSPEND;
 	list_del(&task->stat_list);
 	list_add(&pcpu->sleep_list, &task->stat_list);
+	pcpu->local_rdy_tasks--;
 }
 
 void set_task_ready(struct task *task)
@@ -122,6 +124,7 @@ void set_task_ready(struct task *task)
 
 		list_del(&task->stat_list);
 		list_add(&pcpu->ready_list, &task->stat_list);
+		pcpu->local_rdy_tasks++;
 	}
 
 	if (task->delay) {
@@ -151,6 +154,7 @@ void set_task_sleep(struct task *task)
 
 		list_del(&task->stat_list);
 		list_add(&pcpu->sleep_list, &task->stat_list);
+		pcpu->local_rdy_tasks--;
 	}
 }
 
@@ -360,8 +364,10 @@ void local_switch_to_task(struct pcpu *pcpu,
 
 }
 
-void switch_to_task(struct pcpu *pcpu, struct task *cur, struct task *next)
+void switch_to_task(struct task *cur, struct task *next)
 {
+	struct pcpu *pcpu = get_cpu_var(pcpu);
+
 	/* save the task contex for the current task */
 	save_task_context(cur);
 
@@ -378,6 +384,9 @@ void switch_to_task(struct pcpu *pcpu, struct task *cur, struct task *next)
 		}
 	}
 
+	if (cur->stat == TASK_STAT_RUNNING)
+		cur->stat = TASK_STAT_RDY;
+
 	pcpu->switch_to_task(pcpu, cur, next);
 
 	/*
@@ -385,8 +394,6 @@ void switch_to_task(struct pcpu *pcpu, struct task *cur, struct task *next)
 	 * need to enable the sched timer for fifo task sched
 	 * otherwise disable it.
 	 */
-	next->start_ns = NOW();
-
 	if (task_is_percpu(next)) {
 		if (pcpu->local_rdy_tasks > 1)
 			sched_tick_enable(MILLISECS(next->run_time));
@@ -396,7 +403,12 @@ void switch_to_task(struct pcpu *pcpu, struct task *cur, struct task *next)
 
 	restore_task_context(next);
 
+	next->start_ns = NOW();
+	next->stat = TASK_STAT_RUNNING;
+	task_info(next)->cpu = pcpu->pcpu_id;
+
 	do_hooks((void *)next, NULL, OS_HOOK_TASK_SWITCH_TO);
+
 #ifdef CONFIG_VIRT
 	if (next->flags & TASK_FLAGS_VCPU)
 		enter_to_guest((struct vcpu *)next->pdata, NULL);
@@ -551,6 +563,36 @@ void sched(void)
 	preempt_enable();
 }
 
+void sched_task(struct task *task)
+{
+	unsigned long flags;
+	int t_cpu, s_cpu, smp_resched = 0;
+
+	/*
+	 * check whether this task can be sched on this
+	 * cpu, since there may some pcpu do not sched
+	 * the realtime task, if the realtime task is
+	 * sleep on other cpu need to send a resched signal
+	 */
+	local_irq_save(flags);
+	s_cpu = smp_processor_id();
+
+	if (task_is_realtime(task))
+		t_cpu = task_info(task)->cpu;
+	else
+		t_cpu = task->affinity;
+
+	if ((t_cpu != s_cpu) && pcpu_sched_class[s_cpu] != SCHED_CLASS_GLOBAL)
+		smp_resched = 1;
+
+	local_irq_restore(flags);
+
+	if (smp_resched)
+		pcpu_resched(t_cpu);
+	else
+		sched();
+}
+
 void irq_enter(gp_regs *regs)
 {
 	do_hooks(get_current_task(), (void *)regs,
@@ -577,7 +619,7 @@ void local_irq_return_handler(struct pcpu *pcpu, struct task *task)
 
 	recal_task_run_time(task, pcpu);
 	set_next_task(next, pcpu->pcpu_id);
-	switch_to_task(pcpu, task, next);
+	switch_to_task(task, next);
 }
 
 void global_irq_return_handler(struct pcpu *pcpu, struct task *task)
@@ -617,7 +659,7 @@ void global_irq_return_handler(struct pcpu *pcpu, struct task *task)
 	if (next != task) {
 		recal_task_run_time(task, pcpu);
 		set_next_task(next, cpuid);
-		switch_to_task(pcpu, task, next);
+		switch_to_task(task, next);
 		mb();
 
 		return;
@@ -679,7 +721,7 @@ static void *of_setup_pcpu(struct device_node *node, void *data)
 	if (node->class != DT_CLASS_CPU)
 		return NULL;
 
-	if (of_get_u64_array(node, "reg", &affinity, 1))
+	if (!of_get_u64_array(node, "reg", &affinity, 1))
 		return NULL;
 
 	cpuid = affinity_to_cpuid(affinity);
@@ -687,7 +729,9 @@ static void *of_setup_pcpu(struct device_node *node, void *data)
 		return NULL;
 
 	memset(class, 0, 16);
-	of_get_string(node, "sched_class", class, 15);
+	if (!of_get_string(node, "sched_class", class, 15))
+		return NULL;
+
 	pr_info("sched class of pcpu-%d: %s\n", cpuid, class);
 
 	if (!strcmp(class, "local")) {
@@ -696,6 +740,8 @@ static void *of_setup_pcpu(struct device_node *node, void *data)
 		pcpu->switch_to_task = local_switch_to_task;
 		pcpu->irq_return_handler = local_irq_return_handler;
 		pcpu_sched_class[cpuid] = SCHED_CLASS_LOCAL;
+	} else {
+		pr_warn("unsupport sched class\n");
 	}
 
 	return node;
@@ -713,6 +759,7 @@ void pcpus_init(void)
 		init_list(&pcpu->ready_list);
 		init_list(&pcpu->sleep_list);
 		init_list(&pcpu->new_list);
+		init_list(&pcpu->stop_list);
 		pcpu->pcpu_id = i;
 		get_per_cpu(pcpu, i) = pcpu;
 		spin_lock_init(&pcpu->lock);

@@ -124,9 +124,8 @@ int vm_power_up(int vmid)
 {
 	struct vm *vm = get_vm_by_id(vmid);
 
-	if (vm == NULL) {
+	if (vm == NULL)
 		return -ENOENT;
-	}
 
 	vm_vcpus_init(vm);
 	vm->state = VM_STAT_ONLINE;
@@ -154,11 +153,7 @@ static int __vm_power_off(struct vm *vm, void *args)
 	vm_for_each_vcpu(vm, vcpu) {
 		ret = vcpu_power_off(vcpu, 1000);
 		if (ret)
-			pr_warn("power off vcpu-%d failed\n",
-					vcpu->vcpu_id);
-#if 0
-		pcpu_remove_vcpu(vcpu->affinity, vcpu);
-#endif
+			pr_warn("power off vcpu-%d failed\n", vcpu->vcpu_id);
 	}
 
 	if (args == NULL) {

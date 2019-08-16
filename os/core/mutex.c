@@ -218,8 +218,8 @@ int mutex_post(mutex_t *m)
 		mb();
 
 		spin_unlock(&m->lock);
+		sched_task(task);
 
-		sched();
 		return 0;
 	}
 
