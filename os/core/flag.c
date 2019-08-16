@@ -145,6 +145,7 @@ flag_t flag_accept(struct flag_grp *grp, flag_t flags, int wait_type)
 static int flag_task_ready(struct flag_node *node, flag_t flags)
 {
 	int sched = 0;
+#if 0
 	struct task *task;
 	int cpuid = smp_processor_id();
 	struct task_event *tevent;
@@ -175,7 +176,7 @@ static int flag_task_ready(struct flag_node *node, flag_t flags)
 
 		task_ipi_event(task, tevent, 0);
 	}
-
+#endif
 	return sched;
 }
 

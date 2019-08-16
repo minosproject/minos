@@ -27,37 +27,9 @@ struct task *os_task_table[OS_NR_TASKS];
 
 static atomic_t os_task_nr;
 
-#define NR_TASK_EVENT	32
-static DEFINE_SPIN_LOCK(task_event_lock);
-static struct task_event task_events[NR_TASK_EVENT];
-static DECLARE_BITMAP(task_event_map, NR_TASK_EVENT);
-
 /* idle task needed be static defined */
 static struct task idle_tasks[NR_CPUS];
 static DEFINE_PER_CPU(struct task *, idle_task);
-
-struct task_event *alloc_task_event(void)
-{
-	int bit;
-	struct task_event *event = NULL;
-	unsigned long flags;
-
-	spin_lock_irqsave(&task_event_lock, flags);
-	bit = find_next_zero_bit(task_event_map, NR_TASK_EVENT, 0);
-	if (bit < NR_TASK_EVENT) {
-		set_bit(bit, task_event_map);
-		event = &task_events[bit];
-	}
-
-	spin_unlock_irqrestore(&task_event_lock, flags);
-
-	return event;
-}
-
-void release_task_event(struct task_event *event)
-{
-	clear_bit(event->id, task_event_map);
-}
 
 int alloc_pid(prio_t prio, int cpuid)
 {
@@ -251,67 +223,6 @@ static void task_create_hook(struct task *task)
 	do_hooks((void *)task, NULL, OS_HOOK_CREATE_TASK);
 }
 
-static void task_ipi_event_handler(void *data)
-{
-	struct task *task;
-	struct task_event *ev = (struct task_event *)data;
-
-	if (data == NULL)
-		pr_err("got invalid argument in %s\n", __func__);
-
-	task = ev->task;
-	if ((task->affinity != smp_processor_id()) ||
-			!task_is_percpu(task)) {
-		release_task_event(ev);
-		return;
-	}
-
-	task_lock(task);
-
-	switch (ev->action) {
-	case TASK_EVENT_EVENT_READY:
-		/* if the task has been timeout then skip it */
-		if (!task_is_pending(task))
-			break;
-
-		task->msg = ev->msg;
-		task->stat &= ~ev->msk;
-		task->wait_event = NULL;
-
-		set_task_ready(task);
-		set_need_resched();
-		break;
-
-	case TASK_EVENT_FLAG_READY:
-		if (!task_is_pending(task))
-			break;
-
-		task->delay = 0;
-		task->flags_rdy = ev->flags;
-		task->stat &= ev->msk;
-
-		set_need_resched();
-		break;
-
-	default:
-		break;
-	}
-
-	/*
-	 * set resched flag according to the current prio
-	 * BUG - Do not free memory in interrupt, need to
-	 * fix it
-	 */
-	task_unlock(task);
-	release_task_event(ev);
-}
-
-int task_ipi_event(struct task *task, struct task_event *ev, int wait)
-{
-	return smp_function_call(task->affinity,
-			task_ipi_event_handler, (void *)ev, wait);
-}
-
 int release_task(struct task *task)
 {
 	return 0;
@@ -497,14 +408,3 @@ int create_vcpu_task(char *name, task_func_t func,
 	return create_task(name, func, arg, OS_PRIO_PCPU,
 			aff, flags | TASK_FLAGS_VCPU);
 }
-
-static int task_events_init(void)
-{
-	int i;
-
-	for (i = 0; i < NR_TASK_EVENT; i++)
-		task_events[i].id = i;
-
-	return 0;
-}
-module_initcall(task_events_init);
