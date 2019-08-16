@@ -152,7 +152,7 @@ static void task_init(struct task *task, char *name,
 
 	task->pend_stat = 0;
 	if (task->flags & TASK_FLAGS_VCPU)
-		task->stat = TASK_STAT_SUSPEND;
+		task->stat = TASK_STAT_STOPPED;
 	else
 		task->stat = TASK_STAT_RDY;
 

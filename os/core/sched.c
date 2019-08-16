@@ -67,10 +67,9 @@ static void smp_set_task_ready(void *data)
 	struct task *task = data;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	if ((current == data) || (task_is_ready(task)))
+	if ((current == data))
 		return;
 
-	task->stat = TASK_STAT_RDY;
 	list_del(&task->stat_list);
 	list_add(&pcpu->ready_list, &task->stat_list);
 	pcpu->local_rdy_tasks++;
@@ -86,14 +85,13 @@ static void smp_set_task_suspend(void *data)
 	struct task *task = data;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	if ((current == data) || (!task_is_ready(task)))
+	if ((current == data))
 		return;
 
 	/*
 	 * fix me - when the task is pending to wait
 	 * a mutex or sem, how to deal ?
 	 */
-	task->stat |= TASK_STAT_SUSPEND;
 	list_del(&task->stat_list);
 	list_add(&pcpu->sleep_list, &task->stat_list);
 	pcpu->local_rdy_tasks--;
@@ -817,10 +815,8 @@ int resched_handler(uint32_t irq, void *data)
 		list_del(&task->stat_list);
 		if (task->stat == TASK_STAT_RDY)
 			list_add_tail(&pcpu->ready_list, &task->stat_list);
-		else if (task->stat == TASK_STAT_SUSPEND)
-			list_add_tail(&pcpu->sleep_list, &task->stat_list);
 		else
-			pr_err("wrong task state when create this task\n");
+			list_add_tail(&pcpu->sleep_list, &task->stat_list);
 	}
 	spin_unlock(&pcpu->lock);
 

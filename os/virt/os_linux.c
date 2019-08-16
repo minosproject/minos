@@ -39,6 +39,8 @@ static void linux_vcpu_init(struct vcpu *vcpu)
 			regs->x1 = 2272;		/* arm vexpress machine type */
 			regs->x2 = (uint64_t)vcpu->vm->setup_data;
 		}
+
+		vcpu_online(vcpu);
 	}
 }
 

@@ -352,10 +352,6 @@ int vm_vcpus_init(struct vm *vm)
 		task_vmodules_init(vcpu->task);
 		vm->os->ops->vcpu_init(vcpu);
 
-		/* only when the vm is offline state do this */
-		if (vm->state == VM_STAT_OFFLINE)
-			set_vcpu_ready(vcpu);
-
 		if (!vm_is_native(vm)) {
 			vcpu->vmcs->host_index = 0;
 			vcpu->vmcs->guest_index = 0;

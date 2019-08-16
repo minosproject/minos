@@ -160,7 +160,7 @@ void cpu_idle(void)
 		list_del(&task->stat_list);
 		if (task->stat == TASK_STAT_RDY)
 			list_add_tail(&pcpu->ready_list, &task->stat_list);
-		else if (task->stat == TASK_STAT_SUSPEND)
+		else
 			list_add_tail(&pcpu->sleep_list, &task->stat_list);
 	}
 	spin_unlock_irqrestore(&pcpu->lock, flags);
