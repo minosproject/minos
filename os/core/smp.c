@@ -54,13 +54,13 @@ static void inline smp_call_lock(struct smp_call *call)
 		pr_warn("smp call is already locked\n");
 
 	call->flags |= SMP_CALL_LOCKED;
-	dsb();
+	wmb();
 }
 
 static void inline smp_call_unlock(struct smp_call *call)
 {
 	call->flags &= ~SMP_CALL_LOCKED;
-	dsb();
+	wmb();
 }
 
 int is_cpus_all_up(void)
@@ -70,10 +70,13 @@ int is_cpus_all_up(void)
 
 int smp_function_call(int cpu, smp_function fn, void *data, int wait)
 {
-	int cpuid = smp_processor_id();
+	int cpuid;
 	struct smp_call *call;
 	struct smp_call_data *cd;
 	unsigned long flags;
+
+	preempt_disable();
+	cpuid = smp_processor_id();
 
 	if (cpu >= NR_CPUS)
 		return -EINVAL;
@@ -83,6 +86,7 @@ int smp_function_call(int cpu, smp_function fn, void *data, int wait)
 		local_irq_save(flags);
 		fn(data);
 		local_irq_restore(flags);
+		preempt_enable();
 		return 0;
 	}
 
@@ -99,10 +103,12 @@ int smp_function_call(int cpu, smp_function fn, void *data, int wait)
 	if (wait)
 		smp_call_wait(call);
 
+	preempt_enable();
+
 	return 0;
 }
 
-int smp_function_call_handler(uint32_t irq, void *data)
+static int smp_function_call_handler(uint32_t irq, void *data)
 {
 	int i;
 	struct smp_call_data *cd;
