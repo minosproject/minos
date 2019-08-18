@@ -314,7 +314,7 @@ static int vm_resume(struct vm *vm)
 		resume_task_vmodule_state(vcpu->task);
 	}
 
-	do_hooks((void *)vm, NULL, OS_HOOK_TYPE_RESUME_VM);
+	do_hooks((void *)vm, NULL, OS_HOOK_RESUME_VM);
 	trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
 			VMTRAP_REASON_VM_RESUMED, 0, NULL);
 
@@ -349,7 +349,7 @@ static int __vm_suspend(struct vm *vm)
 			VMTRAP_REASON_VM_SUSPEND, 0, NULL);
 
 	/* call the hooks for suspend */
-	do_hooks((void *)vm, NULL, OS_HOOK_TYPE_SUSPEND_VM);
+	do_hooks((void *)vm, NULL, OS_HOOK_SUSPEND_VM);
 
 	set_task_suspend(0);
 	sched();

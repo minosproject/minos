@@ -619,7 +619,7 @@ void sched_task(struct task *task)
 void irq_enter(gp_regs *regs)
 {
 	do_hooks(get_current_task(), (void *)regs,
-			OS_HOOK_TYPE_ENTER_IRQ);
+			OS_HOOK_ENTER_IRQ);
 
 #ifdef CONFIG_VIRT
 	if (taken_from_guest(regs))

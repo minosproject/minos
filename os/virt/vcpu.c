@@ -419,7 +419,7 @@ void destroy_vm(struct vm *vm)
 			vdev->deinit(vdev);
 	}
 
-	do_hooks((void *)vm, NULL, OS_HOOK_TYPE_DESTROY_VM);
+	do_hooks((void *)vm, NULL, OS_HOOK_DESTROY_VM);
 
 	if (vm->vcpus) {
 		for (i = 0; i < vm->vcpu_nr; i++) {
@@ -552,7 +552,7 @@ struct vm *create_vm(struct vmtag *vme)
 		goto release_vm;
 	}
 
-	if (do_hooks((void *)vm, NULL, OS_HOOK_TYPE_CREATE_VM)) {
+	if (do_hooks((void *)vm, NULL, OS_HOOK_CREATE_VM)) {
 		pr_err("create vm failed in hook function\n");
 		goto release_vm;
 	}

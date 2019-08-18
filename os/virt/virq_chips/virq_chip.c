@@ -110,9 +110,9 @@ int virqchip_get_virq_state(struct vcpu *vcpu, struct virq_desc *virq)
 static int virqchip_init(void)
 {
 	register_hook(virqchip_enter_to_guest,
-			OS_HOOK_TYPE_ENTER_TO_GUEST);
+			OS_HOOK_ENTER_TO_GUEST);
 	register_hook(virqchip_exit_from_guest,
-			OS_HOOK_TYPE_EXIT_FROM_GUEST);
+			OS_HOOK_EXIT_FROM_GUEST);
 	return 0;
 }
 subsys_initcall(virqchip_init);
