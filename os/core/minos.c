@@ -102,9 +102,7 @@ void boot_main(void *setup_data)
 
 void boot_secondary(void)
 {
-	uint32_t cpuid = smp_processor_id();
-
-	pr_info("cpu-%d is up\n", cpuid);
+	pr_info("cpu-%d is up\n", smp_processor_id());
 
 	/*
 	 * need wait for all cpus up then excuted below

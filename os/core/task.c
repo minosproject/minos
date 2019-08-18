@@ -264,8 +264,8 @@ int create_task(char *name, task_func_t func,
 	 * the task has been finish all the related init things
 	 */
 	if ((aff < NR_CPUS) && (prio == OS_PRIO_PCPU)) {
-		pcpu = get_per_cpu(pcpu, aff);
 		spin_lock_irqsave(&pcpu->lock, flags);
+		pcpu = get_per_cpu(pcpu, aff);
 		list_add_tail(&pcpu->task_list, &task->list);
 		if (aff == smp_processor_id())
 			list_add_tail(&pcpu->ready_list, &task->stat_list);

@@ -67,8 +67,15 @@ static void smp_set_task_ready(void *data)
 	struct task *task = data;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	if ((current == data))
+	/*
+	 * current is the task, means the task has already
+	 * set to ready stat, there may some mistake that
+	 * make this case happend, need to check
+	 */
+	if ((current == task) || !task_is_ready(task)) {
+		pr_warn("%s wrong stat %d\n", __func__, task->stat);
 		return;
+	}
 
 	list_del(&task->stat_list);
 	list_add(&pcpu->ready_list, &task->stat_list);
@@ -85,8 +92,10 @@ static void smp_set_task_suspend(void *data)
 	struct task *task = data;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	if ((current == data))
+	if ((current == task) || task_is_ready(task)) {
+		pr_warn("%s wrong stat %d\n", __func__, task->stat);
 		return;
+	}
 
 	/*
 	 * fix me - when the task is pending to wait
@@ -103,7 +112,7 @@ void set_task_ready(struct task *task)
 
 	/*
 	 * when call this function need to ensure :
-	 * 1 - kernel sched lock is locked
+	 * 1 - kernel sched lock is locked (rt task)
 	 * 2 - the interrupt is disabled
 	 */
 	if (task_is_idle(task))
@@ -187,9 +196,8 @@ static int has_high_prio(prio_t prio, prio_t *array, int *map)
 		if (map[i] == 1)
 			continue;
 
-		if (prio == array[i]) {
+		if (prio == array[i])
 			return 1;
-		}
 	}
 
 	return 0;
@@ -337,7 +345,7 @@ static inline void restore_task_context(struct task *task)
 	restore_task_vmodule_state(task);
 }
 
-void global_switch_to_task(struct pcpu *pcpu,
+static void global_switch_out(struct pcpu *pcpu,
 		struct task *cur, struct task *next)
 {
 	int cpuid = pcpu->pcpu_id;
@@ -356,7 +364,19 @@ void global_switch_to_task(struct pcpu *pcpu,
 	kernel_unlock();
 }
 
-void local_switch_to_task(struct pcpu *pcpu,
+static void local_switch_out(struct pcpu *pcpu,
+		struct task *cur, struct task *next)
+{
+
+}
+
+static void global_switch_to(struct pcpu *pcpu,
+		struct task *cur, struct task *next)
+{
+
+}
+
+static void local_switch_to(struct pcpu *pcpu,
 		struct task *cur, struct task *next)
 {
 
@@ -371,9 +391,7 @@ void switch_to_task(struct task *cur, struct task *next)
 
 	/*
 	 * check the current task's stat and do some action
-	 * to it, first if it is a percpu task, then put it
-	 * to the sleep list of its affinity pcpu, then
-	 * check whether it suspend time is set or not
+	 * to it, check whether it suspend time is set or not
 	 */
 	if (!task_is_ready(cur)) {
 		if (cur->delay) {
@@ -385,7 +403,8 @@ void switch_to_task(struct task *cur, struct task *next)
 	if (cur->stat == TASK_STAT_RUNNING)
 		cur->stat = TASK_STAT_RDY;
 
-	pcpu->switch_to_task(pcpu, cur, next);
+	do_hooks((void *)next, NULL, OS_HOOK_TASK_SWITCH_OUT);
+	pcpu->switch_out(pcpu, cur, next);
 
 	/*
 	 * if the next running task prio is OS_PRIO_PCPU, it
@@ -406,6 +425,7 @@ void switch_to_task(struct task *cur, struct task *next)
 	task_info(next)->cpu = pcpu->pcpu_id;
 
 	do_hooks((void *)next, NULL, OS_HOOK_TASK_SWITCH_TO);
+	pcpu->switch_to(pcpu, cur, next);
 
 #ifdef CONFIG_VIRT
 	if (next->flags & TASK_FLAGS_VCPU)
@@ -442,6 +462,11 @@ unsigned long sched_tick_handler(unsigned long data)
 		return 0;
 	}
 
+	/*
+	 * if the preempt is disable at this time, what will
+	 * happend if the task is not on the head of the pcpu's
+	 * ready list ? need further check.
+	 */
 	list_del(&task->stat_list);
 	list_add_tail(&pcpu->ready_list, &task->stat_list);
 	task->run_time = CONFIG_TASK_RUN_TIME;
@@ -602,7 +627,7 @@ void irq_enter(gp_regs *regs)
 #endif
 }
 
-void local_irq_return_handler(struct pcpu *pcpu, struct task *task)
+static void local_irq_handler(struct pcpu *pcpu, struct task *task)
 {
 	struct task *next;
 
@@ -620,7 +645,7 @@ void local_irq_return_handler(struct pcpu *pcpu, struct task *task)
 	switch_to_task(task, next);
 }
 
-void global_irq_return_handler(struct pcpu *pcpu, struct task *task)
+static void global_irq_handler(struct pcpu *pcpu, struct task *task)
 {
 	int i;
 	struct task *next = task;
@@ -696,7 +721,7 @@ void irq_return_handler(struct task *task)
 
 
 	clear_bit(TIF_NEED_RESCHED, &ti->flags);
-	pcpu->irq_return_handler(pcpu, task);
+	pcpu->irq_handler(pcpu, task);
 }
 
 void irq_exit(gp_regs *regs)
@@ -735,8 +760,9 @@ static void *of_setup_pcpu(struct device_node *node, void *data)
 	if (!strcmp(class, "local")) {
 		pcpu = get_per_cpu(pcpu, cpuid);
 		pcpu->sched = local_sched;
-		pcpu->switch_to_task = local_switch_to_task;
-		pcpu->irq_return_handler = local_irq_return_handler;
+		pcpu->switch_out = local_switch_out;
+		pcpu->switch_to = local_switch_to;
+		pcpu->irq_handler = local_irq_handler;
 		pcpu_sched_class[cpuid] = SCHED_CLASS_LOCAL;
 	} else {
 		pr_warn("unsupport sched class\n");
@@ -769,19 +795,22 @@ void pcpus_init(void)
 #ifdef CONFIG_OS_REALTIME_CORE0
 		if (i == 0) {
 			pcpu->sched = global_sched;
-			pcpu->switch_to_task = global_switch_to_task;
-			pcpu->irq_return_handler = global_irq_return_handler;
+			pcpu->switch_out = global_switch_out;
+			pcpu->switch_to = global_switch_to;
+			pcpu->irq_handler = global_irq_handler;
 			pcpu_sched_class[i] = SCHED_CLASS_GLOBAL;
 		} else {
 			pcpu->sched = local_sched;
-			pcpu->switch_to_task = local_switch_to_task;
-			pcpu->irq_return_handler = local_irq_return_handler;
+			pcpu->switch_out = local_switch_out;
+			pcpu->switch_to = local_switch_to;
+			pcpu->irq_handler = local_irq_handler;
 			pcpu_sched_class[i] = SCHED_CLASS_LOCAL;
 		}
 #else
 		pcpu->sched = global_sched;
-		pcpu->switch_to_task = global_switch_to_task;
-		pcpu->irq_return_handler = global_irq_return_handler;
+		pcpu->switch_out = global_switch_out;
+		pcpu->switch_to = global_switch_to;
+		pcpu->irq_handler = global_irq_handler;
 		pcpu_sched_class[i] = SCHED_CLASS_GLOBAL;
 #endif
 	}
@@ -819,21 +848,6 @@ int resched_handler(uint32_t irq, void *data)
 			list_add_tail(&pcpu->sleep_list, &task->stat_list);
 	}
 	spin_unlock(&pcpu->lock);
-
-	/*
-	 * scan all the sleep list to see which percpu task
-	 * need to change the stat
-	 */
-	list_for_each_entry_safe(task, n, &pcpu->sleep_list, stat_list) {
-		if (task->stat == TASK_STAT_RDY) {
-			list_del(&task->stat_list);
-			list_add_tail(&pcpu->ready_list, &task->stat_list);
-			if (task->delay) {
-				task->delay = 0;
-				del_timer(&task->delay_timer);
-			}
-		}
-	}
 
 	set_need_resched();
 

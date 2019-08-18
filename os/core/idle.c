@@ -113,8 +113,6 @@ static void os_clean(void)
 
 void cpu_idle(void)
 {
-	unsigned long flags;
-	struct task *task, *n;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
 	switch (pcpu->pcpu_id) {
@@ -150,23 +148,11 @@ void cpu_idle(void)
 		break;
 	}
 
-	/*
-	 * scan the new task list to find if there are
-	 * some tasks has been created but not add to the
-	 * ready or sleep list
-	 */
-	spin_lock_irqsave(&pcpu->lock, flags);
-	list_for_each_entry_safe(task, n, &pcpu->new_list, stat_list) {
-		list_del(&task->stat_list);
-		if (task->stat == TASK_STAT_RDY)
-			list_add_tail(&pcpu->ready_list, &task->stat_list);
-		else
-			list_add_tail(&pcpu->sleep_list, &task->stat_list);
-	}
-	spin_unlock_irqrestore(&pcpu->lock, flags);
-
 	set_os_running();
 	local_irq_enable();
+
+	/* send a irq to itself for the precpu task */
+	pcpu_resched(pcpu->pcpu_id);
 
 	while (1) {
 		sched();

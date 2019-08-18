@@ -43,10 +43,13 @@ struct pcpu {
 
 	int local_rdy_tasks;
 
+	/* sched class callback for each pcpu */
 	void (*sched)(struct pcpu *pcpu, struct task *cur);
-	void (*irq_return_handler)(struct pcpu *pcpu, struct task *cur);
-	void (*switch_to_task)(struct pcpu *pcpu,
+	void (*irq_handler)(struct pcpu *pcpu, struct task *cur);
+	void (*switch_out)(struct pcpu *pcpu,
 			struct task *cur, struct task *next);
+	void (*switch_to)(struct pcpu *pcpu, struct task *cur,
+			struct task *next);
 };
 
 void pcpus_init(void);
