@@ -86,17 +86,15 @@ void boot_main(void *setup_data)
 
 	vmodules_init();
 
-#ifdef CONFIG_VIRT
-	virt_init();
-#endif
-
 	device_init();
 	device_init_percpu();
 
 	create_idle_task();
 
 	smp_cpus_up();
-
+#ifdef CONFIG_VIRT
+	virt_init();
+#endif
 	cpu_idle();
 }
 

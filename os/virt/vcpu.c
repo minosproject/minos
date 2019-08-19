@@ -61,19 +61,30 @@ static inline void set_vcpu_ready(struct vcpu *vcpu)
 {
 	unsigned long flags;
 
-	local_irq_save(flags);
+	task_lock_irqsave(vcpu->task, flags);
 	vcpu->task->stat = TASK_STAT_RDY;
 	set_task_ready(vcpu->task);
-	local_irq_restore(flags);
+	task_unlock_irqrestore(vcpu->task, flags);
 }
 
 static inline void set_vcpu_suspend(struct vcpu *vcpu)
 {
 	unsigned long flags;
 
-	local_irq_save(flags);
+	task_lock_irqsave(vcpu->task, flags);
+	vcpu->task->stat = TASK_STAT_SUSPEND;
 	set_task_sleep(vcpu->task);
-	local_irq_restore(flags);
+	task_unlock_irqrestore(vcpu->task, flags);
+}
+
+static inline void set_vcpu_stop(struct vcpu *vcpu)
+{
+	unsigned long flags;
+
+	task_lock_irqsave(vcpu->task, flags);
+	vcpu->task->stat = TASK_STAT_STOPPED;
+	set_task_sleep(vcpu->task);
+	task_unlock_irqrestore(vcpu->task, flags);
 }
 
 void vcpu_online(struct vcpu *vcpu)
@@ -134,15 +145,16 @@ void vcpu_idle(struct vcpu *vcpu)
 	unsigned long flags;
 
 	if (vcpu_can_idle(vcpu)) {
-		spin_lock_irqsave(&vcpu->idle_lock, flags);
+		task_lock_irqsave(vcpu->task, flags);
 		if (!vcpu_can_idle(vcpu)) {
-			spin_unlock_irqrestore(&vcpu->idle_lock, flags);
+			task_unlock_irqrestore(vcpu->task, flags);
 			return;
 		}
 
+		vcpu->task->stat = TASK_STAT_SUSPEND;
 		set_task_sleep(vcpu->task);
+		task_unlock_irqrestore(vcpu->task, flags);
 
-		spin_unlock_irqrestore(&vcpu->idle_lock, flags);
 		sched();
 	}
 }
@@ -166,9 +178,7 @@ int vcpu_off(struct vcpu *vcpu)
 	 * force set the vcpu to suspend state then sched
 	 * out
 	 */
-	vcpu->task->stat = TASK_STAT_STOPPED;
-	set_vcpu_suspend(vcpu);
-
+	set_vcpu_stop(vcpu);
 	sched();
 
 	return 0;
@@ -179,12 +189,14 @@ static int vm_check_vcpu_affinity(int vmid, uint32_t *aff, int nr)
 	int i;
 	uint64_t mask = 0;
 
+#if 0
 	/* for hvm fix the affinity to liner */
 	if (vmid == 0) {
 		for (i = 0; i < nr; i++)
 			aff[i] = i;
 		return 0;
 	}
+#endif
 
 	for (i = 0; i < nr; i++) {
 		if (aff[i] >= VM_MAX_VCPU)
@@ -262,6 +274,18 @@ struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id)
 		return NULL;
 
 	return get_vcpu_in_vm(vm, vcpu_id);
+}
+
+void kick_vcpu(struct vcpu *vcpu)
+{
+	unsigned long flags;
+
+	task_lock_irqsave(vcpu->task, flags);
+	if (!task_is_ready(vcpu->task)) {
+		vcpu->task->stat = TASK_STAT_RDY;
+		set_task_ready(vcpu->task);
+	}
+	task_unlock_irqrestore(vcpu->task, flags);
 }
 
 static void release_vcpu(struct vcpu *vcpu)
@@ -350,13 +374,16 @@ int vm_vcpus_init(struct vm *vm)
 				vm->vmid, vcpu->vcpu_id, vcpu_affinity(vcpu));
 
 		task_vmodules_init(vcpu->task);
-		vm->os->ops->vcpu_init(vcpu);
 
 		if (!vm_is_native(vm)) {
 			vcpu->vmcs->host_index = 0;
 			vcpu->vmcs->guest_index = 0;
 		}
 	}
+
+	/* some task will excuted after this function */
+	vm_for_each_vcpu(vm, vcpu)
+		vm->os->ops->vcpu_init(vcpu);
 
 	return 0;
 }
@@ -468,14 +495,12 @@ void vcpu_power_off_call(void *data)
 		return;
 	}
 
-
 	old_stat = vcpu->task->stat;
-	vcpu->task->stat = TASK_STAT_STOPPED;
 
 	/* if the vcpu is current vcpu, sched will set it stat */
 	if ((old_stat != TASK_STAT_RDY) && (old_stat != TASK_STAT_RUNNING) &&
 			vcpu != get_current_vcpu())
-		set_vcpu_suspend(vcpu);
+		set_vcpu_stop(vcpu);
 
 	pr_info("power off vcpu-%d-%d done\n", get_vmid(vcpu),
 			get_vcpu_id(vcpu));
@@ -507,7 +532,7 @@ int vcpu_power_off(struct vcpu *vcpu, int timeout)
 				vcpu_power_off_call, (void *)vcpu, 1);
 	} else {
 		/* just set it stat then force sched to another task */
-		vcpu->task->stat = TASK_STAT_STOPPED;
+		set_vcpu_stop(vcpu);
 		pr_info("power off vcpu-%d-%d done\n", get_vmid(vcpu),
 				get_vcpu_id(vcpu));
 		sched();

@@ -498,10 +498,11 @@ int virt_init(void)
 		 */
 		vm_mm_init(vm);
 		vm_create_resource(vm);
-		vm_vcpus_init(vm);
 		setup_vm(vm);
-
 		vm->state = VM_STAT_ONLINE;
+
+		/* need after all the task of the vm setup is finished */
+		vm_vcpus_init(vm);
 	}
 
 	return 0;

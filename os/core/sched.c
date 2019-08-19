@@ -144,7 +144,7 @@ void set_task_sleep(struct task *task)
 {
 	struct pcpu *pcpu;
 
-	if (task_is_idle(task))
+	if (unlikely(task_is_idle(task)))
 		return;
 
 	if (task_is_realtime(task)) {
@@ -173,6 +173,7 @@ void set_task_suspend(uint32_t delay)
 	task_lock_irqsave(task, flags);
 	task->delay = delay;
 	task->stat |= TASK_STAT_SUSPEND;
+	set_task_sleep(task);
 	task_unlock_irqrestore(task, flags);
 
 	sched();
@@ -411,8 +412,9 @@ void switch_to_task(struct task *cur, struct task *next)
 	 * need to enable the sched timer for fifo task sched
 	 * otherwise disable it.
 	 */
-	if (task_is_percpu(next)) {
-		if (pcpu->local_rdy_tasks > 1)
+	if (!task_is_realtime(next)) {
+		if (1)
+		//if (pcpu->local_rdy_tasks > 1)
 			sched_tick_enable(MILLISECS(next->run_time));
 		else
 			sched_tick_disable();
@@ -498,10 +500,9 @@ static inline void recal_task_run_time(struct task *task, struct pcpu *pcpu)
 void global_sched(struct pcpu *pcpu, struct task *cur)
 {
 	int i;
-	unsigned long flags;
 	struct task *next;
 
-	kernel_lock_irqsave(flags);
+	kernel_lock();
 
 	sched_new(pcpu);
 
@@ -522,9 +523,8 @@ void global_sched(struct pcpu *pcpu, struct task *cur)
 
 		set_next_task(next, pcpu->pcpu_id);
 		arch_switch_task_sw();
-		local_irq_restore(flags);
 	} else
-		kernel_unlock_irqrestore(flags);
+		kernel_unlock();
 }
 
 /*
@@ -535,26 +535,20 @@ void global_sched(struct pcpu *pcpu, struct task *cur)
  */
 void local_sched(struct pcpu *pcpu, struct task *cur)
 {
-	unsigned long flags;
 	struct task *next;
-
-	local_irq_save(flags);
 
 	/* get the next run task from the local list */
 	next = get_next_local_run_task(pcpu);
 	mb();
 
 	if (next == cur)
-		goto out;
+		return;
 
 	if (task_is_ready(cur))
 		recal_task_run_time(cur, pcpu);
 
 	set_next_task(next, pcpu->pcpu_id);
 	arch_switch_task_sw();
-
-out:
-	local_irq_restore(flags);
 }
 
 void sched(void)
@@ -568,22 +562,10 @@ void sched(void)
 		return;
 	}
 
-	preempt_disable();
-
-	/*
-	 * need to check whether the current task is to
-	 * pending on some thing or suspend, then call
-	 * sched_new to get the next run task
-	 */
-	task_lock_irqsave(cur, flags);
-	if (!task_is_ready(cur))
-		set_task_sleep(cur);
-	task_unlock_irqrestore(cur, flags);
-
+	local_irq_save(flags);
 	pcpu = get_cpu_var(pcpu);
 	pcpu->sched(pcpu, cur);
-
-	preempt_enable();
+	local_irq_restore(flags);
 }
 
 void sched_task(struct task *task)
@@ -709,12 +691,12 @@ void irq_return_handler(struct task *task)
 	 * if the task is suspend state, means next the cpu
 	 * will call sched directly, so do not sched out here
 	 */
-	if (p || n || !task_is_ready(task)) {
+	if (p || n) {
 		if (!p)
 			clear_bit(TIF_NEED_RESCHED, &ti->flags);
 #ifdef CONFIG_VIRT
-		if (task->flags & TASK_FLAGS_VCPU)
-			enter_to_guest((struct vcpu *)task->pdata, NULL);
+		//if ((task->flags & TASK_FLAGS_VCPU))
+		//	enter_to_guest((struct vcpu *)task->pdata, NULL);
 #endif
 		return;
 	}
@@ -731,7 +713,7 @@ void irq_exit(gp_regs *regs)
 
 int sched_can_idle(struct pcpu *pcpu)
 {
-	return 1;
+	return is_list_empty(&pcpu->ready_list);
 }
 
 static void *of_setup_pcpu(struct device_node *node, void *data)
@@ -842,10 +824,11 @@ int resched_handler(uint32_t irq, void *data)
 	spin_lock(&pcpu->lock);
 	list_for_each_entry_safe(task, n, &pcpu->new_list, stat_list) {
 		list_del(&task->stat_list);
-		if (task->stat == TASK_STAT_RDY)
+		if (task->stat == TASK_STAT_RDY) {
 			list_add_tail(&pcpu->ready_list, &task->stat_list);
-		else
+		} else {
 			list_add_tail(&pcpu->sleep_list, &task->stat_list);
+		}
 	}
 	spin_unlock(&pcpu->lock);
 

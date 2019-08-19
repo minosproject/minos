@@ -267,10 +267,14 @@ int create_task(char *name, task_func_t func,
 		spin_lock_irqsave(&pcpu->lock, flags);
 		pcpu = get_per_cpu(pcpu, aff);
 		list_add_tail(&pcpu->task_list, &task->list);
-		if (aff == smp_processor_id())
-			list_add_tail(&pcpu->ready_list, &task->stat_list);
-		else
+		if (aff == smp_processor_id()) {
+			if (task->stat == TASK_STAT_RDY)
+				list_add_tail(&pcpu->ready_list, &task->stat_list);
+			else
+				list_add_tail(&pcpu->sleep_list, &task->stat_list);
+		} else {
 			list_add_tail(&pcpu->new_list, &task->stat_list);
+		}
 		pcpu->nr_pcpu_task++;
 		spin_unlock_irqrestore(&pcpu->lock, flags);
 	}
