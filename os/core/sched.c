@@ -313,6 +313,14 @@ static void sched_new(struct pcpu *pcpu)
 #endif
 }
 
+static void inline task_enter_to_guest(struct task *task)
+{
+	gp_regs *reg = (gp_regs *)task->stack_base;
+
+	if (task_is_vcpu(task) && taken_from_guest(reg))
+		enter_to_guest((struct vcpu *)task->pdata, NULL);
+}
+
 static inline struct task *get_next_global_run_task(struct pcpu *pcpu)
 {
 	prio_t prio = os_highest_rdy[pcpu->pcpu_id];
@@ -420,6 +428,8 @@ void switch_to_task(struct task *cur, struct task *next)
 			sched_tick_disable();
 	}
 
+	pr_info("switch to task %d\n", next->pid);
+
 	restore_task_context(next);
 
 	next->start_ns = NOW();
@@ -430,8 +440,7 @@ void switch_to_task(struct task *cur, struct task *next)
 	pcpu->switch_to(pcpu, cur, next);
 
 #ifdef CONFIG_VIRT
-	if (next->flags & TASK_FLAGS_VCPU)
-		enter_to_guest((struct vcpu *)next->pdata, NULL);
+	task_enter_to_guest(next);
 #endif
 }
 
@@ -616,8 +625,7 @@ static void local_irq_handler(struct pcpu *pcpu, struct task *task)
 	next = get_next_local_run_task(pcpu);
 	if (next == task) {
 #ifdef CONFIG_VIRT
-		if (task->flags & TASK_FLAGS_VCPU)
-			enter_to_guest((struct vcpu *)task->pdata, NULL);
+		task_enter_to_guest(task);
 #endif
 		return;
 	}
@@ -672,8 +680,7 @@ static void global_irq_handler(struct pcpu *pcpu, struct task *task)
 
 	kernel_unlock();
 #ifdef CONFIG_VIRT
-	if (next->flags & TASK_FLAGS_VCPU)
-		enter_to_guest((struct vcpu *)next->pdata, NULL);
+	task_enter_to_guest(next);
 #endif
 }
 
@@ -695,8 +702,7 @@ void irq_return_handler(struct task *task)
 		if (!p)
 			clear_bit(TIF_NEED_RESCHED, &ti->flags);
 #ifdef CONFIG_VIRT
-		//if ((task->flags & TASK_FLAGS_VCPU))
-		//	enter_to_guest((struct vcpu *)task->pdata, NULL);
+		task_enter_to_guest(task);
 #endif
 		return;
 	}
