@@ -420,6 +420,7 @@ void switch_to_task(struct task *cur, struct task *next)
 	 * need to enable the sched timer for fifo task sched
 	 * otherwise disable it.
 	 */
+	next->start_ns = NOW();
 	if (!task_is_realtime(next)) {
 		if (1)
 		//if (pcpu->local_rdy_tasks > 1)
@@ -428,11 +429,8 @@ void switch_to_task(struct task *cur, struct task *next)
 			sched_tick_disable();
 	}
 
-	pr_info("switch to task %d\n", next->pid);
-
 	restore_task_context(next);
 
-	next->start_ns = NOW();
 	next->stat = TASK_STAT_RUNNING;
 	task_info(next)->cpu = pcpu->pcpu_id;
 
@@ -459,6 +457,7 @@ unsigned long sched_tick_handler(unsigned long data)
 		return 0;
 	}
 
+#if 0
 	/*
 	 * there is a case that when the sched timer has been
 	 * expires when switch out task, once switch to a new
@@ -472,6 +471,7 @@ unsigned long sched_tick_handler(unsigned long data)
 		// sched_tick_enable(MILLISECS(task->run_time) - delta);
 		return 0;
 	}
+#endif
 
 	/*
 	 * if the preempt is disable at this time, what will
@@ -699,14 +699,11 @@ void irq_return_handler(struct task *task)
 	 * will call sched directly, so do not sched out here
 	 */
 	if (p || n) {
-		if (!p)
-			clear_bit(TIF_NEED_RESCHED, &ti->flags);
 #ifdef CONFIG_VIRT
 		task_enter_to_guest(task);
 #endif
 		return;
 	}
-
 
 	clear_bit(TIF_NEED_RESCHED, &ti->flags);
 	pcpu->irq_handler(pcpu, task);

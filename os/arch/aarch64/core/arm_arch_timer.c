@@ -178,9 +178,9 @@ static int sched_timer_handler(uint32_t irq, void *data)
 {
 	/* disable timer to avoid interrupt */
 	write_sysreg32(0, CNTHP_CTL_EL2);
+	wmb();
 
 	(void)sched_tick_handler((unsigned long)data);
-//	sched_tick_enable(next_evt);
 
 	return 0;
 }
