@@ -313,12 +313,27 @@ static void sched_new(struct pcpu *pcpu)
 #endif
 }
 
-static void inline task_enter_to_guest(struct task *task)
+static void inline task_sched_return(struct task *task)
 {
-	gp_regs *reg = (gp_regs *)task->stack_base;
+#ifdef CONFIG_VIRT
+	gp_regs *reg;
+#endif
 
+	/*
+	 * if need resched but there something block to sched
+	 * a new task, then need enable the sched timer
+	 */
+	if ((task_info(task)->flags & __TIF_NEED_RESCHED) &&
+			task_is_percpu(task)) {
+		task_info(task)->flags &= ~__TIF_NEED_RESCHED;
+		sched_tick_enable(MILLISECS(task->run_time));
+	}
+
+#ifdef CONFIG_VIRT
+	reg = (gp_regs *)task->stack_base;
 	if (task_is_vcpu(task) && taken_from_guest(reg))
 		enter_to_guest((struct vcpu *)task->pdata, NULL);
+#endif
 }
 
 static inline struct task *get_next_global_run_task(struct pcpu *pcpu)
@@ -352,6 +367,25 @@ static inline void save_task_context(struct task *task)
 static inline void restore_task_context(struct task *task)
 {
 	restore_task_vmodule_state(task);
+}
+
+static inline void recal_task_run_time(struct task *task, struct pcpu *pcpu)
+{
+	unsigned long now;
+
+	if (!task_is_percpu(task))
+		return;
+
+	now = (NOW() - task->start_ns) / 1000000;
+	now = now > CONFIG_SCHED_INTERVAL ? 0 : CONFIG_SCHED_INTERVAL - now;
+
+	if (now < 15)
+		task->run_time = CONFIG_SCHED_INTERVAL + now;
+	else
+		task->run_time = now;
+
+	list_del(&task->stat_list);
+	list_add_tail(&pcpu->ready_list, &task->stat_list);
 }
 
 static void global_switch_out(struct pcpu *pcpu,
@@ -401,16 +435,19 @@ void switch_to_task(struct task *cur, struct task *next)
 	/*
 	 * check the current task's stat and do some action
 	 * to it, check whether it suspend time is set or not
+	 *
+	 * if the task is ready state, adjust theurun time of
+	 * this task
 	 */
 	if (!task_is_ready(cur)) {
 		if (cur->delay) {
 			mod_timer(&cur->delay_timer,
 				NOW() + MILLISECS(cur->delay));
 		}
-	}
-
-	if (cur->stat == TASK_STAT_RUNNING)
+	} else {
+		recal_task_run_time(cur, pcpu);
 		cur->stat = TASK_STAT_RDY;
+	}
 
 	do_hooks((void *)next, NULL, OS_HOOK_TASK_SWITCH_OUT);
 	pcpu->switch_out(pcpu, cur, next);
@@ -421,12 +458,14 @@ void switch_to_task(struct task *cur, struct task *next)
 	 * otherwise disable it.
 	 */
 	next->start_ns = NOW();
-	if (!task_is_realtime(next)) {
+	if (task_is_percpu(next)) {
 		if (1)
 		//if (pcpu->local_rdy_tasks > 1)
 			sched_tick_enable(MILLISECS(next->run_time));
 		else
 			sched_tick_disable();
+	} else {
+		sched_tick_disable();
 	}
 
 	restore_task_context(next);
@@ -437,9 +476,7 @@ void switch_to_task(struct task *cur, struct task *next)
 	do_hooks((void *)next, NULL, OS_HOOK_TASK_SWITCH_TO);
 	pcpu->switch_to(pcpu, cur, next);
 
-#ifdef CONFIG_VIRT
-	task_enter_to_guest(next);
-#endif
+	task_sched_return(next);
 }
 
 unsigned long sched_tick_handler(unsigned long data)
@@ -457,7 +494,6 @@ unsigned long sched_tick_handler(unsigned long data)
 		return 0;
 	}
 
-#if 0
 	/*
 	 * there is a case that when the sched timer has been
 	 * expires when switch out task, once switch to a new
@@ -468,10 +504,9 @@ unsigned long sched_tick_handler(unsigned long data)
 	if (delta < MILLISECS(task->run_time)) {
 		pr_debug("Bug happend on timer tick sched 0x%p 0x%p %d %d\n",
 				now, task->start_ns, task->run_time, delta);
-		// sched_tick_enable(MILLISECS(task->run_time) - delta);
+		sched_tick_enable(MILLISECS(task->run_time) - delta);
 		return 0;
 	}
-#endif
 
 	/*
 	 * if the preempt is disable at this time, what will
@@ -485,25 +520,6 @@ unsigned long sched_tick_handler(unsigned long data)
 	set_need_resched();
 
 	return 0;
-}
-
-static inline void recal_task_run_time(struct task *task, struct pcpu *pcpu)
-{
-	unsigned long now;
-
-	if (!task_is_percpu(task))
-		return;
-
-	now = (NOW() - task->start_ns) / 1000000;
-	now = now > CONFIG_SCHED_INTERVAL ? 0 : CONFIG_SCHED_INTERVAL - now;
-
-	if (now < 15) {
-		task->run_time = CONFIG_SCHED_INTERVAL + now;
-
-		list_del(&task->stat_list);
-		list_add_tail(&pcpu->ready_list, &task->stat_list);
-	} else
-		task->run_time = now;
 }
 
 void global_sched(struct pcpu *pcpu, struct task *cur)
@@ -527,9 +543,6 @@ void global_sched(struct pcpu *pcpu, struct task *cur)
 	mb();
 
 	if (cur != next) {
-		if (task_is_ready(cur))
-			recal_task_run_time(cur, pcpu);
-
 		set_next_task(next, pcpu->pcpu_id);
 		arch_switch_task_sw();
 	} else
@@ -552,9 +565,6 @@ void local_sched(struct pcpu *pcpu, struct task *cur)
 
 	if (next == cur)
 		return;
-
-	if (task_is_ready(cur))
-		recal_task_run_time(cur, pcpu);
 
 	set_next_task(next, pcpu->pcpu_id);
 	arch_switch_task_sw();
@@ -624,13 +634,10 @@ static void local_irq_handler(struct pcpu *pcpu, struct task *task)
 
 	next = get_next_local_run_task(pcpu);
 	if (next == task) {
-#ifdef CONFIG_VIRT
-		task_enter_to_guest(task);
-#endif
+		task_sched_return(task);
 		return;
 	}
 
-	recal_task_run_time(task, pcpu);
 	set_next_task(next, pcpu->pcpu_id);
 	switch_to_task(task, next);
 }
@@ -670,7 +677,6 @@ static void global_irq_handler(struct pcpu *pcpu, struct task *task)
 	next = get_next_global_run_task(pcpu);
 	mb();
 	if (next != task) {
-		recal_task_run_time(task, pcpu);
 		set_next_task(next, cpuid);
 		switch_to_task(task, next);
 		mb();
@@ -679,29 +685,24 @@ static void global_irq_handler(struct pcpu *pcpu, struct task *task)
 	}
 
 	kernel_unlock();
-#ifdef CONFIG_VIRT
-	task_enter_to_guest(next);
-#endif
+	task_sched_return(next);
 }
 
 void irq_return_handler(struct task *task)
 {
-	int p, n;
+	int p;
 	struct task_info *ti;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
 	ti = (struct task_info *)task->stack_origin;
 	p = ti->preempt_count;
-	n = !(ti->flags & __TIF_NEED_RESCHED);
 
 	/*
 	 * if the task is suspend state, means next the cpu
 	 * will call sched directly, so do not sched out here
 	 */
-	if (p || n) {
-#ifdef CONFIG_VIRT
-		task_enter_to_guest(task);
-#endif
+	if (p) {
+		task_sched_return(task);
 		return;
 	}
 
@@ -834,8 +835,6 @@ int resched_handler(uint32_t irq, void *data)
 		}
 	}
 	spin_unlock(&pcpu->lock);
-
-	set_need_resched();
 
 	return 0;
 }
