@@ -30,6 +30,8 @@
 #define CONFIG_LOG_LEVEL	PRINT_LEVEL_INFO
 #endif
 
+extern struct task *__current_tasks[NR_CPUS];
+
 static DEFINE_SPIN_LOCK(print_lock);
 static unsigned int print_level = CONFIG_LOG_LEVEL;
 
@@ -80,7 +82,7 @@ void change_log_level(unsigned int level)
 int level_print(int level, char *fmt, ...)
 {
 	va_list arg;
-	int printed, i;
+	int printed, i, cpuid;
 	char buf[512];
 	char *buffer = buf;
 	unsigned long flags;
@@ -90,7 +92,8 @@ int level_print(int level, char *fmt, ...)
 	if (level > print_level)
 		return 0;
 
-	task = get_current_task();
+	cpuid = smp_processor_id();
+	task = __current_tasks[cpuid];
 	if (task && os_is_running())
 		pid = get_task_pid(task);
 	else
@@ -107,9 +110,8 @@ int level_print(int level, char *fmt, ...)
 	*buffer++ = ' ';
 
 	/* add the processor id to the buffer */
-	i = smp_processor_id();
-	*buffer++ = (i / 10) + '0';
-	*buffer++ = (i % 10) + '0';
+	*buffer++ = (cpuid / 10) + '0';
+	*buffer++ = (cpuid % 10) + '0';
 
 	/* add the task pid to the buffer */
 	*buffer++ = ' ';
