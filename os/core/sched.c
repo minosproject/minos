@@ -577,7 +577,7 @@ void sched(void)
 	struct task *cur = get_current_task();
 
 	if ((!preempt_allowed())) {
-		pr_err("os can not sched now preempt disabled\n");
+		panic("os can not sched now preempt disabled\n");
 		return;
 	}
 

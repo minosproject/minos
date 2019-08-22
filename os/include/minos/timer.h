@@ -8,12 +8,14 @@
 
 #define DEFAULT_TIMER_MARGIN	(10)
 
+typedef void (*timer_func_t)(unsigned long);
+
 struct timer_list {
 	int cpu;
 	atomic_t del_request;
 	struct list_head entry;
 	unsigned long expires;
-	void (*function)(unsigned long);
+	timer_func_t function;
 	unsigned long data;
 	struct timers *timers;
 };

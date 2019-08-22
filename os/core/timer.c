@@ -31,6 +31,8 @@ static void run_timer_softirq(struct softirq_action *h)
 	struct timers *timers = &get_cpu_var(timers);
 	struct list_head *entry;
 	struct list_head *next;
+	timer_func_t fn;
+	unsigned long data;
 
 	now = NOW();
 
@@ -52,13 +54,10 @@ static void run_timer_softirq(struct softirq_action *h)
 		 * has been delete from the timers list, this will cause
 		 * that not all the timer can be handled, need to be
 		 * fix later, currently only panic here for debug purpose
+		 *
+		 * here use a member to indicate whether this timer is
+		 * requested to be deleted
 		 */
-		if (next == NULL) {
-			panic("next timer has been deleted\n");
-			if (expires > (now + MILLISECS(1)))
-				expires = now + MILLISECS(1);
-		}
-
 		if (atomic_read(&timer->del_request)) {
 			pr_debug("timer has been deleted\n");
 			list_del(&timer->entry);
@@ -67,19 +66,21 @@ static void run_timer_softirq(struct softirq_action *h)
 		}
 
 		if (timer->expires <= (now + DEFAULT_TIMER_MARGIN)) {
-			list_del(&timer->entry);
-
 			/*
 			 * need to release the spin lock to avoid
 			 * dead lock because on the timer handler
 			 * function the task may aquire other spinlocks
 			 */
+			fn = timer->function;
+			data = timer->data;
+
+			list_del(&timer->entry);
 			timer->entry.next = NULL;
 			timer->expires = (unsigned long)~0;
 			timers->running_timer = timer;
 			raw_spin_unlock(&timers->lock);
 
-			timer->function(timer->data);
+			fn(data);
 
 			raw_spin_lock(&timers->lock);
 		}
@@ -113,11 +114,11 @@ static int detach_timer(struct timers *timers, struct timer_list *timer)
 {
 	struct list_head *entry = &timer->entry;
 
-	if (!timer_pending(timer))
-		return 0;
-
-	list_del(entry);
-	entry->next = NULL;
+	if (timer_pending(timer)) {
+		list_del(entry);
+		entry->next = NULL;
+		atomic_set(&timer->del_request, 0);
+	}
 
 	return 0;
 }
@@ -161,12 +162,10 @@ int mod_timer(struct timer_list *timer, unsigned long expires)
 {
 	struct timers *timers = timer->timers;
 	unsigned long flags;
-	int cpu = smp_processor_id();
+	int cpu;
 
-	/* timer's expires smaller or equal than current */
-	if ((timer_pending(timer)) && (timer->expires <= expires))
-		return 0;
-
+	preempt_disable();
+	cpu = smp_processor_id();
 	expires = slack_expires(expires);
 	timer->expires = expires;
 
@@ -184,6 +183,7 @@ int mod_timer(struct timer_list *timer, unsigned long expires)
 	}
 
 	__mod_timer(timer);
+	preempt_enable();
 
 	return 0;
 }
@@ -192,6 +192,7 @@ void init_timer_on_cpu(struct timer_list *timer, int cpu)
 {
 	BUG_ON(!timer);
 
+	preempt_disable();
 	init_list(&timer->entry);
 	timer->entry.next = NULL;
 	timer->expires = 0;
@@ -199,12 +200,15 @@ void init_timer_on_cpu(struct timer_list *timer, int cpu)
 	timer->data = 0;
 	timer->timers = &get_per_cpu(timers, cpu);
 	timer->cpu = cpu;
+	preempt_enable();
 }
 
 void init_timer(struct timer_list *timer)
 {
+	preempt_disable();
 	BUG_ON(!timer);
 	init_timer_on_cpu(timer, smp_processor_id());
+	preempt_enable();
 }
 
 int del_timer(struct timer_list *timer)
@@ -212,8 +216,11 @@ int del_timer(struct timer_list *timer)
 	unsigned long flags;
 	struct timers *timers = timer->timers;
 
+
 	if (!timer_pending(timer))
 		return 0;
+
+	preempt_disable();
 
 	/*
 	 * if the timer is running on the same cpu
@@ -228,6 +235,8 @@ int del_timer(struct timer_list *timer)
 		atomic_set(&timer->del_request, 1);
 		wmb();
 	}
+
+	preempt_enable();
 
 	return 0;
 }
