@@ -85,6 +85,8 @@ static void smp_set_task_ready(void *data)
 		del_timer(&task->delay_timer);
 		task->delay = 0;
 	}
+
+	set_need_resched();
 }
 
 static void smp_set_task_suspend(void *data)
@@ -690,18 +692,19 @@ static void global_irq_handler(struct pcpu *pcpu, struct task *task)
 
 void irq_return_handler(struct task *task)
 {
-	int p;
+	int p, n;
 	struct task_info *ti;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
 	ti = (struct task_info *)task->stack_origin;
 	p = ti->preempt_count;
+	n = !(ti->flags & __TIF_NEED_RESCHED);
 
 	/*
 	 * if the task is suspend state, means next the cpu
 	 * will call sched directly, so do not sched out here
 	 */
-	if (p) {
+	if (p || n) {
 		task_sched_return(task);
 		return;
 	}
@@ -835,6 +838,8 @@ int resched_handler(uint32_t irq, void *data)
 		}
 	}
 	spin_unlock(&pcpu->lock);
+
+	set_need_resched();
 
 	return 0;
 }
