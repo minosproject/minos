@@ -140,6 +140,8 @@ void set_task_ready(struct task *task)
 		del_timer(&task->delay_timer);
 		task->delay = 0;
 	}
+
+	set_need_resched();
 }
 
 void set_task_sleep(struct task *task)
@@ -191,7 +193,7 @@ struct task *get_highest_task(uint8_t group, prio_t *ready)
 	return os_task_table[(y << 3) + x];
 }
 
-static int has_high_prio(prio_t prio, prio_t *array, int *map)
+static int __used has_high_prio(prio_t prio, prio_t *array, int *map)
 {
 	int i;
 
@@ -206,7 +208,7 @@ static int has_high_prio(prio_t prio, prio_t *array, int *map)
 	return 0;
 }
 
-static int has_current_prio(prio_t prio, prio_t *array, int *map)
+static int __used has_current_prio(prio_t prio, prio_t *array, int *map)
 {
 	int i;
 
@@ -292,6 +294,9 @@ static void sched_new(struct pcpu *pcpu)
 		}
 	}
 
+	pr_info("os_highest_rdy %d %d %d %d\n", os_highest_rdy[0], os_highest_rdy[1],
+			os_highest_rdy[2], os_highest_rdy[3]);
+
 	for (i = 0; i < NR_CPUS; i++) {
 		if (os_highest_rdy[i] > OS_PRIO_PCPU)
 			os_highest_rdy[i] = OS_PRIO_PCPU;
@@ -304,11 +309,11 @@ static void sched_new(struct pcpu *pcpu)
 	 * the core0
 	 */
 	os_highest_rdy[0] = OS_PRIO_PCPU;
-	if (__rdy_table == 0)
+	if (__os_rdy_table == 0)
 		return;
 
-	y = ffs_table[rdy_grp];
-	x = ffs_table[rdy_table[y]];
+	y = ffs_table[os_rdy_grp];
+	x = ffs_table[os_rdy_table[y]];
 	p = (y << 3) + x;
 	os_highest_rdy[0] = p;
 	dsb();
@@ -728,7 +733,7 @@ void irq_exit(gp_regs *regs)
 	irq_softirq_exit();
 }
 
-static void *of_setup_pcpu(struct device_node *node, void *data)
+static void __used *of_setup_pcpu(struct device_node *node, void *data)
 {
 	int cpuid;
 	uint64_t affinity;
