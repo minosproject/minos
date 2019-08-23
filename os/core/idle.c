@@ -155,21 +155,23 @@ void cpu_idle(void)
 	pcpu_resched(pcpu->pcpu_id);
 
 	while (1) {
-		sched();
-
 		/*
 		 * need to check whether the pcpu can go to idle
 		 * state to avoid the interrupt happend before wfi
 		 */
-		local_irq_disable();
-		if (pcpu_can_idle(pcpu)) {
-			pcpu->state = PCPU_STATE_IDLE;
-			local_irq_enable();
-			mb();
-			wfi();
-			mb();
-			pcpu->state = PCPU_STATE_RUNNING;
-		} else
-			local_irq_enable();
+		while (!need_resched()) {
+			local_irq_disable();
+			if (pcpu_can_idle(pcpu)) {
+				pcpu->state = PCPU_STATE_IDLE;
+				mb();
+				wfi();
+				local_irq_enable();
+				mb();
+				pcpu->state = PCPU_STATE_RUNNING;
+			} else
+				local_irq_enable();
+		}
+
+		sched();
 	}
 }

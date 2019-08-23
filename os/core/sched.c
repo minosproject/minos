@@ -584,6 +584,7 @@ void sched(void)
 	}
 
 	local_irq_save(flags);
+	clear_need_resched();
 	pcpu = get_cpu_var(pcpu);
 	pcpu->sched(pcpu, cur);
 	local_irq_restore(flags);
