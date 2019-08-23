@@ -111,7 +111,7 @@ static void task_timeout_handler(unsigned long data)
 		task->stat &= ~TASK_STAT_PEND_ANY;
 		task->pend_stat = TASK_STAT_PEND_TO;
 	} else {
-		if (task->delay) {
+		if ((task->delay) && !task_is_ready(task)) {
 			task->delay = 0;
 			set_task_ready(task);
 			task->stat &= ~TASK_STAT_SUSPEND;

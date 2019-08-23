@@ -9,10 +9,10 @@ void dump_stack(gp_regs *regs, unsigned long *stack);
 
 #define panic(...)	__panic(NULL, __VA_ARGS__)
 
-#define BUG_ON(condition)		 \
+#define BUG_ON(condition, ...)		 \
 	if ((condition)) {		 \
 		do {			 \
-			panic("BUG_ON"); \
+			panic("BUG ON: " __VA_ARGS__); \
 		} while (0); 		 \
 	}
 

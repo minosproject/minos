@@ -62,6 +62,7 @@ static void run_timer_softirq(struct softirq_action *h)
 			pr_debug("timer has been deleted\n");
 			list_del(&timer->entry);
 			timer->entry.next = NULL;
+			timer->expires = (unsigned long)~0;
 			continue;
 		}
 

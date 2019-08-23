@@ -78,7 +78,7 @@ static void smp_set_task_ready(void *data)
 	}
 
 	list_del(&task->stat_list);
-	list_add(&pcpu->ready_list, &task->stat_list);
+	list_add_tail(&pcpu->ready_list, &task->stat_list);
 	pcpu->local_rdy_tasks++;
 
 	if (task->delay) {
@@ -104,7 +104,7 @@ static void smp_set_task_suspend(void *data)
 	 * a mutex or sem, how to deal ?
 	 */
 	list_del(&task->stat_list);
-	list_add(&pcpu->sleep_list, &task->stat_list);
+	list_add_tail(&pcpu->sleep_list, &task->stat_list);
 	pcpu->local_rdy_tasks--;
 }
 
@@ -319,8 +319,15 @@ static void inline task_sched_return(struct task *task)
 {
 #ifdef CONFIG_VIRT
 	gp_regs *reg;
-#endif
 
+	reg = (gp_regs *)task->stack_base;
+	if (task_is_vcpu(task) && taken_from_guest(reg))
+		enter_to_guest((struct vcpu *)task->pdata, NULL);
+#endif
+}
+
+static void inline no_task_sched_return(struct task *task)
+{
 	/*
 	 * if need resched but there something block to sched
 	 * a new task, then need enable the sched timer
@@ -331,11 +338,7 @@ static void inline task_sched_return(struct task *task)
 		sched_tick_enable(MILLISECS(task->run_time));
 	}
 
-#ifdef CONFIG_VIRT
-	reg = (gp_regs *)task->stack_base;
-	if (task_is_vcpu(task) && taken_from_guest(reg))
-		enter_to_guest((struct vcpu *)task->pdata, NULL);
-#endif
+	task_sched_return(task);
 }
 
 static inline struct task *get_next_global_run_task(struct pcpu *pcpu)
@@ -403,7 +406,7 @@ static void global_switch_out(struct pcpu *pcpu,
 		prio = next->prio;
 
 	os_prio_cur[cpuid] = prio;
-	mb();
+	wmb();
 
 	/* release the kernel lock now */
 	kernel_unlock();
@@ -451,7 +454,7 @@ void switch_to_task(struct task *cur, struct task *next)
 		cur->stat = TASK_STAT_RDY;
 	}
 
-	do_hooks((void *)next, NULL, OS_HOOK_TASK_SWITCH_OUT);
+	do_hooks((void *)cur, NULL, OS_HOOK_TASK_SWITCH_OUT);
 	pcpu->switch_out(pcpu, cur, next);
 
 	/*
@@ -492,7 +495,7 @@ unsigned long sched_tick_handler(unsigned long data)
 	delta = now - task->start_ns;
 
 	if (task->prio != OS_PRIO_PCPU) {
-		pr_debug("wrong task type on tick handler %d\n", task->pid);
+		pr_warn("wrong task type on tick handler %d\n", task->pid);
 		return 0;
 	}
 
@@ -504,7 +507,7 @@ unsigned long sched_tick_handler(unsigned long data)
 	 * to other task
 	 */
 	if (delta < MILLISECS(task->run_time)) {
-		pr_debug("Bug happend on timer tick sched 0x%p 0x%p %d %d\n",
+		pr_warn("Bug happend on timer tick sched 0x%p 0x%p %d %d\n",
 				now, task->start_ns, task->run_time, delta);
 		sched_tick_enable(MILLISECS(task->run_time) - delta);
 		return 0;
@@ -533,7 +536,10 @@ void global_sched(struct pcpu *pcpu, struct task *cur)
 
 	sched_new(pcpu);
 
-	/* check whether current pcpu need to resched */
+	/*
+	 * if there other cpu need to change the task running
+	 * on the pcpu, then send the ipi to the related cpu
+	 */
 	for (i = 0; i < NR_CPUS; i++) {
 		if ((os_prio_cur[i] != os_highest_rdy[i])) {
 			if (i != pcpu->pcpu_id)
@@ -542,7 +548,7 @@ void global_sched(struct pcpu *pcpu, struct task *cur)
 	}
 
 	next = get_next_global_run_task(pcpu);
-	mb();
+	rmb();
 
 	if (cur != next) {
 		set_next_task(next, pcpu->pcpu_id);
@@ -637,7 +643,7 @@ static void local_irq_handler(struct pcpu *pcpu, struct task *task)
 
 	next = get_next_local_run_task(pcpu);
 	if (next == task) {
-		task_sched_return(task);
+		no_task_sched_return(task);
 		return;
 	}
 
@@ -671,7 +677,6 @@ static void global_irq_handler(struct pcpu *pcpu, struct task *task)
 		}
 	}
 
-
 	/*
 	 * if need sched or the current task is idle, then
 	 * try to get the next task to check whether need
@@ -688,7 +693,7 @@ static void global_irq_handler(struct pcpu *pcpu, struct task *task)
 	}
 
 	kernel_unlock();
-	task_sched_return(next);
+	no_task_sched_return(next);
 }
 
 void irq_return_handler(struct task *task)
@@ -706,22 +711,16 @@ void irq_return_handler(struct task *task)
 	 * will call sched directly, so do not sched out here
 	 */
 	if (p || n) {
-		task_sched_return(task);
-		return;
+		no_task_sched_return(task);
+	} else {
+		clear_bit(TIF_NEED_RESCHED, &ti->flags);
+		pcpu->irq_handler(pcpu, task);
 	}
-
-	clear_bit(TIF_NEED_RESCHED, &ti->flags);
-	pcpu->irq_handler(pcpu, task);
 }
 
 void irq_exit(gp_regs *regs)
 {
 	irq_softirq_exit();
-}
-
-int sched_can_idle(struct pcpu *pcpu)
-{
-	return is_list_empty(&pcpu->ready_list);
 }
 
 static void *of_setup_pcpu(struct device_node *node, void *data)
@@ -829,7 +828,7 @@ int resched_handler(uint32_t irq, void *data)
 	 * check whether there new task need to add to
 	 * this pcpu
 	 */
-	spin_lock(&pcpu->lock);
+	raw_spin_lock(&pcpu->lock);
 	list_for_each_entry_safe(task, n, &pcpu->new_list, stat_list) {
 		list_del(&task->stat_list);
 		if (task->stat == TASK_STAT_RDY) {
@@ -838,7 +837,7 @@ int resched_handler(uint32_t irq, void *data)
 			list_add_tail(&pcpu->sleep_list, &task->stat_list);
 		}
 	}
-	spin_unlock(&pcpu->lock);
+	raw_spin_unlock(&pcpu->lock);
 
 	set_need_resched();
 

@@ -81,15 +81,9 @@ int system_suspend(void)
 	return 0;
 }
 
-int pcpu_can_idle(struct pcpu *pcpu)
+static inline bool pcpu_can_idle(struct pcpu *pcpu)
 {
-	if (!sched_can_idle(pcpu))
-		return 0;
-
-	if (need_resched())
-		return 0;
-
-	return 1;
+	return true;
 }
 
 static void os_clean(void)
@@ -159,7 +153,7 @@ void cpu_idle(void)
 		 * need to check whether the pcpu can go to idle
 		 * state to avoid the interrupt happend before wfi
 		 */
-		while (!need_resched()) {
+		while (!need_resched() && pcpu_can_idle(pcpu)) {
 			local_irq_disable();
 			if (pcpu_can_idle(pcpu)) {
 				pcpu->state = PCPU_STATE_IDLE;
