@@ -374,7 +374,8 @@ static inline void restore_task_context(struct task *task)
 	restore_task_vmodule_state(task);
 }
 
-static inline void recal_task_run_time(struct task *task, struct pcpu *pcpu)
+static inline void
+recal_task_run_time(struct task *task, struct pcpu *pcpu, int suspend)
 {
 	unsigned long now;
 
@@ -389,8 +390,10 @@ static inline void recal_task_run_time(struct task *task, struct pcpu *pcpu)
 	else
 		task->run_time = now;
 
-	list_del(&task->stat_list);
-	list_add_tail(&pcpu->ready_list, &task->stat_list);
+	if (!suspend) {
+		list_del(&task->stat_list);
+		list_add_tail(&pcpu->ready_list, &task->stat_list);
+	}
 }
 
 static void global_switch_out(struct pcpu *pcpu,
@@ -445,12 +448,13 @@ void switch_to_task(struct task *cur, struct task *next)
 	 * this task
 	 */
 	if (!task_is_ready(cur)) {
+		recal_task_run_time(cur, pcpu, 1);
 		if (cur->delay) {
 			mod_timer(&cur->delay_timer,
 				NOW() + MILLISECS(cur->delay));
 		}
 	} else {
-		recal_task_run_time(cur, pcpu);
+		recal_task_run_time(cur, pcpu, 0);
 		cur->stat = TASK_STAT_RDY;
 	}
 
@@ -548,7 +552,7 @@ void global_sched(struct pcpu *pcpu, struct task *cur)
 	}
 
 	next = get_next_global_run_task(pcpu);
-	rmb();
+	mb();
 
 	if (cur != next) {
 		set_next_task(next, pcpu->pcpu_id);
