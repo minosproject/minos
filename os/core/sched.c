@@ -330,11 +330,14 @@ static void inline no_task_sched_return(struct task *task)
 {
 	/*
 	 * if need resched but there something block to sched
-	 * a new task, then need enable the sched timer
+	 * a new task, then need enable the sched timer, but
+	 * only give the task little run time
 	 */
 	if ((task_info(task)->flags & __TIF_NEED_RESCHED) &&
-			task_is_percpu(task)) {
+			task_is_percpu(task) && (task->start_ns == 0)) {
 		task_info(task)->flags &= ~__TIF_NEED_RESCHED;
+		task->run_time = 15;
+		task->start_ns = NOW();
 		sched_tick_enable(MILLISECS(task->run_time));
 	}
 
@@ -510,12 +513,9 @@ unsigned long sched_tick_handler(unsigned long data)
 	 * task is switch out, so directly return, do not switch
 	 * to other task
 	 */
-	if (delta < MILLISECS(task->run_time)) {
-		pr_warn("Bug happend on timer tick sched 0x%p 0x%p %d %d\n",
+	if (delta < MILLISECS(task->run_time))
+		pr_debug("Bug happend on timer tick sched 0x%p 0x%p %d %d\n",
 				now, task->start_ns, task->run_time, delta);
-		sched_tick_enable(MILLISECS(task->run_time) - delta);
-		return 0;
-	}
 
 	/*
 	 * if the preempt is disable at this time, what will
@@ -524,6 +524,7 @@ unsigned long sched_tick_handler(unsigned long data)
 	 */
 	list_del(&task->stat_list);
 	list_add_tail(&pcpu->ready_list, &task->stat_list);
+	task->start_ns = 0;
 	task->run_time = CONFIG_TASK_RUN_TIME;
 
 	set_need_resched();
