@@ -117,6 +117,8 @@ static inline int arch_irq_disabled(void)
 #define read_sysreg(name)     read_sysreg64(name)
 #define write_sysreg(v, name) write_sysreg64(v, name)
 
+#define nop() asm ("nop")
+
 static inline int affinity_to_cpuid(unsigned long affinity)
 {
 	int aff0, aff1;

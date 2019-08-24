@@ -77,7 +77,6 @@ static void run_timer_softirq(struct softirq_action *h)
 
 			list_del(&timer->entry);
 			timer->entry.next = NULL;
-			timer->expires = (unsigned long)~0;
 			timers->running_timer = timer;
 			raw_spin_unlock(&timers->lock);
 

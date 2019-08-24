@@ -157,13 +157,11 @@ void cpu_idle(void)
 			local_irq_disable();
 			if (pcpu_can_idle(pcpu)) {
 				pcpu->state = PCPU_STATE_IDLE;
-				mb();
 				wfi();
-				local_irq_enable();
-				mb();
+				nop();
 				pcpu->state = PCPU_STATE_RUNNING;
-			} else
-				local_irq_enable();
+			}
+			local_irq_enable();
 		}
 
 		sched();
