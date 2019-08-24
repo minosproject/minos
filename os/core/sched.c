@@ -338,7 +338,6 @@ static void inline no_task_sched_return(struct task *task)
 	if ((task_info(task)->flags & __TIF_NEED_RESCHED) &&
 			task_is_percpu(task) && (task->start_ns == 0)) {
 		task_info(task)->flags &= ~__TIF_NEED_RESCHED;
-		task->run_time = 15;
 		task->start_ns = NOW();
 		sched_tick_enable(MILLISECS(task->run_time));
 	}
@@ -720,8 +719,8 @@ void irq_return_handler(struct task *task)
 	if (p || n) {
 		no_task_sched_return(task);
 	} else {
-		clear_bit(TIF_NEED_RESCHED, &ti->flags);
 		pcpu->irq_handler(pcpu, task);
+		clear_bit(TIF_NEED_RESCHED, &ti->flags);
 	}
 }
 
