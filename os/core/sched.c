@@ -294,9 +294,6 @@ static void sched_new(struct pcpu *pcpu)
 		}
 	}
 
-	pr_info("os_highest_rdy %d %d %d %d\n", os_highest_rdy[0], os_highest_rdy[1],
-			os_highest_rdy[2], os_highest_rdy[3]);
-
 	for (i = 0; i < NR_CPUS; i++) {
 		if (os_highest_rdy[i] > OS_PRIO_PCPU)
 			os_highest_rdy[i] = OS_PRIO_PCPU;
