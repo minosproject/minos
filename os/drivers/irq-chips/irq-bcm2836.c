@@ -314,7 +314,7 @@ int bcm2835_irq_handler(uint32_t irq, void *data)
 		irq_desc = get_irq_desc(no);
 		if (!irq_desc || !irq_desc->handler) {
 			bcm2835_mask_irq(no);
-			pr_err("irq is not register disable it\n", irq);
+			pr_err("irq is not register disable it %d\n", no);
 			continue;
 		}
 

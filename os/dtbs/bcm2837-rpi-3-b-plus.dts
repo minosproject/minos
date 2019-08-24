@@ -24,10 +24,10 @@
 			vmid = <0>;
 			vm_name = "rpi3_linux_host";
 			type = "linux";
-			vcpus = <2>;
+			vcpus = <4>;
 			entry = <0x0 0x00080000>;
 			setup_data = <0x0 0x03e00000>;
-			vcpu_affinity = <0 1>;
+			vcpu_affinity = <0 1 2 3>;
 			memory = <0x0 0x00000000 0x0 0x28000000>;
 			cmdline = "8250.nr_uarts=1 dwc_otg.lpm_enable=0 net.ifnames=0 earlycon=uart8250,mmio32,0x3f215040 console=ttyS0,115200 cma=64M root=/dev/mmcblk0p2 rw rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait noinitrd";
 		};

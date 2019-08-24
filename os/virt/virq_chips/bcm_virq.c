@@ -22,10 +22,10 @@
 #include <minos/cpumask.h>
 #include <minos/irq.h>
 #include <minos/sched.h>
-#include <minos/virq.h>
-#include <minos/vdev.h>
+#include <virt/virq.h>
+#include <virt/vdev.h>
 #include <minos/of.h>
-#include <minos/virq_chip.h>
+#include <virt/virq_chip.h>
 #include <asm/bcm_irq.h>
 
 struct bcm2836_virq {

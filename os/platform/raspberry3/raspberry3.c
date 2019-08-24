@@ -28,7 +28,6 @@
 #include <virt/virq.h>
 #include <virt/vm.h>
 #include <virt/vmm.h>
-#include <virt/vtimer.h>
 
 static int raspberry3_setup_hvm(struct vm *vm, void *dtb)
 {
