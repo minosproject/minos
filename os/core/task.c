@@ -128,6 +128,7 @@ static void task_init(struct task *task, char *name,
 	struct task_info *ti;
 
 	if (stack) {
+		stack += stk_size;
 		task->stack_origin = stack - sizeof(struct task_info);
 		task->stack_base = task->stack_origin;
 		task->stack_size = stk_size;
@@ -185,18 +186,27 @@ static struct task *__create_task(char *name, task_func_t func,
 		return NULL;
 	}
 
-	/* allocate the stack for this task */
-	if (stk_size) {
-		stk_size = BALIGN(stk_size, PAGE_SIZE);
-		stack = __get_free_pages(PAGE_NR(stk_size), PAGE_NR(stk_size));
-		if (stack == NULL) {
-			pr_err("no more memory for task stack\n");
-			free(task);
-			return NULL;
-		} else {
-			pr_info("stack 0x%x for task-%d\n",
-					(unsigned long)stack, pid);
-		}
+	/*
+	 * if CONFIG_VIRT is enabled, system will use sp reg
+	 * to get the task_info of the task, so need to keep
+	 * the stack size as same in each task
+	 */
+#ifdef CONFIG_VIRT
+	stk_size = TASK_STACK_SIZE;
+	stack = __get_free_pages(PAGE_NR(stk_size), PAGE_NR(stk_size));
+#else
+	stk_size = BALIGN(stk_size, sizeof(unsigned long));
+	if (stk_size)
+		stack = malloc(stk_size);
+#endif
+
+	if (stk_size && !stack) {
+		pr_err("no more memory for task stack\n");
+		free(task);
+		return NULL;
+	} else {
+		pr_debug("stack 0x%x for task-%d\n",
+				(unsigned long)stack, pid);
 	}
 
 	/* store this task to the task table */
@@ -228,8 +238,8 @@ int release_task(struct task *task)
 }
 
 int create_task(char *name, task_func_t func,
-		void *arg, prio_t prio,
-		uint16_t aff, unsigned long opt)
+		void *arg, prio_t prio, uint16_t aff,
+		size_t stk_size, unsigned long opt)
 {
 	int pid = -1;
 	struct task *task;
@@ -244,7 +254,7 @@ int create_task(char *name, task_func_t func,
 		return -ENOPID;
 
 	task = __create_task(name, func, arg, prio,
-			pid, aff, TASK_STACK_SIZE, opt);
+			pid, aff, stk_size, opt);
 	if (!task) {
 		release_pid(pid);
 		pid = -ENOPID;
@@ -348,6 +358,10 @@ int create_idle_task(void)
 	set_current_prio(OS_PRIO_PCPU);
 	set_next_prio(OS_PRIO_PCPU);
 
+#ifndef CONFIG_VIRT
+	__task_info = (unsigned long)task->stack_origin;
+#endif
+
 	return 0;
 }
 
@@ -383,13 +397,13 @@ static int tasks_early_init(void)
 early_initcall(tasks_early_init);
 
 int create_percpu_task(char *name, task_func_t func,
-		void *arg, unsigned long flags)
+		void *arg, size_t ss, unsigned long flags)
 {
 	int cpu, ret = 0;
 
 	for_each_online_cpu(cpu) {
 		ret = create_task(name, func, arg,
-				OS_PRIO_PCPU, cpu, flags);
+				OS_PRIO_PCPU, cpu, ss, flags);
 		if (ret < 0) {
 			pr_err("create [%s] fail on cpu%d\n",
 					name, cpu);
@@ -400,14 +414,14 @@ int create_percpu_task(char *name, task_func_t func,
 }
 
 int create_realtime_task(char *name, task_func_t func, void *arg,
-		prio_t prio, unsigned long flags)
+		prio_t prio, size_t ss, unsigned long flags)
 {
-	return create_task(name, func, arg, prio, 0, flags);
+	return create_task(name, func, arg, prio, 0, ss, flags);
 }
 
 int create_vcpu_task(char *name, task_func_t func,
 		void *arg, int aff, unsigned long flags)
 {
 	return create_task(name, func, arg, OS_PRIO_PCPU,
-			aff, flags | TASK_FLAGS_VCPU);
+			aff, 0, flags | TASK_FLAGS_VCPU);
 }

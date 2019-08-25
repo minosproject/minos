@@ -50,7 +50,7 @@ entry_mask	.req	x18
 
 map_boot_mem:
 	/* save the lr register */
-	mov	x28, x30
+	mov	x26, x30
 
 	mov	x1, #0
 	mov	x2, #4096
@@ -98,7 +98,7 @@ map_boot_mem:
 		TT_S1_ATTR_AF)
 	bl	build_pmd_table
 	dsb	sy
-	ret	x28
+	ret	x26
 
 build_pmd_table:
 	/* map vaddr must smaller than 4G */

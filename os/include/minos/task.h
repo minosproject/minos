@@ -14,6 +14,7 @@ struct task_desc {
 	void *arg;
 	prio_t prio;
 	uint16_t aff;
+	size_t size;
 	unsigned long flags;
 };
 
@@ -39,7 +40,7 @@ struct task_event {
 		__ti->flags = 0; \
 	} while (0)
 
-#define DEFINE_TASK(nn, f, a, p, af, fl) \
+#define DEFINE_TASK(nn, f, a, p, af, ss, fl) \
 	static const struct task_desc __used \
 	task_desc_##f __section(.__task_desc) = { \
 		.name = nn,		\
@@ -47,10 +48,11 @@ struct task_event {
 		.arg = a,		\
 		.prio = p,		\
 		.aff = af,		\
+		.size = ss,		\
 		.flags = fl		\
 	}
 
-#define DEFINE_TASK_PERCPU(nn, f, a, fl) \
+#define DEFINE_TASK_PERCPU(nn, f, a, ss, fl) \
 	static const struct task_desc __used \
 	task_desc_##f __section(.__task_desc) = { \
 		.name = nn,		\
@@ -58,10 +60,11 @@ struct task_event {
 		.arg = a,		\
 		.prio = OS_PRIO_PCPU,	\
 		.aff = PCPU_AFF_PERCPU,	\
+		.size = ss,		\
 		.flags = fl		\
 	}
 
-#define DEFINE_REALTIME(nn, f, a, p, fl) \
+#define DEFINE_REALTIME(nn, f, a, p, ss, fl) \
 	static const struct task_desc __used \
 	task_desc_##f __section(.__task_desc) = { \
 		.name = nn,		\
@@ -69,6 +72,7 @@ struct task_event {
 		.arg = a,		\
 		.prio = p,		\
 		.aff = PCPU_AFF_NONE,	\
+		.size = ss,		\
 		.flags = fl		\
 	}
 
@@ -133,17 +137,17 @@ int alloc_pid(prio_t prio, int cpuid);
 void release_pid(int pid);
 
 int create_percpu_task(char *name, task_func_t func,
-		void *arg, unsigned long flags);
+		void *arg, size_t stk_size, unsigned long flags);
 
-int create_realtime_task(char *name, task_func_t func,
-		void *arg, prio_t prio, unsigned long flags);
+int create_realtime_task(char *name, task_func_t func, void *arg,
+		prio_t prio, size_t stk_size, unsigned long flags);
 
 int create_vcpu_task(char *name, task_func_t func, void *arg,
 		int aff, unsigned long flags);
 
 int create_task(char *name, task_func_t func,
 		void *arg, prio_t prio, uint16_t aff,
-		unsigned long opt);
+		size_t stk_size, unsigned long opt);
 
 int release_task(struct task *task);
 struct task *pid_to_task(int pid);

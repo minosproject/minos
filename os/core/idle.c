@@ -42,10 +42,10 @@ static void create_static_tasks(void)
 	section_for_each_item(__task_desc_start, __task_desc_end, tdesc) {
 		if (tdesc->aff == PCPU_AFF_PERCPU) {
 			create_percpu_task(tdesc->name, tdesc->func,
-					tdesc->arg, tdesc->flags);
+					tdesc->arg, tdesc->size, tdesc->flags);
 		} else {
-			ret = create_realtime_task(tdesc->name, tdesc->func,
-					tdesc->arg, tdesc->prio, tdesc->flags);
+			ret = create_realtime_task(tdesc->name, tdesc->func, tdesc->arg,
+					tdesc->prio, tdesc->size, tdesc->flags);
 			if (ret) {
 				pr_err("create [%s] fail on cpu-%d@%d\n",
 					tdesc->name, tdesc->aff, tdesc->prio);

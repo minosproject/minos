@@ -79,6 +79,7 @@ do_start:
 	sub	x0, x0, x19, lsl #CONFIG_TASK_STACK_SHIFT
 	sub	x0, x0, #TASK_INFO_SIZE
 	mov	sp, x0
+	mov	x28, x0		/* task info save to x28 */
 
 	ldr	x1, =el2_vectors
 	msr	VBAR_EL2, x1
@@ -142,7 +143,7 @@ do_start:
 	/* map the boot memory when booting */
 	bl	map_boot_mem
 
-	ldr	x28, =mmu_on
+	ldr	x26, =mmu_on
 
 	/* enable the mmu and disable the aligment check */
 	mrs	x1, SCTLR_EL2
@@ -154,7 +155,7 @@ do_start:
 	dsb	sy
 	msr	SCTLR_EL2, x1
 	isb
-	br	x28
+	br	x26
 
 mmu_on:
 	dsb	sy

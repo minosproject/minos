@@ -30,7 +30,7 @@ lseinstr := $(call as-instr,.arch_extension lse,-DCONFIG_AS_LSE=1)
 MBUILD_LDFLAGS	+= -X
 
 MBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst)
-MBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables -march=armv8-a -ffixed-x24 -ffixed-x25 -ffixed-x26 -ffixed-x27 -ffixed-x28
+MBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables -march=armv8-a -ffixed-x28
 MBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
 
 ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)

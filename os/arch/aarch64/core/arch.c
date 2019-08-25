@@ -152,6 +152,14 @@ void arch_init_task(struct task *task, void *entry, void *arg)
 	regs->x0 = (uint64_t)arg;
 	regs->elr_elx = (uint64_t)entry;
 	regs->spsr_elx = AARCH64_SPSR_EL2h;
+
+
+	/*
+	 * if the CONFIG_VIRT is not enable the x28
+	 * will store the task_info of a task, and
+	 * system will use x28 to get the task info
+	 */
+	regs->x28 = (uint64_t)task->stack_origin;
 }
 
 static int aarch64_init_percpu(void)

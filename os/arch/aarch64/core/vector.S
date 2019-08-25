@@ -33,11 +33,11 @@ arg5		.req	x5
 arg6		.req	x6
 arg7		.req	x7
 
-cpuid		.req	x24
-ct_addr		.req	x25	/* current task address */
-nt_addr		.req	x26	/* next task address */
-ct		.req	x27	/* current task */
-nt		.req	x28	/* next task */
+cpuid		.req	x23
+ct_addr		.req	x24	/* current task address */
+nt_addr		.req	x25	/* next task address */
+ct		.req	x26	/* current task */
+nt		.req	x27	/* next task */
 
 
 	.type arch_switch_task_sw "function"
