@@ -164,25 +164,31 @@ static inline uint64_t cpuid_to_affinity(int cpuid)
 
 #ifdef CONFIG_VIRT
 register unsigned long __task_info asm ("sp");
-#else
-register unsigned long __task_info asm ("x28");
-#endif
-
-register unsigned long __current_sp asm ("sp");
 
 static inline unsigned long current_sp(void)
 {
-	return ((__current_sp + SP_SIZE) & ~(SP_SIZE - 1));
+	return ((__task_info + SP_SIZE) & ~(SP_SIZE - 1));
 }
 
 static inline struct task_info *current_task_info(void)
 {
-#ifdef CONFIG_VIRT
 	return (struct task_info *)(current_sp() - sizeof(struct task_info));
-#else
-	return (struct task_info *)__task_info;
-#endif
 }
+#else
+register unsigned long __task_info asm ("x28");
+register unsigned long __current_sp asm ("sp");
+
+static inline unsigned long current_sp(void)
+{
+	return __current_sp;
+}
+
+static inline struct task_info *current_task_info(void)
+{
+	return (struct task_info *)__task_info;
+}
+#endif
+
 
 static inline void flush_all_tlb_host(void)
 {
