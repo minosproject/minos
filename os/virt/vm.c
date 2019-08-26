@@ -99,8 +99,10 @@ static int vmtag_check_and_config(struct vmtag *tag)
 		return -EINVAL;
 
 	/* for the dynamic need to get the affinity dynamicly */
-	if (tag->flags & VM_FLAGS_DYNAMIC_AFF)
+	if (tag->flags & VM_FLAGS_DYNAMIC_AFF) {
+		memset(tag->vcpu_affinity, 0, sizeof(tag->vcpu_affinity));
 		get_vcpu_affinity(tag->vcpu_affinity, tag->nr_vcpu);
+	}
 
 	return 0;
 }
@@ -143,6 +145,7 @@ static int __vm_power_off(struct vm *vm, void *args)
 
 	/* set the vm to offline state */
 	pr_info("power off vm-%d\n", vm->vmid);
+	preempt_disable();
 	vm->state = VM_STAT_OFFLINE;
 
 	/*
@@ -160,10 +163,12 @@ static int __vm_power_off(struct vm *vm, void *args)
 		pr_info("vm shutdown request by itself\n");
 		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
 			VMTRAP_REASON_SHUTDOWN, 0, NULL);
+		preempt_enable();
 
 		/* called by itself need to sched out */
 		sched();
-	}
+	} else
+		preempt_enable();
 
 	return 0;
 }
@@ -240,6 +245,7 @@ static int __vm_reset(struct vm *vm, void *args)
 
 	/* set the vm to offline state */
 	pr_info("reset vm-%d\n", vm->vmid);
+	preempt_disable();
 	vm->state = VM_STAT_REBOOT;
 
 	/*
@@ -272,13 +278,15 @@ static int __vm_reset(struct vm *vm, void *args)
 		pr_info("vm reset trigger by itself\n");
 		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
 			VMTRAP_REASON_REBOOT, 0, NULL);
+		preempt_enable();
 		/*
 		 * no need to reset the vmodules for the vm, since
 		* the state will be reset when power up, then sched
 		* out if the reset is called by itself
 		*/
 		sched();
-	}
+	} else
+		preempt_enable();
 
 	return 0;
 }
@@ -468,6 +476,18 @@ static void parse_and_create_vms(void)
 #endif
 }
 
+static int vcpu_affinity_init(void)
+{
+	struct vm *vm0 = get_vm_by_id(0);
+
+	e_base_current = e_base = vm0->vcpu_nr;
+	e_nr = NR_CPUS - vm0->vcpu_nr;
+	f_base_current = f_base = 0;
+	f_nr = vm0->vcpu_nr;
+
+	return 0;
+}
+
 int virt_init(void)
 {
 	struct vm *vm;
@@ -483,6 +503,8 @@ int virt_init(void)
 		pr_err("vm0 has not been create correctly\n");
 		return -ENOENT;
 	}
+
+	vcpu_affinity_init();
 
 	/*
 	 * parsing all the memory/irq and resource
@@ -507,21 +529,3 @@ int virt_init(void)
 
 	return 0;
 }
-
-static int vcpu_affinity_init(void)
-{
-	struct vm *vm0 = get_vm_by_id(0);
-
-	if (!vm0) {
-		pr_warn("vm0 is not created\n");
-		return -EINVAL;
-	}
-
-	e_base_current = e_base = vm0->vcpu_nr;
-	e_nr = NR_CPUS - vm0->vcpu_nr;
-	f_base_current = f_base = 0;
-	f_nr = vm0->vcpu_nr;
-
-	return 0;
-}
-device_initcall(vcpu_affinity_init);

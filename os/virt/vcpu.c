@@ -483,7 +483,6 @@ void destroy_vm(struct vm *vm)
 
 void vcpu_power_off_call(void *data)
 {
-	int old_stat;
 	struct vcpu *vcpu = (struct vcpu *)data;
 
 	if (!vcpu)
@@ -495,13 +494,7 @@ void vcpu_power_off_call(void *data)
 		return;
 	}
 
-	old_stat = vcpu->task->stat;
-
-	/* if the vcpu is current vcpu, sched will set it stat */
-	if ((old_stat != TASK_STAT_RDY) && (old_stat != TASK_STAT_RUNNING) &&
-			vcpu != get_current_vcpu())
-		set_vcpu_stop(vcpu);
-
+	set_vcpu_stop(vcpu);
 	pr_info("power off vcpu-%d-%d done\n", get_vmid(vcpu),
 			get_vcpu_id(vcpu));
 
@@ -513,7 +506,7 @@ void vcpu_power_off_call(void *data)
 	 * new vcpu
 	 */
 	if (vcpu == get_current_vcpu())
-		sched();
+		set_need_resched();
 }
 
 int vcpu_power_off(struct vcpu *vcpu, int timeout)
@@ -535,7 +528,6 @@ int vcpu_power_off(struct vcpu *vcpu, int timeout)
 		set_vcpu_stop(vcpu);
 		pr_info("power off vcpu-%d-%d done\n", get_vmid(vcpu),
 				get_vcpu_id(vcpu));
-		sched();
 	}
 
 	return 0;
