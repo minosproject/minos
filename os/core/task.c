@@ -344,8 +344,12 @@ int create_idle_task(void)
 
 	/* reinit the task's stack information */
 	task->stack_size = TASK_STACK_SIZE;
+#ifndef CONFIG_VIRT
 	task->stack_origin = (void *)current_sp() -
 		sizeof(struct task_info);
+#else
+	task->stack_origin = (void *)current_task_info();
+#endif
 
 	task->stat = TASK_STAT_RUNNING;
 	task->flags |= TASK_FLAGS_IDLE;
@@ -357,10 +361,6 @@ int create_idle_task(void)
 
 	set_current_prio(OS_PRIO_PCPU);
 	set_next_prio(OS_PRIO_PCPU);
-
-#ifndef CONFIG_VIRT
-	__task_info = (unsigned long)task->stack_origin;
-#endif
 
 	return 0;
 }
