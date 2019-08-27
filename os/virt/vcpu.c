@@ -350,7 +350,7 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 	vcpu->vm = vm;
 
 	if (!(vm->flags & VM_FLAGS_64BIT))
-		task->flags &= TASK_FLAGS_32BIT;
+		task->flags |= TASK_FLAGS_32BIT;
 
 	init_list(&vcpu->list);
 
