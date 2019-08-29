@@ -337,7 +337,6 @@ static void inline no_task_sched_return(struct task *task)
 	 */
 	if ((task_info(task)->flags & __TIF_NEED_RESCHED) &&
 			task_is_percpu(task) && (task->start_ns == 0)) {
-		task_info(task)->flags &= ~__TIF_NEED_RESCHED;
 		task->start_ns = NOW();
 		sched_tick_enable(MILLISECS(task->run_time));
 	}
@@ -471,15 +470,10 @@ void switch_to_task(struct task *cur, struct task *next)
 	 * otherwise disable it.
 	 */
 	next->start_ns = NOW();
-	if (task_is_percpu(next)) {
-		if (1)
-		//if (pcpu->local_rdy_tasks > 1)
-			sched_tick_enable(MILLISECS(next->run_time));
-		else
-			sched_tick_disable();
-	} else {
+	if (task_is_percpu(next))
+		sched_tick_enable(MILLISECS(next->run_time));
+	else
 		sched_tick_disable();
-	}
 
 	restore_task_context(next);
 
