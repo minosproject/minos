@@ -729,14 +729,14 @@ void irq_exit(gp_regs *regs)
 static void __used *of_setup_pcpu(struct device_node *node, void *data)
 {
 	int cpuid;
-	uint64_t affinity;
+	uint32_t affinity;
 	struct pcpu *pcpu;
 	char class[16];
 
 	if (node->class != DT_CLASS_CPU)
 		return NULL;
 
-	if (!of_get_u64_array(node, "reg", &affinity, 1))
+	if (!of_get_u32_array(node, "reg", &affinity, 1))
 		return NULL;
 
 	cpuid = affinity_to_cpuid(affinity);
