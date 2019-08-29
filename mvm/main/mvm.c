@@ -244,14 +244,19 @@ static void signal_handler(int signum)
 {
 	int vmid = 0xfff;
 
+	pr_info("recevied signal %i\n", signum);
+
 	switch (signum) {
-	case SIGALRM:
-	case SIGINT:
 	case SIGTERM:
+	case SIGBUS:
+	case SIGKILL:
+	case SIGSEGV:
+	case SIGSTOP:
+	case SIGTSTP:
 		if (mvm_vm)
 			vmid = mvm_vm->vmid;
 
-		pr_info("received signal %i shutdown vm-%d\n", signum, vmid);
+		pr_info("shutdown vm-%d\n", vmid);
 		vm_shutdown(mvm_vm);
 		break;
 	default:
@@ -779,8 +784,12 @@ static int mvm_main(struct vm_config *config)
 	struct vm_os *os;
 	struct vmtag *vmtag = &config->vmtag;
 
-	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
+	signal(SIGBUS, signal_handler);
+	signal(SIGKILL, signal_handler);
+	signal(SIGSEGV, signal_handler);
+	signal(SIGSTOP, signal_handler);
+	signal(SIGTSTP, signal_handler);
 
 	mvm_vm = vm = (struct vm *)calloc(1, sizeof(struct vm));
 	if (!vm)

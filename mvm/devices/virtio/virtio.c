@@ -458,6 +458,7 @@ static int __virtio_vdev_init(struct vdev *vdev,
 
 static void inline virtq_reset(struct virt_queue *vq)
 {
+	vq->ready = 0;
 	vq->desc = NULL;
 	vq->avail = NULL;
 	vq->used = NULL;
@@ -467,7 +468,6 @@ static void inline virtq_reset(struct virt_queue *vq)
 	vq->used_flags = 0;
 	vq->signalled_used = 0;
 	vq->signalled_used_valid = 0;
-	vq->ready = 0;
 }
 
 int virtio_device_reset(struct virtio_device *dev)
@@ -613,6 +613,11 @@ static int virtio_queue_event(struct virtio_device *dev, uint32_t arg)
 	if (!queue->callback) {
 		pr_warn("no callback for the queue %d\n", arg);
 		return -ENOENT;
+	}
+
+	if (!queue->ready) {
+		pr_warn("virt queue is not ready %d\n", queue->vq_index);
+		return -EPERM;
 	}
 
 	if (queue->callback)
