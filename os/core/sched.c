@@ -523,10 +523,13 @@ unsigned long sched_tick_handler(unsigned long data)
 	 * happend if the task is not on the head of the pcpu's
 	 * ready list ? need further check.
 	 */
-	list_del(&task->stat_list);
-	list_add_tail(&pcpu->ready_list, &task->stat_list);
 	task->start_ns = 0;
 	task->run_time = CONFIG_TASK_RUN_TIME;
+	if (task_is_ready(task)) {
+		list_del(&task->stat_list);
+		list_add_tail(&pcpu->ready_list, &task->stat_list);
+	} else
+		pr_info("task is not ready now\n");
 
 	set_need_resched();
 

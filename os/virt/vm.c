@@ -163,6 +163,7 @@ static int __vm_power_off(struct vm *vm, void *args)
 		pr_info("vm shutdown request by itself\n");
 		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
 			VMTRAP_REASON_SHUTDOWN, 0, NULL);
+		set_need_resched();
 		preempt_enable();
 
 		/* called by itself need to sched out */
@@ -278,7 +279,9 @@ static int __vm_reset(struct vm *vm, void *args)
 		pr_info("vm reset trigger by itself\n");
 		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
 			VMTRAP_REASON_REBOOT, 0, NULL);
+		set_need_resched();
 		preempt_enable();
+
 		/*
 		 * no need to reset the vmodules for the vm, since
 		* the state will be reset when power up, then sched

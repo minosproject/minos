@@ -505,8 +505,12 @@ void vcpu_power_off_call(void *data)
 	 * may in el2 and el2/el0, force to sched to the
 	 * new vcpu
 	 */
-	if (vcpu == get_current_vcpu())
+	if (vcpu == get_current_vcpu()) {
+		if (!preempt_allowed())
+			pr_err("%s preempt is not allowed\n", __func__);
+
 		set_need_resched();
+	}
 }
 
 int vcpu_power_off(struct vcpu *vcpu, int timeout)
