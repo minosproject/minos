@@ -386,10 +386,10 @@ recal_task_run_time(struct task *task, struct pcpu *pcpu, int suspend)
 		return;
 
 	now = (NOW() - task->start_ns) / 1000000;
-	now = now > CONFIG_SCHED_INTERVAL ? 0 : CONFIG_SCHED_INTERVAL - now;
+	now = now > CONFIG_TASK_RUN_TIME ? 0 : CONFIG_TASK_RUN_TIME - now;
 
 	if (now < 15)
-		task->run_time = CONFIG_SCHED_INTERVAL + now;
+		task->run_time = CONFIG_TASK_RUN_TIME + now;
 	else
 		task->run_time = now;
 
