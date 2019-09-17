@@ -8,6 +8,7 @@
 #include <minos/types.h>
 #include <minos/atomic.h>
 
+#ifdef CONFIG_SMP
 #define DEFINE_SPIN_LOCK(name)	\
 	spinlock_t name = {	\
 		.next_ticket = { \
@@ -43,5 +44,23 @@ static void inline raw_spin_unlock(spinlock_t *lock)
 	__atomic_set(ticket + 1, &lock->ticket_in_service);
 	mb();
 }
+#else
+#define DEFINE_SPIN_LOCK(name) spinlock_t name
+
+static void inline spin_lock_init(spinlock_t *lock)
+{
+
+}
+
+static void inline raw_spin_lock(spinlock_t *lock)
+{
+
+}
+
+static void inline raw_spin_unlock(spinlock_t *lock)
+{
+
+}
+#endif
 
 #endif

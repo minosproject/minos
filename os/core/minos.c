@@ -71,7 +71,9 @@ void boot_main(void *setup_data)
 	pcpus_init();
 	platform_init();
 	irq_init();
+#ifdef CONFIG_SMP
 	smp_init();
+#endif
 	softirq_init();
 	init_timers();
 
@@ -91,7 +93,10 @@ void boot_main(void *setup_data)
 
 	create_idle_task();
 
+#ifdef CONFIG_SMP
 	smp_cpus_up();
+#endif
+
 #ifdef CONFIG_VIRT
 	virt_init();
 #endif

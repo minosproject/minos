@@ -134,8 +134,10 @@ typedef struct {
 } atomic_t;
 
 typedef struct spinlock {
+#ifdef CONFIG_SMP
 	atomic_t next_ticket;
 	atomic_t ticket_in_service;
+#endif
 } spinlock_t;
 
 #endif
