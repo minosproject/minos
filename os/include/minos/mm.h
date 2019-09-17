@@ -4,6 +4,7 @@
 #include <minos/list.h>
 #include <minos/spinlock.h>
 #include <minos/memattr.h>
+#include <minos/bootmem.h>
 
 struct mem_block {
 	unsigned long phy_base;
@@ -24,22 +25,15 @@ struct mem_block {
  * the address to page
  */
 struct page {
-	unsigned long phy_base;
-	struct page *next;
+	union {
+		unsigned long phy_base;
+		unsigned long size;
+	};
+	union {
+		struct page *next;
+		unsigned long magic;
+	};
 } __packed__;
-
-#define MEMORY_REGION_F_RSV	(1 << 0)
-
-struct memory_region {
-	uint32_t flags;
-	phy_addr_t phy_base;
-	vir_addr_t vir_base;
-	size_t size;
-	struct list_head list;
-};
-
-int add_memory_region(uint64_t base, uint64_t size, uint32_t flags);
-int split_memory_region(vir_addr_t base, size_t size, uint32_t flags);
 
 int mm_init(void);
 void *malloc(size_t size);
@@ -84,13 +78,27 @@ static inline void *get_io_pages(int pages)
 	return __get_io_pages(pages, 1);
 }
 
+#ifdef CONFIG_SIMPLE_MM_ALLOCATER
+static inline struct mem_block *alloc_mem_block(unsigned long flags)
+{
+	return NULL;
+}
+
+static inline void release_mem_block(struct mem_block *block)
+{
+
+}
+
+static inline void add_slab_mem(unsigned long base, size_t size)
+{
+
+}
+
+#else
 struct mem_block *alloc_mem_block(unsigned long flags);
 void release_mem_block(struct mem_block *block);
 int has_enough_memory(size_t size);
-
-void *alloc_boot_mem(size_t size);
-void *alloc_boot_pages(int pages);
-
 void add_slab_mem(unsigned long base, size_t size);
+#endif
 
 #endif
