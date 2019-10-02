@@ -20,9 +20,7 @@ struct virq_chip {
 
 	/* for vgicv2 and vgicv3 that support hw virtualaztion */
 #if defined(CONFIG_VIRQCHIP_VGICV2) || defined(CONFIG_VIRQCHIP_VGICV3)
-#define MAX_NR_LRS 64
 	int nr_lrs;
-	DECLARE_BITMAP(irq_bitmap, MAX_NR_LRS);
 #endif
 
 	void *inc_pdata;

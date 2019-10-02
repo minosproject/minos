@@ -53,8 +53,11 @@ int vgic_irq_enter_to_guest(struct vcpu *vcpu, void *data)
 		if (!virq_is_pending(virq)) {
 			pr_err("virq is not request %d %d\n", virq->vno, virq->id);
 			virq->state = 0;
-			if (virq->id != VIRQ_INVALID_ID)
+			if (virq->id != VIRQ_INVALID_ID) {
 				virqchip_update_virq(vcpu, virq, VIRQ_ACTION_CLEAR);
+				clear_bit(virq->id, virq_struct->irq_bitmap);
+				virq->id = VIRQ_INVALID_ID;
+			}
 			list_del(&virq->list);
 			virq->list.next = NULL;
 			continue;
@@ -74,14 +77,14 @@ int vgic_irq_enter_to_guest(struct vcpu *vcpu, void *data)
 			goto __do_send_virq;
 
 		/* allocate a id for the virq */
-		id = find_next_zero_bit(vc->irq_bitmap, vc->nr_lrs, id);
+		id = find_next_zero_bit(virq_struct->irq_bitmap, vc->nr_lrs, 0);
 		if (id == vc->nr_lrs) {
 			pr_warn("virq id is full can not send all virq\n");
 			break;
 		}
 
 		virq->id = id;
-		set_bit(id, vc->irq_bitmap);
+		set_bit(id, virq_struct->irq_bitmap);
 
 __do_send_virq:
 		virqchip_send_virq(vcpu, virq);
@@ -105,7 +108,6 @@ int vgic_irq_exit_from_guest(struct vcpu *vcpu, void *data)
 	 */
 	int status;
 	struct virq_desc *virq, *n;
-	struct virq_chip *vc = vcpu->vm->virq_chip;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
 
 	list_for_each_entry_safe(virq, n, &virq_struct->active_list, list) {
@@ -121,7 +123,7 @@ int vgic_irq_exit_from_guest(struct vcpu *vcpu, void *data)
 		if (status == VIRQ_STATE_INACTIVE) {
 			if (!virq_is_pending(virq)) {
 				virqchip_update_virq(vcpu, virq, VIRQ_ACTION_CLEAR);
-				clear_bit(virq->id, vc->irq_bitmap);
+				clear_bit(virq->id, virq_struct->irq_bitmap);
 				virq->state = VIRQ_STATE_INACTIVE;
 				list_del(&virq->list);
 				virq->id = VIRQ_INVALID_ID;

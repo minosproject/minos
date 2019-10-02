@@ -84,6 +84,10 @@ struct virq_struct {
 	struct list_head pending_list;
 	struct list_head active_list;
 	struct virq_desc local_desc[VM_LOCAL_VIRQ_NR];
+#if defined(CONFIG_VIRQCHIP_VGICV2) || defined(CONFIG_VIRQCHIP_VGICV3)
+#define MAX_NR_LRS 64
+	DECLARE_BITMAP(irq_bitmap, MAX_NR_LRS);
+#endif
 };
 
 static void inline virq_set_enable(struct virq_desc *d)

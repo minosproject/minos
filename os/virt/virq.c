@@ -396,6 +396,7 @@ void vcpu_virq_struct_reset(struct vcpu *vcpu)
 	init_list(&virq_struct->active_list);
 	virq_struct->pending_virq = 0;
 	virq_struct->pending_hirq = 0;
+	memset(virq_struct->irq_bitmap, 0, sizeof(virq_struct->irq_bitmap));
 
 	for (i = 0; i < VM_LOCAL_VIRQ_NR; i++) {
 		desc = &virq_struct->local_desc[i];

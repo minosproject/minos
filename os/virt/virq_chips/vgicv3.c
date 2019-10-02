@@ -531,10 +531,7 @@ static void vgic_deinit(struct vdev *vdev)
 
 static void vgic_reset(struct vdev *vdev)
 {
-	struct virq_chip *vc = vdev->vm->virq_chip;
-
 	pr_info("vgic device reset\n");
-	bitmap_clear(vc->irq_bitmap, 0, MAX_NR_LRS);
 }
 
 static int64_t gicv3_read_lr(int lr)
