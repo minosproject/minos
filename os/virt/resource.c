@@ -24,6 +24,7 @@
 #include <virt/vmm.h>
 #include <minos/irq.h>
 #include <virt/mailbox.h>
+#include <minos/platform.h>
 
 static void *virqchip_start;
 static void *virqchip_end;
@@ -207,11 +208,14 @@ static int create_pdev_iomem_of(struct vm *vm, struct device_node *node)
 	for (i = 0; i < nr_addr; i++) {
 		ret = of_translate_address_index(node, &addr, &size, i);
 		if (ret) {
-			pr_warn("bad address or size for %s\n", i, node->name);
+			pr_warn("bad address index %d for %s\n", i, node->name);
 			continue;
 		}
 
 		if (size == 0)
+			continue;
+
+		if (!platform_iomem_valid(addr))
 			continue;
 
 		/* map the physical memory for vm */

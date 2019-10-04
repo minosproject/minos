@@ -15,6 +15,7 @@ struct platform {
 	void (*system_shutdown)(void);
 	int (*system_suspend)(void);
 	int (*time_init)(void);
+	int (*iomem_valid)(unsigned long addr);
 #ifdef CONFIG_VIRT
 	int (*setup_hvm)(struct vm *vm, void *data);
 #endif
@@ -28,6 +29,7 @@ extern struct platform *platform;
 	static struct platform *__platform__##pl __used \
 		__section(".__platform") = &pl
 
-extern void platform_set_to(const char *name);
+void platform_set_to(const char *name);
+int platform_iomem_valid(unsigned long addr);
 
 #endif
