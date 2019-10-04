@@ -362,11 +362,9 @@ static int gicv2_init(struct device_node *node)
 	translate_device_address_index(node, &array[4], &array[5], 2);
 	translate_device_address_index(node, &array[6], &array[7], 3);
 
-	pr_info("gicv2 information :\n"
-		"        gic_dist_addr=%p size=0x%x\n"
-		"        gic_cpu_addr=%p size=0x%x\n"
-		"        gic_hyp_addr=%p size=0x%x\n"
-		"        gic_vcpu_addr=%p size=0x%x\n",
+	pr_info("gicv2 information: gic_dist_addr=%p size=0x%x "
+		"gic_cpu_addr=%p size=0x%x gic_hyp_addr=%p size=0x%x "
+		"gic_vcpu_addr=%p size=0x%x\n",
 		array[0], array[1], array[2], array[3],
 		array[4], array[5], array[6], array[7]);
 
