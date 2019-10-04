@@ -744,7 +744,7 @@ static void __used *of_setup_pcpu(struct device_node *node, void *data)
 		return NULL;
 
 	memset(class, 0, 16);
-	if (!of_get_string(node, "sched_class", class, 15))
+	if (of_get_string(node, "sched_class", class, 15) <= 0)
 		return NULL;
 
 	pr_info("sched class of pcpu-%d: %s\n", cpuid, class);
