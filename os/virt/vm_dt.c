@@ -87,6 +87,7 @@ static int fdt_setup_cmdline(struct vm *vm)
 	char *new_cmdline;
 	char buf[512];
 	void *dtb = vm->setup_data;
+	extern void *hv_dtb;
 
 	chosen_node = fdt_path_offset(dtb, "/chosen");
 	if (chosen_node < 0) {
@@ -103,11 +104,11 @@ static int fdt_setup_cmdline(struct vm *vm)
 	else
 		pr_info("default_cmdline: %s\n", (char *)data);
 
-	node = fdt_path_offset(dtb, "/vms/vm0");
+	node = fdt_path_offset(hv_dtb, "/vms/vm0");
 	if (node < 0)
 		return 0;
 
-	new_cmdline = (char *)fdt_getprop(dtb, node, "cmdline", &len);
+	new_cmdline = (char *)fdt_getprop(hv_dtb, node, "cmdline", &len);
 	if (!new_cmdline || len <= 0) {
 		pr_info("no new cmdline using default\n");
 		return 0;
@@ -122,6 +123,7 @@ static int fdt_setup_cmdline(struct vm *vm)
 	pr_info("new_cmdline:%s\n", new_cmdline);
 	strncpy(buf, new_cmdline, MIN(511, len));
 	fdt_setprop(dtb, chosen_node, "bootargs", buf, len);
+
 	return 0;
 }
 
