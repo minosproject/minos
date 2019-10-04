@@ -104,6 +104,11 @@ typedef void (*void_func_t)(void);
 #define IS_PAGE_ALIGN(x)	(!((unsigned long)(x) & (PAGE_SIZE - 1)))
 #define IS_BLOCK_ALIGN(x)	(!((unsigned long)(x) & (0x1fffff)))
 
+#define __IN_RANGE_UNSIGNED(value, base, size) \
+	((value >= base) && (value < (base + size)))
+#define IN_RANGE_UNSIGNED(value, base, size) \
+	__IN_RANGE_UNSIGNED((unsigned long)(value), (unsigned long)(base), (size_t)(size))
+
 #define __stringify_1(x...) #x
 #define __stringify(x...)   __stringify_1(x)
 

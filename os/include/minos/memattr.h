@@ -45,16 +45,18 @@
 #define GPF_PAGE_META		(1 << 2)
 #define GFB_VM			(1 << 3)
 #define GFB_IO			(1 << 4)
+#define GFB_FIXED		(1 << 5)
 
 #define GFB_SLAB_BIT		(0)
 #define GFB_PAGE_BIT		(1)
 #define GFB_PAGE_META_BIT	(2)
 #define GFB_VM_BIT		(3)
 #define GFB_IO_BIT		(4)
+#define GFB_FIXED_BIT		(5)
 
 #define GFB_MASK		(0xffff)
 
-#define MAX_MEM_SECTIONS	(10)
+#define MAX_MEM_SECTIONS	(32)
 #define MEM_BLOCK_SIZE		(0x200000)
 #define MEM_BLOCK_SHIFT		(21)
 #define PAGES_IN_BLOCK		(MEM_BLOCK_SIZE >> PAGE_SHIFT)

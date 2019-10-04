@@ -23,8 +23,6 @@ unsigned long bootmem_size = 0;
 static DEFINE_SPIN_LOCK(bootmem_lock);
 void *bootmem_page_base;
 
-LIST_HEAD(mem_list);
-
 #define BOOTMEM_MIN_SIZE	(32 * 1024)
 
 void *alloc_boot_mem(size_t size)
@@ -109,93 +107,4 @@ void bootmem_init(void)
 			(unsigned long)bootmem_start,
 			(unsigned long)bootmem_end,
 			(unsigned long)bootmem_size);
-}
-
-int add_memory_region(uint64_t base, uint64_t size, uint32_t flags)
-{
-	struct memory_region *region;
-
-	if (size == 0)
-		return -EINVAL;
-
-	region = alloc_boot_mem(sizeof(struct memory_region));
-	if (!region)
-		panic("no more boot memory\n");
-
-	memset((void *)region, 0, sizeof(struct memory_region));
-	region->vir_base = base;
-	region->phy_base = base;
-	region->size = size;
-	region->flags = flags;
-
-	pr_info("ADD MEM : 0x%x -> 0x%x 0x%x %d\n", region->vir_base,
-		region->phy_base, region->size, region->flags);
-
-	init_list(&region->list);
-	list_add_tail(&mem_list, &region->list);
-
-	return 0;
-}
-
-int split_memory_region(vir_addr_t base, size_t size, uint32_t flags)
-{
-	vir_addr_t start, end;
-	vir_addr_t new_end = base + size;
-	struct memory_region *region, *n, *tmp;
-
-	pr_info("SPLIT MEM 0x%x 0x%x\n", base, size);
-
-	if ((size == 0))
-		return -EINVAL;
-
-	/*
-	 * delete the memory for host, these region
-	 * usually for vms
-	 */
-	list_for_each_entry_safe(region, n, &mem_list, list) {
-		start = region->vir_base;
-		end = start + region->size;
-
-		if ((base > end) || (base < start) || (new_end > end))
-			continue;
-
-		/* just delete this region from the list */
-		if ((base == start) && (new_end == end)) {
-			return 0;
-		} else if ((base == start) && (new_end < end)) {
-			region->vir_base = region->phy_base = new_end;
-			region->size -= size;
-		} else if ((base > start) && (new_end < end)) {
-			n = alloc_boot_mem(sizeof(struct memory_region));
-			if (!n)
-				panic("no more boot memory\n");
-			init_list(&n->list);
-			n->vir_base = n->phy_base = new_end;
-			n->size = end - new_end;
-			n->flags = region->flags;
-			list_add_tail(&mem_list, &n->list);
-			region->size = base - start;
-		} else if ((base > start) && (end == new_end)) {
-			region->size = region->size - size;
-		} else {
-			pr_warn("incorrect memory region 0x%x 0x%x\n",
-					base, size);
-			return -EINVAL;
-		}
-
-		/* alloc a new memory region for vm memory */
-		tmp = alloc_boot_mem(sizeof(struct memory_region));
-		if (!tmp)
-			panic("no more boot memory\n");
-		init_list(&tmp->list);
-		tmp->vir_base = tmp->phy_base = base;
-		tmp->size = size;
-		tmp->flags = region->flags;
-		list_add_tail(&mem_list, &tmp->list);
-
-		return 0;
-	}
-
-	add_memory_region(base, size, flags);
-	return 0;
 }

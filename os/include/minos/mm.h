@@ -6,15 +6,39 @@
 #include <minos/memattr.h>
 #include <minos/bootmem.h>
 
+#define MEMORY_REGION_F_NORMAL	(1 << 0)
+#define MEMORY_REGION_F_DMA	(1 << 1)
+#define MEMORY_REGION_F_RSV	(1 << 2)
+#define MEMORY_REGION_F_VM	(1 << 3)
+#define MEMORY_REGION_F_DTB	(1 << 4)
+#define MEMORY_REGION_F_KERNEL	(1 << 5)
+#define MEMORY_REGION_TYPE_MASK (0xff)
+
+#define MEMORY_REGION_TYPE_NORMAL	0
+#define MEMORY_REGION_TYPE_DMA		1
+#define MEMORY_REGION_TYPE_RSV		2
+#define MEMORY_REGION_TYPE_VM		3
+#define MEMORY_REGION_TYPE_DTB		4
+#define MEMORY_REGION_TYPE_KERNEL	5
+#define MEMORY_REGION_TYPE_MAX		6
+
+struct memory_region {
+	uint32_t flags;
+	phy_addr_t phy_base;
+	vir_addr_t vir_base;
+	size_t size;
+	struct list_head list;
+};
+
 struct mem_block {
 	unsigned long phy_base;
 	uint16_t flags;
 	uint16_t free_pages;
+	uint16_t nr_pages;
 	uint16_t bm_current;
-	uint16_t padding;
 	struct list_head list;
 	unsigned long *pages_bitmap;
-} __packed__;
+};
 
 /*
  * phy_base[0:11] is the count of the continous page
@@ -33,7 +57,11 @@ struct page {
 		struct page *next;
 		unsigned long magic;
 	};
-} __packed__;
+};
+
+int add_memory_region(uint64_t base, uint64_t size, uint32_t flags);
+int split_memory_region(vir_addr_t base, size_t size, uint32_t flags);
+int memory_region_type(struct memory_region *region);
 
 int mm_init(void);
 void *malloc(size_t size);

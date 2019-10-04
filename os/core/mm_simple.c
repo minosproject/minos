@@ -233,7 +233,7 @@ void release_pages(struct page *page)
 		__free(page);
 }
 
-int mm_init(void)
+int mm_do_init(void)
 {
 	struct memory_region *region;
 
@@ -243,14 +243,11 @@ int mm_init(void)
 	 */
 	pr_info("simple memory allocator init...\n");
 
-	split_memory_region(CONFIG_MINOS_START_ADDRESS,
-			CONFIG_MINOS_RAM_SIZE, 0);
-
-	list_for_each_entry(region, &mem_list, list) {
-		init_mem_zone(region->vir_base, region->size);
-	}
-
+	/* at least one memory zoen for minos */
 	nr_mem_zone = 1;
+
+	list_for_each_entry(region, &mem_list, list)
+		init_mem_zone(region->vir_base, region->size);
 
 	return 0;
 }

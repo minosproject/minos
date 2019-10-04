@@ -29,9 +29,21 @@ extern void *bootmem_page_base;
 extern unsigned long bootmem_size;
 extern struct list_head mem_list;
 
+#define MEM_SECTION_NORMAL	MEMORY_REGION_TYPE_NORMAL
+#define MEM_SECTION_DMA		MEMORY_REGION_TYPE_DMA
+#define MEM_SECTION_PAGE	(MEMORY_REGION_TYPE_MAX)
+
+#define MEM_SECTION_F_NORMAL	MEMORY_REGION_F_NORMAL
+#define MEM_SECTION_F_DMA	MEMORY_REGION_F_DMA
+#define MEM_SECTION_TYPE_MASK	(0xff)
+
+#define MEM_SECTION_F_PAGE	(1 << 8)
+#define MEM_SECTION_F_BLOCK	(1 << 9)
+
 struct mem_section {
 	unsigned long phy_base;
 	int id;
+	int type;
 	size_t size;
 	size_t nr_blocks;
 	size_t free_blocks;
@@ -39,10 +51,12 @@ struct mem_section {
 	unsigned long bm_end;
 	unsigned long bm_current;
 	spinlock_t lock;
-	struct mem_block *blocks;
+	union {
+		struct mem_block *blocks;
+		struct page *pages;
+	};
 };
 
-struct slab_header;
 struct slab_header {
 	unsigned long size;
 	union {
@@ -75,6 +89,7 @@ struct page_pool {
 	struct list_head block_list;
 };
 
+#define MIN_BLOCK_PAGE_SIZE	(8 * PAGE_SIZE)
 #define PAGE_METAS_IN_BLOCK	(254)
 #define BLOCK_BITMAP_SIZE	(64)
 #define PAGE_METAS_BITMAP_SIZE	(DIV_ROUND_UP(PAGE_METAS_IN_BLOCK, BITS_PER_BYTE))
@@ -148,59 +163,137 @@ static LIST_HEAD(host_list);
 #define FREE_POOL_OFFSET		(2)
 #define CACHE_POOL_OFFSET		(1)
 
-static int add_memory_section(unsigned long mem_base, size_t size)
+static int inline add_page_section(phy_addr_t base, size_t size)
 {
 	struct mem_section *ms;
-	unsigned long mem_end;
-	size_t real_size;
+	phy_addr_t mem_base, mem_end;
+	size_t real_size, left;
 
-	if (nr_sections >= MAX_MEM_SECTIONS)
+	if ((size == 0) || (nr_sections >= MAX_MEM_SECTIONS)) {
+		pr_err("no enough memory section for page section\n");
 		return -EINVAL;
+	}
 
-	/*
-	 * Fix Me : may waste some memory
-	 */
-	ms = &mem_sections[nr_sections];
-	spin_lock_init(&ms->lock);
-
-	mem_end = ALIGN(mem_base + size, MEM_BLOCK_SIZE);
-	mem_base = BALIGN(mem_base, MEM_BLOCK_SIZE);
+	mem_end = ALIGN(base + size, PAGE_SIZE);
+	mem_base = BALIGN(base, PAGE_SIZE);
 	real_size = mem_end - mem_base;
 
-	/* if the memory is smaller than BLOCK_SIZE */
-	if ((real_size == 0) && (size > 0)) {
-		add_slab_mem(mem_base, size);
+	if (real_size == 0) {
+		add_slab_mem(base, size);
 		return 0;
 	}
 
+	pr_info("PAGE  SECTION: base: 0x%p size: 0x%x\n",
+			mem_base, real_size);
+	ms = &mem_sections[nr_sections];
+	spin_lock_init(&ms->lock);
+
+	/* nr_blocks or free_blocks means the pages count */
 	ms->phy_base = mem_base;
 	ms->size = real_size;
+	ms->type = MEM_SECTION_F_NORMAL | MEM_SECTION_F_PAGE;
+	ms->nr_blocks = real_size >> PAGE_SHIFT;
+	ms->free_blocks = ms->nr_blocks;
+	ms->id = nr_sections;
+
+	/* init the bitmaps and pages data for this section */
+	ms->bitmap = alloc_boot_mem(BITS_TO_LONGS(ms->nr_blocks));
+	if (!ms->bitmap) {
+		pr_err("no enough boot mem for section bitmap\n");
+		return -ENOMEM;
+	}
+
+	memset(ms->bitmap, 0, BITS_TO_LONGS(ms->nr_blocks));
+	ms->bm_current = 0;
+	ms->bm_end = ms->nr_blocks;
+
+	ms->pages = alloc_boot_mem(ms->nr_blocks * sizeof(struct page));
+	if (!ms->pages) {
+		pr_err("no enough boot mem for section pages\n");
+		return -ENOMEM;
+	}
+
+	/* memset(ms->pages, 0, ms->nr_blocks * sizeof(struct page)); */
+	nr_sections++;
+
+	left = mem_base - base;
+	add_slab_mem(base, left);
+
+	left = (base + size) - mem_end;
+	add_slab_mem(base, left);
+
+	return 0;
+}
+
+static int add_block_section(phy_addr_t base, size_t size, int type)
+{
+	struct mem_section *ms;
+	phy_addr_t mem_end, mem_base;
+	size_t real_size, left;
+
+	if ((size == 0) || (nr_sections >= MAX_MEM_SECTIONS)) {
+		pr_err("no enough memory section for block section\n");
+		return -EINVAL;
+	}
+
+	mem_end = ALIGN(base + size, MEM_BLOCK_SIZE);
+	mem_base = BALIGN(base, MEM_BLOCK_SIZE);
+	real_size = mem_end - mem_base;
+
+	/*
+	 * if the memory is smaller than BLOCK_SIZE, if the size
+	 * is bigger than 32K, add it to a block list for page
+	 * allocater, otherwise add it to the slab lis
+	 */
+	if (real_size == 0) {
+		add_page_section(base, size);
+		return 0;
+	}
+
+	ms = &mem_sections[nr_sections];
+	spin_lock_init(&ms->lock);
+
+	ms->phy_base = mem_base;
+	ms->size = real_size;
+	ms->type = (type & MEM_SECTION_TYPE_MASK) | MEM_SECTION_F_BLOCK;
 	ms->nr_blocks = real_size >> MEM_BLOCK_SHIFT;
 	ms->free_blocks = ms->nr_blocks;
 	ms->id = nr_sections;
 	free_blocks += ms->nr_blocks;
 
 	nr_sections++;
-	pr_info("MEM SECTION : start:0x%x size:0x%x\n", mem_base, size);
+	pr_info("BLOCK SECTION: base: 0x%x size: 0x%x type: %d\n",
+			mem_base, size, type);
 
-	size = size - real_size;
-	if (size > SLAB_MIN_SIZE)
-		add_slab_mem(mem_base + real_size, size);
+	/*
+	 * handle the memory space if the section is not
+	 * BLOCK align first is the header section, then
+	 * is the tail section
+	 */
+	left = mem_base - base;
+	if (left > 0)
+		add_page_section(base, left);
+
+	left = (base + size) - mem_end;
+	if (left > 0)
+		add_page_section(mem_base + real_size, left);
 
 	return 0;
 }
 
 static void parse_system_regions(void)
 {
+	int type;
 	struct memory_region *region;
 
-	split_memory_region(CONFIG_MINOS_START_ADDRESS, CONFIG_MINOS_RAM_SIZE, 0);
-
 	list_for_each_entry(region, &mem_list, list) {
-		if (region->flags != 0)
+		type = memory_region_type(region);
+		if ((type == MEMORY_REGION_TYPE_RSV) ||
+			(type == MEMORY_REGION_TYPE_VM) ||
+			(type == MEMORY_REGION_F_DTB))
 			continue;
 
-		add_memory_section(region->vir_base, region->size);
+		add_block_section(region->vir_base, region->size, type);
 	}
 }
 
@@ -215,6 +308,9 @@ static unsigned long blocks_bitmap_init(unsigned long base)
 	 */
 	for (i = 0; i < nr_sections; i++) {
 		section = &mem_sections[i];
+		if (!(section->type & MEM_SECTION_F_BLOCK))
+			continue;
+
 		section->bitmap = (unsigned long *)bitmap_base;
 		section->bm_current = 0;
 		section->bm_end = section->nr_blocks;
@@ -233,17 +329,18 @@ static unsigned long blocks_table_init(unsigned long base)
 	struct mem_section *section;
 	unsigned long tmp = base;
 
-	/*
-	 * allocate memory for mem_block table need confirm
-	 */
+	/* allocate memory for mem_block table need confirm */
 	for (i = 0; i < nr_sections; i++) {
 		section = &mem_sections[i];
+		if (!(section->type & MEM_SECTION_F_BLOCK))
+			continue;
+
 		section->blocks = (struct mem_block *)tmp;
 		tmp += (section->nr_blocks) * sizeof(struct mem_block);
 		tmp = BALIGN(tmp, sizeof(unsigned long));
 	}
 
-	memset((void *)base, 0, tmp - base);
+	/* memset((void *)base, 0, tmp - base); */
 
 	return tmp;
 }
@@ -271,8 +368,8 @@ static int mem_sections_init(void)
 	pr_info("code_start after blocks_init:0x%x\n", mem_start);
 
 	/*
-	 * find the boot section, boot section do not need
-	 * to map again
+	 * find the boot section, boot section need always MEM_BLOCK
+	 * align, other section may not mapped
 	 */
 	for (i = 0; i < nr_sections; i++) {
 		section = &mem_sections[i];
@@ -284,12 +381,11 @@ static int mem_sections_init(void)
 	}
 
 	if (!boot_section)
-		panic("errors in memory config\n");
+		panic("errors in memory config no boot section\n");
 
 	/*
-	 * boot section must be the first entry
-	 * since when map the memory need to allocate
-	 * the page table, at that time only boot section
+	 * boot section must be the first entry since when map the memory
+	 * need to allocate the page table, at that time only boot section
 	 * has been mapped
 	 */
 	if (boot_section->id != 0) {
@@ -322,6 +418,7 @@ static int mem_sections_init(void)
 		block->free_pages = 0;
 		block->bm_current = 0;
 		block->phy_base = code_base;
+		block->flags = 0;
 
 		block++;
 		code_base += MEM_BLOCK_SIZE;
@@ -340,11 +437,14 @@ static int mem_sections_init(void)
 	/* add left bootmem to slab allocator */
 	boot_block_size = bootmem_page_base - bootmem_start;
 	if (boot_block_size > SLAB_MIN_SIZE) {
+		pr_info("add left boot mem to slab 0x%p->0x%x\n",
+				bootmem_start, boot_block_size);
 		add_slab_mem((unsigned long)bootmem_start,
 				boot_block_size);
-		bootmem_size = 0;
-		bootmem_start = NULL;
 	}
+
+	bootmem_size = 0;
+	bootmem_start = NULL;
 
 	return 0;
 }
@@ -356,8 +456,7 @@ static struct mem_section *addr_to_mem_section(unsigned long addr)
 
 	for (i = 0; i < nr_sections; i++) {
 		temp = &mem_sections[i];
-		if ((addr >= temp->phy_base) &&
-			(addr < (temp->phy_base + temp->size))) {
+		if (IN_RANGE_UNSIGNED(addr, temp->phy_base, temp->size)) {
 			section = temp;
 			break;
 		}
@@ -371,6 +470,8 @@ static struct mem_block *addr_to_mem_block(unsigned long addr)
 	struct mem_section *section = NULL;
 
 	section = addr_to_mem_section(addr);
+	if (!section || !(section->type & MEM_SECTION_F_BLOCK))
+		return NULL;
 
 	return (&section->blocks[(addr - section->phy_base) >>
 			MEM_BLOCK_SHIFT]);
@@ -445,6 +546,9 @@ struct mem_block *alloc_mem_block(unsigned long flags)
 
 	for (i = 0; i < nr_sections; i++) {
 		section = &mem_sections[i];
+		if (!(section->type & MEM_SECTION_F_BLOCK))
+			continue;
+
 		block = __alloc_mem_block(section, flags);
 		if (block)
 			break;
@@ -544,7 +648,7 @@ static struct page *alloc_pages_from_block(struct mem_block *block,
 	 */
 	block->free_pages -= count;
 	bitmap_set(block->pages_bitmap, bit, count);
-	if (count == 1) {
+	if ((count == 1) || (align == 1)) {
 		block->bm_current = bit + count;
 		if (block->bm_current == PAGES_IN_BLOCK)
 			block->bm_current = 0;
@@ -563,15 +667,12 @@ static struct page *alloc_pages_from_block(struct mem_block *block,
 	return page;
 }
 
-static struct page *__alloc_pages_internal(struct page_pool *pool,
+static struct page *alloc_pages_from_pool(struct page_pool *pool,
 		int count, int align, unsigned long flags)
 {
 	struct mem_block *block = NULL, *n = NULL;
 	unsigned long *page_meta = NULL;
 	struct page *page = NULL;
-
-	if (count <= 0)
-		return NULL;
 
 	spin_lock(&pool->lock);
 
@@ -593,9 +694,7 @@ static struct page *__alloc_pages_internal(struct page_pool *pool,
 	if (page)
 		goto out;
 
-	/*
-	 * need new memory block from the section
-	 */
+	/* need new memory block from the section */
 	block = alloc_mem_block(flags);
 	if (!block)
 		goto out;
@@ -616,9 +715,87 @@ out:
 	return page;
 }
 
+static struct page *__alloc_pages_from_section(struct mem_section *section,
+		int count, int align)
+{
+	int bit, i;
+	void *addr;
+	struct page *page, *tmp;
+
+	if (count == 1)
+		bit = find_next_zero_bit(section->bitmap, section->nr_blocks,
+				section->bm_current);
+	else
+		bit = bitmap_find_next_zero_area_align(section->bitmap,
+				section->nr_blocks, 0, count, align);
+	if (bit >= section->nr_blocks)
+		return NULL;
+
+	bitmap_set(section->bitmap, bit, count);
+	if ((count = 1) || (align == 1)) {
+		section->bm_current = bit + count;
+		if (section->bm_current >= section->nr_blocks)
+			section->bm_current = 0;
+	}
+
+	tmp = page = section->pages + bit;
+	addr = (void *)PAGE_ADDR(section->phy_base, bit);
+	page->phy_base = (unsigned long)addr | (count & 0xfff);
+	section->free_blocks -= count;
+
+	/* indicate that other pages are not a page header */
+	for (i = 1; i < count; i++) {
+		tmp++;
+		tmp->phy_base = (unsigned long)(addr + PAGE_SIZE * i) | 0xfff;
+	}
+
+	return page;
+}
+
+static struct page *alloc_pages_from_section(int pages, int align)
+{
+	int i;
+	struct page *page = NULL;
+	struct mem_section *section;
+
+	for (i = 0; i < nr_sections; i++) {
+		section = &mem_sections[i];
+		if (!(section->type & MEM_SECTION_F_PAGE))
+			continue;
+
+		spin_lock(&section->lock);
+		if (section->free_blocks < pages) {
+			spin_unlock(&section->lock);
+			continue;
+		}
+
+		page = __alloc_pages_from_section(section, pages, align);
+		spin_unlock(&section->lock);
+
+		if (page)
+			return page;
+	}
+
+	return NULL;
+}
+
 struct page *__alloc_pages(int pages, int align)
 {
-	return __alloc_pages_internal(page_pool, pages, align, GFB_PAGE);
+	struct page *page;
+
+	if ((pages <= 0) || (align == 0))
+		return NULL;
+
+	/* can not make sure section's page can keep align */
+	if (align > 1)
+		goto from_pool;
+
+	page = alloc_pages_from_section(pages, align);
+	if (page)
+		return page;
+
+from_pool:
+	return alloc_pages_from_pool(page_pool, pages, align, GFB_PAGE);
 }
 
 void *__get_free_pages(int pages, int align)
@@ -636,8 +813,7 @@ void *__get_io_pages(int pages, int align)
 {
 	struct page *page = NULL;
 
-	page = __alloc_pages_internal(io_pool, pages,
-			align, GFB_PAGE | GFB_IO);
+	page = alloc_pages_from_pool(io_pool, pages, align, GFB_PAGE | GFB_IO);
 	if (page)
 		return (void *)(page->phy_base & __PAGE_MASK);
 
@@ -662,6 +838,9 @@ void add_slab_mem(unsigned long base, size_t size)
 	int i;
 	struct slab_pool *pool;
 	struct slab_header *header;
+
+	if (size < SLAB_MIN_SIZE)
+		return;
 
 	pr_info("add mem : 0x%x : 0x%x to slab\n", base, size);
 
@@ -1039,7 +1218,7 @@ void release_mem_block(struct mem_block *block)
 	 * shoud do this here or in free_page function ?
 	 * TBD fix me
 	 */
-	if (block->flags & BIT(GFB_PAGE_BIT)) {
+	if (block->flags & (GFB_PAGE)) {
 		meta_block = addr_to_mem_block((unsigned long)block->pages_bitmap);
 		if (!meta_block)
 			goto out;
@@ -1051,21 +1230,19 @@ out:
 	spin_unlock(&section->lock);
 }
 
-void free_pages(void *addr)
+static void free_pages_in_block(void *addr, struct mem_block *block)
 {
-	struct mem_block *block;
 	unsigned long start;
 	struct page *meta;
 	int i, count;
 	struct page_pool *pool;
 
-	block = addr_to_mem_block((unsigned long)addr);
-	start = offset_in_block_bitmap((unsigned long)addr, block);
-
-	if (!(block->flags & BIT(GFB_PAGE_BIT))) {
+	if (!(block->flags & GFB_PAGE)) {
 		pr_err("addr is not a page 0x%p\n", addr);
 		return;
 	}
+
+	start = offset_in_block_bitmap((unsigned long)addr, block);
 
 	if (block->flags & GFB_IO)
 		pool = io_pool;
@@ -1095,6 +1272,47 @@ void free_pages(void *addr)
 	spin_unlock(&pool->lock);
 }
 
+static int free_pages_in_section(void *addr, struct mem_section *ms)
+{
+	struct page *page;
+	unsigned long start;
+	int count;
+
+	spin_lock(&ms->lock);
+
+	start = ((unsigned long)addr - ms->phy_base) >> PAGE_SHIFT;
+	page = ms->pages + start;
+	count = page->phy_base && 0xffff;
+
+	/* just clear the bitmap from start with count */
+	bitmap_clear(ms->bitmap, start, count);
+	ms->free_blocks += count;
+
+	spin_unlock(&ms->lock);
+
+	return 0;
+}
+
+void free_pages(void *addr)
+{
+	struct mem_block *block;
+	struct mem_section *section;
+
+	section = addr_to_mem_section((vir_addr_t)addr);
+	if (section && (section->type & MEM_SECTION_F_PAGE)) {
+		free_pages_in_section(addr, section);
+		return;
+	}
+
+	block = addr_to_mem_block((vir_addr_t)addr);
+	if (block && (block->flags & GFB_PAGE)) {
+		free_pages_in_block(addr, block);
+		return;
+	}
+
+	pr_err("addr-0x%p is not a page address\n", addr);
+}
+
 void release_pages(struct page *page)
 {
 	return free_pages((void *)(page->phy_base & __PAGE_MASK));
@@ -1106,16 +1324,31 @@ void free(void *addr)
 	struct slab_header *header;
 	struct slab_pool *slab_pool;
 	struct mem_block *block;
+	struct mem_section *section;
 
 	if (!addr)
 		return;
 
-	block = addr_to_mem_block((unsigned long)addr);
-	if (block->flags & BIT(GFB_PAGE_BIT)) {
-		free_pages(addr);
+	/*
+	 * check whether this addr is in page section or
+	 * block section or is just a slab memory
+	 */
+	section = addr_to_mem_section((unsigned long)addr);
+	if (!section)
+		goto free_slab;
+
+	if (section->type & MEM_SECTION_F_PAGE) {
+		free_pages_in_section(addr, section);
 		return;
 	}
 
+	block = addr_to_mem_block((unsigned long)addr);
+	if (block && (block->flags & GFB_PAGE)) {
+		free_pages_in_block(addr, block);
+		return;
+	}
+
+free_slab:
 	header = ADDR_TO_SLAB_HEADER(addr);
 	if (header->magic != SLAB_MAGIC) {
 		pr_warn("memory is not a slab mem 0x%p\n",
@@ -1159,7 +1392,7 @@ int has_enough_memory(size_t size)
 	return (free_blocks >= (size >> MEM_BLOCK_SHIFT));
 }
 
-int mm_init(void)
+int mm_do_init(void)
 {
 	/*
 	 * first need init the slab allocator then

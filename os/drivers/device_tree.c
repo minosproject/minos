@@ -21,7 +21,7 @@
 #include <minos/of.h>
 #include <config/config.h>
 
-static void *dtb = NULL;
+void *hv_dtb = NULL;
 struct device_node *hv_node;
 
 int fdt_spin_table_init(phy_addr_t *smp_holding)
@@ -38,7 +38,7 @@ int fdt_spin_table_init(phy_addr_t *smp_holding)
 	 * address space
 	 */
 
-	offset = of_get_node_by_name(dtb, 0, "cpus");
+	offset = of_get_node_by_name(hv_dtb, 0, "cpus");
 	if (offset <= 0) {
 		pr_err("can not find cpus node in dtb\n");
 		return -EINVAL;
@@ -46,14 +46,14 @@ int fdt_spin_table_init(phy_addr_t *smp_holding)
 
 	for (i = 0; i < CONFIG_NR_CPUS; i++) {
 		sprintf(name, "cpu@%d", i);
-		node = of_get_node_by_name(dtb, offset, name);
+		node = of_get_node_by_name(hv_dtb, offset, name);
 		if (node <= 0) {
 			pr_err("can not find %s\n", name);
 			continue;
 		}
 
 		/* get the enable methold content */
-		data = fdt_getprop(dtb, node, "enable-method", &len);
+		data = fdt_getprop(hv_dtb, node, "enable-method", &len);
 		if (!data || len <= 0)
 			continue;
 
@@ -61,7 +61,7 @@ int fdt_spin_table_init(phy_addr_t *smp_holding)
 			continue;
 
 		/* read the holding address */
-		data = fdt_getprop(dtb, node, "cpu-release-addr", &len);
+		data = fdt_getprop(hv_dtb, node, "cpu-release-addr", &len);
 		if (!data || len <= sizeof(uint32_t))
 			continue;
 
@@ -84,7 +84,7 @@ static void fdt_setup_platform(void)
 	int len;
 	const void *data;
 
-	data = fdt_getprop(dtb, 0, "model", &len);
+	data = fdt_getprop(hv_dtb, 0, "model", &len);
 	if (data)
 		pr_info("model : %s\n", (char *)data);
 
@@ -92,7 +92,7 @@ static void fdt_setup_platform(void)
 	 * compatible may like arm,fvp-base\0arm,vexpress\0
 	 * but here, only parsing the first string
 	 */
-	data = fdt_getprop(dtb, 0, "compatible", &len);
+	data = fdt_getprop(hv_dtb, 0, "compatible", &len);
 	if (data) {
 		pr_info("platform : %s\n", (char *)data);
 		platform_set_to((const char *)data);
@@ -101,10 +101,10 @@ static void fdt_setup_platform(void)
 
 int fdt_init(void)
 {
-	if (!dtb)
+	if (!hv_dtb)
 		panic("dtb address is not set\n");
 
-	hv_node = of_parse_device_tree(dtb);
+	hv_node = of_parse_device_tree(hv_dtb);
 	if (!hv_node)
 		pr_warn("root device node create failed\n");
 
@@ -118,15 +118,15 @@ static int __fdt_parse_memory_info(int node, char *attr)
 	int size_cell, address_cell;
 	fdt32_t *v;
 
-	v = (fdt32_t *)fdt_getprop(dtb, node, attr, &len);
+	v = (fdt32_t *)fdt_getprop(hv_dtb, node, attr, &len);
 	if (!v || (len < 8)) {
 		pr_warn("no memory info found in dtb\n");
 		return -ENOENT;
 	}
 
 	len = len / 4;
-	size_cell = fdt_n_size_cells(dtb, node);
-	address_cell = fdt_n_addr_cells(dtb, node);
+	size_cell = fdt_n_size_cells(hv_dtb, node);
+	address_cell = fdt_n_addr_cells(hv_dtb, node);
 	pr_info("memory node address_cells:%d size_cells:%d\n",
 			address_cell, size_cell);
 	if ((size_cell > 2) || (size_cell == 0)) {
@@ -157,52 +157,119 @@ static int __fdt_parse_memory_info(int node, char *attr)
 		}
 
 		len -= size_cell + address_cell;
-		add_memory_region(base, size, 0);
+		add_memory_region(base, size, MEMORY_REGION_F_NORMAL);
 	}
 
 	return 0;
 }
 
+static void __fdt_parse_dtb_mem(void)
+{
+	size_t size;
+
+	/*
+	 * reserve the dtb memory, the dtb memeory size keep
+	 * 4K align
+	 */
+	size = fdt_totalsize(hv_dtb);
+	pr_info("DTB - 0x%x ---> 0x%x\n", (unsigned long)hv_dtb, size);
+	size = BALIGN(size, PAGE_SIZE);
+	split_memory_region((phy_addr_t)hv_dtb, size, MEMORY_REGION_F_DTB);
+}
+
 static void __fdt_parse_memreserve(void)
 {
-#if 0
 	int count, i, ret;
 	uint64_t address, size;
 
-	count = fdt_num_mem_rsv(dtb);
+	count = fdt_num_mem_rsv(hv_dtb);
 	if (count == 0)
 		return;
 
 	for (i = 0; i < count; i++) {
-		ret = fdt_get_mem_rsv(dtb, i, &address, &size);
+		ret = fdt_get_mem_rsv(hv_dtb, i, &address, &size);
 		if (ret)
 			continue;
 
 		pr_info("find rev memory - id: %d addr: 0x%x size: 0x%x\n",
 				i, address, size);
-		add_memory_region(address, size, MEMORY_REGION_F_RSV);
+		split_memory_region(address, size, MEMORY_REGION_F_RSV);
+	}
+}
+
+#ifdef CONFIG_VIRT
+static void __fdt_parse_vm_mem(void)
+{
+	const char *name;
+	const char *type;
+	int node, child, len, i;
+	uint64_t array[2 * 10];
+	phy_addr_t base;
+	size_t size;
+
+	node = fdt_path_offset(hv_dtb, "/vms");
+	if (node <= 0) {
+		pr_warn("no virtual machine found in dts\n");
+		return;
 	}
 
-	/* reserve the dtb memory */
-	size = fdt_totalsize(dtb);
-	pr_info("DTB - 0x%x ---> 0x%x\n", (unsigned long)dtb, size);
-	size = BALIGN(size, PAGE_SIZE);
-	add_memory_region((uint64_t)dtb, size, MEMORY_REGION_F_RSV);
+	fdt_for_each_subnode(child, hv_dtb, node) {
+		type = (char *)fdt_getprop(hv_dtb, child, "device_type", &len);
+		if (!type)
+			continue;
+		if (strcmp(type, "virtual_machine") != 0)
+			continue;
+
+		/*
+		 * get the memory information for the vm, each vm will
+		 * have max 10 memory region
+		 */
+		len = __of_get_u64_array(hv_dtb, child, "memory", array, 2 * 10);
+		if ((len <= 0) || ((len % 2) != 0)) {
+			name = fdt_get_name(hv_dtb, child, NULL);
+			pr_err("wrong memory information for %s\n",
+					name ? name : "unknown");
+			continue;
+		}
+
+		for (i = 0; i < len; i += 2 ) {
+			base = (phy_addr_t)array[i];
+			size = (size_t)array[i + 1];
+			split_memory_region(base, size, MEMORY_REGION_F_VM);
+		}
+	}
+}
 #endif
+
+static void __fdt_parse_kernel_mem(void)
+{
+	split_memory_region(CONFIG_MINOS_START_ADDRESS,
+			CONFIG_MINOS_RAM_SIZE, MEMORY_REGION_F_KERNEL);
 }
 
 int fdt_parse_memory_info(void)
 {
 	int node;
 
-	node = of_get_node_by_name(dtb, 0, "memory");
+	node = of_get_node_by_name(hv_dtb, 0, "memory");
 	if (node <= 0) {
 		pr_warn("no memory node found in dtb\n");
 		return -ENOENT;
 	}
 
 	__fdt_parse_memory_info(node, "reg");
+
+	/*
+	 * split the minos kernel's memory region, need
+	 * before to split the dtb memory
+	 */
+	__fdt_parse_kernel_mem();
 	__fdt_parse_memreserve();
+	__fdt_parse_dtb_mem();
+
+#ifdef CONFIG_VIRT
+	__fdt_parse_vm_mem();
+#endif
 
 	return 0;
 }
@@ -221,11 +288,11 @@ int fdt_early_init(void *setup_data)
 		return -ENOMEM;
 	}
 
-	dtb = setup_data;
+	hv_dtb = setup_data;
 
-	if (fdt_check_header(dtb)) {
+	if (fdt_check_header(hv_dtb)) {
 		pr_err("invaild dtb header\n");
-		dtb = NULL;
+		hv_dtb = NULL;
 		return -EINVAL;
 	}
 
@@ -235,7 +302,6 @@ int fdt_early_init(void *setup_data)
 	 * wake up other cores
 	 */
 	fdt_setup_platform();
-	fdt_parse_memory_info();
 
 	return 0;
 }
