@@ -1,6 +1,5 @@
 /dts-v1/;
 
-/memreserve/	0x0000000080000000 0x0000000000010000;
 / {
 	model = "FVP Base";
 	compatible = "arm,fvp-base", "arm,vexpress";
