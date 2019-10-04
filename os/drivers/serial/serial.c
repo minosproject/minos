@@ -43,6 +43,10 @@ int serial_init(void)
 	return bcm283x_mu_init((void *)0x3f215040, 250000000, 115200);
 #endif
 
+#ifdef CONFIG_PLATFORM_RASPBERRY4
+	return bcm283x_mu_init((void *)0xfe215040, 250000000, 115200);
+#endif
+
 	return 0;
 }
 
@@ -56,7 +60,7 @@ void serial_putc(char ch)
 	serial_pl011_putc(ch);
 #endif
 
-#ifdef CONFIG_PLATFORM_RASPBERRY3
+#if defined(CONFIG_PLATFORM_RASPBERRY3) || defined(CONFIG_PLATFORM_RASPBERRY4)
 	bcm283x_mu_putc(ch);
 #endif
 }
@@ -71,7 +75,7 @@ char serial_getc(void)
 	return serial_pl011_getc();
 #endif
 
-#ifdef CONFIG_PLATFORM_RASPBERRY3
+#if defined(CONFIG_PLATFORM_RASPBERRY3) || defined(CONFIG_PLATFORM_RASPBERRY4)
 	return bcm283x_mu_getc();
 #endif
 	return 0;

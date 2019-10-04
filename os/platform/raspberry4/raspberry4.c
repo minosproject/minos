@@ -30,7 +30,7 @@
 #include <virt/vmm.h>
 #include <virt/vdev.h>
 
-#define BCM2838_RELEASE_ADDR	(0xff800000)
+#define BCM2838_RELEASE_ADDR	CONFIG_MINOS_START_ADDRESS
 
 static int bcm2838_fake_scu_read(struct vdev *vdev, gp_regs *regs,
 		unsigned long address, unsigned long *value)
@@ -55,6 +55,9 @@ static int bcm2838_fake_scu_write(struct vdev *vdev, gp_regs *regs,
 		pr_err("no such vcpu vcpu-id:%d\n", cpu);
 		return -EINVAL;
 	}
+
+	if (cpu == 0)
+		return 0;
 
 	vcpu_power_on(get_current_vcpu(), cpuid_to_affinity(cpu),
 			*value, 0);
@@ -110,11 +113,22 @@ static int raspberry4_setup_hvm(struct vm *vm, void *dtb)
 		vdev->write = bcm2838_fake_scu_write;
 	}
 
+	/* create pcie address mapping for VM0 */
+	create_guest_mapping(vm, 0x600000000, 0x600000000, 0x100000, VM_IO);
+
 	pr_info("raspberry4 setup vm done\n");
 
 	return 0;
 }
 #endif
+
+static int raspberry4_iomem_valid(unsigned long addr)
+{
+	if ((addr >= 0xf3000000) && (addr < 0xffffffff))
+		return 1;
+
+	return 0;
+}
 
 static void raspberry4_system_reboot(int mode, const char *cmd)
 {
@@ -136,6 +150,7 @@ static struct platform platform_raspberry4 = {
 	.cpu_on		 = spin_table_cpu_on,
 	.system_reboot	 = raspberry4_system_reboot,
 	.system_shutdown = raspberry4_system_shutdown,
+	.iomem_valid	 = raspberry4_iomem_valid,
 #ifdef CONFIG_VIRT
 	.setup_hvm	 = raspberry4_setup_hvm,
 #endif
