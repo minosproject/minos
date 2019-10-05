@@ -140,9 +140,29 @@ static void raspberry4_system_shutdown(void)
 
 }
 
+/*
+ * VC FW passed below memory region to Linux kernel
+ * 0x0		- 0x3b3fffff
+ * 0x40000000	- 0xfc000000
+ *
+ * memory map get from vc FW and the cmdline is:
+ * 0x0		- 0x3b3fffff		[Linux Memory]
+ * 0x3b400000   - 0x3ebfffff		[Unknown may be VC]
+ * 0x3ec00000	- 0x7ebfffff		[VC memory]
+ * 0x7ec00000   - 0xf2ffffff		[Linux]
+ *
+ * need parse the right information to Linux kernel, from
+ * the dtb just can get the first memory information, the
+ * below is the memory map when using Minos Hypervisor
+ *
+ * 0x0		- 0x373fffff		[Linux Memeory]
+ * 0x37400000	- 0x3b3fffff@64M	[Minos Memory]
+ * 0x3b400000	- 0x3ebfffff		[Unknown Memory do not passed to Linux]
+ * 0x3ec00000	- 0x7ebfffff		[Need to passed to Linux]
+ */
 static void raspberry4_parse_mem_info(void)
 {
-
+	add_memory_region(0x40000000, 0xbc000000, MEMORY_REGION_F_NORMAL);
 }
 
 static struct platform platform_raspberry4 = {
