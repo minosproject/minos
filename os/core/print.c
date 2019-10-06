@@ -83,7 +83,7 @@ int level_print(int level, char *fmt, ...)
 {
 	va_list arg;
 	int printed, i, cpuid;
-	char buf[256];
+	char buf[512];
 	char *buffer = buf;
 	unsigned long flags;
 	int pid;
