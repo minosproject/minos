@@ -520,10 +520,6 @@ int of_n_interrupt_cells(struct device_node *node)
 	int offset;
 	const struct fdt_property *prop;
 
-	ret = of_get_u32_array(node, "#interrupt-cells", &ni, 1);
-	if (ni)
-		return ni;
-
 	while (parent) {
 		prop = fdt_get_property(parent->data, parent->offset,
 				"interrupt-parent", &len);
