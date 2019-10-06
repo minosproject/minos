@@ -69,6 +69,7 @@ char bcm283x_mu_getc(void)
 
 int bcm283x_mu_init(void *base, int clk, int baud)
 {
+#if 0
 	uint32_t divider;
 
 	if (!base)
@@ -79,6 +80,7 @@ int bcm283x_mu_init(void *base, int clk, int baud)
 
 	iowrite32(BCM283X_LCR_DATA_SIZE_8, serial_base + AUX_MU_LCR);
 	iowrite32(divider - 1, serial_base + AUX_MU_BAUD);
+#endif
 
 	return 0;
 }
