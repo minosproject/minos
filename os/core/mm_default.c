@@ -183,8 +183,9 @@ static int inline add_page_section(phy_addr_t base, size_t size)
 		return 0;
 	}
 
-	pr_info("PAGE  SECTION: base: 0x%p size: 0x%x\n",
-			mem_base, real_size);
+	pr_info("PAGE  SECTION: 0x%p ---> 0x%p [0x%x]\n", mem_base,
+			mem_base + real_size, real_size);
+
 	ms = &mem_sections[nr_sections];
 	spin_lock_init(&ms->lock);
 
@@ -260,10 +261,10 @@ static int add_block_section(phy_addr_t base, size_t size, int type)
 	ms->free_blocks = ms->nr_blocks;
 	ms->id = nr_sections;
 	free_blocks += ms->nr_blocks;
-
 	nr_sections++;
-	pr_info("BLOCK SECTION: base: 0x%x size: 0x%x type: %d\n",
-			mem_base, size, type);
+
+	pr_info("BLOCK SECTION: 0x%p ---> 0x%p [0x%p]\n", mem_base,
+			mem_base + size, size);
 
 	/*
 	 * handle the memory space if the section is not
