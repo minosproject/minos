@@ -279,8 +279,8 @@ static int dataabort_tfl_handler(gp_regs *regs, uint32_t esr_value)
 		}
 		break;
 	default:
-		pr_info("unsupport data abort type this time %d\n",
-				dabt->dfsc & ~FSC_LL_MASK);
+		pr_info("unsupport data abort type this time %d @0x%p\n",
+				dabt->dfsc & ~FSC_LL_MASK, paddr);
 		inject_virtual_abort();
 		break;
 	}
