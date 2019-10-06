@@ -9,14 +9,14 @@
 struct vm;
 
 int vm_mm_init(struct vm *vm);
-void vm_mm_struct_init(struct vm *vm, unsigned long base, size_t size);
+void vm_mm_struct_init(struct vm *vm);
 
 int map_vm_memory(struct vm *vm, unsigned long vir_base,
 		unsigned long phy_base, size_t size, int type);
 int unmap_vm_memory(struct vm *vm, unsigned long vir_addr,
 			size_t size, int type);
 
-int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size);
+int alloc_vm_memory(struct vm *vm);
 void release_vm_memory(struct vm *vm);
 
 int create_guest_mapping(struct vm *vm, unsigned long vir,

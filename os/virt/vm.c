@@ -188,7 +188,22 @@ int vm_power_off(int vmid, void *arg)
 	return __vm_power_off(vm, arg);
 }
 
-int create_new_vm(struct vmtag *tag)
+static int guest_vm_memory_init(struct vm *vm, uint64_t base, uint64_t size)
+{
+	struct mm_struct *mm = &vm->mm;
+	struct memory_region *region = &mm->memory_regions[0];
+
+	mm->nr_mem_regions = 1;
+	region->flags = 0;
+	region->phy_base = base;
+	region->vir_base = base;
+	region->free_size = region->size = size;
+
+	/* allocate memory for this vm */
+	return vm_mmap_init(vm, size);
+}
+
+int create_guest_vm(struct vmtag *tag)
 {
 	int ret;
 	struct vm *vm;
@@ -207,10 +222,7 @@ int create_new_vm(struct vmtag *tag)
 	if (!vm)
 		goto unmap_vmtag;
 
-	/*
-	 * allocate memory to this vm
-	 */
-	ret = vm_mmap_init(vm, vmtag->mem_size);
+	ret = guest_vm_memory_init(vm, vmtag->mem_base, vmtag->mem_size);
 	if (ret) {
 		pr_err("no more mmap space for vm\n");
 		goto release_vm;
@@ -218,7 +230,7 @@ int create_new_vm(struct vmtag *tag)
 
 	vmtag->mmap_base = vm->mm.hvm_mmap_base;
 
-	ret = alloc_vm_memory(vm, vmtag->mem_base, vmtag->mem_size);
+	ret = alloc_vm_memory(vm);
 	if (ret)
 		goto release_vm;
 
@@ -437,11 +449,14 @@ static void setup_vm(struct vm *vm)
 		fdt_vm_init(vm);
 }
 
-static void *create_vm_of(struct device_node *node, void *arg)
+static void *create_native_vm_of(struct device_node *node, void *arg)
 {
-	int ret;
-	void *vm;
+	int ret, i;
+	struct vm *vm;
+	struct mm_struct *mm;
 	struct vmtag vmtag;
+	struct memory_region *region;
+	uint64_t meminfo[2 * VM_MAX_MEM_REGIONS];
 
 	if (node->class != DT_CLASS_VM)
 		return NULL;
@@ -455,7 +470,6 @@ static void *create_vm_of(struct device_node *node, void *arg)
 	pr_info("    name: %s\n", vmtag.name);
 	pr_info("    os_type: %s\n", vmtag.os_type);
 	pr_info("    nr_vcpu: %d\n", vmtag.nr_vcpu);
-	pr_info("    memory: 0x%x 0x%x\n", vmtag.mem_base, vmtag.mem_size);
 	pr_info("    entry: 0x%p\n", vmtag.entry);
 	pr_info("    setup_data: 0x%p\n", vmtag.setup_data);
 	pr_info("    flags: 0x%x\n", vmtag.flags);
@@ -466,8 +480,36 @@ static void *create_vm_of(struct device_node *node, void *arg)
 			vmtag.vcpu_affinity[6], vmtag.vcpu_affinity[7]);
 
 	vm = (void *)create_vm(&vmtag);
-	if (!vm)
+	if (!vm) {
 		pr_err("create vm-%d failed\n", vmtag.vmid);
+		return NULL;
+	}
+
+	/* parse the memory information of the vm from dtb */
+	mm = &vm->mm;
+	ret = of_get_u64_array(node, "memory", meminfo, 2 * VM_MAX_MEM_REGIONS);
+	if ((ret <= 0) || ((ret % 2) != 0)) {
+		pr_err("get wrong memory information for vm-%d", vmtag.vmid);
+		destroy_vm(vm);
+
+		return NULL;
+	}
+
+	ret = ret / 2;
+	if (ret > 10) {
+		pr_warn("VM have max %d@%d memory regions",
+				ret, VM_MAX_MEM_REGIONS);
+		ret = 10;
+	}
+
+	mm->nr_mem_regions = ret;
+	for (i = 0; i < ret; i ++) {
+		region = &mm->memory_regions[i];
+		region->flags = 0;
+		region->phy_base = meminfo[i * 2];
+		region->vir_base = meminfo[i * 2];
+		region->free_size = region->size = meminfo[i * 2 + 1];
+	}
 
 	return vm;
 }
@@ -475,7 +517,7 @@ static void *create_vm_of(struct device_node *node, void *arg)
 static void parse_and_create_vms(void)
 {
 #ifdef CONFIG_DEVICE_TREE
-	of_iterate_all_node_loop(hv_node, create_vm_of, NULL);
+	of_iterate_all_node_loop(hv_node, create_native_vm_of, NULL);
 #endif
 }
 

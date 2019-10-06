@@ -291,7 +291,7 @@ static void parse_system_regions(void)
 		type = memory_region_type(region);
 		if ((type == MEMORY_REGION_TYPE_RSV) ||
 			(type == MEMORY_REGION_TYPE_VM) ||
-			(type == MEMORY_REGION_F_DTB))
+			(type == MEMORY_REGION_TYPE_DTB))
 			continue;
 
 		add_block_section(region->vir_base, region->size, type);

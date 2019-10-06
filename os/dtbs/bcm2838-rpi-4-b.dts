@@ -26,8 +26,8 @@
 			entry = <0x0 0x00080000>;
 			setup_data = <0x0 0x03e00000>;
 			vcpu_affinity = <0 1 2 3>;
-			memory = <0x0 0x00000000 0x0 0x30000000>;
-			cmdline = "8250.nr_uarts=1 earlycon=uart8250,mmio32,0xfe215040 cma=64M smsc95xx.macaddr=DC:A6:32:1C:65:A1 dwc_otg.fiq_fix_enable=2 console=ttyS0,115200 root=/dev/mmcblk0p2 rw rootfstype=ext4 fsck.repair=yes rootwait noinitrd net.ifnames=0";
+			memory = <0x0 0x00000000 0x0 0x37400000 0x0 0x40000000 0x0 0xbc000000>;
+			cmdline = "coherent_pool=1M 8250.nr_uarts=1 earlycon=uart8250,mmio32,0xfe215040 loglevel=9 cma=64M cma=256M video=HDMI-A-1:720x576M@50,margin_left=0,margin_right=0,margin_top=0,margin_bottom=0 smsc95xx.macaddr=DC:A6:32:1C:65:A1 vc_mem.mem_base=0x3ec00000 vc_mem.mem_size=0x40000000 dwc_otg.fiq_fix_enable=0 console=ttyS0,115200 root=/dev/mmcblk0p2 rw rootfstype=ext4 rootwait rootflags=noload net.ifnames=0 loglevel=9";
 		};
 	};
 
@@ -677,7 +677,6 @@
 
 	memory {
 		device_type = "memory";
-		reg = <0x0 0x00000000 0x30000000>;
 	};
 
 	leds {

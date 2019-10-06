@@ -564,7 +564,7 @@ struct vm *create_vm(struct vmtag *vme)
 	if (native)
 		vm->flags |= VM_FLAGS_NATIVE;
 
-	vm_mm_struct_init(vm, vme->mem_base, vme->mem_size);
+	vm_mm_struct_init(vm);
 
 	ret = create_vcpus(vm);
 	if (ret) {

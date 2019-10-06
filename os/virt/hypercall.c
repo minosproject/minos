@@ -35,7 +35,7 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 
 	switch (id) {
 	case HVC_VM_CREATE:
-		vmid = create_new_vm((struct vmtag *)args[0]);
+		vmid = create_guest_vm((struct vmtag *)args[0]);
 		HVC_RET1(c, vmid);
 		break;
 

@@ -282,13 +282,14 @@ int fdt_early_init(void *setup_data)
 	 * 4K align, memory management will not protect this area
 	 * so please put the dtb data to a right place
 	 */
-	if (!setup_data || !IS_PAGE_ALIGN(setup_data)) {
-		pr_fatal("invalid dtb address 0x%p must 4K align\n",
-				(unsigned long)setup_data);
-		return -ENOMEM;
+	if (!hv_dtb && !setup_data) {
+		pr_fatal("can not find device tree data\n");
+		BUG();
+	} else {
+		hv_dtb = setup_data;
 	}
 
-	hv_dtb = setup_data;
+	pr_info("using device tree @0x%x\n", hv_dtb);
 
 	if (fdt_check_header(hv_dtb)) {
 		pr_err("invaild dtb header\n");

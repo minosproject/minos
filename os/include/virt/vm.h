@@ -169,7 +169,7 @@ static inline void enter_to_guest(struct vcpu *vcpu, gp_regs *regs)
 }
 
 struct vm *create_vm(struct vmtag *vme);
-int create_new_vm(struct vmtag *tag);
+int create_guest_vm(struct vmtag *tag);
 void destroy_vm(struct vm *vm);
 int vm_power_up(int vmid);
 int vm_reset(int vmid, void *args);

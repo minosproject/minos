@@ -26,10 +26,28 @@ extern int fdt_parse_memory_info(void);
 
 int add_memory_region(uint64_t base, uint64_t size, uint32_t flags)
 {
+	phy_addr_t r_base, r_end;
+	size_t r_size;
 	struct memory_region *region;
 
 	if (size == 0)
 		return -EINVAL;
+
+	/*
+	 * need to check whether this region is confilct with
+	 * other region
+	 */
+	list_for_each_entry(region, &mem_list, list) {
+		r_size = region->size;
+		r_base = region->phy_base;
+		r_end = r_base + r_size - 1;
+
+		if (!((base > r_end) || ((base + size) < r_base))) {
+			pr_err("memory region invalid 0x%p ---> [0x%p]\n",
+					r_base, r_end, r_size);
+			return -EINVAL;
+		}
+	}
 
 	region = alloc_boot_mem(sizeof(struct memory_region));
 	if (!region)

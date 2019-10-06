@@ -114,7 +114,7 @@ static int raspberry4_setup_hvm(struct vm *vm, void *dtb)
 	}
 
 	/* create pcie address mapping for VM0 */
-	create_guest_mapping(vm, 0x600000000, 0x600000000, 0x100000, VM_IO);
+	create_guest_mapping(vm, 0x600000000, 0x600000000, 0x4000000, VM_IO);
 
 	pr_info("raspberry4 setup vm done\n");
 
@@ -124,8 +124,13 @@ static int raspberry4_setup_hvm(struct vm *vm, void *dtb)
 
 static int raspberry4_iomem_valid(unsigned long addr)
 {
+	if ((addr >= 0x3b400000) && (addr < 0x3ebfffff))
+		return 1;
+
 	if ((addr >= 0xf3000000) && (addr < 0xffffffff))
 		return 1;
+
+	pr_err("memory region:0x%p not register\n", addr, addr);
 
 	return 0;
 }
@@ -163,6 +168,7 @@ static void raspberry4_system_shutdown(void)
 static void raspberry4_parse_mem_info(void)
 {
 	add_memory_region(0x40000000, 0xbc000000, MEMORY_REGION_F_NORMAL);
+	//add_memory_region(0x00000000, 0x3b400000, MEMORY_REGION_F_NORMAL);
 }
 
 static struct platform platform_raspberry4 = {

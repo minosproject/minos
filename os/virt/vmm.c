@@ -219,17 +219,18 @@ int vm_mmap(struct vm *vm, unsigned long offset, unsigned long size)
 	struct vm *vm0 = get_vm_by_id(0);
 	struct mm_struct *mm = &vm->mm;
 	struct mm_struct *mm0 = &vm0->mm;
+	struct memory_region *region = &mm->memory_regions[0];
 
-	if (size > mm->mem_size)
+	if (size > region->free_size)
 		return -EINVAL;
 
 	offset = ALIGN(offset, PMD_MAP_SIZE);
 	size = BALIGN(size, PMD_MAP_SIZE);
-	vir = mm->mem_base + offset;
+	vir = region->vir_base + offset;
 	phy = mm->hvm_mmap_base + offset;
 
-	if ((offset + size) > mm->mem_size)
-		size = (mm->mem_size - offset);
+	if ((offset + size) > region->free_size)
+		size = (region->size - offset);
 
 	left = size >> PMD_RANGE_OFFSET;
 	phy_off = pmd_idx(phy);
@@ -286,9 +287,10 @@ void vm_unmmap(struct vm *vm)
 	struct vm *vm0 = get_vm_by_id(0);
 	struct mm_struct *mm0 = &vm0->mm;
 	struct mm_struct *mm = &vm->mm;
+	struct memory_region *region = &mm->memory_regions[0];
 
 	phy = mm->hvm_mmap_base;
-	left = mm->mem_size >> PMD_RANGE_OFFSET;
+	left = region->size >> PMD_RANGE_OFFSET;
 
 	while (left > 0) {
 		vm0_pmd = (unsigned long *)get_mapping_pmd(mm0->pgd_base, phy, 0);
@@ -315,21 +317,19 @@ void vm_unmmap(struct vm *vm)
 }
 
 /* alloc physical memory for guest vm */
-int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size)
+int alloc_vm_memory(struct vm *vm)
 {
 	int i, count;
 	unsigned long base;
 	struct mm_struct *mm = &vm->mm;
 	struct mem_block *block;
+	struct memory_region *region = &mm->memory_regions[0];
 
-	base = ALIGN(start, MEM_BLOCK_SIZE);
-	if (base != start)
+	base = ALIGN(region->vir_base, MEM_BLOCK_SIZE);
+	if (base != region->vir_base)
 		pr_warn("memory base is not mem_block align\n");
 
-	mm->mem_base = base;
-	mm->mem_size = size;
-	mm->mem_free = size;
-	count = size >> MEM_BLOCK_SHIFT;
+	count = region->size >> MEM_BLOCK_SHIFT;
 
 	/*
 	 * here get all the memory block for the vm
@@ -342,7 +342,7 @@ int alloc_vm_memory(struct vm *vm, unsigned long start, size_t size)
 
 		// block->vmid = vm->vmid;
 		list_add_tail(&mm->block_list, &block->list);
-		mm->mem_free -= MEM_BLOCK_SIZE;
+		region->free_size -= MEM_BLOCK_SIZE;
 	}
 
 	/*
@@ -371,9 +371,10 @@ phy_addr_t get_vm_memblock_address(struct vm *vm, unsigned long a)
 	struct mm_struct *mm = &vm->mm;
 	struct mem_block *block;
 	unsigned long base = 0;
-	unsigned long offset = a - mm->mem_base;
+	struct memory_region *region = &mm->memory_regions[0];
+	unsigned long offset = a - region->vir_base;
 
-	if ((a < mm->mem_base) || (a >= mm->mem_base + mm->mem_size))
+	if ((a < region->vir_base) || (a >= region->vir_base + region->size))
 		return 0;
 
 	list_for_each_entry(block, &mm->block_list, list) {
@@ -385,17 +386,15 @@ phy_addr_t get_vm_memblock_address(struct vm *vm, unsigned long a)
 	return 0;
 }
 
-void vm_mm_struct_init(struct vm *vm, unsigned long mbase, size_t msize)
+void vm_mm_struct_init(struct vm *vm)
 {
 	struct mm_struct *mm = &vm->mm;
 
-	init_list(&mm->mem_list);
 	init_list(&mm->block_list);
 	mm->head = NULL;
 	mm->pgd_base = 0;
+	mm->nr_mem_regions = 0;
 	spin_lock_init(&mm->lock);
-	mm->mem_base = mbase;
-	mm->mem_size = mm->mem_free = msize;
 
 	mm->pgd_base = alloc_pgd();
 	if (mm->pgd_base == 0) {
@@ -457,11 +456,20 @@ void *vm_map_shmem(struct vm *vm, void *phy, uint32_t size,
 
 int vm_mm_init(struct vm *vm)
 {
+	int i, ret;
+	struct memory_region *region;
 	struct mm_struct *mm = &vm->mm;
 
-	/* just mapping the physical memory for guest */
-	create_guest_mapping(vm, mm->mem_base,
-			mm->mem_base, mm->mem_size, 0);
+	/* just mapping the physical memory for VM */
+	for (i = 0; i < mm->nr_mem_regions; i++) {
+		region = &mm->memory_regions[i];
+		ret = create_guest_mapping(vm, region->vir_base,
+				region->phy_base, region->size, 0);
+		if (ret) {
+			pr_err("build mem ma failed for vm-%d 0x%p 0x%p\n",
+				vm->vmid, region->phy_base, region->size);
+		}
+	}
 
 	return 0;
 }

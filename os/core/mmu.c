@@ -475,20 +475,22 @@ int create_early_pmd_mapping(vir_addr_t vir, phy_addr_t phy)
 int create_host_mapping(vir_addr_t vir, phy_addr_t phy,
 		size_t size, unsigned long flags)
 {
+	size_t new_size;
 	unsigned long vir_base, phy_base, tmp;
 
 	/*
 	 * for host mapping, IO and Normal memory all mapped
 	 * as MEM_BLOCK_SIZE ALIGN
 	 */
+	tmp = BALIGN(vir + size, MEM_BLOCK_SIZE);
 	vir_base = ALIGN(vir, MEM_BLOCK_SIZE);
 	phy_base = ALIGN(phy, MEM_BLOCK_SIZE);
-	tmp = BALIGN(vir_base + size, MEM_BLOCK_SIZE);
-	size = tmp - vir_base;
+	new_size = tmp - vir_base;
+
 	flags |= VM_HOST;
 
 	return create_mem_mapping(&host_mm,
-			vir_base, phy_base, size, flags);
+			vir_base, phy_base, new_size, flags);
 }
 
 int destroy_host_mapping(vir_addr_t vir, size_t size)

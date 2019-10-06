@@ -82,7 +82,6 @@ static int fdt_setup_minos(struct vm *vm)
 
 static int fdt_setup_cmdline(struct vm *vm)
 {
-	const void *data;
 	int node, len, chosen_node;
 	char *new_cmdline;
 	char buf[512];
@@ -98,12 +97,6 @@ static int fdt_setup_cmdline(struct vm *vm)
 		}
 	}
 
-	data = fdt_getprop(dtb, chosen_node, "bootargs", &len);
-	if ((!data) || (len <= 0))
-		pr_info("default_cmdline:\n");
-	else
-		pr_info("default_cmdline: %s\n", (char *)data);
-
 	node = fdt_path_offset(hv_dtb, "/vms/vm0");
 	if (node < 0)
 		return 0;
@@ -114,13 +107,15 @@ static int fdt_setup_cmdline(struct vm *vm)
 		return 0;
 	}
 
+	if (len >= 512)
+		pr_warn("new cmdline is too big %d\n", len);
+
 	/*
 	 * can not directly using new_cmdline in fdt_setprop
 	 * do not know why, there may a issue in libfdt or
 	 * other reason
 	 */
 	buf[511] = 0;
-	pr_info("new_cmdline:%s\n", new_cmdline);
 	strncpy(buf, new_cmdline, MIN(511, len));
 	fdt_setprop(dtb, chosen_node, "bootargs", buf, len);
 
@@ -163,7 +158,7 @@ static int fdt_setup_cpu(struct vm *vm)
 
 static int fdt_setup_memory(struct vm *vm)
 {
-	int offset, size;
+	int offset, size, i;
 	int size_cell, address_cell;
 	uint32_t *args, *tmp;
 	unsigned long mstart, msize;
@@ -191,26 +186,30 @@ static int fdt_setup_memory(struct vm *vm)
 		return -ENOMEM;
 
 	size = 0;
-	mstart = vm->mm.mem_base;
-	msize = vm->mm.mem_size;
-	pr_info("add memory region to vm0 0x%p 0x%p\n", mstart, msize);
 
-	if (address_cell == 1) {
-		*args++ = cpu_to_fdt32(mstart);
-		size++;
-	} else {
-		*args++ = cpu_to_fdt32(mstart >> 32);
-		*args++ = cpu_to_fdt32(mstart);
-		size += 2;
-	}
+	for (i = 0; i < vm->mm.nr_mem_regions; i++) {
+		mstart = vm->mm.memory_regions[i].phy_base;
+		msize = vm->mm.memory_regions[i].size;
 
-	if (size_cell ==  1) {
-		*args++ = cpu_to_fdt32(msize);
-		size++;
-	} else {
-		*args++ = cpu_to_fdt32(msize >> 32);
-		*args++ = cpu_to_fdt32(msize);
-		size += 2;
+		pr_info("add memory region to vm0 0x%p 0x%p\n", mstart, msize);
+
+		if (address_cell == 1) {
+			*args++ = cpu_to_fdt32(mstart);
+			size++;
+		} else {
+			*args++ = cpu_to_fdt32(mstart >> 32);
+			*args++ = cpu_to_fdt32(mstart);
+			size += 2;
+		}
+
+		if (size_cell ==  1) {
+			*args++ = cpu_to_fdt32(msize);
+			size++;
+		} else {
+			*args++ = cpu_to_fdt32(msize >> 32);
+			*args++ = cpu_to_fdt32(msize);
+			size += 2;
+		}
 	}
 
 	fdt_setprop(dtb, offset, "reg", (void *)tmp, size * 4);

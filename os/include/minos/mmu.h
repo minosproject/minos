@@ -7,6 +7,7 @@
 #include <asm/pagetable.h>
 #include <minos/list.h>
 #include <minos/spinlock.h>
+#include <minos/memory.h>
 
 typedef __pgd_t pgd_t;
 typedef __pud_t pud_t;
@@ -99,8 +100,6 @@ typedef __pte_t pte_t;
 #define set_pud_at(pudp, val)	(*(pud_t *)pudp = val)
 #define set_pgd_at(pgdp, val)	(*(pgd_t *)pgdp = val)
 
-struct mm_struct;
-
 struct mapping_struct {
 	unsigned long table_base;
 	vir_addr_t vir_base;
@@ -109,43 +108,6 @@ struct mapping_struct {
 	int lvl;
 	unsigned long flags;
 	struct pagetable_attr *config;
-};
-
-/*
- * pgd_base : the lvl0 table base
- * mem_list : static config memory region for this vm
- * block_list : the mem_block allocated for this vm
- * head : the pages table allocated for this vm
- */
-struct mm_struct {
-	size_t mem_size;
-	size_t mem_free;
-	unsigned long mem_base;
-	unsigned long pgd_base;
-	unsigned long hvm_mmap_base;		/* the base address mapped in VM0 */
-
-	/*
-	 * for the shared memory of native vm
-	 * or the iomem space of guest vm
-	 */
-	union {
-		unsigned long gvm_iomem_base;
-		unsigned long shmem_base;
-	};
-	union {
-		unsigned long gvm_iomem_size;
-		unsigned long shmem_size;
-	};
-
-	/* for virtio devices */
-	unsigned long virtio_mmio_gbase;
-	void *virtio_mmio_iomem;
-	size_t virtio_mmio_size;
-
-	struct page *head;
-	struct list_head mem_list;
-	struct list_head block_list;
-	spinlock_t lock;
 };
 
 int create_mem_mapping(struct mm_struct *mm, unsigned long addr,
