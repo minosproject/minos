@@ -200,11 +200,14 @@ int mm_init(void)
 	fdt_parse_memory_info();
 #endif
 
-	map_os_memory();
-
 	dump_memory_info();
-
 	mm_do_init();
+
+	/*
+	 * need ensure that hypervisor has enough
+	 * memory to map all the memory
+	 */
+	map_os_memory();
 
 	return 0;
 }

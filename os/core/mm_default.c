@@ -557,7 +557,8 @@ struct mem_block *alloc_mem_block(unsigned long flags)
 
 	/*
 	 * if the block is not for guest vm mapped it to host
-	 * memory space
+	 * memory space, even the memory is from normal to IO
+	 * need to do this
 	 */
 	if (block && (!(flags & GFB_VM))) {
 		f |= VM_RW;
@@ -566,8 +567,8 @@ struct mem_block *alloc_mem_block(unsigned long flags)
 		else
 			f |= VM_NORMAL;
 
-		/* section and normal memory skip mapping */
-		if ((section->id == 0) && (f & VM_NORMAL))
+		/* if the flags is normal memory skip mapping */
+		if (f & VM_NORMAL)
 			return block;
 
 		create_host_mapping(block->phy_base, block->phy_base,

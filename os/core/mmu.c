@@ -90,8 +90,11 @@ static int get_map_type(struct mapping_struct *info)
 	unsigned long a, b;
 
 	if (info->flags & VM_HOST) {
+		/* force to map as 2M block entry for host */
 		if (info->lvl == PMD)
 			return VM_DES_BLOCK;
+		else
+			return VM_DES_TABLE;
 	} else {
 		if (info->lvl == PTE)
 			return VM_DES_PAGE;
@@ -308,6 +311,12 @@ static int __destroy_mem_mapping(struct mapping_struct *info)
 					return -EINVAL;
 				}
 			} else {
+				/* check the size with the talbe mapping size */
+				if (size < attr->map_size) {
+					pr_err("can not destroy mapping 0x%p [0x%x] @0x%x entry\n",
+							vir, size, attr->map_size);
+					return -EINVAL;
+				}
 				*(table + offset) = 0;
 				size -= attr->map_size;
 				vir += attr->map_size;

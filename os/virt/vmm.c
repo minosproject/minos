@@ -221,7 +221,7 @@ int vm_mmap(struct vm *vm, unsigned long offset, unsigned long size)
 	struct mm_struct *mm0 = &vm0->mm;
 	struct memory_region *region = &mm->memory_regions[0];
 
-	if (size > region->free_size)
+	if (size > region->size)
 		return -EINVAL;
 
 	offset = ALIGN(offset, PMD_MAP_SIZE);

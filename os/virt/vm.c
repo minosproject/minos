@@ -402,33 +402,24 @@ int vm_suspend(int vmid)
 int vm_create_host_vdev(struct vm *vm)
 {
 	phy_addr_t addr;
-	int ret;
 
 	/*
-	 * map the memory of the vm's setup data to
-	 * the hypervisor's memory space, the setup
-	 * data must 2M algin
+	 * convert the guest's memory to hypervisor's memory space
+	 * do not need to map again, since all the guest VM's memory
+	 * has been mapped when mm_init()
 	 */
 	addr = get_vm_memblock_address(vm, (unsigned long)vm->setup_data);
 	if (!addr)
 		return -ENOMEM;
 
-	ret = create_host_mapping(addr, addr, MEM_BLOCK_SIZE, VM_RO);
-	if (ret)
-		goto out;
-
-	ret = create_vm_resource_of(vm, (void *)addr);
-	destroy_host_mapping(addr, MEM_BLOCK_SIZE);
-
-out:
-	return ret;
+	return create_vm_resource_of(vm, (void *)addr);
 }
 
 static int vm_create_resource(struct vm *vm)
 {
 	/*
 	 * first map the dtb address to the hypervisor, here
-	 * map these memory as read only
+	 * map these native VM's memory as read only
 	 */
 	create_host_mapping((vir_addr_t)vm->setup_data,
 			(phy_addr_t)vm->setup_data, MEM_BLOCK_SIZE, VM_RO);
