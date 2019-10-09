@@ -30,6 +30,8 @@ struct pcpu {
 	struct list_head task_list;
 	struct list_head new_list;
 
+	struct task *running_task;
+
 	/*
 	 * link to the task for the pcpu and the
 	 * task which is ready and which is sleep, these

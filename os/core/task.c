@@ -353,8 +353,10 @@ int create_idle_task(void)
 
 	task->stat = TASK_STAT_RUNNING;
 	task->flags |= TASK_FLAGS_IDLE;
+	task->run_time = 0;
 
 	pcpu->idle_task = task;
+	pcpu->running_task = task;
 
 	/* call the hooks for the idle task */
 	task_create_hook(task);

@@ -132,7 +132,7 @@ void set_task_ready(struct task *task)
 		}
 
 		list_del(&task->stat_list);
-		list_add(&pcpu->ready_list, &task->stat_list);
+		list_add_tail(&pcpu->ready_list, &task->stat_list);
 		pcpu->local_rdy_tasks++;
 	}
 
@@ -328,15 +328,15 @@ static void inline task_sched_return(struct task *task)
 #endif
 }
 
-static void inline no_task_sched_return(struct task *task)
+static void inline no_task_sched_return(struct pcpu *pcpu, struct task *task)
 {
 	/*
 	 * if need resched but there something block to sched
 	 * a new task, then need enable the sched timer, but
 	 * only give the task little run time
 	 */
-	if ((task_info(task)->flags & __TIF_NEED_RESCHED) &&
-			task_is_percpu(task) && (task->start_ns == 0)) {
+	if ((pcpu->running_task != task)) {
+		pcpu->running_task = task;
 		task->start_ns = NOW();
 		sched_tick_enable(MILLISECS(task->run_time));
 	}
@@ -470,10 +470,8 @@ void switch_to_task(struct task *cur, struct task *next)
 	 * otherwise disable it.
 	 */
 	next->start_ns = NOW();
-	if (task_is_percpu(next))
-		sched_tick_enable(MILLISECS(next->run_time));
-	else
-		sched_tick_disable();
+	pcpu->running_task = next;
+	sched_tick_enable(MILLISECS(next->run_time));
 
 	restore_task_context(next);
 
@@ -518,7 +516,13 @@ unsigned long sched_tick_handler(unsigned long data)
 	 * ready list ? need further check.
 	 */
 	task->start_ns = 0;
-	task->run_time = CONFIG_TASK_RUN_TIME;
+	if (!task_is_idle(task))
+		task->run_time = CONFIG_TASK_RUN_TIME;
+	else
+		task->run_time = 0;
+
+	pcpu->running_task = pcpu->idle_task;
+
 	if (task_is_ready(task)) {
 		list_del(&task->stat_list);
 		list_add_tail(&pcpu->ready_list, &task->stat_list);
@@ -595,7 +599,19 @@ void sched(void)
 	local_irq_save(flags);
 	clear_need_resched();
 	pcpu = get_cpu_var(pcpu);
+
+	/*
+	 * if current task is percpu task, and is not in
+	 * suspend state, means it need ot drop the run time
+	 * then need to set it to the tail of the ready list
+	 */
+	if (task_is_percpu(cur) && task_is_ready(cur)) {
+		list_del(&cur->stat_list);
+		list_add_tail(&pcpu->ready_list, &cur->stat_list);
+	}
+
 	pcpu->sched(pcpu, cur);
+
 	local_irq_restore(flags);
 }
 
@@ -646,7 +662,7 @@ static void local_irq_handler(struct pcpu *pcpu, struct task *task)
 
 	next = get_next_local_run_task(pcpu);
 	if (next == task) {
-		no_task_sched_return(task);
+		no_task_sched_return(pcpu, task);
 		return;
 	}
 
@@ -696,7 +712,8 @@ static void global_irq_handler(struct pcpu *pcpu, struct task *task)
 	}
 
 	kernel_unlock();
-	no_task_sched_return(next);
+
+	no_task_sched_return(pcpu, next);
 }
 
 void irq_return_handler(struct task *task)
@@ -714,7 +731,7 @@ void irq_return_handler(struct task *task)
 	 * will call sched directly, so do not sched out here
 	 */
 	if (p || n) {
-		no_task_sched_return(task);
+		no_task_sched_return(pcpu, task);
 	} else {
 		pcpu->irq_handler(pcpu, task);
 		clear_bit(TIF_NEED_RESCHED, &ti->flags);
@@ -835,7 +852,7 @@ int resched_handler(uint32_t irq, void *data)
 	list_for_each_entry_safe(task, n, &pcpu->new_list, stat_list) {
 		list_del(&task->stat_list);
 		if (task->stat == TASK_STAT_RDY) {
-			list_add_tail(&pcpu->ready_list, &task->stat_list);
+			list_add(&pcpu->ready_list, &task->stat_list);
 		} else {
 			list_add_tail(&pcpu->sleep_list, &task->stat_list);
 		}
