@@ -29,44 +29,57 @@
 extern void virqs_init(void);
 extern void fdt_vm_init(struct vm *vm);
 
-static int e_base;
-static int f_base;
-static int e_base_current;
-static int f_base_current;
-static int e_nr;
-static int f_nr;
+static int aff_current;
+DECLARE_BITMAP(vcpu_aff_bitmap, NR_CPUS);
 DEFINE_SPIN_LOCK(affinity_lock);
+
+static int vcpu_affinity_init(void)
+{
+	int i;
+	struct vm *vm0 = get_vm_by_id(0);
+
+	bitmap_clear(vcpu_aff_bitmap, 0, NR_CPUS);
+
+	for (i = 0; i < vm0->vcpu_nr; i++)
+		set_bit(vm0->vcpu_affinity[i], vcpu_aff_bitmap);
+
+	aff_current = find_first_zero_bit(vcpu_aff_bitmap, NR_CPUS);
+
+	return 0;
+}
 
 void get_vcpu_affinity(uint32_t *aff, int nr)
 {
-	int i, e, f, j = 0;
+	int i = 0;
+	int vm0_vcpu0_ok = 0;
+	int vm0_vcpus_ok = 0;
+	struct vm *vm0 = get_vm_by_id(0);
+	int vm0_vcpu0 = vm0->vcpu_affinity[0];
 
-	e = MIN(nr, e_nr);
-	f = nr - e;
+	if (nr == NR_CPUS)
+		vm0_vcpu0_ok = 1;
+	else if (nr > (NR_CPUS - vm0->vcpu_nr))
+		vm0_vcpus_ok = 1;
 
 	spin_lock(&affinity_lock);
 
-	for (i = 0; i < e; i++) {
-		aff[j] = e_base_current;
-		e_base_current++;
-		if (e_base_current == NR_CPUS)
-			e_base_current = e_base;
-		j++;
-	}
-
-	for (i = 0; i < f; i++) {
-		if ( (f_base_current == 0) && ((f < f_nr) || (i == 0)) ) {
-			f_base_current++;
-			if (f_base_current == e_base)
-				f_base_current = f_base;
+	do {
+		if (!test_bit(aff_current, vcpu_aff_bitmap)) {
+			aff[i] = aff_current;
+			i++;
+		} else {
+			if ((aff_current == vm0_vcpu0) && vm0_vcpu0_ok) {
+				aff[i] = aff_current;
+				i++;
+			} else if ((aff_current != vm0_vcpu0) && vm0_vcpus_ok) {
+				aff[i] = aff_current;
+				i++;
+			}
 		}
 
-		aff[j] = f_base_current;
-		j++;
-		f_base_current++;
-		if (f_base_current == e_base)
-			f_base_current = f_base;
-	}
+		if (++aff_current >= NR_CPUS)
+			aff_current = 0;
+	} while (i < nr);
 
 	spin_unlock(&affinity_lock);
 }
@@ -511,18 +524,6 @@ static void parse_and_create_vms(void)
 #ifdef CONFIG_DEVICE_TREE
 	of_iterate_all_node_loop(hv_node, create_native_vm_of, NULL);
 #endif
-}
-
-static int vcpu_affinity_init(void)
-{
-	struct vm *vm0 = get_vm_by_id(0);
-
-	e_base_current = e_base = vm0->vcpu_nr;
-	e_nr = NR_CPUS - vm0->vcpu_nr;
-	f_base_current = f_base = 0;
-	f_nr = vm0->vcpu_nr;
-
-	return 0;
 }
 
 int virt_init(void)

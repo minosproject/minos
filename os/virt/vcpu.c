@@ -179,15 +179,6 @@ static int vm_check_vcpu_affinity(int vmid, uint32_t *aff, int nr)
 	int i;
 	uint64_t mask = 0;
 
-#if 0
-	/* for hvm fix the affinity to liner */
-	if (vmid == 0) {
-		for (i = 0; i < nr; i++)
-			aff[i] = i;
-		return 0;
-	}
-#endif
-
 	for (i = 0; i < nr; i++) {
 		if (aff[i] >= VM_MAX_VCPU)
 			return -EINVAL;
@@ -207,7 +198,7 @@ static struct vm *__create_vm(struct vmtag *vme)
 
 	if (vm_check_vcpu_affinity(vme->vmid, vme->vcpu_affinity,
 				vme->nr_vcpu)) {
-		pr_err("vcpu affinit for vm no incorrect\n");
+		pr_err("vcpu affinit for vm not correct\n");
 		return NULL;
 	}
 
