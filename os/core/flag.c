@@ -245,7 +245,7 @@ static void flag_block(struct flag_grp *grp, struct flag_node *pnode,
 	task->flag_node = pnode;
 	list_add_tail(&grp->wait_list, &pnode->list);
 
-	set_task_sleep(task);
+	set_task_sleep(task, timeout);
 
 	task_unlock(task);
 }

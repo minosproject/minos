@@ -108,12 +108,12 @@ static void task_timeout_handler(unsigned long data)
 		task->stat &= ~TASK_STAT_SUSPEND;
 		task->stat &= ~TASK_STAT_PEND_ANY;
 		task->pend_stat = TASK_STAT_PEND_TO;
-		set_task_ready(task);
+		set_task_ready(task, 0);
 	} else {
 		if ((task->delay) && !task_is_ready(task)) {
 			task->delay = 0;
 			task->stat &= ~TASK_STAT_SUSPEND;
-			set_task_ready(task);
+			set_task_ready(task, 0);
 		}
 	}
 
@@ -300,7 +300,7 @@ int create_task(char *name, task_func_t func,
 		 */
 		if (task_is_realtime(task)) {
 			kernel_lock_irqsave(flags);
-			set_task_ready(task);
+			set_task_ready(task, 0);
 			kernel_unlock_irqrestore(flags);
 		}
 

@@ -133,6 +133,27 @@ static inline int task_is_vcpu(struct task *task)
 	return (task->flags & TASK_FLAGS_VCPU);
 }
 
+static inline void task_set_resched(struct task *task)
+{
+	struct task_info *tf = (struct task_info *)task->stack_origin;
+
+	tf->flags |= TIF_NEED_RESCHED;
+}
+
+static inline void task_clear_resched(struct task *task)
+{
+	struct task_info *tf = (struct task_info *)task->stack_origin;
+
+	tf->flags &= ~TIF_NEED_RESCHED;
+}
+
+static inline int task_need_resched(struct task *task)
+{
+	struct task_info *tf = (struct task_info *)task->stack_origin;
+
+	return (tf->flags & TIF_NEED_RESCHED);
+}
+
 int alloc_pid(prio_t prio, int cpuid);
 void release_pid(int pid);
 

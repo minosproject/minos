@@ -154,9 +154,8 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	task_lock_irqsave(task, flags);
 	task->stat |= TASK_STAT_MUTEX;
 	task->pend_stat = TASK_STAT_PEND_OK;
-	task->delay = timeout;
 	task->wait_event = to_event(m);
-	set_task_sleep(task);
+	set_task_sleep(task, timeout);
 	task_unlock_irqrestore(task, flags);
 
 	event_task_wait(task, to_event(m));

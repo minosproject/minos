@@ -43,8 +43,6 @@ struct pcpu {
 	struct list_head stop_list;
 	struct task *idle_task;
 
-	int local_rdy_tasks;
-
 	/* sched class callback for each pcpu */
 	void (*sched)(struct pcpu *pcpu, struct task *cur);
 	void (*irq_handler)(struct pcpu *pcpu, struct task *cur);
@@ -60,9 +58,9 @@ int sched_init(void);
 int local_sched_init(void);
 void pcpu_resched(int pcpu_id);
 int sched_can_idle(struct pcpu *pcpu);
-void set_task_ready(struct task *task);
+int set_task_ready(struct task *task, int preempt);
 void set_task_suspend(uint32_t delay);
-void set_task_sleep(struct task *task);
+int set_task_sleep(struct task *task, uint32_t ms);
 struct task *get_highest_task(uint8_t group, prio_t *ready);
 void irq_enter(gp_regs *regs);
 void irq_exit(gp_regs *regs);

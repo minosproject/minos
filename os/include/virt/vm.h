@@ -156,7 +156,7 @@ void vcpu_online(struct vcpu *vcpu);
 int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 		unsigned long entry, unsigned long unsed);
 int vcpu_power_off(struct vcpu *vcpu, int timeout);
-void kick_vcpu(struct vcpu *vcpu);
+void kick_vcpu(struct vcpu *vcpu, int preempt);
 
 static inline void exit_from_guest(struct vcpu *vcpu, gp_regs *regs)
 {

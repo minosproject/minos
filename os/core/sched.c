@@ -51,6 +51,22 @@ static int pcpu_sched_class[NR_CPUS];
 extern void sched_tick_disable(void);
 extern void sched_tick_enable(unsigned long exp);
 
+static inline void percpu_task_ready(struct pcpu *pcpu,
+		struct task *task, int preempt)
+{
+	list_del(&task->stat_list);
+	if (preempt)
+		list_add(&pcpu->ready_list, &task->stat_list);
+	else
+		list_add_tail(&pcpu->ready_list, &task->stat_list);
+}
+
+static inline void precpu_task_sleep(struct pcpu *pcpu, struct task *task)
+{
+	list_del(&task->stat_list);
+	list_add_tail(&pcpu->sleep_list, &task->stat_list);
+}
+
 static void inline set_next_task(struct task *task, int cpuid)
 {
 	__next_tasks[cpuid] = task;
@@ -62,7 +78,7 @@ void pcpu_resched(int pcpu_id)
 	send_sgi(CONFIG_MINOS_RESCHED_IRQ, pcpu_id);
 }
 
-static void smp_set_task_ready(void *data)
+static void __used smp_set_task_ready(void *data)
 {
 	struct task *task = data;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
@@ -77,9 +93,8 @@ static void smp_set_task_ready(void *data)
 		return;
 	}
 
-	list_del(&task->stat_list);
-	list_add_tail(&pcpu->ready_list, &task->stat_list);
-	pcpu->local_rdy_tasks++;
+	percpu_task_ready(pcpu, task, task_need_resched(task));
+	task_clear_resched(task);
 
 	if (task->delay) {
 		del_timer(&task->delay_timer);
@@ -89,26 +104,7 @@ static void smp_set_task_ready(void *data)
 	set_need_resched();
 }
 
-static void smp_set_task_suspend(void *data)
-{
-	struct task *task = data;
-	struct pcpu *pcpu = get_cpu_var(pcpu);
-
-	if ((current == task) || task_is_ready(task)) {
-		pr_warn("%s wrong stat %d\n", __func__, task->stat);
-		return;
-	}
-
-	/*
-	 * fix me - when the task is pending to wait
-	 * a mutex or sem, how to deal ?
-	 */
-	list_del(&task->stat_list);
-	list_add_tail(&pcpu->sleep_list, &task->stat_list);
-	pcpu->local_rdy_tasks--;
-}
-
-void set_task_ready(struct task *task)
+int set_task_ready(struct task *task, int preempt)
 {
 	struct pcpu *pcpu;
 
@@ -117,23 +113,20 @@ void set_task_ready(struct task *task)
 	 * 1 - kernel sched lock is locked (rt task)
 	 * 2 - the interrupt is disabled
 	 */
-	if (task_is_idle(task))
-		return;
-
 	if (task_is_realtime(task)) {
 		os_rdy_grp |= task->bity;
 		os_rdy_table[task->by] |= task->bitx;
 	} else {
 		pcpu = get_cpu_var(pcpu);
 		if (pcpu->pcpu_id != task->affinity) {
-			smp_function_call(task->affinity, smp_set_task_ready,
-					(void *)task, 0);
-			return;
+			if (preempt)
+				task_set_resched(task);
+
+			pcpu_resched(task->affinity);
+			return 0;
 		}
 
-		list_del(&task->stat_list);
-		list_add_tail(&pcpu->ready_list, &task->stat_list);
-		pcpu->local_rdy_tasks++;
+		percpu_task_ready(pcpu, task, preempt);
 	}
 
 	if (task->delay) {
@@ -142,14 +135,12 @@ void set_task_ready(struct task *task)
 	}
 
 	set_need_resched();
+	return 0;
 }
 
-void set_task_sleep(struct task *task)
+int set_task_sleep(struct task *task, uint32_t ms)
 {
 	struct pcpu *pcpu;
-
-	if (unlikely(task_is_idle(task)))
-		return;
 
 	if (task_is_realtime(task)) {
 		os_rdy_table[task->by] &= ~task->bitx;
@@ -157,16 +148,17 @@ void set_task_sleep(struct task *task)
 			os_rdy_grp &= ~task->bity;
 	} else {
 		pcpu = get_cpu_var(pcpu);
-		if (pcpu->pcpu_id != task->affinity) {
-			smp_function_call(task->affinity, smp_set_task_suspend,
-					(void *)task, 0);
-			return;
+
+		if (task->affinity != pcpu->pcpu_id) {
+			pr_warn("can not sleep other task %d\n", task->pid);
+			return -EPERM;
 		}
 
-		list_del(&task->stat_list);
-		list_add(&pcpu->sleep_list, &task->stat_list);
-		pcpu->local_rdy_tasks--;
+		precpu_task_sleep(pcpu, task);
 	}
+
+	task->delay = ms;
+	return 0;
 }
 
 void set_task_suspend(uint32_t delay)
@@ -175,9 +167,8 @@ void set_task_suspend(uint32_t delay)
 	struct task *task = get_current_task();
 
 	task_lock_irqsave(task, flags);
-	task->delay = delay;
 	task->stat |= TASK_STAT_SUSPEND;
-	set_task_sleep(task);
+	set_task_sleep(task, delay);
 	task_unlock_irqrestore(task, flags);
 
 	sched();
@@ -605,10 +596,12 @@ void sched(void)
 	 * suspend state, means it need ot drop the run time
 	 * then need to set it to the tail of the ready list
 	 */
+	raw_spin_lock(&cur->lock);
 	if (task_is_percpu(cur) && task_is_ready(cur)) {
 		list_del(&cur->stat_list);
 		list_add_tail(&pcpu->ready_list, &cur->stat_list);
 	}
+	raw_spin_unlock(&cur->lock);
 
 	pcpu->sched(pcpu, cur);
 
@@ -851,13 +844,25 @@ int resched_handler(uint32_t irq, void *data)
 	raw_spin_lock(&pcpu->lock);
 	list_for_each_entry_safe(task, n, &pcpu->new_list, stat_list) {
 		list_del(&task->stat_list);
-		if (task->stat == TASK_STAT_RDY) {
+		if (task->stat == TASK_STAT_RDY)
 			list_add(&pcpu->ready_list, &task->stat_list);
-		} else {
+		else
 			list_add_tail(&pcpu->sleep_list, &task->stat_list);
-		}
 	}
 	raw_spin_unlock(&pcpu->lock);
+
+	/*
+	 * list all the task in the sleep list to see whether need
+	 * to wakeup it, here do not need to aquire the spinlock of
+	 * the task stat, since only this task can be only run at
+	 * current cpu
+	 */
+	list_for_each_entry_safe(task, n, &pcpu->sleep_list, stat_list) {
+		if (task_is_ready(task)) {
+			percpu_task_ready(pcpu, task, task_need_resched(task));
+			task_clear_resched(task);
+		}
+	}
 
 	set_need_resched();
 

@@ -39,7 +39,7 @@ get_virq_desc(struct vcpu *vcpu, uint32_t virq)
 static void inline virq_kick_vcpu(struct vcpu *vcpu,
 		struct virq_desc *desc)
 {
-	kick_vcpu(vcpu);
+	kick_vcpu(vcpu, virq_is_hw(desc));
 }
 
 static int inline __send_virq(struct vcpu *vcpu, struct virq_desc *desc)

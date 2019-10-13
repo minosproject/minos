@@ -80,8 +80,8 @@ struct task {
 	uint32_t delay;
 	struct timer_list delay_timer;
 
-	volatile uint16_t stat;
-	volatile uint16_t pend_stat;
+	volatile uint32_t stat;
+	volatile uint32_t pend_stat;
 	uint8_t del_req;
 	uint8_t prio;
 	uint8_t bx;
@@ -103,7 +103,7 @@ struct task {
 	 * cpu - the cpu node which the task runing at currently
 	 */
 	uint16_t affinity;
-	uint16_t cpu;
+	uint16_t padding0;
 
 	unsigned long run_time;
 	unsigned long start_ns;

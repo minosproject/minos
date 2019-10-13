@@ -63,17 +63,7 @@ static inline void set_vcpu_ready(struct vcpu *vcpu)
 
 	task_lock_irqsave(vcpu->task, flags);
 	vcpu->task->stat = TASK_STAT_RDY;
-	set_task_ready(vcpu->task);
-	task_unlock_irqrestore(vcpu->task, flags);
-}
-
-static inline void set_vcpu_suspend(struct vcpu *vcpu)
-{
-	unsigned long flags;
-
-	task_lock_irqsave(vcpu->task, flags);
-	vcpu->task->stat = TASK_STAT_SUSPEND;
-	set_task_sleep(vcpu->task);
+	set_task_ready(vcpu->task, 0);
 	task_unlock_irqrestore(vcpu->task, flags);
 }
 
@@ -83,7 +73,7 @@ static inline void set_vcpu_stop(struct vcpu *vcpu)
 
 	task_lock_irqsave(vcpu->task, flags);
 	vcpu->task->stat = TASK_STAT_STOPPED;
-	set_task_sleep(vcpu->task);
+	set_task_sleep(vcpu->task, 0);
 	task_unlock_irqrestore(vcpu->task, flags);
 }
 
@@ -152,7 +142,7 @@ void vcpu_idle(struct vcpu *vcpu)
 		}
 
 		vcpu->task->stat = TASK_STAT_SUSPEND;
-		set_task_sleep(vcpu->task);
+		set_task_sleep(vcpu->task, 0);
 		task_unlock_irqrestore(vcpu->task, flags);
 
 		sched();
@@ -276,14 +266,14 @@ struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id)
 	return get_vcpu_in_vm(vm, vcpu_id);
 }
 
-void kick_vcpu(struct vcpu *vcpu)
+void kick_vcpu(struct vcpu *vcpu, int preempt)
 {
 	unsigned long flags;
 
 	task_lock_irqsave(vcpu->task, flags);
 	if (!task_is_ready(vcpu->task)) {
 		vcpu->task->stat = TASK_STAT_RDY;
-		set_task_ready(vcpu->task);
+		set_task_ready(vcpu->task, preempt);
 	}
 	task_unlock_irqrestore(vcpu->task, flags);
 }
