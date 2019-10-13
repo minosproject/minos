@@ -463,6 +463,7 @@ static void *create_native_vm_of(struct device_node *node, void *arg)
 	pr_info("    nr_vcpu: %d\n", vmtag.nr_vcpu);
 	pr_info("    entry: 0x%p\n", vmtag.entry);
 	pr_info("    setup_data: 0x%p\n", vmtag.setup_data);
+	pr_info("    %s-bit vm\n", vmtag.flags & VM_FLAGS_64BIT ? "64" : "32");
 	pr_info("    flags: 0x%x\n", vmtag.flags);
 	pr_info("    affinity: %d %d %d %d %d %d %d %d\n",
 			vmtag.vcpu_affinity[0], vmtag.vcpu_affinity[1],
