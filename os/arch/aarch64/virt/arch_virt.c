@@ -89,6 +89,7 @@ static void aarch64_system_state_init(struct task *task, void *c)
 {
 	struct aarch64_system_context *context =
 			(struct aarch64_system_context *)c;
+	struct vcpu *vcpu = (struct vcpu *)task->pdata;
 
 	memset(context, 0, sizeof(*context));
 
@@ -118,7 +119,11 @@ static void aarch64_system_state_init(struct task *task, void *c)
 		context->hcr_el2 |= HCR_EL2_RW;
 
 	context->vmpidr = 0x00000000 | get_vcpu_id(task_to_vcpu(task));
-	context->vpidr = 0x410fc050;	/* arm fvp */
+
+	if (vm_is_native(vcpu->vm))
+		context->vpidr = read_sysreg(VPIDR_EL2);
+	else
+		context->vpidr = 0x410fc050;	/* arm fvp */
 }
 
 static void aarch64_system_state_resume(struct task *task, void *c)

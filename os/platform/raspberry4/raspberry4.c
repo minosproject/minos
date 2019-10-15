@@ -30,7 +30,8 @@
 #include <virt/vmm.h>
 #include <virt/vdev.h>
 
-#define BCM2838_RELEASE_ADDR	CONFIG_MINOS_START_ADDRESS
+#define BCM2838_64BIT_RELEASE_ADDR	CONFIG_MINOS_START_ADDRESS
+#define BCM2838_32BIT_RELEASE_ADDR	0xff800000
 
 static int bcm2838_fake_scu_read(struct vdev *vdev, gp_regs *regs,
 		unsigned long address, unsigned long *value)
@@ -38,19 +39,9 @@ static int bcm2838_fake_scu_read(struct vdev *vdev, gp_regs *regs,
 	return 0;
 }
 
-static int bcm2838_fake_scu_write(struct vdev *vdev, gp_regs *regs,
-		unsigned long address, unsigned long *value)
+static int inline bcm2838_bootup_secondary(struct vm *vm,
+		int cpu, unsigned long entry)
 {
-	int cpu;
-	struct vm *vm = vdev->vm;
-	unsigned long offset = address - BCM2838_RELEASE_ADDR;
-
-	if (offset % sizeof(uint64_t)) {
-		pr_err("unsupport address 0x%x\n", address);
-		return -EINVAL;
-	}
-
-	cpu = offset / sizeof(uint64_t);
 	if (cpu >= vm->vcpu_nr) {
 		pr_err("no such vcpu vcpu-id:%d\n", cpu);
 		return -EINVAL;
@@ -59,10 +50,36 @@ static int bcm2838_fake_scu_write(struct vdev *vdev, gp_regs *regs,
 	if (cpu == 0)
 		return 0;
 
-	vcpu_power_on(get_current_vcpu(), cpuid_to_affinity(cpu),
-			*value, 0);
+	return vcpu_power_on(get_current_vcpu(),
+			cpuid_to_affinity(cpu), entry, 0);
+}
 
-	return 0;
+static int bcm2838_fake_64bit_scu_write(struct vdev *vdev, gp_regs *regs,
+		unsigned long address, unsigned long *value)
+{
+	int cpu;
+	struct vm *vm = vdev->vm;
+	unsigned long offset = address - BCM2838_64BIT_RELEASE_ADDR;
+
+	if (offset % sizeof(uint64_t)) {
+		pr_err("unsupport address 0x%x\n", address);
+		return -EINVAL;
+	}
+
+	cpu = offset / sizeof(uint64_t);
+
+	return bcm2838_bootup_secondary(vm, cpu, *value);
+}
+
+static int bcm2838_fake_32bit_scu_write(struct vdev *vdev, gp_regs *regs,
+		unsigned long address, unsigned long *value)
+{
+	int cpu;
+	unsigned long offset = address - BCM2838_32BIT_RELEASE_ADDR;
+
+	cpu = (offset - LOCAL_MAILBOX3_SET0) >> 4;
+
+	return bcm2838_bootup_secondary(vdev->vm, cpu, *value);
 }
 
 static int raspberry4_setup_hvm(struct vm *vm, void *dtb)
@@ -73,6 +90,7 @@ static int raspberry4_setup_hvm(struct vm *vm, void *dtb)
 	uint64_t dtb_addr = 0;
 	uint32_t *tmp = (uint32_t *)&dtb_addr;
 	struct vdev *vdev;
+	unsigned long base;
 
 	offset = of_get_node_by_name(dtb, 0, "cpus");
 	if (offset < 0) {
@@ -91,7 +109,7 @@ static int raspberry4_setup_hvm(struct vm *vm, void *dtb)
 		if (node <= 0)
 			continue;
 
-		addr = BCM2838_RELEASE_ADDR + i * sizeof(uint64_t);
+		addr = BCM2838_64BIT_RELEASE_ADDR + i * sizeof(uint64_t);
 		pr_info("vcpu-%d release addr redirect to 0x%p\n", i, addr);
 		tmp[0] = cpu_to_fdt32(addr >> 32);
 		tmp[1] = cpu_to_fdt32(addr & 0xffffffff);
@@ -106,11 +124,24 @@ static int raspberry4_setup_hvm(struct vm *vm, void *dtb)
 		if (!vdev)
 			panic("no more memory for spi-table\n");
 
-		host_vdev_init(vm, vdev, BCM2838_RELEASE_ADDR, 0x1000);
-		vdev_set_name(vdev, "fake-controller");
+		if (vm->flags & VM_FLAGS_64BIT)
+			base = BCM2838_64BIT_RELEASE_ADDR;
+		else
+			base = BCM2838_32BIT_RELEASE_ADDR;
 
+		host_vdev_init(vm, vdev, base, 0x1000);
+		vdev_set_name(vdev, "smp-fake-controller");
+
+		/*
+		 * for raspberry4, currently kernel will use the local
+		 * interrupt IC base address to wake up other cpu in 32
+		 * bit mode, which is different with 64bit
+		 */
 		vdev->read = bcm2838_fake_scu_read;
-		vdev->write = bcm2838_fake_scu_write;
+		if (vm->flags & VM_FLAGS_64BIT)
+			vdev->write = bcm2838_fake_64bit_scu_write;
+		else
+			vdev->write = bcm2838_fake_32bit_scu_write;
 	}
 
 	/* create pcie address mapping for VM0 */
@@ -124,6 +155,18 @@ static int raspberry4_setup_hvm(struct vm *vm, void *dtb)
 
 static int raspberry4_iomem_valid(unsigned long addr)
 {
+	/*
+	 * 0xff800000 ---> 0xffffffff will used for local_intc
+	 * in 32bit mode, kernel will use this address to wake
+	 * up other cpus
+	 */
+	if ((addr >= 0xff800000) && (addr < 0xffffffff))
+		return 0;
+
+	/*
+	 * 0x3b400000 ---> 0x3ebfffff will used for the framebuffer
+	 * in raspberry4
+	 */
 	if ((addr >= 0x3b400000) && (addr < 0x3ebfffff))
 		return 1;
 
