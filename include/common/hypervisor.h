@@ -35,7 +35,6 @@ struct vmtag {
 	void *setup_data;
 	unsigned long flags;
 	uint32_t vcpu_affinity[8];
-	uint64_t mmap_base;
 };
 
 #define IOCTL_CREATE_VM			0xf000

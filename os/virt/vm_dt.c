@@ -158,11 +158,12 @@ static int fdt_setup_cpu(struct vm *vm)
 
 static int fdt_setup_memory(struct vm *vm)
 {
-	int offset, size, i;
+	int offset, size;
 	int size_cell, address_cell;
 	uint32_t *args, *tmp;
 	unsigned long mstart, msize;
 	void *dtb = vm->setup_data;
+	struct vmm_area *va;
 
 	offset = of_get_node_by_name(dtb, 0, "memory");
 	if (offset < 0) {
@@ -187,9 +188,12 @@ static int fdt_setup_memory(struct vm *vm)
 
 	size = 0;
 
-	for (i = 0; i < vm->mm.nr_mem_regions; i++) {
-		mstart = vm->mm.memory_regions[i].phy_base;
-		msize = vm->mm.memory_regions[i].size;
+	list_for_each_entry(va, &vm->mm.vmm_area_used, list) {
+		if (!(va->flags & VM_NORMAL))
+			continue;
+
+		mstart = va->start;
+		msize = va->size;
 
 		pr_info("add memory region to vm0 0x%p 0x%p\n", mstart, msize);
 

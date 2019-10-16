@@ -80,20 +80,22 @@ void *map_vm_memory(struct vm *vm)
 	uint64_t args[2];
 	void *addr = NULL;
 
-	args[0] = 0;
+	args[0] = vm->mem_start;
 	args[1] = vm->mem_size;
+
+	if (ioctl(vm->vm_fd, IOCTL_VM_MMAP, args)) {
+		pr_err("mmap memory failed 0x%lx 0x%lx\n",
+				vm->mem_start, vm->mem_size);
+		return NULL;
+	}
+
+	vm->hvm_paddr = args[0];
+	args[0] = 0;
 
 	addr = mmap(NULL, args[1], PROT_READ | PROT_WRITE,
 			MAP_SHARED, vm->vm_fd, args[0]);
 	if (addr == (void *)-1)
 		return NULL;
-
-	if (ioctl(vm->vm_fd, IOCTL_VM_MMAP, args)) {
-		pr_err("mmap memory failed 0x%lx 0x%lx\n", args[0],
-				vm->mem_size);
-		munmap(addr, vm->mem_size);
-		addr = 0;
-	}
 
 	return addr;
 }
@@ -110,7 +112,6 @@ static int create_new_vm(struct vm *vm)
 	info.mem_base = vm->mem_start;
 	info.entry = (void *)vm->entry;
 	info.setup_data = (void *)vm->setup_data;
-	info.mmap_base = 0;
 	info.flags = vm->flags;
 	info.vmid = vm->vmid;
 
@@ -137,7 +138,6 @@ static int create_new_vm(struct vm *vm)
 		return vmid;
 	}
 
-	vm->hvm_paddr = info.mmap_base;
 	close(fd);
 
 	return vmid;

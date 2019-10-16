@@ -561,7 +561,6 @@ struct mem_block *alloc_mem_block(unsigned long flags)
 	 * need to do this
 	 */
 	if (block && (!(flags & GFB_VM))) {
-		f |= VM_RW;
 		if (flags & GFB_IO)
 			f |= VM_IO;
 		else

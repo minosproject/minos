@@ -145,7 +145,7 @@ static int raspberry4_setup_hvm(struct vm *vm, void *dtb)
 	}
 
 	/* create pcie address mapping for VM0 */
-	create_guest_mapping(vm, 0x600000000, 0x600000000, 0x4000000, VM_IO);
+	create_guest_mapping(&vm->mm, 0x600000000, 0x600000000, 0x4000000, VM_IO);
 
 	pr_info("raspberry4 setup vm done\n");
 

@@ -37,6 +37,15 @@ static void inline list_add_tail(struct list_head *head,
 	head->pre = new;
 }
 
+static void inline list_insert_before(struct list_head *head,
+		struct list_head *new)
+{
+	new->pre = head->pre;
+	new->next = head;
+	head->pre->next = new;
+	head->pre = new;
+}
+
 static void inline list_del(struct list_head *list)
 {
 	list->next->pre = list->pre;

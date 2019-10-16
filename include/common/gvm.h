@@ -27,4 +27,7 @@
 #define GVM_IRQ_COUNT		32
 #define GVM_IRQ_END		(GVM_IRQ_BASE + GVM_IRQ_COUNT)
 
+#define VIRTIO_NET_IRQ		(GVM_IRQ_BASE)
+#define VIRTION_NET_IOMEM_BASE	()
+
 #endif

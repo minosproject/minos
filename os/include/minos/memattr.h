@@ -11,6 +11,7 @@
 #define VM_NONE			(0x00000000)
 #define VM_IO			(0x00000001)
 #define VM_NORMAL		(0x00000002)
+#define VM_SHMEM		(0x00000004)
 #define VM_TYPE_MASK		(0x000000ff)
 
 #define VM_DES_FAULT		(0x00000000)
@@ -25,10 +26,16 @@
 #define VM_FORCE_2M		(0x00020000)
 #define VM_FORCE_1G		(0x00040000)
 
+/* the default acess type is 0 means RW */
 #define VM_RO			(0x00100000)
 #define VM_WO			(0x00200000)
-#define VM_RW			(VM_RO | VM_WO)
 #define VM_RW_MASK		(0x00300000)
+
+#define VM_PT			(0x01000000)	/* mapped as passthough only for IO memory*/
+#define VM_BK			(0X02000000)	/* mapped as block */
+#define VM_PG			(0x04000000)	/* mapped as page */
+#define VM_LN			(0x08000000)	/* mapped as liner */
+#define VM_MAP_TYPE_MASK	(0x0f000000)
 
 #define MEM_REGION_NAME_SIZE	32
 
@@ -37,8 +44,15 @@
 #define PMD			(2)
 #define PTE			(3)
 
+#define MAX_MEM_SECTIONS	(32)
+#define MEM_BLOCK_SIZE		(0x200000)
+#define MEM_BLOCK_SHIFT		(21)
+#define PAGES_IN_BLOCK		(MEM_BLOCK_SIZE >> PAGE_SHIFT)
+
 #define PAGE_NR(size)		(size >> PAGE_SHIFT)
 #define __PAGE_MASK		(~((1UL << PAGE_SHIFT) - 1))
+#define __BLOCK_MASK		(~((1UL << MEM_BLOCK_SHIFT) - 1))
+#define BLOCK_MASK		((1 << MEM_BLOCK_SHIFT) - 1)
 
 #define GFB_SLAB		(1 << 0)
 #define GFB_PAGE		(1 << 1)
@@ -55,10 +69,5 @@
 #define GFB_FIXED_BIT		(5)
 
 #define GFB_MASK		(0xffff)
-
-#define MAX_MEM_SECTIONS	(32)
-#define MEM_BLOCK_SIZE		(0x200000)
-#define MEM_BLOCK_SHIFT		(21)
-#define PAGES_IN_BLOCK		(MEM_BLOCK_SIZE >> PAGE_SHIFT)
 
 #endif

@@ -613,7 +613,7 @@ static struct virq_chip *vgicv2_virqchip_init(struct vm *vm,
 		pr_info("map gicc 0x%x to gicv 0x%x size 0x%x\n",
 				gicc_base, vgicv2_info.gicv_base, gicc_size);
 
-		create_guest_mapping(vm, gicc_base,
+		create_guest_mapping(&vm->mm, gicc_base,
 				vgicv2_info.gicv_base, gicc_size, VM_IO);
 	} else {
 		vgicv2_create_vgicc(vm, gicc_base, gicc_size);

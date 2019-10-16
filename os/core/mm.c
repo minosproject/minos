@@ -102,7 +102,6 @@ int split_memory_region(phy_addr_t base, size_t size, uint32_t flags)
 			n = alloc_boot_mem(sizeof(struct memory_region));
 			if (!n)
 				panic("no more boot memory\n");
-			init_list(&n->list);
 			n->vir_base = n->phy_base = new_end;
 			n->size = end - new_end;
 			n->flags = region->flags;
@@ -121,7 +120,6 @@ int split_memory_region(phy_addr_t base, size_t size, uint32_t flags)
 		if (!tmp)
 			panic("no more boot memory\n");
 
-		init_list(&tmp->list);
 		tmp->vir_base = tmp->phy_base = base;
 		tmp->size = size;
 		tmp->flags = flags;

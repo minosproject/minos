@@ -201,19 +201,43 @@ int vm_power_off(int vmid, void *arg)
 	return __vm_power_off(vm, arg);
 }
 
-static int guest_vm_memory_init(struct vm *vm, uint64_t base, uint64_t size)
+static int guest_mm_init(struct vm *vm, uint64_t base, uint64_t size)
 {
-	struct mm_struct *mm = &vm->mm;
-	struct memory_region *region = &mm->memory_regions[0];
+	if (split_vmm_area(&vm->mm, base, 0, size, VM_NORMAL | VM_BK)) {
+		pr_err("invalid memory config for guest VM\n");
+		return -EINVAL;
+	}
 
-	mm->nr_mem_regions = 1;
-	region->flags = 0;
-	region->phy_base = base;
-	region->vir_base = base;
-	region->free_size = region->size = size;
+	if (alloc_vm_memory(vm)) {
+		pr_err("allocate memory for vm-%d failed\n", vm->vmid);
+		return -ENOMEM;
+	}
 
-	/* allocate memory for this vm */
-	return vm_mmap_init(vm, size);
+	return 0;
+}
+
+int create_vm_mmap(int vmid,  unsigned long offset,
+		unsigned long size, unsigned long *addr)
+{
+	struct vm *vm = get_vm_by_id(vmid);
+	struct vmm_area *va;
+
+	va = vm_mmap(vm, offset, size);
+	if (!va)
+		return -EINVAL;
+
+	*addr = va->start;
+	return 0;
+}
+
+void destroy_vm_mmap(int vmid)
+{
+	struct vm *vm = get_vm_by_id(vmid);
+
+	if (!vm)
+		return;
+
+	vm_unmmap(vm);
 }
 
 int create_guest_vm(struct vmtag *tag)
@@ -235,19 +259,10 @@ int create_guest_vm(struct vmtag *tag)
 	if (!vm)
 		goto unmap_vmtag;
 
-	ret = guest_vm_memory_init(vm, vmtag->mem_base, vmtag->mem_size);
-	if (ret) {
-		pr_err("no more mmap space for vm\n");
-		goto release_vm;
-	}
-
-	vmtag->mmap_base = vm->mm.hvm_mmap_base;
-
-	ret = alloc_vm_memory(vm);
+	ret = guest_mm_init(vm, vmtag->mem_base, vmtag->mem_size);
 	if (ret)
 		goto release_vm;
 
-	dsb();
 	unmap_vm_mem((unsigned long)tag, sizeof(struct vmtag));
 
 	return (vm->vmid);
@@ -421,7 +436,7 @@ int vm_create_host_vdev(struct vm *vm)
 	 * do not need to map again, since all the guest VM's memory
 	 * has been mapped when mm_init()
 	 */
-	addr = get_vm_memblock_address(vm, (unsigned long)vm->setup_data);
+	addr = translate_vm_address(vm, (unsigned long)vm->setup_data);
 	if (!addr)
 		return -ENOMEM;
 
@@ -457,9 +472,7 @@ static void *create_native_vm_of(struct device_node *node, void *arg)
 {
 	int ret, i;
 	struct vm *vm;
-	struct mm_struct *mm;
 	struct vmtag vmtag;
-	struct memory_region *region;
 	uint64_t meminfo[2 * VM_MAX_MEM_REGIONS];
 
 	if (node->class != DT_CLASS_VM)
@@ -491,7 +504,6 @@ static void *create_native_vm_of(struct device_node *node, void *arg)
 	}
 
 	/* parse the memory information of the vm from dtb */
-	mm = &vm->mm;
 	ret = of_get_u64_array(node, "memory", meminfo, 2 * VM_MAX_MEM_REGIONS);
 	if ((ret <= 0) || ((ret % 2) != 0)) {
 		pr_err("get wrong memory information for vm-%d", vmtag.vmid);
@@ -501,19 +513,10 @@ static void *create_native_vm_of(struct device_node *node, void *arg)
 	}
 
 	ret = ret / 2;
-	if (ret > 10) {
-		pr_warn("VM have max %d@%d memory regions",
-				ret, VM_MAX_MEM_REGIONS);
-		ret = 10;
-	}
 
-	mm->nr_mem_regions = ret;
 	for (i = 0; i < ret; i ++) {
-		region = &mm->memory_regions[i];
-		region->flags = 0;
-		region->phy_base = meminfo[i * 2];
-		region->vir_base = meminfo[i * 2];
-		region->free_size = region->size = meminfo[i * 2 + 1];
+		split_vmm_area(&vm->mm, meminfo[i * 2], meminfo[i * 2],
+				meminfo[i * 2 + 1], VM_NORMAL | VM_PT);
 	}
 
 	return vm;
@@ -556,9 +559,9 @@ int virt_init(void)
 		 * - init the vmodule state for each vcpu
 		 * - prepare the vcpu for bootup
 		 */
-		vm_mm_init(vm);
 		vm_create_resource(vm);
 		setup_vm(vm);
+		vm_mm_init(vm);
 		vm->state = VM_STAT_ONLINE;
 
 		/* need after all the task of the vm setup is finished */

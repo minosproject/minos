@@ -82,8 +82,6 @@ static void *create_vm_irqchip_of(struct device_node *node, void *arg)
 
 int parse_vm_info_of(struct device_node *node, struct vmtag *vmtag)
 {
-	uint64_t memory[2];
-
 	/* 64bit virtual machine default */
 	memset(vmtag, 0, sizeof(*vmtag));
 	vmtag->flags |= VM_FLAGS_64BIT;
@@ -96,10 +94,6 @@ int parse_vm_info_of(struct device_node *node, struct vmtag *vmtag)
 	of_get_u32_array(node, "vcpu_affinity",
 			vmtag->vcpu_affinity, vmtag->nr_vcpu);
 	of_get_u64_array(node, "setup_data", (uint64_t *)&vmtag->setup_data, 1);
-
-	of_get_u64_array(node, "memory", memory, 2);
-	vmtag->mem_base = memory[0];
-	vmtag->mem_size = memory[1];
 
 	if (of_get_bool(node, "vm_32bit"))
 		vmtag->flags &= ~VM_FLAGS_64BIT;
@@ -221,7 +215,7 @@ static int create_pdev_iomem_of(struct vm *vm, struct device_node *node)
 		/* map the physical memory for vm */
 		pr_info("[VM%d IOMEM] 0x%x->0x%x 0x%x %s\n", vm->vmid,
 				addr, addr, size, node->name);
-		create_guest_mapping(vm, addr, addr, size, VM_IO);
+		create_guest_mapping(&vm->mm, addr, addr, size, VM_IO);
 	}
 
 	return 0;
@@ -254,23 +248,64 @@ static int create_vm_res_of(struct vm *vm, struct device_node *node)
 	return 0;
 }
 
+static void *create_vm_simple_bus(struct vm *vm, struct device_node *node)
+{
+	/* get all the ranges and handle the vmm_area */
+	int scells, acells, count;
+	int i, n = 0;
+	unsigned long base, size;
+	uint32_t array[64];
+
+	count = of_get_u32_array(node, "ranges", array, 64);
+	if (count <= 0)
+		return NULL;
+
+	acells = of_n_addr_cells(node);
+	scells = of_n_size_cells(node);
+	if ((scells == 0) || (acells == 0))
+		return NULL;
+
+	if (count % (scells + acells + 2)) {
+		pr_warn("wrong ranges config in %s\n", node->name);
+		return NULL;
+	}
+
+	count = count / (scells + acells + 2);
+	for (i = 0; i < count; i++) {
+		base = array[n + scells + acells];
+		size = array[n + scells + acells + 1];
+
+		pr_info("found IO ranges 0x%p ---> 0x%x\n",
+				base, base + size - 1);
+
+		split_vmm_area(&vm->mm, base, base, size, VM_IO | VM_PT);
+
+		n += (scells + acells + 2);
+	}
+
+	return node;
+}
+
 static void *__create_vm_resource_of(struct device_node *node, void *arg)
 {
 	struct vm *vm = (struct vm *)arg;
 
 	switch(node->class) {
-		case DT_CLASS_PCI_BUS:
-		case DT_CLASS_PDEV:
-			create_vm_pdev_of(vm, node);
-			break;
-		case DT_CLASS_VDEV:
-			create_vm_vdev_of(vm, node);
-			break;
-		case DT_CLASS_VM:
-			create_vm_res_of(vm, node);
-			break;
-		default:
-			break;
+	case DT_CLASS_PCI_BUS:
+	case DT_CLASS_PDEV:
+		create_vm_pdev_of(vm, node);
+		break;
+	case DT_CLASS_VDEV:
+		create_vm_vdev_of(vm, node);
+		break;
+	case DT_CLASS_VM:
+		create_vm_res_of(vm, node);
+		break;
+	case DT_CLASS_SIMPLE_BUS:
+		create_vm_simple_bus(vm, node);
+		break;
+	default:
+		break;
 	}
 
 	return NULL;

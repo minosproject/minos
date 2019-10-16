@@ -122,8 +122,8 @@ static unsigned long alloc_mapping_page(struct mm_struct *mm)
 		return 0;
 
 	memset(page_to_addr(page), 0, PAGE_SIZE);
-	page->next = mm->head;
-	mm->head = page;
+	page->next = mm->page_head;
+	mm->page_head = page;
 
 	return (unsigned long)(page_to_addr(page));
 }
@@ -261,9 +261,9 @@ int create_mem_mapping(struct mm_struct *mm, vir_addr_t addr,
 		map_info.config = attrs[PUD];
 	}
 
-	spin_lock(&mm->lock);
+	spin_lock(&mm->mm_lock);
 	ret = create_table_entry(mm, &map_info);
-	spin_unlock(&mm->lock);
+	spin_unlock(&mm->mm_lock);
 
 	if (ret)
 		pr_err("map fail 0x%x->0x%x size:%x\n", addr, phy, size);
@@ -275,6 +275,62 @@ int create_mem_mapping(struct mm_struct *mm, vir_addr_t addr,
 		flush_local_tlb_guest();
 
 	return ret;
+}
+
+static phy_addr_t mmu_translate_address(struct mapping_struct *info)
+{
+	int type, lvl = info->lvl;
+	unsigned long des, offset;
+	vir_addr_t va = info->vir_base;
+	struct pagetable_attr *attr = info->config;
+	unsigned long *table = (unsigned long *)info->table_base;
+
+	do {
+		offset = (va & attr->offset_mask) >> attr->range_offset;
+		des = *(table + offset);
+		if (0 == des)
+			return 0;
+
+		type = get_mapping_type(lvl, des);
+		if (type == VM_DES_FAULT)
+			return 0;
+
+		if (type == VM_DES_TABLE) {
+			lvl++;
+			table = (unsigned long *)(des & ~PAGE_MASK);
+			attr = attr->next;
+			if ((lvl > PTE) || (attr == NULL))
+				return 0;
+		} else {
+			return (des & ~(attr->map_size - 1));
+		}
+	} while (1);
+}
+
+phy_addr_t mmu_translate_guest_address(void *pgd, unsigned long va)
+{
+	struct mapping_struct info;
+
+	memset(&info, 0, sizeof(info));
+	info.table_base = (unsigned long)pgd;
+	info.vir_base = va;
+	info.lvl = PUD;
+	info.config = attrs[PUD];
+
+	return mmu_translate_address(&info);
+}
+
+phy_addr_t mmu_translate_host_address(void *pgd, unsigned long va)
+{
+	struct mapping_struct info;
+
+	memset(&info, 0, sizeof(info));
+	info.table_base = (unsigned long)pgd;
+	info.vir_base = va;
+	info.lvl = PGD;
+	info.config = attrs[PGD];
+
+	return mmu_translate_address(&info);
 }
 
 static int __destroy_mem_mapping(struct mapping_struct *info)
@@ -340,9 +396,9 @@ int destroy_mem_mapping(struct mm_struct *mm, unsigned long vir,
 	map_info.size = size;
 	map_info.config = attrs[PGD];
 
-	spin_lock(&mm->lock);
+	spin_lock(&mm->mm_lock);
 	__destroy_mem_mapping(&map_info);
-	spin_unlock(&mm->lock);
+	spin_unlock(&mm->mm_lock);
 
 	if (flags & VM_HOST)
 		flush_tlb_va_host(vir, size);
@@ -423,12 +479,12 @@ unsigned long alloc_guest_pmd(struct mm_struct *mm, unsigned long phy)
 		return pmd;
 
 	/* alloc a new pmd mapping page */
-	spin_lock(&mm->lock);
+	spin_lock(&mm->mm_lock);
 	pmd = alloc_mapping_page(mm);
 	if (pmd)
 		create_pud_mapping(mm->pgd_base, phy, pmd, VM_DES_TABLE);
 
-	spin_unlock(&mm->lock);
+	spin_unlock(&mm->mm_lock);
 	return pmd;
 }
 
@@ -516,10 +572,9 @@ int destroy_host_mapping(vir_addr_t vir, size_t size)
 
 static int vmm_early_init(void)
 {
-	spin_lock_init(&host_mm.lock);
+	spin_lock_init(&host_mm.mm_lock);
 	host_mm.pgd_base = (unsigned long)&__el2_ttb0_pgd;
 
 	return 0;
 }
-
 early_initcall(vmm_early_init);

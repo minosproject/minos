@@ -619,7 +619,7 @@ static struct virq_chip *bcm2836_virqchip_init(struct vm *vm,
 	 * 0x40000200 - 0x40000300 : bcm2835 inc controller
 	 *
 	 */
-	create_guest_mapping(vm, BCM2836_INC_BASE, (unsigned long)bcm2836->iomem,
+	create_guest_mapping(&vm->mm, BCM2836_INC_BASE, (unsigned long)bcm2836->iomem,
 			PAGE_SIZE, VM_IO | VM_RO);
 
 	vc = alloc_virq_chip();

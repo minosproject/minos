@@ -60,8 +60,8 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 		break;
 
 	case HVC_VM_MMAP:
-		addr = create_vm_mmap((int)args[0], args[1], args[2]);
-		HVC_RET1(c, addr);
+		ret = create_vm_mmap((int)args[0], args[1], args[2], &addr);
+		HVC_RET2(c, ret, addr);
 		break;
 
 	case HVC_VM_UNMMAP:

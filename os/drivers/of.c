@@ -471,13 +471,14 @@ int of_n_addr_cells(struct device_node *node)
 	fdt32_t *ip;
 
 	do {
-		if (node->parent)
-			node = node->parent;
 		ip = (fdt32_t *)fdt_getprop(node->data, node->offset,
 				"#address-cells", NULL);
 		if (ip)
 			return fdt32_to_cpu(*ip);
-	} while (node->parent);
+
+		if (node->parent)
+			node = node->parent;
+	} while (node);
 
 	return 2;
 }
@@ -487,13 +488,14 @@ int of_n_size_cells(struct device_node *node)
 	fdt32_t *ip;
 
 	do {
-		if (node->parent)
-			node = node->parent;
 		ip = (fdt32_t *)fdt_getprop(node->data, node->offset,
 				"#size-cells", NULL);
 		if (ip)
 			return fdt32_to_cpu(*ip);
-	} while (node->parent);
+
+		if (node->parent)
+			node = node->parent;
+	} while (node);
 
 	return 1;
 }

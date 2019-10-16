@@ -157,7 +157,7 @@ unsigned long vm_create_vmcs(struct vm *vm)
 	vm->vmcs = (void *)base;
 	memset(vm->vmcs, 0, size);
 
-	vm->hvm_vmcs = (void *)create_hvm_iomem_map(base, size);
+	vm->hvm_vmcs = (void *)create_hvm_iomem_map(vm, base, size);
 	if (!vm->hvm_vmcs) {
 		pr_err("mapping vmcs to hvm failed\n");
 		free(vm->vmcs);

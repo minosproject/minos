@@ -175,10 +175,11 @@ static void *virtio_create_device(struct vm *vm, struct device_node *node)
 	struct mm_struct *mm = &vm->mm;
 	uint64_t base, size;
 	unsigned long flags;
+	struct vmm_area *va = vm->mm.virito_mmio_va;
 
 	pr_info("create virtio-mmio device for vm-%d\n", vm->vmid);
 
-	if (!mm->virtio_mmio_iomem)
+	if (!mm->virito_mmio_va)
 		return NULL;
 
 	ret = translate_device_address(node, &base, &size);
@@ -189,7 +190,7 @@ static void *virtio_create_device(struct vm *vm, struct device_node *node)
 	if (ret)
 		return NULL;
 
-	if (base >= (mm->virtio_mmio_gbase + mm->virtio_mmio_size)) {
+	if (base >= (va->start + va->size)) {
 		pr_err("invalid virtio mmio range 0x%x\n", base);
 		return NULL;
 	}
@@ -207,8 +208,8 @@ static void *virtio_create_device(struct vm *vm, struct device_node *node)
 	request_virq(vm, irq, 0);
 
 	/* set up the iomem base of the vdev */
-	offset = base - mm->virtio_mmio_gbase;
-	vdev->iomem = mm->virtio_mmio_iomem + offset;
+	offset = base - va->start;
+	vdev->iomem = (void *)(va->pstart + offset);
 
 	vdev->read = virtio_mmio_read;
 	vdev->write = virtio_mmio_write;
@@ -227,13 +228,9 @@ int virtio_mmio_init(struct vm *vm, size_t size,
 		unsigned long *gbase, unsigned long *hbase)
 {
 	void *iomem = NULL;
-	unsigned long __gbase = 0;
 	struct mm_struct *mm = &vm->mm;
-
-	if (mm->virtio_mmio_iomem) {
-		pr_err("virtio mmio has been inited\n");
-		return -EINVAL;
-	}
+	struct vm *vm0 = get_vm_by_id(0);
+	struct vmm_area *gva, *hva;
 
 	if (size == 0) {
 		pr_err("invaild virtio mmio size\n");
@@ -244,13 +241,20 @@ int virtio_mmio_init(struct vm *vm, size_t size,
 	*hbase = 0;
 	size = PAGE_BALIGN(size);
 
-	__gbase = create_guest_vdev(vm, size);
-	if (__gbase == 0)
+	/* read only for guest vm */
+	gva = alloc_free_vmm_area(mm, size, PAGE_MASK, VM_IO | VM_RO);
+	if (!gva)
+		return -ENOMEM;
+
+	hva = alloc_free_vmm_area(&vm0->mm, size, PAGE_MASK, VM_IO);
+	if (!hva)
 		return -ENOMEM;
 
 	iomem = get_io_pages(PAGE_NR(size));
-	if (!iomem)
+	if (!iomem) {
+		release_vmm_area(&vm0->mm, hva);
 		return -ENOMEM;
+	}
 
 	memset(iomem, 0, size);
 
@@ -260,38 +264,27 @@ int virtio_mmio_init(struct vm *vm, size_t size,
 	 * by the way, this memory also need to mapped to the
 	 * guest vm 's memory space
 	 */
-	*hbase = create_hvm_iomem_map((unsigned long)iomem, size);
-	if (*hbase == 0) {
-		free_pages(iomem);
-		return -ENOMEM;
-	}
+	if (map_vmm_area(&vm0->mm, gva, (unsigned long)iomem))
+		goto out;
 
-	if (create_guest_mapping(vm, __gbase, (unsigned long)iomem,
-				size, VM_IO | VM_RO)) {
-		free_pages(iomem);
-		return -EFAULT;
-	}
+	if (create_guest_mapping(&vm0->mm, hva->start,
+			(unsigned long)iomem, size, VM_IO))
+		goto out;
 
-	/* update the virtio information of the vm */
-	mm->virtio_mmio_gbase = __gbase;
-	mm->virtio_mmio_iomem = iomem;
-	mm->virtio_mmio_size = size;
-
-	*gbase = __gbase;
+	*gbase = gva->start;
+	*hbase = hva->start;
+	hva->vmid = vm->vmid;
+	mm->virito_mmio_va = gva;
 
 	return 0;
+
+out:
+	free_pages(iomem);
+	release_vmm_area(&vm0->mm, hva);
+	return -EFAULT;
 }
 
 int virtio_mmio_deinit(struct vm *vm)
 {
-	struct mm_struct *mm = &vm->mm;
-
-	if (mm->virtio_mmio_iomem)
-		free_pages(mm->virtio_mmio_iomem);
-
-	mm->virtio_mmio_gbase = 0;
-	mm->virtio_mmio_iomem = NULL;
-	mm->virtio_mmio_size = 0;
-
 	return 0;
 }

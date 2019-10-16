@@ -189,6 +189,11 @@ static inline int vm_is_hvm(struct vm *vm)
 	return (vm->vmid == 0);
 }
 
+static inline int vm_is_64bit(struct vm *vm)
+{
+	return vm->flags & VM_FLAGS_64BIT;
+}
+
 static inline int vm_is_native(struct vm *vm)
 {
 	return !!(vm->flags & VM_FLAGS_NATIVE);
@@ -199,26 +204,10 @@ static inline int vm_id(struct vm *vm)
 	return vm->vmid;
 }
 
-static inline int
-create_vm_mmap(int vmid,  unsigned long offset, unsigned long size)
-{
-	struct vm *vm = get_vm_by_id(vmid);
+int create_vm_mmap(int vmid,  unsigned long offset,
+		unsigned long size, unsigned long *addr);
+void destroy_vm_mmap(int vmid);
 
-	if (!vm)
-		return -ENOENT;
-
-	return vm_mmap(vm, offset, size);
-}
-
-static inline void destroy_vm_mmap(int vmid)
-{
-	struct vm *vm = get_vm_by_id(vmid);
-
-	if (!vm)
-		return;
-
-	vm_unmmap(vm);
-}
 
 int vm_create_host_vdev(struct vm *vm);
 int request_vm_virqs(struct vm *vm, int base, int nr);

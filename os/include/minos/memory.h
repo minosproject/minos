@@ -60,30 +60,28 @@ struct page {
 	};
 };
 
+/*
+ * pstart - if this area is mapped as continous the pstart
+ * is the phsical address of this vmm_area
+ */
+struct vmm_area {
+	unsigned long start;
+	unsigned long end;
+	unsigned long pstart;
+	size_t size;
+	unsigned long flags;
+	int vmid;			/* 0 - for self other for VM */
+	struct list_head list;
+	union {
+		struct page *p_head;
+		struct list_head b_head;
+	};
+};
+
 struct mm_struct {
 	/* the base address of the page table for the vm */
 	unsigned long pgd_base;
-
-	/* the base address mapped in VM0 */
-	unsigned long hvm_mmap_base;
-
-	/*
-	 * for the shared memory of native vm
-	 * or the iomem space of guest vm
-	 */
-	union {
-		unsigned long gvm_iomem_base;
-		unsigned long shmem_base;
-	};
-	union {
-		unsigned long gvm_iomem_size;
-		unsigned long shmem_size;
-	};
-
-	/* for virtio devices */
-	unsigned long virtio_mmio_gbase;
-	void *virtio_mmio_iomem;
-	size_t virtio_mmio_size;
+	spinlock_t mm_lock;
 
 	/*
 	 * head - all page allocated to this VM, the mmu
@@ -92,18 +90,19 @@ struct mm_struct {
 	 * block_list - all the blocks allocated to this
 	 * vm
 	 */
-	struct page *head;
-	struct list_head block_list;
+	struct page *page_head;
 
 	/*
-	 * list all the memory region for this VM, usually
-	 * native VM may have at least one memory region, but
-	 * guest VM will only have one region
+	 * vmm_area_free : list to all the free vmm_area
+	 * vmm_area_used : list to all the used vmm_area
+	 * lock		 : spin lock for vmm_area allocate
 	 */
-	int nr_mem_regions;
-	struct memory_region memory_regions[VM_MAX_MEM_REGIONS];
+	spinlock_t vmm_area_lock;
+	struct list_head vmm_area_free;
+	struct list_head vmm_area_used;
+	struct vmm_area *virito_mmio_va;	/* for virtio mmio framwork */
 
-	spinlock_t lock;
+	void *vm;
 };
 
 int add_memory_region(uint64_t base, uint64_t size, uint32_t flags);
