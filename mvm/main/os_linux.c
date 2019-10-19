@@ -49,6 +49,7 @@
 #include <bootimage.h>
 #include <libfdt/libfdt.h>
 #include <vdev.h>
+#include <common/gvm.h>
 
 #define GIC_TYPE_GICV3	(0)
 #define GIC_TYPE_GICV2	(1)
@@ -64,31 +65,31 @@ static int fdt_set_gicv2(void *dtb, int node)
 
 	/* gicd */
 	regs[0] = cpu_to_fdt32(0);
-	regs[1] = cpu_to_fdt32(0x2f000000);
+	regs[1] = cpu_to_fdt32(GICV2_GICD_IOMEM_BASE);
 	regs[2] = cpu_to_fdt32(0x0);
-	regs[3] = cpu_to_fdt32(0x10000);
+	regs[3] = cpu_to_fdt32(GICV2_GICD_IOMEM_SIZE);
 
 	/* gicc */
 	regs[4] = cpu_to_fdt32(0);
-	regs[5] = cpu_to_fdt32(0x2c000000);
+	regs[5] = cpu_to_fdt32(GICV2_GICC_IOMEM_BASE);
 	regs[6] = cpu_to_fdt32(0x0);
-	regs[7] = cpu_to_fdt32(0x2000);
+	regs[7] = cpu_to_fdt32(GICV2_GICC_IOMEM_SIZE);
 
 	/* gich */
 	regs[8] = cpu_to_fdt32(0);
-	regs[9] = cpu_to_fdt32(0x2c010000);
+	regs[9] = cpu_to_fdt32(GICV2_GICH_IOMEM_BASE);
 	regs[10] = cpu_to_fdt32(0x0);
-	regs[11] = cpu_to_fdt32(0x2000);
+	regs[11] = cpu_to_fdt32(GICV2_GICH_IOMEM_SIZE);
 
 	/* gicv */
 	regs[12] = cpu_to_fdt32(0);
-	regs[13] = cpu_to_fdt32(0x2c02f000);
+	regs[13] = cpu_to_fdt32(GICV2_GICV_IOMEM_BASE);
 	regs[14] = cpu_to_fdt32(0x0);
-	regs[15] = cpu_to_fdt32(0x2000);
+	regs[15] = cpu_to_fdt32(GICV2_GICV_IOMEM_SIZE);
 	fdt_setprop(dtb, node, "reg", (void *)regs, 64);
 
 	regs[0] = cpu_to_fdt32(1);
-	regs[1] = cpu_to_fdt32(9);
+	regs[1] = cpu_to_fdt32(GIC_IRQ);
 	regs[2] = cpu_to_fdt32(4);
 	fdt_setprop(dtb, node, "interrupts", (void *)regs, 12);
 
@@ -105,42 +106,42 @@ static int fdt_set_gicv3(void *dtb, int node)
 
 	/* gicd */
 	regs[0] = cpu_to_fdt32(0x0);
-	regs[1] = cpu_to_fdt32(0x2f000000);
+	regs[1] = cpu_to_fdt32(GICV3_GICD_IOMEM_BASE);
 	regs[2] = cpu_to_fdt32(0x0);
-	regs[3] = cpu_to_fdt32(0x10000);
+	regs[3] = cpu_to_fdt32(GICV3_GICD_IOMEM_SIZE);
 
 	/* gicr */
 	regs[4] = cpu_to_fdt32(0x0);
-	regs[5] = cpu_to_fdt32(0x2f100000);
+	regs[5] = cpu_to_fdt32(GICV3_GICR_IOMEM_BASE);
 	regs[6] = cpu_to_fdt32(0x0);
-	regs[7] = cpu_to_fdt32(0x200000);
+	regs[7] = cpu_to_fdt32(GICV3_GICR_IOMEM_SIZE);
 
 	/* gicc */
 	regs[8] = cpu_to_fdt32(0x0);
-	regs[9] = cpu_to_fdt32(0x2c000000);
+	regs[9] = cpu_to_fdt32(GICV3_GICC_IOMEM_BASE);
 	regs[10] = cpu_to_fdt32(0x0);
-	regs[11] = cpu_to_fdt32(0x2000);
+	regs[11] = cpu_to_fdt32(GICV3_GICC_IOMEM_SIZE);
 
 	/* gich */
 	regs[12] = cpu_to_fdt32(0x0);
-	regs[13] = cpu_to_fdt32(0x2c010000);
+	regs[13] = cpu_to_fdt32(GICV3_GICH_IOMEM_BASE);
 	regs[14] = cpu_to_fdt32(0x0);
-	regs[15] = cpu_to_fdt32(0x2000);
+	regs[15] = cpu_to_fdt32(GICV3_GICH_IOMEM_SIZE);
 
 	/* gicv */
 	regs[16] = cpu_to_fdt32(0x0);
-	regs[17] = cpu_to_fdt32(0x2c02f000);
+	regs[17] = cpu_to_fdt32(GICV3_GICV_IOMEM_BASE);
 	regs[18] = cpu_to_fdt32(0x0);
-	regs[19] = cpu_to_fdt32(0x2000);
+	regs[19] = cpu_to_fdt32(GICV3_GICV_IOMEM_SIZE);
 	fdt_setprop(dtb, node, "reg", (void *)regs, 80);
 
 	regs[0] = cpu_to_fdt32(1);
-	regs[1] = cpu_to_fdt32(9);
+	regs[1] = cpu_to_fdt32(GIC_IRQ);
 	regs[2] = cpu_to_fdt32(4);
 	fdt_setprop(dtb, node, "interrupts", (void *)regs, 12);
 
 	/* add the its node */
-	its_node = fdt_add_subnode(dtb, node, "its@2f020000");
+	its_node = fdt_add_subnode(dtb, node, "its@0x10330000");
 	if (its_node < 0) {
 		pr_err("add its node for gicv3 failed\n");
 		return its_node;
@@ -151,9 +152,9 @@ static int fdt_set_gicv3(void *dtb, int node)
 	fdt_setprop(dtb, its_node, "msi-controller", "", 0);
 
 	regs[0] = cpu_to_fdt32(0x0);
-	regs[1] = cpu_to_fdt32(0x2f020000);
+	regs[1] = cpu_to_fdt32(GICV3_ITS_IOMEM_BASE);
 	regs[2] = cpu_to_fdt32(0x0);
-	regs[3] = cpu_to_fdt32(0x20000);
+	regs[3] = cpu_to_fdt32(GICV3_ITS_IOMEM_SIZE);
 	fdt_setprop(dtb, its_node, "reg", (void *)regs, 12);
 
 	return 0;

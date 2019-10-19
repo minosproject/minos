@@ -145,6 +145,7 @@ static int __vdev_alloc_and_request_irq(struct vm *vm, int nr, int request)
 	if (vdev_irq_count < nr)
 		return 0;
 
+	/* try to request the virq */
 	if (request)
 		ret = __vdev_request_virq(vm, vdev_irq_base, nr);
 
@@ -194,7 +195,7 @@ static int dtb_add_virtio(struct vdev *vdev, void *dtb)
 	}
 
 	memset(buf, 0, 64);
-	addr = vdev->guest_iomem - 0x40000000;
+	addr = vdev->guest_iomem - 0x10000000;
 	sprintf(buf, "%s@%lx", vdev->name, (unsigned long)addr);
 	node = fdt_add_subnode(dtb, offset, buf);
 	if (node < 0) {

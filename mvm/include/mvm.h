@@ -22,6 +22,8 @@
 #include <os.h>
 #include <vm.h>
 
+#define INVALID_MMAP_ADDR		((void *)-1)
+
 #define MAXCOMLEN			(19)
 
 #define PAGE_SIZE			(4096)

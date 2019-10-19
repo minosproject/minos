@@ -27,7 +27,7 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 {
 	int vmid = -1, ret;
 	unsigned long addr;
-	unsigned long gbase = 0, hbase = 0;
+	unsigned long hbase = 0;
 	struct vm *vm = get_vm_by_id((uint32_t)args[0]);
 
 	if (!vm_is_hvm(get_current_vm()))
@@ -91,12 +91,8 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 		break;
 
 	case HVC_VM_VIRTIO_MMIO_INIT:
-		ret = virtio_mmio_init(vm, args[1], &gbase, &hbase);
-		HVC_RET3(c, ret, gbase, hbase);
-		break;
-	case HVC_VM_VIRTIO_MMIO_DEINIT:
-		ret = virtio_mmio_deinit(vm);
-		HVC_RET1(c, 0);
+		ret = virtio_mmio_init(vm, args[1], args[2], &hbase);
+		HVC_RET2(c, ret, hbase);
 		break;
 	case HVC_VM_CREATE_HOST_VDEV:
 		ret = vm_create_host_vdev(vm);

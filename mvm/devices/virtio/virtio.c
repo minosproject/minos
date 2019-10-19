@@ -35,23 +35,45 @@
 #include <virtio.h>
 #include <io.h>
 #include <barrier.h>
+#include <common/gvm.h>
 
-static void *virtio_guest_iobase;
-static void *virtio_host_iobase;
-static size_t virtio_iomem_size;
-static size_t virtio_iomem_free;
+static int virtio_devices_nr;
+static void *virtio_iomem_base;
+static int virtio_device_index;
 
-static int hv_create_virtio_device(struct vm *vm,
-		void **gbase, void **hbase)
+static void *hv_virtio_mmio_init(struct vm *vm, void *gbase)
+{
+	int ret = 0;
+	void *map_base;
+	uint64_t args[2] = {(uint64_t)gbase, VIRTIO_DEVICE_IOMEM_SIZE};
+
+	ret = ioctl(vm->vm_fd, IOCTL_VIRTIO_MMIO_INIT, args);
+	if (ret || !args[0] || !args[1]) {
+		pr_err("virtio mmio init failed in hypervisor\n");
+		return INVALID_MMAP_ADDR;
+	}
+
+	map_base = vdev_map_iomem((void *)((unsigned long)args[0]),
+			VIRTIO_DEVICE_IOMEM_SIZE);
+
+	return map_base;
+}
+
+static int hv_create_virtio_device(struct vm *vm, void **gbase, void **hbase)
 {
 	void *__gbase, *__hbase;
 
-	if (virtio_iomem_free < VIRTIO_DEVICE_IOMEM_SIZE)
-		return -ENOMEM;
+	if (virtio_device_index >= virtio_devices_nr)
+		return -ENOENT;
 
-	__gbase = virtio_guest_iobase + (virtio_iomem_size - virtio_iomem_free);
-	__hbase = virtio_host_iobase + (virtio_iomem_size - virtio_iomem_free);
-	virtio_iomem_free -= VIRTIO_DEVICE_IOMEM_SIZE;
+	__gbase = virtio_iomem_base + (virtio_device_index *
+			VIRTIO_DEVICE_IOMEM_SIZE);
+	virtio_device_index++;
+
+	/* get the physical memory for this virtio device */
+	__hbase = hv_virtio_mmio_init(vm, __gbase);
+	if (__hbase == INVALID_MMAP_ADDR)
+		return -ENOMEM;
 
 	*gbase = __gbase;
 	*hbase = __hbase;
@@ -59,73 +81,19 @@ static int hv_create_virtio_device(struct vm *vm,
 	return 0;
 }
 
-static int hv_virtio_mmio_deinit(struct vm *vm)
+int virtio_mmio_init(struct vm *vm)
 {
-	return ioctl(vm->vm_fd, IOCTL_VIRTIO_MMIO_DEINIT, NULL);
-}
-
-static int hv_virtio_mmio_init(struct vm *vm,
-		size_t size, void **gbase, void **hbase)
-{
-	int ret = 0;
-	void *map_base;
-	uint64_t args[2] = {size, 0};
-
-	ret = ioctl(vm->vm_fd, IOCTL_VIRTIO_MMIO_INIT, args);
-	if (ret || !args[0] || !args[1]) {
-		pr_err("virtio mmio init failed in hypervisor\n");
-		return ret;
-	}
-
-	map_base = vdev_map_iomem((void *)((unsigned long)args[1]), size);
-	if (map_base == (void *)-1) {
-		hv_virtio_mmio_deinit(vm);
-		return -ENOMEM;
-	}
-
-
-	*gbase = (void *)(unsigned long)args[0];
-	*hbase = map_base;
-
-	return 0;
-}
-
-int virtio_mmio_init(struct vm *vm, int nr_devs)
-{
-	int ret = 0;
-	size_t size;
-	void *gbase = NULL, *hbase = NULL;
-
 	/*
-	 * each virtio device will have 0x400 iomem
+	 * each virtio device will have 0x1000 iomem
 	 * space for communicated between guest and host
 	 *
 	 * and the total virtio mem space must PAGE_ALIGN
 	 */
-	size = nr_devs * VIRTIO_DEVICE_IOMEM_SIZE;
-	size = BALIGN(size, PAGE_SIZE);
-	if (size == 0)
-		return -EINVAL;
-
-	ret = hv_virtio_mmio_init(vm, size, &gbase, &hbase);
-	if (ret || !gbase || !hbase)
-		return ret;
-
-	virtio_guest_iobase = gbase;
-	virtio_host_iobase = hbase;
-	virtio_iomem_size = size;
-	virtio_iomem_free = size;
-
-	pr_info("virtio-mmio : 0x%p 0x%p 0x%lx\n", gbase, hbase, size);
+	virtio_devices_nr = VM_MAX_VIRTIO_DEVICES;
+	virtio_iomem_base = (void *)VM_VIRTIO_IOMEM_BASE;
+	virtio_device_index = 0;
 
 	return 0;
-}
-
-int virtio_mmio_deinit(struct vm *vm)
-{
-	vdev_unmap_iomem(virtio_host_iobase, virtio_iomem_size);
-
-	return hv_virtio_mmio_deinit(vm);
 }
 
 static inline int next_desc(struct vring_desc *desc)

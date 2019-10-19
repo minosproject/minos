@@ -224,28 +224,19 @@ out:
 }
 VDEV_DECLARE(virtio_mmio, virtio_match_table, virtio_create_device);
 
-int virtio_mmio_init(struct vm *vm, size_t size,
-		unsigned long *gbase, unsigned long *hbase)
+int virtio_mmio_init(struct vm *vm, unsigned long gbase,
+		size_t size, unsigned long *hbase)
 {
 	void *iomem = NULL;
-	struct mm_struct *mm = &vm->mm;
 	struct vm *vm0 = get_vm_by_id(0);
-	struct vmm_area *gva, *hva;
+	struct vmm_area *hva;
 
 	if (size == 0) {
 		pr_err("invaild virtio mmio size\n");
 		return -EINVAL;
 	}
 
-	*gbase = 0;
-	*hbase = 0;
 	size = PAGE_BALIGN(size);
-
-	/* read only for guest vm */
-	gva = alloc_free_vmm_area(mm, size, PAGE_MASK, VM_IO | VM_RO);
-	if (!gva)
-		return -ENOMEM;
-
 	hva = alloc_free_vmm_area(&vm0->mm, size, PAGE_MASK, VM_IO);
 	if (!hva)
 		return -ENOMEM;
@@ -264,27 +255,28 @@ int virtio_mmio_init(struct vm *vm, size_t size,
 	 * by the way, this memory also need to mapped to the
 	 * guest vm 's memory space
 	 */
-	if (map_vmm_area(&vm0->mm, gva, (unsigned long)iomem))
+	if (create_guest_mapping(&vm->mm, gbase, (unsigned long)iomem,
+				size, VM_IO | VM_RO))
 		goto out;
 
 	if (create_guest_mapping(&vm0->mm, hva->start,
 			(unsigned long)iomem, size, VM_IO))
 		goto out;
 
-	*gbase = gva->start;
-	*hbase = hva->start;
+	/*
+	 * mark this to the hva, when release the vmm_area
+	 * then the physical memory will release too
+	 */
 	hva->vmid = vm->vmid;
-	mm->virito_mmio_va = gva;
+	hva->flags |= VM_LN;
+	hva->pstart = (unsigned long)iomem;
+
+	*hbase = hva->start;
 
 	return 0;
 
 out:
 	free_pages(iomem);
 	release_vmm_area(&vm0->mm, hva);
-	return -EFAULT;
-}
-
-int virtio_mmio_deinit(struct vm *vm)
-{
-	return 0;
+	return -ENOMEM;
 }

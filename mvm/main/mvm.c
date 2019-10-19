@@ -72,8 +72,7 @@ int verbose;
 static void free_vm_config(struct vm_config *config);
 int vm_shutdown(struct vm *vm);
 
-extern int virtio_mmio_init(struct vm *vm, int nr_devs);
-extern int virtio_mmio_deinit(struct vm *vm);
+extern int virtio_mmio_init(struct vm *vm);
 
 void *map_vm_memory(struct vm *vm)
 {
@@ -201,7 +200,6 @@ int destroy_vm(struct vm *vm)
 	list_for_each_entry(vdev, &vm->vdev_list, list)
 		release_vdev(vdev);
 
-	virtio_mmio_deinit(vm);
 	mevent_deinit();
 
 	if (vm->mmap) {
@@ -400,7 +398,7 @@ static int vm_vdev_init(struct vm *vm, struct vm_config *config)
 	vdev_subsystem_init();
 
 	/* init the virtio framework */
-	ret = virtio_mmio_init(vm, info->nr_virtio_dev);
+	ret = virtio_mmio_init(vm);
 	if (ret) {
 		pr_err("unable to init the virtio framework\n");
 		return ret;
