@@ -42,7 +42,7 @@ static int get_print_time(char *buffer)
 	int len, left;
 	char buf[64];
 
-	us = NOW() / 1000;
+	us = get_current_time() / 1000;
 	second = us / 1000000;
 	us = us % 1000000;
 

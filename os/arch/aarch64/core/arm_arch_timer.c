@@ -79,6 +79,16 @@ unsigned long get_sys_ticks(void)
 	return ticks;
 }
 
+unsigned long get_current_time(void)
+{
+	uint64_t ticks;
+
+	ticks = read_sysreg64(CNTPCT_EL0) - boot_tick;
+	dsb();
+
+	return ticks_to_ns(ticks);
+}
+
 unsigned long get_sys_time(void)
 {
 	uint64_t ticks;
