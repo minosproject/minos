@@ -30,8 +30,7 @@
 #include <virt/vmm.h>
 #include <virt/vdev.h>
 
-#define BCM2838_64BIT_RELEASE_ADDR	CONFIG_MINOS_START_ADDRESS
-#define BCM2838_32BIT_RELEASE_ADDR	0xff800000
+#define BCM2838_RELEASE_ADDR	0xff800000
 
 static int bcm2838_fake_scu_read(struct vdev *vdev, gp_regs *regs,
 		unsigned long address, unsigned long *value)
@@ -59,7 +58,7 @@ static int bcm2838_fake_64bit_scu_write(struct vdev *vdev, gp_regs *regs,
 {
 	int cpu;
 	struct vm *vm = vdev->vm;
-	unsigned long offset = address - BCM2838_64BIT_RELEASE_ADDR;
+	unsigned long offset = address - BCM2838_RELEASE_ADDR;
 
 	if (offset % sizeof(uint64_t)) {
 		pr_err("unsupport address 0x%x\n", address);
@@ -75,7 +74,7 @@ static int bcm2838_fake_32bit_scu_write(struct vdev *vdev, gp_regs *regs,
 		unsigned long address, unsigned long *value)
 {
 	int cpu;
-	unsigned long offset = address - BCM2838_32BIT_RELEASE_ADDR;
+	unsigned long offset = address - BCM2838_RELEASE_ADDR;
 
 	cpu = (offset - LOCAL_MAILBOX3_SET0) >> 4;
 
@@ -90,7 +89,6 @@ static int raspberry4_setup_hvm(struct vm *vm, void *dtb)
 	uint64_t dtb_addr = 0;
 	uint32_t *tmp = (uint32_t *)&dtb_addr;
 	struct vdev *vdev;
-	unsigned long base;
 
 	offset = of_get_node_by_name(dtb, 0, "cpus");
 	if (offset < 0) {
@@ -109,7 +107,7 @@ static int raspberry4_setup_hvm(struct vm *vm, void *dtb)
 		if (node <= 0)
 			continue;
 
-		addr = BCM2838_64BIT_RELEASE_ADDR + i * sizeof(uint64_t);
+		addr = BCM2838_RELEASE_ADDR + i * sizeof(uint64_t);
 		pr_info("vcpu-%d release addr redirect to 0x%p\n", i, addr);
 		tmp[0] = cpu_to_fdt32(addr >> 32);
 		tmp[1] = cpu_to_fdt32(addr & 0xffffffff);
@@ -124,12 +122,7 @@ static int raspberry4_setup_hvm(struct vm *vm, void *dtb)
 		if (!vdev)
 			panic("no more memory for spi-table\n");
 
-		if (vm->flags & VM_FLAGS_64BIT)
-			base = BCM2838_64BIT_RELEASE_ADDR;
-		else
-			base = BCM2838_32BIT_RELEASE_ADDR;
-
-		host_vdev_init(vm, vdev, base, 0x1000);
+		host_vdev_init(vm, vdev, BCM2838_RELEASE_ADDR, 0x1000);
 		vdev_set_name(vdev, "smp-fake-controller");
 
 		/*
@@ -156,11 +149,11 @@ static int raspberry4_setup_hvm(struct vm *vm, void *dtb)
 static int raspberry4_iomem_valid(unsigned long addr)
 {
 	/*
-	 * 0xff800000 ---> 0xffffffff will used for local_intc
+	 * 0xff800000 ---> 0xff800fff will used for local_intc
 	 * in 32bit mode, kernel will use this address to wake
 	 * up other cpus
 	 */
-	if ((addr >= 0xff800000) && (addr < 0xffffffff))
+	if ((addr >= 0xff800000) && (addr < 0xff800fff))
 		return 0;
 
 	/*
