@@ -149,9 +149,12 @@ static int create_pdev_virq_of(struct vm *vm, struct device_node *node)
 	struct virq_chip *vc = vm->virq_chip;
 	unsigned long type;
 
+	if (node->class == DT_CLASS_IRQCHIP)
+		return 0;
+
 	val = (of32_t *)of_getprop(node, "interrupts", &len);
 	if (!val || (len < 4))
-		return -EINVAL;
+		return 0;
 
 	/* get the irq count for the device */
 	nr_icells = of_n_interrupt_cells(node);
@@ -215,7 +218,11 @@ static int create_pdev_iomem_of(struct vm *vm, struct device_node *node)
 		/* map the physical memory for vm */
 		pr_info("[VM%d IOMEM] 0x%x->0x%x 0x%x %s\n", vm->vmid,
 				addr, addr, size, node->name);
-		create_guest_mapping(&vm->mm, addr, addr, size, VM_IO);
+		split_vmm_area(&vm->mm, addr, addr, size, VM_IO | VM_MAP_PT);
+
+		/* irqchip do not map the virtual address */
+		if (node->class != DT_CLASS_IRQCHIP)
+			create_guest_mapping(&vm->mm, addr, addr, size, VM_IO);
 	}
 
 	return 0;
@@ -227,6 +234,8 @@ static int create_vm_pdev_of(struct vm *vm, struct device_node *node)
 
 	ret += create_pdev_iomem_of(vm, node);
 	ret += create_pdev_virq_of(vm, node);
+
+	pr_info("create %s [%s]\n", node->name, ret ? "fail" : "ok");
 
 	return ret;
 }
@@ -248,49 +257,12 @@ static int create_vm_res_of(struct vm *vm, struct device_node *node)
 	return 0;
 }
 
-static void *create_vm_simple_bus(struct vm *vm, struct device_node *node)
-{
-	/* get all the ranges and handle the vmm_area */
-	int scells, acells, count;
-	int i, n = 0;
-	unsigned long base, size;
-	uint32_t array[64];
-
-	count = of_get_u32_array(node, "ranges", array, 64);
-	if (count <= 0)
-		return NULL;
-
-	acells = of_n_addr_cells(node);
-	scells = of_n_size_cells(node);
-	if ((scells == 0) || (acells == 0))
-		return NULL;
-
-	if (count % (scells + acells + 2)) {
-		pr_warn("wrong ranges config in %s\n", node->name);
-		return NULL;
-	}
-
-	count = count / (scells + acells + 2);
-	for (i = 0; i < count; i++) {
-		base = array[n + scells + acells];
-		size = array[n + scells + acells + 1];
-
-		pr_info("found IO ranges 0x%p ---> 0x%x\n",
-				base, base + size - 1);
-
-		split_vmm_area(&vm->mm, base, base, size, VM_IO | VM_MAP_PT);
-
-		n += (scells + acells + 2);
-	}
-
-	return node;
-}
-
 static void *__create_vm_resource_of(struct device_node *node, void *arg)
 {
 	struct vm *vm = (struct vm *)arg;
 
 	switch(node->class) {
+	case DT_CLASS_IRQCHIP:
 	case DT_CLASS_PCI_BUS:
 	case DT_CLASS_PDEV:
 		create_vm_pdev_of(vm, node);
@@ -300,9 +272,6 @@ static void *__create_vm_resource_of(struct device_node *node, void *arg)
 		break;
 	case DT_CLASS_VM:
 		create_vm_res_of(vm, node);
-		break;
-	case DT_CLASS_SIMPLE_BUS:
-		create_vm_simple_bus(vm, node);
 		break;
 	default:
 		break;

@@ -388,9 +388,9 @@ int split_vmm_area(struct mm_struct *mm, unsigned long base,
 	struct vmm_area *old = NULL;
 	struct vmm_area *old1 = NULL;
 
-	if (!IS_PAGE_ALIGN(base) || !IS_PAGE_ALIGN(size) ||
-			(size == 0) || !IS_PAGE_ALIGN(pbase)) {
-		pr_err("vm_area is not page align 0x%p 0x%x\n",
+	if ((flags & VM_NORMAL) && (!IS_BLOCK_ALIGN(base) ||
+			!IS_BLOCK_ALIGN(size) || !IS_BLOCK_ALIGN(pbase))) {
+		pr_err("vm_area is not PMD align for NORMAL mem 0x%p 0x%x\n",
 				base, size);
 		return -EINVAL;
 	}
@@ -890,7 +890,8 @@ void *vm_map_shmem(struct vm *vm, void *phy, uint32_t size,
 int vm_mm_init(struct vm *vm)
 {
 	int ret;
-	struct vmm_area *va;
+	unsigned long base, end, size;
+	struct vmm_area *va, *n;
 	struct mm_struct *mm = &vm->mm;
 
 	dump_vmm_areas(&vm->mm);
@@ -904,6 +905,30 @@ int vm_mm_init(struct vm *vm)
 		if (ret) {
 			pr_err("build mem ma failed for vm-%d 0x%p 0x%p\n",
 				vm->vmid, va->start, va->size);
+		}
+	}
+
+	/* make sure that all the free vmm_area are PAGE aligned */
+	list_for_each_entry_safe(va, n, &mm->vmm_area_free, list) {
+		base = BALIGN(va->start, PAGE_SIZE);
+		end = ALIGN(va->end, PAGE_SIZE);
+		size = end - base;
+
+		if ((va->size < PAGE_SIZE) || (size == 0) || (base >= end)) {
+			pr_info("drop unused vmm_area 0x%p ---> 0x%p @0x%x\n",
+					va->start, va->end, va->size);
+			list_del(&va->list);
+			free(va);
+			continue;
+		}
+
+		if ((base != va->start) || (va->end != end) ||
+				(size != va->size)) {
+			pr_info("adjust vmm_area: 0x%p->0x%p 0x%p->0x%p 0x%x->0x%x\n",
+					va->start, base, va->end, end, va->size, size);
+			va->start = base;
+			va->end = end;
+			va->size = size;
 		}
 	}
 
