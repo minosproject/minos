@@ -17,7 +17,7 @@ default_config = {
     'CONFIG_MINOS_RESCHED_IRQ': ['7', 1],
     'CONFIG_MAX_SLAB_BLOCKS': ['10', 1],
     'CONFIG_PLATFORM_ADDRESS_RANGE': ['40', 1],
-    'CONFIG_LOG_LEVEL': ['3', 1],
+    'CONFIG_LOG_LEVEL': ['4', 1],
     'CONFIG_MINOS_START_ADDRESS': ['0x0', 1],
     'CONFIG_BOOTMEM_SIZE': ['64K', 1],
     'CONFIG_MAX_MAILBOX_NR': ['10', 1],
