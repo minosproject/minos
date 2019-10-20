@@ -62,8 +62,6 @@ int fdt_n_addr_cells(void *dtb, int node)
 	return 2;
 }
 
-
-
 static inline void *__of_getprop(void *dtb, int node,
 		char *attr, int *len)
 {
@@ -802,13 +800,13 @@ int of_translate_address_index(struct device_node *np,
 
 	data = np->data;
 	node = np->offset;
-	na = of_n_addr_cells(np);
+	na = fdt_n_addr_cells(np->data, np->offset);
 	if (na < 1) {
 		pr_debug("bad #address-cells %s\n", np->name);
 		return -EINVAL;
 	}
 
-	ns = of_n_size_cells(np);
+	ns = fdt_n_size_cells(np->data, np->offset);
 	if (ns < 0) {
 		pr_debug("bad #size-cells %s\n", np->name);
 		return -EINVAL;
