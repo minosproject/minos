@@ -100,7 +100,6 @@ struct mm_struct {
 	spinlock_t vmm_area_lock;
 	struct list_head vmm_area_free;
 	struct list_head vmm_area_used;
-	struct vmm_area *virito_mmio_va;	/* for virtio mmio framwork */
 
 	void *vm;
 };

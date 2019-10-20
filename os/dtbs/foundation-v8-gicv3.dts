@@ -21,10 +21,10 @@
 			vmid = <0>;
 			vm_name = "fvp_linux_host";
 			type = "linux";
-			vcpus = <2>;
+			vcpus = <1>;
 			entry = <0x0 0x80080000>;
 			setup_data = <0x0 0x83e00000>;
-			vcpu_affinity = <3 2 1 0>;
+			vcpu_affinity = <0 1 2 3>;
 			memory = <0x0 0x80000000 0x0 0x08000000>;
 			shmem = <0x0 0xc0000000 0x0 0x1000000>;
 		};

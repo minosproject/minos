@@ -170,9 +170,9 @@ static int fdt_set_gic(void *dtb, int gic_type)
 {
 	int node;
 
-	node = fdt_path_offset(dtb, "/interrupt-controller@2f000000");
+	node = fdt_path_offset(dtb, "/interrupt-controller@10000000");
 	if (node < 0) {
-		node = fdt_add_subnode(dtb, 0, "interrupt-controller");
+		node = fdt_add_subnode(dtb, 0, "interrupt-controller@10000000");
 		if (node < 0) {
 			pr_err("add interrupt node failed\n");
 			return node;

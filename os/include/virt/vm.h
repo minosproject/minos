@@ -206,9 +206,6 @@ static inline int vm_id(struct vm *vm)
 
 int create_vm_mmap(int vmid,  unsigned long offset,
 		unsigned long size, unsigned long *addr);
-void destroy_vm_mmap(int vmid);
-
-
 int vm_create_host_vdev(struct vm *vm);
 int request_vm_virqs(struct vm *vm, int base, int nr);
 

@@ -297,12 +297,12 @@ static phy_addr_t mmu_translate_address(struct mapping_struct *info)
 
 		if (type == VM_DES_TABLE) {
 			lvl++;
-			table = (unsigned long *)(des & ~PAGE_MASK);
+			table = (unsigned long *)(des & VM_ADDRESS_MASK);
 			attr = attr->next;
 			if ((lvl > PTE) || (attr == NULL))
 				return 0;
 		} else {
-			return (des & ~(attr->map_size - 1));
+			return (des & VM_ADDRESS_MASK);
 		}
 	} while (1);
 }
@@ -423,7 +423,7 @@ unsigned long get_mapping_entry(unsigned long tt,
 			return 0;
 
 		attr = attr->next;
-		table = (unsigned long *)(value & 0xfffffffffffff000);
+		table = (unsigned long *)(value & 0x0000fffffffff000);
 	} while (attr->lvl < end);
 
 	return (unsigned long)table;

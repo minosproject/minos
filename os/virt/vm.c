@@ -203,7 +203,7 @@ int vm_power_off(int vmid, void *arg)
 
 static int guest_mm_init(struct vm *vm, uint64_t base, uint64_t size)
 {
-	if (split_vmm_area(&vm->mm, base, 0, size, VM_NORMAL | VM_BK)) {
+	if (split_vmm_area(&vm->mm, base, 0, size, VM_NORMAL | VM_MAP_BK)) {
 		pr_err("invalid memory config for guest VM\n");
 		return -EINVAL;
 	}
@@ -230,16 +230,6 @@ int create_vm_mmap(int vmid,  unsigned long offset,
 	return 0;
 }
 
-void destroy_vm_mmap(int vmid)
-{
-	struct vm *vm = get_vm_by_id(vmid);
-
-	if (!vm)
-		return;
-
-	vm_unmmap(vm);
-}
-
 int create_guest_vm(struct vmtag *tag)
 {
 	int ret;
@@ -263,16 +253,14 @@ int create_guest_vm(struct vmtag *tag)
 	if (ret)
 		goto release_vm;
 
-	unmap_vm_mem((unsigned long)tag, sizeof(struct vmtag));
-
-	return (vm->vmid);
+	ret = vm->vmid;
+	goto unmap_vmtag;
 
 release_vm:
 	destroy_vm(vm);
 unmap_vmtag:
 	unmap_vm_mem((unsigned long)tag, sizeof(struct vmtag));
-
-	return -ENOMEM;
+	return ret;
 }
 
 static int __vm_reset(struct vm *vm, void *args)
@@ -516,7 +504,7 @@ static void *create_native_vm_of(struct device_node *node, void *arg)
 
 	for (i = 0; i < ret; i ++) {
 		split_vmm_area(&vm->mm, meminfo[i * 2], meminfo[i * 2],
-				meminfo[i * 2 + 1], VM_NORMAL | VM_PT);
+				meminfo[i * 2 + 1], VM_NORMAL | VM_MAP_PT);
 	}
 
 	return vm;

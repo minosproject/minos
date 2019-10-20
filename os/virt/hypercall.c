@@ -64,11 +64,6 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 		HVC_RET2(c, ret, addr);
 		break;
 
-	case HVC_VM_UNMMAP:
-		destroy_vm_mmap((int)args[0]);
-		HVC_RET1(c, 0);
-		break;
-
 	case HVC_VM_SEND_VIRQ:
 		send_virq_to_vm(get_vm_by_id((int)args[0]), (int)args[1]);
 		HVC_RET1(c, 0);

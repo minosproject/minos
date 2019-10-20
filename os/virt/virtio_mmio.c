@@ -169,18 +169,12 @@ static void *virtio_create_device(struct vm *vm, struct device_node *node)
 {
 	int ret;
 	uint32_t irq;
-	unsigned long offset = 0;
 	struct vdev *vdev;
-	struct virtio_device *virtio_dev = NULL;
-	struct mm_struct *mm = &vm->mm;
-	uint64_t base, size;
+	unsigned long base, size;
 	unsigned long flags;
-	struct vmm_area *va = vm->mm.virito_mmio_va;
+	struct virtio_device *virtio_dev = NULL;
 
 	pr_info("create virtio-mmio device for vm-%d\n", vm->vmid);
-
-	if (!mm->virito_mmio_va)
-		return NULL;
 
 	ret = translate_device_address(node, &base, &size);
 	if (ret || (size == 0))
@@ -189,11 +183,6 @@ static void *virtio_create_device(struct vm *vm, struct device_node *node)
 	ret = vm_get_device_irq_index(vm, node, &irq, &flags, 0);
 	if (ret)
 		return NULL;
-
-	if (base >= (va->start + va->size)) {
-		pr_err("invalid virtio mmio range 0x%x\n", base);
-		return NULL;
-	}
 
 	virtio_dev = malloc(sizeof(struct virtio_device));
 	if (!virtio_dev)
@@ -208,8 +197,12 @@ static void *virtio_create_device(struct vm *vm, struct device_node *node)
 	request_virq(vm, irq, 0);
 
 	/* set up the iomem base of the vdev */
-	offset = base - va->start;
-	vdev->iomem = (void *)(va->pstart + offset);
+	vdev->iomem = (void *)translate_vm_address(vm, base);
+	if (!vdev->iomem) {
+		pr_err("get iomem for virtio_device failed\n");
+		release_virtio_dev(vm, virtio_dev);
+		return NULL;
+	}
 
 	vdev->read = virtio_mmio_read;
 	vdev->write = virtio_mmio_write;
@@ -268,7 +261,7 @@ int virtio_mmio_init(struct vm *vm, unsigned long gbase,
 	 * then the physical memory will release too
 	 */
 	hva->vmid = vm->vmid;
-	hva->flags |= VM_LN;
+	hva->flags |= VM_MAP_LN;
 	hva->pstart = (unsigned long)iomem;
 
 	*hbase = hva->start;

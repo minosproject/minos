@@ -188,14 +188,14 @@ static int dtb_add_virtio(struct vdev *vdev, void *dtb)
 	uint32_t args[3];
 	void *addr;
 
-	offset = fdt_path_offset(dtb, "/smb/motherboard/vdev");
+	offset = fdt_path_offset(dtb, "/smb");
 	if (offset < 0) {
 		pr_err("set up vdev failed no vdev node\n");
 		return -ENOENT;
 	}
 
 	memset(buf, 0, 64);
-	addr = vdev->guest_iomem - 0x10000000;
+	addr = vdev->guest_iomem;
 	sprintf(buf, "%s@%lx", vdev->name, (unsigned long)addr);
 	node = fdt_add_subnode(dtb, offset, buf);
 	if (node < 0) {

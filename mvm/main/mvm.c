@@ -202,11 +202,8 @@ int destroy_vm(struct vm *vm)
 
 	mevent_deinit();
 
-	if (vm->mmap) {
-		if (vm->vm_fd)
-			ioctl(vm->vm_fd, IOCTL_VM_UNMAP, 0);
+	if (vm->mmap)
 		munmap(vm->mmap, vm->mem_size);
-	}
 
 	if (vm->vm_fd > 0)
 		close(vm->vm_fd);
@@ -852,10 +849,6 @@ static int mvm_main(struct vm_config *config)
 	ret = vm_create_host_vdev(vm);
 	if (ret)
 		pr_warn("failed to create some host virtual devices\n");
-
-	/* free the global config */
-	//free_vm_config(global_config);
-	//global_config = NULL;
 
 	mvm_main_loop();
 

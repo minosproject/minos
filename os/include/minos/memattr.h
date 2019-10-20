@@ -4,6 +4,8 @@
 #define GVM_PGD_PAGE_NR		(__GVM_PGD_PAGE_NR)
 #define GVM_PGD_PAGE_ALIGN	(__GVM_PGD_PAGE_ALIGN)
 
+#define VM_ADDRESS_MASK		(0x0000fffffffff000)
+
 #define MEM_TYPE_SHARED		0
 #define MEM_TYPE_IO		1
 #define MEM_TYPE_NORMAL		2
@@ -31,11 +33,12 @@
 #define VM_WO			(0x00200000)
 #define VM_RW_MASK		(0x00300000)
 
-#define VM_PT			(0x01000000)	/* mapped as passthough only for IO memory*/
-#define VM_BK			(0X02000000)	/* mapped as block */
-#define VM_PG			(0x04000000)	/* mapped as page */
-#define VM_LN			(0x08000000)	/* mapped as liner */
-#define VM_MAP_TYPE_MASK	(0x0f000000)
+#define VM_MAP_PT		(0x01000000)	/* mapped as passthough only for IO memory*/
+#define VM_MAP_BK		(0X02000000)	/* mapped as block */
+#define VM_MAP_PG		(0x04000000)	/* mapped as page */
+#define VM_MAP_LN		(0x08000000)	/* mapped as liner */
+#define VM_MAP_P2P		(0x10000000)	/* mapped as point to point */
+#define VM_MAP_TYPE_MASK	(0xff000000)
 
 #define MEM_REGION_NAME_SIZE	32
 

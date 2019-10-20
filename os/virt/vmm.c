@@ -258,7 +258,7 @@ int map_vmm_area(struct mm_struct *mm,
 {
 	if (pbase && IS_PAGE_ALIGN(pbase)) {
 		va->pstart = pbase;
-		va->flags |= VM_LN;
+		va->flags |= VM_MAP_LN;
 	}
 
 	if (!(va->pstart) && !(va->flags & VM_MAP_TYPE_MASK)) {
@@ -267,14 +267,14 @@ int map_vmm_area(struct mm_struct *mm,
 	}
 
 	switch (va->flags & VM_MAP_TYPE_MASK) {
-	case VM_LN:
-	case VM_PT:
+	case VM_MAP_LN:
+	case VM_MAP_PT:
 		vmm_area_map_ln(mm, va);
 		break;
-	case VM_BK:
+	case VM_MAP_BK:
 		vmm_area_map_bk(mm, va);
 		break;
-	case VM_PG:
+	case VM_MAP_PG:
 		vmm_area_map_pg(mm, va);
 		break;
 	default:
@@ -494,6 +494,45 @@ static void inline release_vmm_area_bk(struct vmm_area *va)
 	}
 }
 
+static int __vm_unmap(struct mm_struct *mm0, struct vmm_area *va)
+{
+	unsigned long *vm0_pmd;
+	int left, count, offset;
+	unsigned long phy = va->start;
+
+	left = va->size >> PMD_RANGE_OFFSET;
+
+	/* TBD */
+	spin_lock(&mm0->mm_lock);
+
+	while (left > 0) {
+		vm0_pmd = (unsigned long *)get_mapping_pmd(mm0->pgd_base, phy, 0);
+		if (mapping_error(vm0_pmd))
+			return -EFAULT;
+
+		offset = pmd_idx(phy);
+		count = PAGE_MAPPING_COUNT - offset;
+		if (count > left)
+			count = left;
+
+		memset((void *)(vm0_pmd + offset), 0,
+				count * sizeof(unsigned long));
+
+		if ((offset == 0) && (count == PAGE_MAPPING_COUNT)) {
+			/* here we can free this pmd page TBD */
+		}
+
+		phy += count << PMD_RANGE_OFFSET;
+		left -= count;
+	}
+
+	spin_unlock(&mm0->mm_lock);
+
+	flush_local_tlb_guest();
+
+	return 0;
+}
+
 static void release_vmm_area_in_vm0(struct vm *vm)
 {
 	struct vm *vm0 = get_vm_by_id(0);
@@ -505,6 +544,12 @@ static void release_vmm_area_in_vm0(struct vm *vm)
 	list_for_each_entry_safe(va, n, &mm->vmm_area_used, list) {
 		if (va->vmid != vm->vmid)
 			continue;
+
+		if ((va->flags & VM_NORMAL) && (va->flags & VM_MAP_PT))
+			(void)__vm_unmap(mm, va);
+
+		if (va->flags & VM_MAP_LN)
+			free((void *)va->pstart);
 
 		list_del(&va->list);
 		add_free_vmm_area(mm, va);
@@ -535,17 +580,17 @@ void release_vm_memory(struct vm *vm)
 	 */
 	list_for_each_entry_safe(va, n, &mm->vmm_area_used, list) {
 		type = va->flags & VM_MAP_TYPE_MASK;
-		if ((type == VM_PT) || (type == 0))
+		if ((type == VM_MAP_PT) || (type == 0))
 			continue;
 
 		switch (type) {
-		case VM_LN:
+		case VM_MAP_LN:
 			free((void *)va->pstart);
 			break;
-		case VM_BK:
+		case VM_MAP_BK:
 			release_vmm_area_bk(va);
 			break;
-		case VM_PG:
+		case VM_MAP_PG:
 			release_vmm_area_pg(va);
 			break;
 		default:
@@ -585,7 +630,7 @@ unsigned long create_hvm_iomem_map(struct vm *vm,
 		return 0;
 
 	va->vmid = vm->vmid;
-	va->flags |= (VM_PT | VM_IO);
+	va->flags |= (VM_MAP_PT | VM_IO);
 	va->pstart = phy;
 	map_vmm_area(&vm0->mm, va, 0);
 
@@ -707,7 +752,7 @@ struct vmm_area *vm_mmap(struct vm *vm, unsigned long offset, size_t size)
 	struct vm *vm0 = get_vm_by_id(0);
 
 	va = alloc_free_vmm_area(&vm0->mm, size, BLOCK_MASK,
-			VM_NORMAL | VM_PT);
+			VM_NORMAL | VM_MAP_PT);
 	if (!va)
 		return 0;
 
@@ -720,74 +765,6 @@ struct vmm_area *vm_mmap(struct vm *vm, unsigned long offset, size_t size)
 	va->vmid = vm->vmid;
 
 	return va;
-}
-
-static int __vm_unmmap(struct mm_struct *mm0, struct vmm_area *va)
-{
-	unsigned long *vm0_pmd;
-	int left, count, offset;
-	unsigned long phy = va->start;
-
-	left = va->size >> PMD_RANGE_OFFSET;
-
-	/* TBD */
-	spin_lock(&mm0->mm_lock);
-
-	while (left > 0) {
-		vm0_pmd = (unsigned long *)get_mapping_pmd(mm0->pgd_base, phy, 0);
-		if (mapping_error(vm0_pmd))
-			return -EFAULT;
-
-		offset = pmd_idx(phy);
-		count = PAGE_MAPPING_COUNT - offset;
-		if (count > left)
-			count = left;
-
-		memset((void *)(vm0_pmd + offset), 0,
-				count * sizeof(unsigned long));
-
-		if ((offset == 0) && (count == PAGE_MAPPING_COUNT)) {
-			/* here we can free this pmd page TBD */
-		}
-
-		phy += count << PMD_RANGE_OFFSET;
-		left -= count;
-	}
-
-	spin_unlock(&mm0->mm_lock);
-
-	flush_local_tlb_guest();
-
-	return 0;
-}
-
-/*
- * unmap the guest VM memory from the VM0, only release
- * the Normal memory
- */
-void vm_unmmap(struct vm *vm)
-{
-	int ret;
-	struct vm *vm0 = get_vm_by_id(0);
-	struct mm_struct *mm = &vm0->mm;
-	struct vmm_area *va, *n;
-
-	spin_lock(&mm->vmm_area_lock);
-
-	list_for_each_entry_safe(va, n, &mm->vmm_area_used, list) {
-		if ((va->flags & VM_NORMAL) && (va->vmid == vm->vmid) &&
-				(va->flags & VM_PT)) {
-			ret = __vm_unmmap(&vm0->mm, va);
-			if (ret)
-				pr_err("unmap 0x%p @0x%p failed for vm-%d\n", va->start,
-						va->size, vm->vmid);
-
-			list_del(&va->list);
-			add_free_vmm_area(mm, va);
-		}
-	}
-
-	spin_unlock(&mm->vmm_area_lock);
 }
 
 static int __alloc_vm_memory(struct mm_struct *mm, struct vmm_area *va)
@@ -803,7 +780,7 @@ static int __alloc_vm_memory(struct mm_struct *mm, struct vmm_area *va)
 	}
 
 	init_list(&va->b_head);
-	va->flags |= VM_BK;
+	va->flags |= VM_MAP_BK;
 	count = va->size >> MEM_BLOCK_SHIFT;
 
 	/*

@@ -25,8 +25,6 @@ int create_guest_mapping(struct mm_struct *mm, unsigned long vir,
 struct vmm_area *vm_mmap(struct vm *vm, unsigned long offset,
 		unsigned long size);
 
-void vm_unmmap(struct vm *vm);
-
 void *vm_alloc_pages(struct vm *vm, int pages);
 
 unsigned long create_hvm_iomem_map(struct vm *vm,

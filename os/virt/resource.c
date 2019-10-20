@@ -278,7 +278,7 @@ static void *create_vm_simple_bus(struct vm *vm, struct device_node *node)
 		pr_info("found IO ranges 0x%p ---> 0x%x\n",
 				base, base + size - 1);
 
-		split_vmm_area(&vm->mm, base, base, size, VM_IO | VM_PT);
+		split_vmm_area(&vm->mm, base, base, size, VM_IO | VM_MAP_PT);
 
 		n += (scells + acells + 2);
 	}
