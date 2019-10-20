@@ -75,6 +75,8 @@ typedef void (*void_func_t)(void);
 #define PAGE_SHIFT	(12)
 #define PAGE_MASK	(0xfffUL)
 
+#define INVALID_ADDRESS	(0xffffffffffffffff)
+
 #define BITS_PER_BYTE		(8)
 
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))

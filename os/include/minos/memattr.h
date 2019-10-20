@@ -36,8 +36,7 @@
 #define VM_MAP_PT		(0x01000000)	/* mapped as passthough only for IO memory*/
 #define VM_MAP_BK		(0X02000000)	/* mapped as block */
 #define VM_MAP_PG		(0x04000000)	/* mapped as page */
-#define VM_MAP_LN		(0x08000000)	/* mapped as liner */
-#define VM_MAP_P2P		(0x10000000)	/* mapped as point to point */
+#define VM_MAP_P2P		(0x08000000)	/* mapped as point to point */
 #define VM_MAP_TYPE_MASK	(0xff000000)
 
 #define MEM_REGION_NAME_SIZE	32

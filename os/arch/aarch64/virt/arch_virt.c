@@ -243,7 +243,7 @@ int virtual_timer_irq_handler(uint32_t irq, void *data)
 	dsb();
 
 	if (!(value & CNT_CTL_ISTATUS)) {
-		pr_err("vtimer is not trigger\n");
+		pr_debug("vtimer is not trigger\n");
 		return 0;
 	}
 

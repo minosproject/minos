@@ -36,11 +36,7 @@ void vdev_set_name(struct vdev *vdev, char *name)
 
 void vdev_release(struct vdev *vdev)
 {
-	if (vdev->iomem)
-		free(vdev->iomem);
 
-	if (vdev->hvm_paddr)
-		destroy_hvm_iomem_map(vdev->hvm_paddr, vdev->mem_size);
 }
 
 static void vdev_deinit(struct vdev *vdev)

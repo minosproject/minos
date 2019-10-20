@@ -440,10 +440,6 @@ void destroy_vm(struct vm *vm)
 		free(vm->vcpus);
 	}
 
-	if (vm->hvm_vmcs)
-		destroy_hvm_iomem_map((unsigned long)vm->hvm_vmcs,
-				VMCS_SIZE(vm->vcpu_nr));
-
 	if (vm->vmcs)
 		free(vm->vmcs);
 

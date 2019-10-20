@@ -258,7 +258,7 @@ int map_vmm_area(struct mm_struct *mm,
 {
 	if (pbase && IS_PAGE_ALIGN(pbase)) {
 		va->pstart = pbase;
-		va->flags |= VM_MAP_LN;
+		va->flags |= VM_MAP_P2P;
 	}
 
 	if (!(va->pstart) && !(va->flags & VM_MAP_TYPE_MASK)) {
@@ -267,7 +267,7 @@ int map_vmm_area(struct mm_struct *mm,
 	}
 
 	switch (va->flags & VM_MAP_TYPE_MASK) {
-	case VM_MAP_LN:
+	case VM_MAP_P2P:
 	case VM_MAP_PT:
 		vmm_area_map_ln(mm, va);
 		break;
@@ -545,11 +545,16 @@ static void release_vmm_area_in_vm0(struct vm *vm)
 		if (va->vmid != vm->vmid)
 			continue;
 
-		if ((va->flags & VM_NORMAL) && (va->flags & VM_MAP_PT))
+		/*
+		 * the kernel memory space for vm, mapped as NORMAL and
+		 * PT attr, need to unmap it
+		 */
+		if ((va->flags & VM_NORMAL) && (va->flags & VM_MAP_PT)) {
 			(void)__vm_unmap(mm, va);
-
-		if (va->flags & VM_MAP_LN)
+		} else if (va->flags & VM_MAP_P2P) {
+			destroy_guest_mapping(&vm0->mm, va->start, va->size);
 			free((void *)va->pstart);
+		}
 
 		list_del(&va->list);
 		add_free_vmm_area(mm, va);
@@ -584,7 +589,7 @@ void release_vm_memory(struct vm *vm)
 			continue;
 
 		switch (type) {
-		case VM_MAP_LN:
+		case VM_MAP_P2P:
 			free((void *)va->pstart);
 			break;
 		case VM_MAP_BK:
@@ -627,23 +632,14 @@ unsigned long create_hvm_iomem_map(struct vm *vm,
 
 	va = alloc_free_vmm_area(&vm0->mm, size, PAGE_MASK, 0);
 	if (!va)
-		return 0;
+		return INVALID_ADDRESS;
 
 	va->vmid = vm->vmid;
-	va->flags |= (VM_MAP_PT | VM_IO);
+	va->flags |= (VM_MAP_P2P | VM_IO);
 	va->pstart = phy;
 	map_vmm_area(&vm0->mm, va, 0);
 
 	return va->start;
-}
-
-void destroy_hvm_iomem_map(unsigned long vir, uint32_t size)
-{
-	struct vm *vm0 = get_vm_by_id(0);
-
-	/* just destroy the vm0's mapping entry */
-	size = PAGE_BALIGN(size);
-	destroy_guest_mapping(&vm0->mm, vir, size);
 }
 
 /*
