@@ -252,8 +252,8 @@ static int fdt_setup_cpu(void *dtb, int vcpus)
 	return 0;
 }
 
-static int fdt_setup_memory(void *dtb, uint64_t mstart,
-		uint64_t msize, int bit64)
+static int fdt_setup_memory(void *dtb, unsigned long mstart,
+		unsigned long msize, int bit64)
 {
 	int offset, i;
 	int size_cell;
@@ -284,9 +284,17 @@ static int fdt_setup_memory(void *dtb, uint64_t mstart,
 
 	size_cell = fdt_size_cells(dtb, offset);
 	if (size_cell == 2) {
+#ifdef CONFIG_AARCH32
+		args[0] = cpu_to_fdt32(0);
+#else
 		args[0] = cpu_to_fdt32(mstart >> 32);
+#endif
 		args[1] = cpu_to_fdt32(mstart);
+#ifdef CONFIG_AARCH32
+		args[2] = cpu_to_fdt32(0);
+#else
 		args[2] = cpu_to_fdt32(msize >> 32);
+#endif
 		args[3] = cpu_to_fdt32(msize);
 		size_cell = sizeof(uint32_t) * 4;
 		pr_info("setup memory 0x%x 0x%x 0x%x 0x%x\n",
@@ -461,7 +469,7 @@ static int load_spare_image(int fd, void *target)
 		return -EINVAL;
 
 	size = stbuf.st_size;
-	pr_debug("load 0x%lx to 0x%lx\n", size, (unsigned long)target);
+	pr_debug("load 0x%zx to 0x%lx\n", size, (unsigned long)target);
 
 	if (read(fd, target, size) != size)
 		return -EIO;

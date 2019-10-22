@@ -19,8 +19,12 @@ TARGET := mvm
 
 CCFLAG := -Wall -D_XOPEN_SOURCE -D_GNU_SOURCE -march=armv8-a \
 	-Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing \
-	-fno-common -fshort-wchar -Werror-implicit-function-declaration \
+	-fno-common -Werror-implicit-function-declaration \
 	-Wno-format-security -I$(PWD)/include -I$(PWD)/../include
+
+ifeq ($(ARCH), aarch32)
+	CCFLAG += -DCONFIG_AARCH32
+endif
 
 src	:= main/mvm.c main/bootimage.c main/os_linux.c main/os_other.c
 src	+= libfdt/fdt_addresses.c libfdt/fdt.c libfdt/fdt_empty_tree.c

@@ -50,11 +50,11 @@ struct vm {
 	char name[32];
 	char os_type[32];
 	int32_t nr_vcpus;
-	uint64_t mem_size;
-	uint64_t mem_start;
-	uint64_t entry;
-	uint64_t setup_data;
-	uint64_t hvm_paddr;
+	unsigned long mem_size;
+	unsigned long mem_start;
+	unsigned long entry;
+	unsigned long setup_data;
+	unsigned long hvm_paddr;
 
 	struct vm_config *vm_config;
 	struct mvm_queue queue;

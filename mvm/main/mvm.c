@@ -76,7 +76,7 @@ extern int virtio_mmio_init(struct vm *vm);
 
 void *map_vm_memory(struct vm *vm)
 {
-	uint64_t args[2];
+	unsigned long args[2];
 	void *addr = NULL;
 
 	args[0] = vm->mem_start;
@@ -663,7 +663,7 @@ static int mvm_main_loop(void)
 	struct vm *vm = mvm_vm;
 	pthread_t vcpu_thread;
 	int *base;
-	uint64_t arg;
+	unsigned long arg[2];
 	struct mvm_node *node;
 
 	/*
@@ -696,8 +696,9 @@ static int mvm_main_loop(void)
 		 * register the irq and eventfd to kernel
 		 */
 		vm->irqs[i] = irq;
-		arg = ((unsigned long)vm->eventfds[i] << 32) | irq;
-		ret = ioctl(vm->vm_fd, IOCTL_REGISTER_VCPU, &arg);
+		arg[0] = (unsigned long)vm->eventfds[i];
+		arg[1] = irq;
+		ret = ioctl(vm->vm_fd, IOCTL_REGISTER_VCPU, arg);
 		if (ret)
 			return ret;
 
@@ -799,7 +800,7 @@ static int mvm_main(struct vm_config *config)
 	vm->flags = vmtag->flags;
 	vm->vmid = -1;
 	vm->vm_fd = -1;
-	vm->entry = (uint64_t)vmtag->entry;
+	vm->entry = (unsigned long)vmtag->entry;
 	vm->mem_start = vmtag->mem_base;
 	vm->mem_size = vmtag->mem_size;
 	vm->nr_vcpus = vmtag->nr_vcpu;
@@ -874,7 +875,7 @@ static struct option options[] = {
 	{NULL,		0,		   NULL,  0}
 };
 
-static int parse_vm_memsize(char *buf, uint64_t *size)
+static int parse_vm_memsize(char *buf, unsigned long *size)
 {
 	int len = 0;
 

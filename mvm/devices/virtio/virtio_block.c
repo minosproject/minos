@@ -172,7 +172,7 @@ virtio_blk_proc(struct virtio_blk *blk,
 
 	io = &blk->ios[idx];
 	if (iov[0].iov_len != sizeof(struct virtio_blk_hdr)) {
-		pr_err("wrong size of virtio_blk_hdr %ld %ld\n",
+		pr_err("wrong size of virtio_blk_hdr %zu %zu\n",
 				iov[0].iov_len, sizeof(struct virtio_blk_hdr));
 		return;
 	}

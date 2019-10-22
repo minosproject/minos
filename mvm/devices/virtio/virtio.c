@@ -45,7 +45,7 @@ static void *hv_virtio_mmio_init(struct vm *vm, void *gbase)
 {
 	int ret = 0;
 	void *map_base;
-	uint64_t args[2] = {(uint64_t)gbase, VIRTIO_DEVICE_IOMEM_SIZE};
+	unsigned long args[2] = {(unsigned long)gbase, VIRTIO_DEVICE_IOMEM_SIZE};
 
 	ret = ioctl(vm->vm_fd, IOCTL_VIRTIO_MMIO_INIT, args);
 	if (ret || !args[0] || !args[1]) {
@@ -615,15 +615,18 @@ static int virtio_buffer_event(struct virtio_device *dev, uint32_t arg)
 
 	high = ioread32(iomem + VIRTIO_MMIO_QUEUE_DESC_HIGH);
 	low = ioread32(iomem + VIRTIO_MMIO_QUEUE_DESC_LOW);
-	vq->desc = (struct vring_desc *)u32_to_u64(high, low);
+	vq->desc = (struct vring_desc *)
+		((unsigned long)u32_to_u64(high, low));
 
 	high = ioread32(iomem + VIRTIO_MMIO_QUEUE_AVAIL_HIGH);
 	low = ioread32(iomem + VIRTIO_MMIO_QUEUE_AVAIL_LOW);
-	vq->avail = (struct vring_avail *)u32_to_u64(high, low);
+	vq->avail = (struct vring_avail *)
+		((unsigned long)u32_to_u64(high, low));
 
 	high = ioread32(iomem + VIRTIO_MMIO_QUEUE_USED_HIGH);
 	low = ioread32(iomem + VIRTIO_MMIO_QUEUE_USED_LOW);
-	vq->used = (struct vring_used *)u32_to_u64(high, low);
+	vq->used = (struct vring_used *)
+		((unsigned long)u32_to_u64(high, low));
 
 	vq->desc = (struct vring_desc *)
 		gpa_to_hvm_va((unsigned long)vq->desc);

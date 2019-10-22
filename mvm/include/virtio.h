@@ -54,7 +54,7 @@
 #define VIRTIO_MAX_FEATURE_SIZE		(4)
 
 #define u32_to_u64(high, low) \
-	(((unsigned long)(high) << 32) | (low))
+	(((uint64_t)(high) << 32) | (low))
 
 #define u16_to_u32(high, low) \
 	(((unsigned long)(high) << 16) | (low))
