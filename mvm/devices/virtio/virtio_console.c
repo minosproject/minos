@@ -912,6 +912,9 @@ static int virtio_console_event(struct vdev *vdev, int read,
 			nr++;
 		}
 
+		buf[4] = 0;
+		printf("%s\n", buf);
+
 		return write(be->fd, buf, nr);
 	}
 

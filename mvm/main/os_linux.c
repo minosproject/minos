@@ -323,8 +323,8 @@ static int fdt_setup_ramdisk(void *dtb, uint32_t start, uint32_t size)
 	}
 
 	pr_info("set ramdisk : 0x%x 0x%x\n", start, size);
-	fdt_setprop_cell(dtb, offset, "linux,initrd-start", start);
 	fdt_setprop_cell(dtb, offset, "linux,initrd-end", start + size);
+	fdt_setprop_cell(dtb, offset, "linux,initrd-start", start);
 
 	return 0;
 }
@@ -433,7 +433,7 @@ static int linux_load_bootimage(struct vm *vm)
 			load_offset, seek, load_size);
 	ret = load_image(vm, load_offset, seek, load_size);
 	if (ret) {
-		pr_err("load ramdisk image failed\n");
+		pr_err("load ramdisk image failed %d\n", ret);
 		return ret;
 	}
 

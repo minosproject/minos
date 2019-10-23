@@ -29,11 +29,11 @@ struct vmtag {
 	char name[VM_NAME_SIZE];
 	char os_type[VM_TYPE_SIZE];
 	int32_t nr_vcpu;
-	unsigned long mem_base;
-	unsigned long mem_size;
-	void *entry;
-	void *setup_data;
-	unsigned long flags;
+	uint64_t mem_base;
+	uint64_t mem_size;
+	uint64_t entry;
+	uint64_t setup_data;
+	uint64_t flags;
 	uint32_t vcpu_affinity[8];
 };
 

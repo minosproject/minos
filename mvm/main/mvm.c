@@ -96,6 +96,9 @@ void *map_vm_memory(struct vm *vm)
 	if (addr == (void *)-1)
 		return NULL;
 
+	pr_info("vm-%d mmap address in vm0: 0x%lx mmap:0x%lx\n",
+			vm->vmid, vm->hvm_paddr, (unsigned long)addr);
+
 	return addr;
 }
 
@@ -109,8 +112,8 @@ static int create_new_vm(struct vm *vm)
 	info.nr_vcpu = vm->nr_vcpus;
 	info.mem_size = vm->mem_size;
 	info.mem_base = vm->mem_start;
-	info.entry = (void *)vm->entry;
-	info.setup_data = (void *)vm->setup_data;
+	info.entry = vm->entry;
+	info.setup_data = vm->setup_data;
 	info.flags = vm->flags;
 	info.vmid = vm->vmid;
 
@@ -126,14 +129,14 @@ static int create_new_vm(struct vm *vm)
 	pr_info("        -nr_vcpu    : %d\n", info.nr_vcpu);
 	pr_info("        -bit64      : %d\n",
 			!!vm->flags & VM_FLAGS_64BIT);
-	pr_info("        -mem_size   : 0x%lx\n", info.mem_size);
-	pr_info("        -mem_base  : 0x%lx\n", info.mem_base);
-	pr_info("        -entry      : 0x%p\n", info.entry);
-	pr_info("        -setup_data : 0x%p\n", info.setup_data);
+	pr_info("        -mem_size   : 0x%llx\n", info.mem_size);
+	pr_info("        -mem_base  : 0x%llx\n", info.mem_base);
+	pr_info("        -entry      : 0x%llx\n", info.entry);
+	pr_info("        -setup_data : 0x%llx\n", info.setup_data);
 
 	vmid = ioctl(fd, IOCTL_CREATE_VM, &info);
 	if (vmid <= 0) {
-		perror("vmid");
+		pr_err("create new vm failed %d\n", vmid);
 		return vmid;
 	}
 
@@ -875,7 +878,7 @@ static struct option options[] = {
 	{NULL,		0,		   NULL,  0}
 };
 
-static int parse_vm_memsize(char *buf, unsigned long *size)
+static int parse_vm_memsize(char *buf, uint64_t *size)
 {
 	int len = 0;
 
@@ -893,13 +896,13 @@ static int parse_vm_memsize(char *buf, unsigned long *size)
 	return 0;
 }
 
-static int parse_vm_membase(char *buf, unsigned long *value)
+static int parse_vm_membase(char *buf, uint64_t *value)
 {
 	if (strlen(buf) < 3)
 		return -EINVAL;
 
 	if ((buf[0] == '0') && (buf[1] == 'x')) {
-		sscanf(buf, "0x%lx", value);
+		sscanf(buf, "0x%llx", value);
 		return 0;
 	}
 
@@ -1016,10 +1019,10 @@ int main(int argc, char **argv)
 			}
 			break;
 		case 'n':
-			strncpy(vmtag->name, optarg, VM_NAME_SIZE - 1);
+			strncpy((char *)vmtag->name, optarg, VM_NAME_SIZE - 1);
 			break;
 		case 't':
-			strncpy(vmtag->os_type, optarg, VM_TYPE_SIZE - 1);
+			strncpy((char *)vmtag->os_type, optarg, VM_TYPE_SIZE - 1);
 			break;
 		case 'b':
 			ret = atoi(optarg);

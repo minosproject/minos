@@ -218,8 +218,8 @@ static struct vm *__create_vm(struct vmtag *vme)
 	vm->vmid = vme->vmid;
 	strncpy(vm->name, vme->name, sizeof(vm->name) - 1);
 	vm->vcpu_nr = vme->nr_vcpu;
-	vm->entry_point = vme->entry;
-	vm->setup_data = vme->setup_data;
+	vm->entry_point = (void *)vme->entry;
+	vm->setup_data = (void *)vme->setup_data;
 	vm->state = VM_STAT_OFFLINE;
 	init_list(&vm->vdev_list);
 	memcpy(vm->vcpu_affinity, vme->vcpu_affinity,
