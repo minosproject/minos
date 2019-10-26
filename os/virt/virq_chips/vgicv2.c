@@ -18,7 +18,6 @@
 #include <minos/vmodule.h>
 #include <minos/irq.h>
 #include <asm/gicv2.h>
-#include <asm/vgicv2.h>
 #include <asm/io.h>
 #include <minos/vmodule.h>
 #include <minos/cpumask.h>
@@ -55,6 +54,7 @@ struct vgicv2_info {
 
 struct vgicc {
 	struct vdev vdev;
+	unsigned long gicc_base;
 	uint32_t gicc_ctlr;
 	uint32_t gicc_pmr;
 	uint32_t gicc_bpr;
@@ -376,8 +376,8 @@ static void vgicv2_deinit(struct vdev *vdev)
 static int vgicc_read(struct vdev *vdev, gp_regs *reg,
 		unsigned long address, unsigned long *value)
 {
-	unsigned long offset = address - VGICV2_GICC_GVM_BASE;
 	struct vgicc *vgicc = vdev_to_vgicc(vdev);
+	unsigned long offset = address - vgicc->gicc_base;
 
 	switch (offset) {
 	case GICC_CTLR:
@@ -412,8 +412,8 @@ static int vgicc_read(struct vdev *vdev, gp_regs *reg,
 static int vgicc_write(struct vdev *vdev, gp_regs *reg,
 		unsigned long address, unsigned long *value)
 {
-	unsigned long offset = address - VGICV2_GICC_GVM_BASE;
 	struct vgicc *vgicc = vdev_to_vgicc(vdev);
+	unsigned long offset = address - vgicc->gicc_base;
 
 	switch (offset) {
 	case GICC_CTLR:
@@ -459,6 +459,7 @@ static int vgicv2_create_vgicc(struct vm *vm,
 
 	host_vdev_init(vm, &vgicc->vdev, base, size);
 	vdev_set_name(&vgicc->vdev, "vgicv2_vgicc");
+	vgicc->gicc_base = base;
 	vgicc->vdev.read = vgicc_read;
 	vgicc->vdev.write = vgicc_write;
 	vgicc->vdev.reset = vgicc_reset;
