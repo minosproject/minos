@@ -286,7 +286,7 @@ int send_virq_to_vm(struct vm *vm, uint32_t virq)
 		return -ENOENT;
 
 	if (virq_is_hw(desc)) {
-		pr_err("can not send hw irq in here\n");
+		pr_err("can not send hw irq in here %d\n", virq);
 		return -EPERM;
 	}
 

@@ -258,6 +258,7 @@ int map_vmm_area(struct mm_struct *mm,
 {
 	if (pbase && IS_PAGE_ALIGN(pbase)) {
 		va->pstart = pbase;
+		va->flags &= ~VM_MAP_TYPE_MASK;
 		va->flags |= VM_MAP_P2P;
 	}
 
@@ -874,17 +875,6 @@ void vm_mm_struct_init(struct vm *vm)
 		vmm_area_init(mm, 1);
 	else
 		vmm_area_init(mm, 0);
-}
-
-void vm_init_shmem(struct vm *vm, uint64_t base, uint64_t size)
-{
-
-}
-
-void *vm_map_shmem(struct vm *vm, void *phy, uint32_t size,
-		unsigned long flags)
-{
-	return NULL;
 }
 
 int vm_mm_init(struct vm *vm)

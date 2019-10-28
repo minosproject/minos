@@ -684,6 +684,11 @@ static int gicv3_get_virq_state(struct vcpu *vcpu, struct virq_desc *virq)
 	return ((int)value);
 }
 
+static int gicv3_generate_virq(uint32_t *array, int virq)
+{
+	return vgic_generate_virq(array, virq);
+}
+
 static void vgicv3_init_virqchip(struct virq_chip *vc,
 		struct vgicv3_dev *dev, unsigned long flags)
 {
@@ -692,6 +697,7 @@ static void vgicv3_init_virqchip(struct virq_chip *vc,
 		vc->exit_from_guest = vgic_irq_exit_from_guest;
 		vc->enter_to_guest = vgic_irq_enter_to_guest;
 		vc->xlate = gic_xlate_irq;
+		vc->generate_virq = gicv3_generate_virq;
 		vc->send_virq = gicv3_send_virq;
 		vc->update_virq = gicv3_update_virq;
 		vc->get_virq_state = gicv3_get_virq_state;

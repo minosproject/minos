@@ -13,8 +13,8 @@ typedef enum __device_class {
 	DT_CLASS_PCI_BUS,
 	DT_CLASS_VDEV,
 	DT_CLASS_PDEV,
-	DT_CLASS_VIRTIO_DEV,
 	DT_CLASS_VM,
+	DT_CLASS_VMBOX,
 	DT_CLASS_OTHER,
 } device_class_t;
 

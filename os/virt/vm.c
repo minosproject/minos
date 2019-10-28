@@ -25,6 +25,7 @@
 #include <virt/resource.h>
 #include <common/gvm.h>
 #include <virt/vmcs.h>
+#include <virt/vmbox.h>
 
 extern void virqs_init(void);
 extern void fdt_vm_init(struct vm *vm);
@@ -517,6 +518,26 @@ static void parse_and_create_vms(void)
 #endif
 }
 
+static int of_create_vmboxs(void)
+{
+	struct device_node *mailboxes;
+	struct device_node *child;
+
+	mailboxes = of_find_node_by_name(hv_node, "vmboxs");
+	if (!mailboxes)
+		return -ENOENT;
+
+	/* parse each mailbox entry and create it */
+	of_node_for_each_child(mailboxes, child) {
+		if (of_create_vmbox(child))
+			pr_err("create mailbox [%s] fail\n", child->name);
+		else
+			pr_info("create mailbox [%s] successful\n", child->name);
+	}
+
+	return 0;
+}
+
 int virt_init(void)
 {
 	struct vm *vm;
@@ -534,6 +555,11 @@ int virt_init(void)
 	}
 
 	vcpu_affinity_init();
+
+#ifdef CONFIG_DEVICE_TREE
+	/* here create all the mailbox for all native vm */
+	of_create_vmboxs();
+#endif
 
 	/*
 	 * parsing all the memory/irq and resource

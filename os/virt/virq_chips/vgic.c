@@ -18,6 +18,7 @@
 #include <virt/virq.h>
 #include <minos/of.h>
 #include <virt/virq_chip.h>
+#include <libfdt/libfdt.h>
 
 /*
  * The following cases are considered software programming
@@ -139,6 +140,15 @@ int vgic_irq_exit_from_guest(struct vcpu *vcpu, void *data)
 	}
 
 	return 0;
+}
+
+int vgic_generate_virq(uint32_t *array, int virq)
+{
+	array[0] = cpu_to_fdt32(0x0);
+	array[1] = cpu_to_fdt32(virq - 32);
+	array[2] = cpu_to_fdt32(0x4);
+
+	return 3;
 }
 
 int gic_vm0_virq_data(uint32_t *array, int vspi_nr, int type)

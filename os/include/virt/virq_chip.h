@@ -11,6 +11,7 @@ struct virq_chip {
 	int (*exit_from_guest)(struct vcpu *vcpu, void *data);
 	int (*enter_to_guest)(struct vcpu *vcpu, void *data);
 	int (*vm0_virq_data)(uint32_t *array, int vspi_nr, int type);
+	int (*generate_virq)(uint32_t *array, int virq);
 	int (*xlate)(struct device_node *node, uint32_t *intspec,
 			unsigned int intsize, uint32_t *hwirq,
 			unsigned long *type);

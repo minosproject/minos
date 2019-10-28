@@ -36,11 +36,6 @@ int create_early_pmd_mapping(unsigned long vir, unsigned long phy);
 void *map_vm_mem(unsigned long gva, size_t size);
 void unmap_vm_mem(unsigned long gva, size_t size);
 
-void *vm_map_shmem(struct vm *vm, void *phy,
-		uint32_t size, unsigned long flags);
-
-void vm_init_shmem(struct vm *vm, uint64_t base, uint64_t size);
-
 int split_vmm_area(struct mm_struct *mm, unsigned long base,
 		unsigned long pbase, unsigned long size, unsigned long flags);
 

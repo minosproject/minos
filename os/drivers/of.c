@@ -279,6 +279,8 @@ static int of_parse_dt_class(struct device_node *node)
 			node->class = DT_CLASS_PCI_BUS;
 		else if (strcmp(type, "virtual_machine") == 0)
 			node->class = DT_CLASS_VM;
+		else if (strcmp(type, "vmbox") == 0)
+			node->class = DT_CLASS_VMBOX;
 		else
 			node->class = DT_CLASS_OTHER;
 	} else {

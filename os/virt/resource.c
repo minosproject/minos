@@ -23,7 +23,7 @@
 #include <minos/mm.h>
 #include <virt/vmm.h>
 #include <minos/irq.h>
-#include <virt/mailbox.h>
+#include <virt/vmbox.h>
 #include <minos/platform.h>
 
 static void *virqchip_start;
@@ -242,18 +242,6 @@ static int create_vm_pdev_of(struct vm *vm, struct device_node *node)
 
 static int create_vm_res_of(struct vm *vm, struct device_node *node)
 {
-	int ret;
-	uint64_t shmem[2];
-
-	/*
-	 * parse the shared memory sapce, mailbox and other info
-	 * for the vm, need to parse the shared memory first, as
-	 * other resource may depened on it.
-	 */
-	ret = of_get_u64_array(node, "shmem", shmem, 2);
-	if (ret >= 2)
-		vm_init_shmem(vm, shmem[0], shmem[1]);
-
 	return 0;
 }
 
@@ -280,32 +268,6 @@ static void *__create_vm_resource_of(struct device_node *node, void *arg)
 	return NULL;
 }
 
-static int of_create_vm_mailbox(struct device_node *node)
-{
-	int owner[2];
-	uint32_t size, event;
-	struct device_node *mailboxes;
-	struct device_node *child;
-
-	mailboxes = of_find_node_by_name(node, "vm_mailboxes");
-	if (!mailboxes)
-		return -ENOENT;
-
-	/* parse each mailbox entry and create it */
-	of_node_for_each_child(mailboxes, child) {
-		of_get_u32_array(child, "owner", (uint32_t *)owner, 2);
-		of_get_u32_array(child, "shmem_size", &size, 1);
-		of_get_u32_array(child, "event_size", &event, 1);
-		if (!create_mailbox(child->name, owner[0],
-				owner[1], size, event))
-			pr_err("create mailbox [%s] fail\n", child->name);
-		else
-			pr_info("create mailbox [%s] successful\n", child->name);
-	}
-
-	return 0;
-}
-
 int create_vm_resource_of(struct vm *vm, void *data)
 {
 	struct device_node *node;
@@ -328,9 +290,6 @@ int create_vm_resource_of(struct vm *vm, void *data)
 		panic("can not create virq chip for vm\n");
 
 	of_iterate_all_node_loop(node, __create_vm_resource_of, vm);
-
-	/* here create all the mailbox for all native vm */
-	of_create_vm_mailbox(node);
 
 	/* here we can free all the device node to save memory */
 	of_release_all_node(node);

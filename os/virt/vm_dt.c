@@ -25,6 +25,8 @@
 #include <virt/virq_chip.h>
 #include <common/hypervisor.h>
 
+extern void of_setup_vm_vmbox(struct vm *vm);
+
 static int fdt_setup_other(struct vm *vm)
 {
 	int node;
@@ -40,6 +42,22 @@ static int fdt_setup_other(struct vm *vm)
 
 static int fdt_setup_minos(struct vm *vm)
 {
+	int node;
+	void *dtb = vm->setup_data;
+
+	node = fdt_path_offset(dtb, "/minos");
+	if (node < 0) {
+		node = fdt_add_subnode(dtb, 0, "minos");
+		if (node < 0)
+			return node;
+	}
+
+	fdt_setprop(dtb, node, "compatible", "minos,hypervisor", 17);
+	return 0;
+}
+
+static int fdt_setup_vm_virqs(struct vm *vm)
+{
 	int node, i;
 	uint32_t *tmp = NULL;
 	size_t size;
@@ -47,9 +65,9 @@ static int fdt_setup_minos(struct vm *vm)
 	struct virq_chip *vc = vm->virq_chip;
 	void *dtb = vm->setup_data;
 
-	node = fdt_path_offset(dtb, "/minos");
+	node = fdt_path_offset(dtb, "/vm_fake_device");
 	if (node < 0) {
-		node = fdt_add_subnode(dtb, 0, "minos");
+		node = fdt_add_subnode(dtb, 0, "vm_fake_device");
 		if (node < 0)
 			return node;
 	}
@@ -62,7 +80,7 @@ static int fdt_setup_minos(struct vm *vm)
 		return -ENOMEM;
 	}
 
-	fdt_setprop(dtb, node, "compatible", "minos,hypervisor", 17);
+	fdt_setprop(dtb, node, "compatible", "minos,fakedev", 17);
 
 	size = 0;
 	if (vc && vc->vm0_virq_data) {
@@ -78,6 +96,7 @@ static int fdt_setup_minos(struct vm *vm)
 
 	free(tmp);
 	return i;
+
 }
 
 static int fdt_setup_cmdline(struct vm *vm)
@@ -238,9 +257,18 @@ void fdt_vm_init(struct vm *vm)
 	if (vm_is_hvm(vm))
 		fdt_setup_minos(vm);
 
+	/*
+	 * current need to export all the irq number
+	 * int the VM, if one device need to request
+	 * the virq dynmaic, TO BE FIXED
+	 */
+	if (vm_is_native(vm))
+		fdt_setup_vm_virqs(vm);
+
 	fdt_setup_cmdline(vm);
 	fdt_setup_cpu(vm);
 	fdt_setup_memory(vm);
+	of_setup_vm_vmbox(vm);
 	fdt_setup_other(vm);
 
 	if (platform->setup_hvm && vm_is_hvm(vm))

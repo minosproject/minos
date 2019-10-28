@@ -28,24 +28,29 @@
 			memory = <0x0 0x80000000 0x0 0x08000000>;
 			shmem = <0x0 0xc0000000 0x0 0x1000000>;
 		};
-/*
+
 		vm1 {
 			device_type = "virtual_machine";
 			vmid = <1>;
 			vm_name = "fvp_linux_vm1";
 			type = "linux";
-			vcpus = "2";
+			vcpus = <1>;
 			entry = <0x0 0x90080000>;
 			setup_data = <0x0 0x97e00000>;
-			vcpu_affinity = <1 2>;
-			memory = <0x0 0x90000000 0x0 0x08000000>;;
-			shmem = <0x0 0xc0000000 0x0 0x10000000>;
+			vcpu_affinity = <1>;
+			memory = <0x0 0x90000000 0x0 0x08000000>;
 		};
 
-		vm_mailboxs {
-
-		}
-*/
+		vmboxs {
+			vmbox_hvc@0 {
+				compatible = "minos,vmbox";
+				vmbox-type = "hvc";
+				vmbox-owner = <0x0 0x1>;
+				vmbox-shmem-size = <8192>;	/* 8192 8K rx2048 */
+				vmbox-id = <0x3420 0xffffffff>;
+				platform-device;
+			};
+		};
 	};
 
 	psci {
@@ -236,20 +241,6 @@
 				phandle = <0xd>;
 			};
 
-			iofpga@3,00000000 {
-				compatible = "arm,amba-bus", "simple-bus";
-				#address-cells = <0x1>;
-				#size-cells = <0x1>;
-				ranges = <0x0 0x3 0x0 0x200000>;
-
-				uart@90000 {
-					compatible = "arm,pl011", "arm,primecell";
-					reg = <0x90000 0x1000>;
-					interrupts = <0x0 0x5 0x4>;
-					clocks = <0xf 0xf>;
-					clock-names = "uartclk", "apb_pclk";
-				};
-			};
 		};
 	};
 };
