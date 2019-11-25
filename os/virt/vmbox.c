@@ -28,13 +28,12 @@
 #include <asm/io.h>
 
 #define VMBOX_MAX_COUNT	16
-#define VMBOX_MAGIC	0xabcdefUL
 #define VMBOX_MAX_VQS	4
-
-#define VMBOX_REG_SIZE	0x200
 
 #define BE_IDX		0
 #define FE_IDX		1
+
+#define VMBOX_DEV_VIRTQ_HEADER_SIZE	0x100
 
 struct vmbox_info {
 	int owner[2];
@@ -125,7 +124,7 @@ vmbox_virtq_vring_size(unsigned int qsz, unsigned long align)
 
 static inline size_t get_vmbox_iomem_header_size(struct vmbox_info *vinfo)
 {
-	size_t size = VMBOX_REG_SIZE;
+	size_t size = VMBOX_DEV_VIRTQ_HEADER_SIZE;
 
 	/*
 	 * calculate the vring desc size first, each vmbox will
