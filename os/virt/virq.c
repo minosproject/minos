@@ -185,6 +185,17 @@ uint32_t virq_get_pr(struct vcpu *vcpu, uint32_t virq)
 	return desc->pr;
 }
 
+int virq_can_request(struct vcpu *vcpu, uint32_t virq)
+{
+	struct virq_desc *desc;
+
+	desc = get_virq_desc(vcpu, virq);
+	if (!desc)
+		return 0;
+
+	return !virq_is_requested(desc);
+}
+
 int virq_set_type(struct vcpu *vcpu, uint32_t virq, int value)
 {
 	struct virq_desc *desc;
@@ -486,6 +497,7 @@ static int __request_virq(struct vcpu *vcpu, struct virq_desc *desc,
 		virq_clear_hw(desc);
 
 	update_virq_cap(desc, flags);
+	desc->flags |= VIRQS_REQUESTED;
 
 	return 0;
 }

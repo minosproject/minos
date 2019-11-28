@@ -497,19 +497,12 @@ int bcm2836_send_virq(struct vcpu *vcpu, uint32_t virq)
 	return 0;
 }
 
-static int bcm2836_vm0_virq_data(uint32_t *array, int vspi_nr, int type)
+static int bcm2838_generate_virq(uint32_t *addr, int virq)
 {
-	int i, size = 0;
+	array[0] = cpu_to_of32(i / 32);
+	array[1] = cpu_to_of32(i % 32);
 
-	if (type & VM_FLAGS_SETUP_OF) {
-		for (i = 0; i < vspi_nr; i++) {
-			*array++ = cpu_to_of32(i / 32);
-			*array++ = cpu_to_of32(i % 32);
-			size += (2 * 4);
-		}
-	}
-
-	return size;
+	return 2;
 }
 
 static int bcm2836_update_virq(struct vcpu *vcpu,
@@ -629,7 +622,7 @@ static struct virq_chip *bcm2836_virqchip_init(struct vm *vm,
 	vc->xlate = bcm2836_xlate_irq;
 	vc->exit_from_guest = NULL;
 	vc->enter_to_guest = bcm2836_enter_to_guest;
-	vc->vm0_virq_data = bcm2836_vm0_virq_data;
+	vc->generate_virq = bcm2838_generate_virq;
 	vc->update_virq = bcm2836_update_virq;
 	vc->inc_pdata = (void *)bcm2836;
 

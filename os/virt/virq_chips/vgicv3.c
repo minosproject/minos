@@ -701,7 +701,6 @@ static void vgicv3_init_virqchip(struct virq_chip *vc,
 		vc->send_virq = gicv3_send_virq;
 		vc->update_virq = gicv3_update_virq;
 		vc->get_virq_state = gicv3_get_virq_state;
-		vc->vm0_virq_data = gic_vm0_virq_data;
 		vc->flags = flags;
 	} else {
 		pr_warn("***WARN***vgicv3 currently only" \

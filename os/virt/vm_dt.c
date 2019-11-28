@@ -23,6 +23,7 @@
 #include <minos/of.h>
 #include <config/config.h>
 #include <virt/virq_chip.h>
+#include <virt/virq.h>
 #include <common/hypervisor.h>
 
 extern void of_setup_vm_vmbox(struct vm *vm);
@@ -81,22 +82,27 @@ static int fdt_setup_vm_virqs(struct vm *vm)
 	}
 
 	fdt_setprop(dtb, node, "compatible", "minos,fakedev", 17);
-
 	size = 0;
-	if (vc && vc->vm0_virq_data) {
-		size = vc->vm0_virq_data(tmp, vspi_nr,
-				vm->flags & VM_FLAGS_SETUP_MASK);
+
+	if (vc && vc->generate_virq) {
+		for (i = 0; i < vspi_nr; i++) {
+			if (!virq_can_request(vm->vcpus[0], i +
+						VM_LOCAL_VIRQ_NR))
+				continue;
+			size += vc->generate_virq(tmp + size,
+					i + VM_LOCAL_VIRQ_NR);
+		}
 	}
 
 	if (size) {
-		i = fdt_setprop(dtb, node, "interrupts", (void *)tmp, size);
+		i = fdt_setprop(dtb, node, "interrupts",
+				(void *)tmp, size * sizeof(uint32_t));
 		if (i)
 			pr_err("fdt set interrupt for minos failed\n");
 	}
 
 	free(tmp);
 	return i;
-
 }
 
 static int fdt_setup_cmdline(struct vm *vm)

@@ -150,20 +150,3 @@ int vgic_generate_virq(uint32_t *array, int virq)
 
 	return 3;
 }
-
-int gic_vm0_virq_data(uint32_t *array, int vspi_nr, int type)
-{
-	int i, size = 0;
-
-	if (type & VM_FLAGS_SETUP_OF) {
-		for (i = 0; i < vspi_nr; i++) {
-			*array++ = cpu_to_of32(0);
-			*array++ = cpu_to_of32(i);
-			*array++ = cpu_to_of32(4);
-			size += (3 * sizeof(uint32_t));
-		}
-	}
-
-	return size;
-
-}

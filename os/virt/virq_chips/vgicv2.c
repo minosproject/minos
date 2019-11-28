@@ -557,7 +557,7 @@ static int vgicv2_init_virqchip(struct virq_chip *vc,
 	}
 
 	vc->xlate = gic_xlate_irq;
-	vc->vm0_virq_data = gic_vm0_virq_data;
+	vc->generate_virq = vgic_generate_virq;
 	vc->flags = flags;
 	vc->inc_pdata = dev;
 
