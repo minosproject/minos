@@ -45,6 +45,14 @@ struct vmbox {
 
 #define VMBOX_F_PLATFORM_DEV	(1 << 0)
 
+struct vmbox_hook_ops {
+	int (*vmbox_init)(struct vmbox *vmbox);
+	int (*vmbox_be_init)(struct vm *vm, struct vmbox *vmbox,
+			struct vmbox_device *vdev);
+	int (*vmbox_fe_init)(struct vm *vm, struct vmbox *vmbox,
+			struct vmbox_device *vdev);
+};
+
 struct vmbox_controller {
 	void *pa;
 	void *va;
@@ -106,7 +114,10 @@ struct vmbox_controller {
 #define VMBOX_DEV_EVENT_CLOSED		0x4
 #define VMBOX_DEV_EVENT_USER_BASE	0x1000
 
-
+int register_vmbox_hook(char *name, struct vmbox_hook_ops *ops);
 int of_create_vmbox(struct device_node *node);
+struct vmbox_controller *vmbox_get_controller(struct vm *vm);
+int vmbox_register_platdev(struct vmbox_device *vdev,
+		void *dtb, char *type);
 
 #endif

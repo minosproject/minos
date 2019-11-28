@@ -46,7 +46,14 @@ struct vmbox_info {
 	char type[32];
 };
 
+struct vmbox_hook {
+	char name[32];
+	struct list_head list;
+	struct vmbox_hook_ops *ops;
+};
+
 static LIST_HEAD(vmbox_con_list);
+static LIST_HEAD(vmbox_hook_list);
 
 struct vring_used_elem {
 	uint32_t id;
@@ -77,6 +84,57 @@ typedef int (*vmbox_hvc_handler_t)(struct vm *vm,
 
 static int vmbox_index = 0;
 static struct vmbox *vmboxs[VMBOX_MAX_COUNT];
+
+static inline struct vmbox_hook *vmbox_find_hook(char *name)
+{
+	struct vmbox_hook *hook;
+
+	list_for_each_entry(hook, &vmbox_hook_list, list) {
+		if (strcmp(hook->name, name) == 0)
+			return hook;
+	}
+
+	return NULL;
+}
+
+int register_vmbox_hook(char *name, struct vmbox_hook_ops *ops)
+{
+	int len;
+	struct vmbox_hook *hook;
+
+	if (!ops)
+		return -EINVAL;
+
+	hook = vmbox_find_hook(name);
+	if (hook) {
+		pr_warn("vmbox hook [%s] areadly register\n", name);
+		return -EEXIST;
+	}
+
+	hook = zalloc(sizeof(*hook));
+	if (!hook)
+		return -ENOMEM;
+
+	len = strlen(name);
+	len = MIN(len, 31);
+	strncpy(hook->name, name, len);
+	hook->ops = ops;
+	list_add_tail(&vmbox_hook_list, &hook->list);
+
+	return 0;
+}
+
+static void do_vmbox_hook(struct vmbox *vmbox)
+{
+	struct vmbox_hook *hook;
+
+	hook = vmbox_find_hook(vmbox->name);
+	if (!hook)
+		return;
+
+	if (hook->ops->vmbox_init)
+		hook->ops->vmbox_init(vmbox);
+}
 
 static inline unsigned int
 vmbox_virtq_vring_desc_size(unsigned int qsz, unsigned long align)
@@ -244,6 +302,8 @@ static int create_vmbox(struct vmbox_info *vinfo)
 	if (create_vmbox_devices(vmbox))
 		pr_err("create vmbox device for %s failed\n", vmbox->name);
 
+	do_vmbox_hook(vmbox);
+
 	return 0;
 }
 
@@ -291,7 +351,7 @@ out:
 	return create_vmbox(&vinfo);
 }
 
-static struct vmbox_controller *vmbox_get_controller(struct vm *vm)
+struct vmbox_controller *vmbox_get_controller(struct vm *vm)
 {
 	struct vmbox_controller *vc;
 
@@ -671,20 +731,17 @@ static int vm_create_vmbox_controller(struct vm *vm)
 	return 0;
 }
 
-static int vmbox_register_platdev(struct vm *vm,
-		struct vmbox_device *vdev, char *type)
+int vmbox_register_platdev(struct vmbox_device *vdev, void *dtb, char *type)
 {
 	int node;
 	char node_name[128];
-	void *dtb = vm->setup_data;
 
 	memset(node_name, 0, 128);
 	sprintf(node_name, "vmbox-%s@%x", type, vdev->iomem);
 
 	node = fdt_add_subnode(dtb, 0, node_name);
 	if (node < 0) {
-		pr_err("failed to add platform device %s for vm-%d\n",
-				node_name, vm->vmid);
+		pr_err("failed to add platform device %s\n", type);
 		return -ENOENT;
 	}
 
@@ -698,49 +755,22 @@ static int vmbox_register_platdev(struct vm *vm,
 	return 0;
 }
 
-static int vmbox_platdev_online(struct vm *vm, struct vmbox_device *vdev)
-{
-	struct vmbox_controller *vc;
-	struct vmm_area *va;
-	struct vmbox *vmbox = vmboxs[vdev->vmbox_id];
-
-	vc = vmbox_get_controller(vm);
-	if (!vc)
-		return -ENOENT;
-
-	va = alloc_free_vmm_area(&vm->mm, vmbox->shmem_size,
-			PAGE_MASK, VM_MAP_PT | VM_IO);
-	if (!va)
-		return -ENOMEM;
-	vdev->iomem = va->start;
-	vdev->iomem_size = vmbox->shmem_size;
-	map_vmm_area(&vm->mm, va, (unsigned long)vmbox->shmem);
-
-	return vmbox_register_platdev(vm, vdev, vmbox->name);
-}
-
-static int vm_create_vmbox_platdev(struct vm *vm)
+static int vmbox_device_do_hooks(struct vm *vm)
 {
 	int i;
+	struct vmbox_hook *hook;
 	struct vmbox *vmbox;
 
-	/*
-	 * some vmbox device need to be registed as a platform
-	 * device for VM, since it may access before the vmbox
-	 * controller init, like HVC
-	 */
 	for (i = 0; i < vmbox_index; i++) {
 		vmbox = vmboxs[i];
-		if (!(vmbox->flags & VMBOX_F_PLATFORM_DEV))
+		hook = vmbox_find_hook(vmbox->name);
+		if (!hook)
 			continue;
 
-		/*
-		 * only register frontend device current, currently
-		 * no use case need backend device setup before
-		 * vmbox controller
-		 */
-		if (vmbox->owner[1] == vm->vmid)
-			vmbox_platdev_online(vm, vmbox->devices[1]);
+		if (hook->ops->vmbox_be_init)
+			hook->ops->vmbox_be_init(vm, vmbox, vmbox->devices[0]);
+		if (hook->ops->vmbox_fe_init)
+			hook->ops->vmbox_fe_init(vm, vmbox, vmbox->devices[1]);
 	}
 
 	return 0;
@@ -754,5 +784,5 @@ int of_setup_vm_vmbox(struct vm *vm)
 	if (ret)
 		return ret;
 
-	return vm_create_vmbox_platdev(vm);
+	return vmbox_device_do_hooks(vm);
 }

@@ -2,6 +2,7 @@
 #define __VIRQ_CHIP_H__
 
 #include <minos/types.h>
+#include <minos/device_id.h>
 
 struct vcpu;
 
