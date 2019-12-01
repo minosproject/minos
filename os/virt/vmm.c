@@ -898,10 +898,15 @@ int vm_mm_init(struct vm *vm)
 		}
 	}
 
-	/* make sure that all the free vmm_area are PAGE aligned */
+	/*
+	 * make sure that all the free vmm_area are PAGE aligned
+	 * when caculated the end address need to plus 1, in the
+	 * future, need to define the marco to caculate the size
+	 * and the end_base of vmm_area
+	 */
 	list_for_each_entry_safe(va, n, &mm->vmm_area_free, list) {
 		base = BALIGN(va->start, PAGE_SIZE);
-		end = ALIGN(va->end, PAGE_SIZE);
+		end = ALIGN(va->end + 1, PAGE_SIZE);
 		size = end - base;
 
 		if ((va->size < PAGE_SIZE) || (size == 0) || (base >= end)) {
@@ -911,6 +916,8 @@ int vm_mm_init(struct vm *vm)
 			free(va);
 			continue;
 		}
+
+		end -= 1;
 
 		if ((base != va->start) || (va->end != end) ||
 				(size != va->size)) {

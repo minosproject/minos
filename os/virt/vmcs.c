@@ -62,10 +62,7 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 	vmcs->trap_reason = reason;
 	vmcs->trap_data = data;
 	vmcs->trap_ret = 0;
-	if (result)
-		vmcs->trap_result = *result;
-	else
-		vmcs->trap_result = 0;
+	vmcs->trap_result = result ? *result : 0;
 
 	/*
 	 * increase the host index of the vmcs, then send the
@@ -80,7 +77,6 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 		vmcs->host_index--;
 		vmcs->trap_ret = -EPERM;
 		vmcs->trap_result = 0;
-		mb();
 		return -EFAULT;
 	}
 

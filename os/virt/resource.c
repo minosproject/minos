@@ -212,8 +212,10 @@ static int create_pdev_iomem_of(struct vm *vm, struct device_node *node)
 		if (size == 0)
 			continue;
 
-		if (!platform_iomem_valid(addr))
-			continue;
+		if (vm_is_hvm(vm)) {
+			if (!platform_iomem_valid(addr))
+				continue;
+		}
 
 		/* map the physical memory for vm */
 		pr_info("[VM%d IOMEM] 0x%x->0x%x 0x%x %s\n", vm->vmid,
