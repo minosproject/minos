@@ -89,10 +89,9 @@ void *map_vm_memory(struct vm *vm)
 	}
 
 	vm->hvm_paddr = args[0];
-	args[0] = 0;
 
-	addr = mmap(NULL, args[1], PROT_READ | PROT_WRITE,
-			MAP_SHARED, vm->vm_fd, args[0]);
+	addr = mmap(NULL, vm->mem_size, PROT_READ | PROT_WRITE,
+			MAP_SHARED, vm->vm_fd, 0);
 	if (addr == (void *)-1)
 		return NULL;
 

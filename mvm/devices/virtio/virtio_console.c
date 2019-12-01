@@ -49,7 +49,7 @@
 
 #define	VIRTIO_CONSOLE_RINGSZ	64
 #define	VIRTIO_CONSOLE_IOVSZ	64
-#define	VIRTIO_CONSOLE_MAXPORTS	16
+#define	VIRTIO_CONSOLE_MAXPORTS	2
 #define	VIRTIO_CONSOLE_MAXQ	(VIRTIO_CONSOLE_MAXPORTS * 2 + 2)
 
 #define	VIRTIO_CONSOLE_DEVICE_READY	0
@@ -375,6 +375,11 @@ virtio_console_notify_rx(struct virt_queue *vq)
 	struct virtio_console *console;
 	struct virtio_console_port *port;
 
+	/*
+	 * when guest start up, it will fill the read buffer
+	 * to this queue, and will do virtqueue kick, here
+	 * is the kick handler
+	 */
 	console = virtio_dev_to_console(vq->dev);
 	port = virtio_console_vq_to_port(console, vq);
 
@@ -912,8 +917,10 @@ static int virtio_console_event(struct vdev *vdev, int read,
 			nr++;
 		}
 
+#if 0
 		buf[4] = 0;
-		printf("%s\n", buf);
+		printf("%s", buf);
+#endif
 
 		return write(be->fd, buf, nr);
 	}
