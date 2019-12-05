@@ -378,12 +378,14 @@ out:
 static int vcpu_affinity_init(void)
 {
 	int i;
-	struct vm *vm0 = get_vm_by_id(0);
+	struct vm *vm;
 
 	bitmap_clear(vcpu_aff_bitmap, 0, NR_CPUS);
 
-	for (i = 0; i < vm0->vcpu_nr; i++)
-		set_bit(vm0->vcpu_affinity[i], vcpu_aff_bitmap);
+	for_each_vm(vm) {
+		for (i = 0; i < vm->vcpu_nr; i++)
+			set_bit(vm->vcpu_affinity[i], vcpu_aff_bitmap);
+	}
 
 	aff_current = find_first_zero_bit(vcpu_aff_bitmap, NR_CPUS);
 
