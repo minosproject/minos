@@ -23,19 +23,18 @@
 #define invalid_queue(qt) \
 	((qt == NULL) || (qt->type != OS_EVENT_TYPE_Q))
 
-queue_t *queue_create(int size, char *name)
+int queue_init(queue_t *qt, int size, char *name)
 {
-	queue_t *qt;
 	struct queue *q;
 
 	q = zalloc(sizeof(*q));
 	if (!q)
-		return NULL;
+		return -ENOMEM;
 
 	q->q_start = (void **)zalloc(sizeof(void *) * size);
 	if (!q->q_start) {
 		free(q);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	q->q_end = q->q_start + size;
@@ -44,14 +43,8 @@ queue_t *queue_create(int size, char *name)
 	q->q_cnt = 0;
 	q->q_size = size;
 
-	qt = (queue_t *)create_event(OS_EVENT_TYPE_Q, (void *)q, name);
-	if (!qt) {
-		free(q->q_start);
-		free(q);
-		return NULL;
-	}
-
-	return qt;
+	event_init(to_event(qt), OS_EVENT_TYPE_Q, (void *)q, name);
+	return 0;
 }
 
 static inline void queue_free(queue_t *qt)
@@ -63,51 +56,6 @@ static inline void queue_free(queue_t *qt)
 		free(q->q_start);
 	if (q)
 		free(q);
-
-	release_event(to_event(qt));
-}
-
-int queue_del(queue_t *qt, int opt)
-{
-	int ret;
-	int tasks_waiting;
-	unsigned long flags;
-
-	if (invalid_queue(qt))
-		return -EINVAL;
-
-	spin_lock_irqsave(&qt->lock, flags);
-
-	if (event_has_waiter(to_event(qt)))
-		tasks_waiting = 1;
-	else
-		tasks_waiting = 0;
-
-	switch (opt) {
-	case OS_DEL_NO_PEND:
-		if (tasks_waiting == 0) {
-			spin_unlock_irqrestore(&qt->lock, flags);
-			queue_free(qt);
-			return 0;
-		}
-		break;
-
-	case OS_DEL_ALWAYS:
-		event_del_always(to_event(qt));
-		spin_unlock_irqrestore(&qt->lock, flags);
-		queue_free(qt);
-
-		if (tasks_waiting)
-			sched();
-
-		return 0;
-	default:
-		ret = 0;
-		break;
-	}
-
-	spin_unlock_irqrestore(&qt->lock, flags);
-	return ret;
 }
 
 static inline void *queue_pop(struct queue *q)

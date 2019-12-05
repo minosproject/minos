@@ -23,11 +23,6 @@
 #define invalid_mbox(mbox)	\
 	((mbox == NULL) && (mbox->type != OS_EVENT_TYPE_MBOX))
 
-mbox_t *mbox_create(void *pmsg, char *name)
-{
-	return (mbox_t *)create_event(OS_EVENT_TYPE_MBOX, pmsg, name);
-}
-
 void *mbox_accept(mbox_t *m)
 {
 	unsigned long flags;
@@ -41,49 +36,6 @@ void *mbox_accept(mbox_t *m)
 	spin_unlock_irqrestore(&m->lock, flags);
 
 	return msg;
-}
-
-int mbox_del(mbox_t *m, int opt)
-{
-	int ret = 0;
-	unsigned long flags;
-	int tasks_waiting;
-
-	if (invalid_mbox(m))
-		return -EINVAL;
-
-	spin_lock_irqsave(&m->lock, flags);
-	if (m->wait_grp || (!is_list_empty(&m->wait_list)))
-		tasks_waiting = 1;
-	else
-		tasks_waiting = 0;
-
-	switch (opt) {
-	case OS_DEL_NO_PEND:
-		if (tasks_waiting == 0) {
-			spin_unlock_irqrestore(&m->lock, flags);
-			release_event(to_event(m));
-			return 0;
-		} else
-			ret = -EPERM;
-		break;
-
-	case OS_DEL_ALWAYS:
-		event_del_always((struct event *)m);
-		spin_unlock_irqrestore(&m->lock, flags);
-		release_event(m);
-
-		if (tasks_waiting)
-			sched();
-
-		return 0;
-	default:
-		ret = -EINVAL;
-		break;
-	}
-
-	spin_unlock_irqrestore(&m->lock, flags);
-	return ret;
 }
 
 void *mbox_pend(mbox_t *m, uint32_t timeout)

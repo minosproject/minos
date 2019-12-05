@@ -23,19 +23,6 @@
 #define invalid_mutex(mutex)	\
 	((mutex == NULL) && (mutex->type != OS_EVENT_TYPE_MUTEX))
 
-mutex_t *mutex_create(char *name)
-{
-	mutex_t *mutex;
-
-	mutex = (mutex_t *)create_event(OS_EVENT_TYPE_MUTEX, NULL, name);
-	if (!mutex)
-		return NULL;
-
-	mutex->cnt = OS_MUTEX_AVAILABLE;
-
-	return mutex;
-}
-
 int mutex_accept(mutex_t *mutex)
 {
 	int ret = -EBUSY;
@@ -55,62 +42,6 @@ int mutex_accept(mutex_t *mutex)
 	}
 	spin_unlock_irqrestore(&mutex->lock, flags);
 
-	return ret;
-}
-
-int mutex_del(mutex_t *mutex, int opt)
-{
-	unsigned long flags;
-	int tasks_waiting;
-	int ret;
-	struct task *task;
-
-	if (invalid_mutex(mutex))
-		return -EINVAL;
-
-	spin_lock_irqsave(&mutex->lock, flags);
-
-	if (event_has_waiter(to_event(mutex)))
-		tasks_waiting = 1;
-	else
-		tasks_waiting = 0;
-
-	switch (opt) {
-	case OS_DEL_NO_PEND:
-		if (tasks_waiting) {
-			pr_err("can not delete mutex task waitting for it\n");
-			ret = -EPERM;
-		} else {
-			spin_unlock_irqrestore(&mutex->lock, flags);
-			release_event(to_event(mutex));
-			return 0;
-		}
-		break;
-
-	case OS_DEL_ALWAYS:
-		/*
-		 * need to unlock the cpu if the cpu is lock
-		 * by this task, the mutex can not be accessed
-		 * by the task after it has been locked.
-		 */
-		task = (struct task *)mutex->data;
-		if (task != NULL)
-			task->lock_event = NULL;
-
-		event_del_always(to_event(mutex));
-		spin_unlock_irqrestore(&mutex->lock, flags);
-		release_event(to_event(mutex));
-
-		if (tasks_waiting)
-			sched();
-
-		return 0;
-	default:
-		ret = -EINVAL;
-		break;
-	}
-
-	spin_unlock_irqrestore(&mutex->lock, flags);
 	return ret;
 }
 

@@ -25,22 +25,6 @@
 #define invalid_flag(f) \
 	((f == NULL) || (f->type != OS_EVENT_TYPE_FLAG))
 
-struct flag_grp *flag_create(flag_t flags)
-{
-	struct flag_grp *fg;
-
-	fg = zalloc(sizeof(*fg));
-	if (fg)
-		return NULL;
-
-	fg->type = OS_EVENT_TYPE_FLAG;
-	fg->flags = flags;
-	init_list(&fg->wait_list);
-	spin_lock_init(&fg->lock);
-
-	return fg;
-}
-
 static inline flag_t flag_wait_set_all(struct flag_grp *grp,
 		flag_t flags, int consume)
 {
@@ -178,53 +162,6 @@ static int flag_task_ready(struct flag_node *node, flag_t flags)
 	}
 #endif
 	return sched;
-}
-
-int flag_del(struct flag_grp *grp, int opt)
-{
-	int ret;
-	int tasks_waiting;
-	struct flag_node *pnode, *n;
-	unsigned long irq;
-
-	if (invalid_flag(grp))
-		return -EINVAL;
-
-	spin_lock_irqsave(&grp->lock, irq);
-
-	if (!is_list_empty(&grp->wait_list))
-		tasks_waiting = 1;
-	else
-		tasks_waiting = 0;
-
-	switch (opt) {
-	case OS_DEL_NO_PEND:
-		if (tasks_waiting == 0) {
-			free(grp);
-			ret = 0;
-		} else
-			ret = -EPERM;
-		break;
-	case OS_DEL_ALWAYS:
-		list_for_each_entry_safe(pnode, n,
-				&grp->wait_list, list) {
-			flag_task_ready(pnode, 0);
-			list_del(&pnode->list);
-		}
-
-		free(grp);
-		spin_unlock_irqrestore(&grp->lock, irq);
-
-		if (tasks_waiting)
-			sched();
-		return 0;
-	default:
-		ret = -EINVAL;
-		break;
-	}
-
-	spin_unlock_irqrestore(&grp->lock, irq);
-	return ret;
 }
 
 static void flag_block(struct flag_grp *grp, struct flag_node *pnode,

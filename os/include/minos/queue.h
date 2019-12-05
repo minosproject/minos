@@ -14,8 +14,7 @@ struct queue {
 	int q_cnt;		/* current queue entriy size */
 };
 
-queue_t *queue_create(int size, char *name);
-int queue_del(queue_t *qt, int opt);
+int queue_init(queue_t *qt, int size, char *name);
 void *queue_accept(queue_t *qt);
 int queue_flush(queue_t *qt);
 void *queue_pend(queue_t *qt, uint32_t timeout);

@@ -21,9 +21,6 @@
 #include <minos/mm.h>
 #include <minos/smp.h>
 
-static LIST_HEAD(event_list);
-static DEFINE_SPIN_LOCK(event_lock);
-
 void event_init(struct event *event, int type, void *pdata, char *name)
 {
 	event->type = type;
@@ -31,33 +28,6 @@ void event_init(struct event *event, int type, void *pdata, char *name)
 	init_list(&event->wait_list);
 	event->data = pdata;
 	strncpy(event->name, name, MIN(strlen(name), OS_EVENT_NAME_SIZE));
-
-	spin_lock(&event_lock);
-	list_add_tail(&event_list, &event->list);
-	spin_unlock(&event_lock);
-}
-
-struct event *create_event(int type, void *pdata, char *name)
-{
-	struct event *event;
-
-	event = zalloc(sizeof(struct event));
-	if (!event)
-		return NULL;
-
-	event_init(event, type, pdata, name);
-
-	return event;
-}
-
-void release_event(struct event *event)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&event_lock, flags);
-	list_del(&event->list);
-	spin_unlock_irqrestore(&event_lock, flags);
-	free(event);
 }
 
 void event_task_wait(struct task *task, struct event *ev)

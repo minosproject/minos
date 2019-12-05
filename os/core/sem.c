@@ -21,18 +21,7 @@
 #include <minos/sched.h>
 
 #define invalid_sem(sem) \
-	((sem == NULL) || (sem->type != OS_EVENT_TYPE_MBOX))
-
-sem_t *sem_create(uint32_t cnt, char *name)
-{
-	sem_t *sem;
-
-	sem = create_event(OS_EVENT_TYPE_SEM, NULL, name);
-	if (sem)
-		sem->cnt = cnt;
-
-	return sem;
-}
+	((sem == NULL) || (sem->type != OS_EVENT_TYPE_SEM))
 
 uint32_t sem_accept(sem_t *sem)
 {
@@ -49,47 +38,6 @@ uint32_t sem_accept(sem_t *sem)
 	spin_unlock_irqrestore(&sem->lock, flags);
 
 	return cnt;
-}
-
-int sem_del(sem_t *sem, int opt)
-{
-	int ret = 0;
-	unsigned long flags;
-	int tasks_waiting;
-
-	if (invalid_sem(sem))
-		return -EINVAL;
-
-	spin_lock_irqsave(&sem->lock, flags);
-	if (event_has_waiter((struct event *)sem))
-		tasks_waiting = 1;
-	else
-		tasks_waiting = 0;
-
-	switch (opt) {
-	case OS_DEL_NO_PEND:
-		if (tasks_waiting == 0) {
-			spin_unlock_irqrestore(&sem->lock, flags);
-			release_event(to_event(sem));
-			return 0;
-		} else
-			ret = -EPERM;
-		break;
-
-	case OS_DEL_ALWAYS:
-		event_del_always((struct event *)sem);
-		spin_unlock_irqrestore(&sem->lock, flags);
-		release_event(to_event(sem));
-
-		if (tasks_waiting)
-			sched();
-		return 0;
-	default:
-		ret = -EINVAL;
-		break;
-	}
-
-	return ret;
 }
 
 int sem_pend(sem_t *sem, uint32_t timeout)

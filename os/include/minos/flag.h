@@ -1,6 +1,7 @@
 #ifndef __MINOS_FLAG_H__
 #define __MINOS_FLAG_H__
 
+#include <minos/event.h>
 #include <minos/spinlock.h>
 
 #define FLAG_WAIT_CLR_ALL       0
@@ -19,9 +20,9 @@
 
 struct flag_grp {
 	int type;
-	struct list_head wait_list;
 	flag_t flags;
 	spinlock_t lock;
+	struct list_head wait_list;
 };
 
 struct flag_node {
@@ -32,12 +33,19 @@ struct flag_node {
 	int wait_type;
 };
 
-struct flag_grp *flag_create(flag_t flags);
-int flag_del(struct flag_grp *grp, int opt);
+static void inline flag_init(struct flag_grp *fg, flag_t flags)
+{
+	fg->type = OS_EVENT_TYPE_FLAG;
+	fg->flags = flags;
+	init_list(&fg->wait_list);
+	spin_lock_init(&fg->lock);
+}
+
 flag_t flag_accept(struct flag_grp *grp, flag_t flags, int wait_type);
 
 flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 		int wait_type, uint32_t timeout);
+
 flag_t flag_pend_get_flags_ready(void);
 flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt);
 

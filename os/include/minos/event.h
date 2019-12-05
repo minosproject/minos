@@ -11,9 +11,6 @@
 #define OS_EVENT_TYPE_MUTEX	4
 #define OS_EVENT_TYPE_FLAG	5
 
-#define OS_DEL_NO_PEND          0
-#define OS_DEL_ALWAYS           1
-
 #define OS_PEND_OPT_NONE        0
 #define OS_PEND_OPT_BROADCAST   1
 
