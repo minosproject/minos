@@ -12,6 +12,9 @@
 #define dma_rmb()	__dmb(oshld)
 #define dma_wmb()	__dmb(oshst)
 
+#define iormb()		dma_rmb()
+#define iowmb()		dma_wmb()
+
 #define smp_mb()	__dmb(ish)
 #define smp_rmb()	__dmb(ishld)
 #define smp_wmb()	__dmb(ishst)

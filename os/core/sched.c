@@ -450,7 +450,7 @@ void switch_to_task(struct task *cur, struct task *next)
 	} else {
 		recal_task_run_time(cur, pcpu, 0);
 		cur->stat = TASK_STAT_RDY;
-		wnb();
+		wmb();
 	}
 
 	do_hooks((void *)cur, NULL, OS_HOOK_TASK_SWITCH_OUT);
