@@ -36,17 +36,14 @@ struct event {
 
 #define to_event(e)	(struct event *)e
 
-struct event *create_event(int type, void *pdata, char *name);
-void release_event(struct event *event);
-void event_task_wait(struct task *task, struct event *ev);
 int event_task_remove(struct task *task, struct event *ev);
 struct task *event_get_waiter(struct event *ev);
 
 struct task *event_highest_task_ready(struct event *ev, void *msg,
 		uint32_t msk, int pend_stat);
 
-void event_del_always(struct event *ev);
 void event_init(struct event *event, int type, void *pdata, char *name);
+void event_task_wait(struct task *task, void *ev, int stat, uint32_t to);
 
 static inline int event_has_waiter(struct event *ev)
 {

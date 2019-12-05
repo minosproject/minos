@@ -65,5 +65,6 @@ struct task *get_highest_task(uint8_t group, prio_t *ready);
 void irq_enter(gp_regs *regs);
 void irq_exit(gp_regs *regs);
 void sched_task(struct task *task);
+void cpus_resched(void);
 
 #endif

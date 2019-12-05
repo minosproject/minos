@@ -138,7 +138,14 @@ struct task_info {
 #define TIF_NEED_RESCHED	0
 #define TIF_32BIT		1
 
+#define TIF_HARDIRQ_MASK	8
+#define TIF_SOFTIRQ_MASK	9
+
 #define __TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
 #define __TIF_32BIT		(1 << TIF_32BIT)
+
+#define __TIF_HARDIRQ_MASK	(1 << TIF_HARDIRQ_MASK)
+#define __TIF_SOFTIRQ_MASK	(1 << TIF_SOFTIRQ_MASK)
+#define __TIF_IN_INTERRUPT	(0xff00)
 
 #endif

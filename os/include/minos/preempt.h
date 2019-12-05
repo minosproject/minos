@@ -43,6 +43,11 @@ static inline int need_resched(void)
 	return  (current_task_info()->flags & __TIF_NEED_RESCHED);
 }
 
+static inline int in_interrupt(void)
+{
+	return (current_task_info()->flags & __TIF_IN_INTERRUPT);
+}
+
 static inline int os_is_running(void)
 {
 	int running = 0;

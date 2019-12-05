@@ -30,13 +30,31 @@ void event_init(struct event *event, int type, void *pdata, char *name)
 	strncpy(event->name, name, MIN(strlen(name), OS_EVENT_NAME_SIZE));
 }
 
-void event_task_wait(struct task *task, struct event *ev)
+void event_task_wait(struct task *task, void *ev, int stat, uint32_t to)
 {
-	if (task_is_realtime(task)) {
-		ev->wait_grp |= task->bity;
-		ev->wait_tbl[task->by] |= task->bitx;
-	} else
-		list_add_tail(&ev->wait_list, &task->event_list);
+	unsigned long flags;
+	struct event *event;
+
+	task_lock_irqsave(task, flags);
+
+	task->stat |= stat;
+	task->pend_stat = TASK_STAT_PEND_OK;
+	task->delay = to;
+
+	if (stat == TASK_STAT_FLAG) {
+		task->flag_node = ev;
+	} else {
+		event = (struct event *)ev;
+		task->wait_event = event;
+		if (task_is_realtime(task)) {
+			event->wait_grp |= task->bity;
+			event->wait_tbl[task->by] |= task->bitx;
+		} else
+			list_add_tail(&event->wait_list, &task->event_list);
+	}
+
+	set_task_sleep(task, to);
+	task_unlock_irqrestore(task, flags);
 }
 
 int event_task_remove(struct task *task, struct event *ev)

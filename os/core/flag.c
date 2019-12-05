@@ -22,9 +22,6 @@
 #include <minos/sched.h>
 #include <minos/spinlock.h>
 
-#define invalid_flag(f) \
-	((f == NULL) || (f->type != OS_EVENT_TYPE_FLAG))
-
 static inline flag_t flag_wait_set_all(struct flag_grp *grp,
 		flag_t flags, int consume)
 {
@@ -92,9 +89,6 @@ flag_t flag_accept(struct flag_grp *grp, flag_t flags, int wait_type)
 	int result;
 	int consume;
 
-	if (invalid_flag(grp))
-		return 0;
-
 	result = wait_type & FLAG_CONSUME;
 	if (result != 0) {
 		wait_type &= ~FLAG_CONSUME;
@@ -129,38 +123,25 @@ flag_t flag_accept(struct flag_grp *grp, flag_t flags, int wait_type)
 static int flag_task_ready(struct flag_node *node, flag_t flags)
 {
 	int sched = 0;
-#if 0
-	struct task *task;
-	int cpuid = smp_processor_id();
-	struct task_event *tevent;
+	struct task *task = node->task;
 
-	task = node->task;
-
-	if (task_is_realtime(task) || (task->affinity == cpuid)) {
-		task_lock(task);
-		task->delay = 0;
+	task_lock(task);
+	/*
+	 * if the task already timeout, then do nothing, else
+	 * wake up the releated task, here do not need to call
+	 * event_remove_task, since flag_t will not put the task
+	 * to the event wait list
+	 */
+	if (task_is_pending(task)) {
 		task->flags_rdy = flags;
-		task->stat &= ~TASK_STAT_FLAG;
 		task->pend_stat = TASK_STAT_PEND_OK;
-		if (task->stat == TASK_STAT_RDY)
-			sched = 1;
-		else
-			sched = 0;
-
-		task_unlock(task);
-	} else {
-		tevent = zalloc(sizeof(*tevent));
-		if (!tevent)
-			panic("no memory for flag task event\n");
-
-		tevent->msk = TASK_STAT_FLAG;
-		tevent->task = task;
-		tevent->action = TASK_EVENT_FLAG_READY;
-		tevent->flags = flags;
-
-		task_ipi_event(task, tevent, 0);
+		task->msg = NULL;
+		task->wait_event = NULL;
+		set_task_ready(task, 0);
+		sched = (task->stat == TASK_STAT_RDY);
 	}
-#endif
+	task_unlock(task);
+
 	return sched;
 }
 
@@ -174,17 +155,9 @@ static void flag_block(struct flag_grp *grp, struct flag_node *pnode,
 	pnode->wait_type = wait_type;
 	pnode->task = task;
 	pnode->flag_grp = grp;
-
-	task_lock(task);
-	task->stat |= TASK_STAT_FLAG;
-	task->pend_stat = TASK_STAT_PEND_OK;
-	task->delay = timeout;
-	task->flag_node = pnode;
 	list_add_tail(&grp->wait_list, &pnode->list);
 
-	set_task_sleep(task, timeout);
-
-	task_unlock(task);
+	event_task_wait(task, pnode, TASK_STAT_FLAG, timeout);
 }
 
 flag_t flag_pend(struct flag_grp *grp, flag_t flags,
@@ -195,9 +168,6 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 	flag_t flags_rdy;
 	int result, consume;
 	struct task *task = get_current_task();
-
-	if (invalid_flag(grp))
-		return 0;
 
 	might_sleep();
 
@@ -210,6 +180,10 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 
 	spin_lock_irqsave(&grp->lock, irq);
 
+	/*
+	 * check the related flags is set or clear, if the
+	 * condition is matched, then return
+	 */
 	switch (wait_type) {
 	case FLAG_WAIT_SET_ALL:
 		flags_rdy = flag_wait_set_all(grp, flags, consume);
@@ -233,14 +207,20 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 		return flags_rdy;
 	}
 
+	/*
+	 * if the condition does not matched, then the task
+	 * will suspend to wait the requested flags
+	 */
 	flag_block(grp, &node, flags, wait_type, timeout);
 	spin_unlock_irqrestore(&grp->lock, irq);
 
 	sched();
 
 	spin_lock_irqsave(&grp->lock, irq);
-	task_lock(task);
 
+	/*
+	 * wait timeout or the releated event happened
+	 */
 	if (task->pend_stat != TASK_STAT_PEND_OK) {
 		task->pend_stat = TASK_STAT_PEND_OK;
 		list_del(&node.list);
@@ -266,7 +246,6 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 		}
 	}
 
-	task_unlock(task);
 	spin_unlock_irqrestore(&grp->lock, irq);
 
 	return flags_rdy;
@@ -288,12 +267,12 @@ flag_t flag_pend_get_flags_ready(void)
 
 flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt)
 {
-	int need_sched;
+	int need_sched = 0;
 	flag_t flags_rdy;
 	unsigned long irq;
 	struct flag_node *pnode, *n;
 
-	if (invalid_flag(grp) || (opt > FLAG_SET))
+	if (opt > FLAG_SET)
 		return -EINVAL;
 
 	spin_lock_irqsave(&grp->lock, irq);
@@ -307,13 +286,12 @@ flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt)
 		break;
 	}
 
-	need_sched = 0;
 	list_for_each_entry_safe(pnode, n, &grp->wait_list, list) {
 		switch (pnode->wait_type) {
 		case FLAG_WAIT_SET_ALL:
 			flags_rdy = grp->flags & pnode->flags;
 			if (flags_rdy == pnode->flags) {
-				need_sched = flag_task_ready(pnode,
+				need_sched += flag_task_ready(pnode,
 						flags_rdy);
 			}
 			break;
@@ -321,7 +299,7 @@ flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt)
 		case FLAG_WAIT_SET_ANY:
 			flags_rdy = grp->flags & pnode->flags;
 			if (flags_rdy != 0) {
-				need_sched = flag_task_ready(pnode,
+				need_sched += flag_task_ready(pnode,
 						flags_rdy);
 			}
 			break;
@@ -329,7 +307,7 @@ flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt)
 		case FLAG_WAIT_CLR_ALL:
 			flags_rdy = ~grp->flags & pnode->flags;
 			if (flags_rdy == pnode->flags) {
-				need_sched = flag_task_ready(pnode,
+				need_sched += flag_task_ready(pnode,
 						flags_rdy);
 			}
 			break;
@@ -337,7 +315,7 @@ flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt)
 		case FLAG_WAIT_CLR_ANY:
 			flags_rdy = ~grp->flags & pnode->flags;
 			if (flags_rdy != 0) {
-				need_sched = flag_task_ready(pnode,
+				need_sched += flag_task_ready(pnode,
 						flags_rdy);
 			}
 
@@ -350,7 +328,7 @@ flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt)
 	spin_unlock_irqrestore(&grp->lock, irq);
 
 	if (need_sched)
-		sched();
+		cpus_resched();
 
 	spin_lock_irqsave(&grp->lock, irq);
 	flags_rdy = grp->flags;

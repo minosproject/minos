@@ -20,16 +20,10 @@
 #include <minos/sem.h>
 #include <minos/sched.h>
 
-#define invalid_sem(sem) \
-	((sem == NULL) || (sem->type != OS_EVENT_TYPE_SEM))
-
 uint32_t sem_accept(sem_t *sem)
 {
 	uint32_t cnt;
 	unsigned long flags;
-
-	if (invalid_sem(sem))
-		return -EINVAL;
 
 	spin_lock_irqsave(&sem->lock, flags);
 	cnt = sem->cnt;
@@ -44,10 +38,7 @@ int sem_pend(sem_t *sem, uint32_t timeout)
 {
 	int ret;
 	unsigned long flags;
-	struct task *task = get_current_task();
-
-	if (invalid_sem(sem))
-		return -EINVAL;
+	struct task *task;
 
 	might_sleep();
 
@@ -58,20 +49,12 @@ int sem_pend(sem_t *sem, uint32_t timeout)
 		return 0;
 	}
 
-	task_lock(task);
-	task->stat |= TASK_STAT_SEM;
-	task->pend_stat = TASK_STAT_PEND_OK;
-	task->delay = timeout;
-	task->wait_event = to_event(sem);
-	task_unlock(task);
-
-	event_task_wait(task, (struct event *)sem);
+	task = get_current_task();
+	event_task_wait(task, to_event(sem), TASK_STAT_SEM, timeout);
 	spin_unlock_irqrestore(&sem->lock, flags);
 
 	sched();
 
-	spin_lock_irqsave(&sem->lock, flags);
-	task_lock(task);
 	switch (task->pend_stat) {
 	case TASK_STAT_PEND_OK:
 		ret = 0;
@@ -81,15 +64,15 @@ int sem_pend(sem_t *sem, uint32_t timeout)
 		break;
 	case TASK_STAT_PEND_TO:
 	default:
-		event_task_remove(task, to_event(sem));
 		ret = -ETIMEDOUT;
+		spin_lock_irqsave(&sem->lock, flags);
+		event_task_remove(task, to_event(sem));
+		spin_unlock_irqrestore(&sem->lock, flags);
 		break;
 	}
 
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->wait_event = NULL;
-	task_unlock(task);
-	spin_unlock_irqrestore(&sem->lock, flags);
 
 	return ret;
 }
@@ -99,9 +82,6 @@ int sem_pend_abort(sem_t *sem, int opt)
 	int nbr_tasks = 0;
 	unsigned long flags;
 	struct task *task;
-
-	if (invalid_sem(sem))
-		return -EINVAL;
 
 	might_sleep();
 
@@ -126,9 +106,11 @@ int sem_pend_abort(sem_t *sem, int opt)
 		}
 
 		spin_unlock_irqrestore(&sem->lock, flags);
-		sched();
 
-		return nbr_tasks;
+		if (nbr_tasks) {
+			cpus_resched();
+			return nbr_tasks;
+		}
 	}
 
 	spin_unlock_irqrestore(&sem->lock, flags);
@@ -140,18 +122,13 @@ int sem_post(sem_t *sem)
 	unsigned long flags;
 	struct task *task;
 
-	if (invalid_sem(sem))
-		return -EINVAL;
-
 	spin_lock_irqsave(&sem->lock, flags);
-	if (event_has_waiter(to_event(sem))) {
-		task = event_highest_task_ready((struct event *)sem,
-				NULL, TASK_STAT_SEM, TASK_STAT_PEND_OK);
-		if (task) {
-			spin_unlock_irqrestore(&sem->lock, flags);
-			sched();
-			return 0;
-		}
+	task = event_highest_task_ready((struct event *)sem,
+			NULL, TASK_STAT_SEM, TASK_STAT_PEND_OK);
+	if (task) {
+		spin_unlock_irqrestore(&sem->lock, flags);
+		sched_task(task);
+		return 0;
 	}
 
 	if (sem->cnt < 65535)

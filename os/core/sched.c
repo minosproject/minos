@@ -608,6 +608,14 @@ void sched(void)
 	local_irq_restore(flags);
 }
 
+static inline void cpu_resched(void)
+{
+	if (!in_interrupt())
+		sched();
+	else
+		set_need_resched();
+}
+
 void sched_task(struct task *task)
 {
 	unsigned long flags;
@@ -635,11 +643,33 @@ void sched_task(struct task *task)
 	if (smp_resched)
 		pcpu_resched(t_cpu);
 	else
-		sched();
+		cpu_resched();
+}
+
+/*
+ * notify all the cpu to do a resched if need
+ */
+void cpus_resched(void)
+{
+	unsigned long flags;
+	int cpuid, cpu;
+
+	local_irq_save(flags);
+	cpuid = smp_processor_id();
+	for_each_online_cpu(cpu) {
+		if (cpu != cpuid)
+			pcpu_resched(cpu);
+	}
+	local_irq_restore(flags);
+
+	cpu_resched();
 }
 
 void irq_enter(gp_regs *regs)
 {
+
+	current_task_info()->flags |= __TIF_HARDIRQ_MASK;
+
 	do_hooks(get_current_task(), (void *)regs,
 			OS_HOOK_ENTER_IRQ);
 
@@ -733,7 +763,12 @@ void irq_return_handler(struct task *task)
 
 void irq_exit(gp_regs *regs)
 {
+	struct task_info *tf = current_task_info();
+
+	tf->flags &= ~__TIF_HARDIRQ_MASK;
+	tf->flags |= __TIF_SOFTIRQ_MASK;
 	irq_softirq_exit();
+	tf->flags &= ~__TIF_SOFTIRQ_MASK;
 }
 
 static void __used *of_setup_pcpu(struct device_node *node, void *data)

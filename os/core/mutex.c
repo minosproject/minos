@@ -80,16 +80,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	 * finish it work, but there is a big problem, if the
 	 * task need to get two mutex, how to deal with this ?
 	 */
-
-	/* set the task's state and suspend the task */
-	task_lock_irqsave(task, flags);
-	task->stat |= TASK_STAT_MUTEX;
-	task->pend_stat = TASK_STAT_PEND_OK;
-	task->wait_event = to_event(m);
-	set_task_sleep(task, timeout);
-	task_unlock_irqrestore(task, flags);
-
-	event_task_wait(task, to_event(m));
+	event_task_wait(task, to_event(m), TASK_STAT_MUTEX, timeout);
 	spin_unlock(&m->lock);
 
 	sched();
@@ -113,7 +104,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	}
 
 	task->pend_stat = TASK_STAT_PEND_OK;
-	task->wait_event = 0;
+	task->wait_event = NULL;
 	mb();
 
 	return ret;
@@ -123,8 +114,10 @@ int mutex_post(mutex_t *m)
 {
 	struct task *task = get_current_task();
 
-	if (invalid_mutex(m))
+	if (in_interrupt()) {
+		pr_err("can not call this in interrupt\n");
 		return -EPERM;
+	}
 
 	spin_lock(&m->lock);
 	if (task != (struct task *)m->data) {

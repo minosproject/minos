@@ -93,9 +93,6 @@ void *queue_accept(queue_t *qt)
 	struct queue *q;
 	void *pmsg = NULL;
 
-	if (invalid_queue(qt))
-		return NULL;
-
 	spin_lock_irqsave(&qt->lock, flags);
 
 	q = (struct queue *)qt->data;
@@ -111,9 +108,6 @@ int queue_flush(queue_t *qt)
 {
 	struct queue *q;
 	unsigned long flags;
-
-	if (invalid_queue(qt))
-		return -EINVAL;
 
 	spin_lock_irqsave(&qt->lock, flags);
 	q = (struct queue *)qt->data;
@@ -132,9 +126,6 @@ void *queue_pend(queue_t *qt, uint32_t timeout)
 	unsigned long flags;
 	struct task *task;
 
-	if (invalid_queue(qt))
-		return NULL;
-
 	might_sleep();
 
 	spin_lock_irqsave(&qt->lock, flags);
@@ -146,20 +137,10 @@ void *queue_pend(queue_t *qt, uint32_t timeout)
 	}
 
 	task = get_current_task();
-	task_lock(task);
-	task->stat |= TASK_STAT_Q;
-	task->pend_stat = TASK_STAT_PEND_OK;
-	task->delay = timeout;
-	task->wait_event = to_event(qt);
-	task_unlock(task);
-
-	event_task_wait(task, to_event(qt));
+	event_task_wait(task, to_event(qt), TASK_STAT_Q, timeout);
 	spin_unlock_irqrestore(&qt->lock, flags);
 
 	sched();
-
-	spin_lock_irqsave(&qt->lock, flags);
-	task_lock(task);
 
 	switch (task->pend_stat) {
 	case TASK_STAT_PEND_OK:
@@ -172,17 +153,16 @@ void *queue_pend(queue_t *qt, uint32_t timeout)
 
 	case TASK_STAT_PEND_TO:
 	default:
-		event_task_remove(task, to_event(qt));
 		pmsg = NULL;
+		spin_lock_irqsave(&qt->lock, flags);
+		event_task_remove(task, to_event(qt));
+		spin_unlock_irqrestore(&qt->lock, flags);
 		break;
 	}
 
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->wait_event = NULL;
 	task->msg = NULL;
-
-	task_unlock(task);
-	spin_unlock_irqrestore(&qt->lock, flags);
 
 	return pmsg;
 }
@@ -191,57 +171,54 @@ int queue_post_abort(queue_t *qt, int opt)
 {
 	unsigned long flags;
 	int nbr_tasks = 0;
-
-	if (invalid_queue(qt))
-		return -EINVAL;
-
-	might_sleep();
+	struct task *task;
 
 	spin_lock_irqsave(&qt->lock, flags);
 	if (event_has_waiter(to_event(qt))) {
 		switch(opt) {
 		case OS_PEND_OPT_BROADCAST:
 			while (event_has_waiter(to_event(qt))) {
-				event_highest_task_ready(to_event(qt),
+				task = event_highest_task_ready(to_event(qt),
 						NULL, TASK_STAT_Q,
 						TASK_STAT_PEND_ABORT);
-				nbr_tasks++;
+				if (task)
+					nbr_tasks++;
 			}
 			break;
 
 		case OS_PEND_OPT_NONE:
 		default:
-			event_highest_task_ready(to_event(qt), NULL,
+			task = event_highest_task_ready(to_event(qt), NULL,
 					TASK_STAT_Q, TASK_STAT_PEND_ABORT);
-			nbr_tasks++;
+			if (task)
+				nbr_tasks++;
 			break;
 		}
-
-		spin_unlock_irqrestore(&qt->lock, flags);
-		sched();
-
-		return nbr_tasks;
 	}
 
 	spin_unlock_irqrestore(&qt->lock, flags);
+
+	if (nbr_tasks)
+		cpus_resched();
+
 	return nbr_tasks;
 }
 
 static int __queue_post(queue_t *qt, void *pmsg, int front)
 {
+	struct task *task;
 	struct queue *q;
 	unsigned long flags;
 
-	if (invalid_queue(qt) || !pmsg)
+	if (!pmsg)
 		return -EINVAL;
 
 	spin_lock_irqsave(&qt->lock, flags);
-	if (event_has_waiter(to_event(qt))) {
-		event_highest_task_ready(to_event(qt), pmsg,
-				TASK_STAT_Q, TASK_STAT_PEND_OK);
+	task = event_highest_task_ready(to_event(qt), pmsg,
+			TASK_STAT_Q, TASK_STAT_PEND_OK);
+	if (task) {
 		spin_unlock_irqrestore(&qt->lock, flags);
-
-		sched();
+		sched_task(task);
 		return 0;
 	}
 
@@ -276,29 +253,27 @@ int queue_post_opt(queue_t *qt, int opt, void *pmsg)
 	unsigned long flags;
 	struct queue *q;
 	int nr_task = 0;
-
-	if (invalid_queue(qt) || !pmsg)
-		return -EINVAL;
+	struct task *task;
 
 	spin_lock_irqsave(&qt->lock, flags);
-	if (event_has_waiter(to_event(qt))) {
-		if (opt & OS_POST_OPT_BROADCAST) {
-			while (event_has_waiter(to_event(qt))) {
-				event_highest_task_ready(to_event(qt), pmsg,
-					TASK_STAT_Q, TASK_STAT_PEND_OK);
-				nr_task++;
-			}
-		} else {
-			event_highest_task_ready(to_event(qt), pmsg,
+	if (opt & OS_POST_OPT_BROADCAST) {
+		while (event_has_waiter(to_event(qt))) {
+			task = event_highest_task_ready(to_event(qt), pmsg,
 				TASK_STAT_Q, TASK_STAT_PEND_OK);
-			nr_task++;
+			if (task)
+				nr_task++;
 		}
+	} else {
+		task = event_highest_task_ready(to_event(qt), pmsg,
+			TASK_STAT_Q, TASK_STAT_PEND_OK);
+		if (task)
+			nr_task++;
+	}
 
-		if (nr_task) {
-			spin_unlock_irqrestore(&qt->lock, flags);
-			if ((opt & OS_POST_OPT_NO_SCHED) == 0)
-				sched();
-
+	if (nr_task) {
+		spin_unlock_irqrestore(&qt->lock, flags);
+		if ((opt & OS_POST_OPT_NO_SCHED) == 0) {
+			cpus_resched();
 			return 0;
 		}
 	}

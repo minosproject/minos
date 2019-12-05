@@ -20,16 +20,10 @@
 #include <minos/mbox.h>
 #include <minos/task.h>
 
-#define invalid_mbox(mbox)	\
-	((mbox == NULL) && (mbox->type != OS_EVENT_TYPE_MBOX))
-
 void *mbox_accept(mbox_t *m)
 {
 	unsigned long flags;
 	void *msg = NULL;
-
-	if (invalid_mbox(m))
-		return NULL;
 
 	spin_lock_irqsave(&m->lock, flags);
 	msg = m->data;
@@ -38,14 +32,16 @@ void *mbox_accept(mbox_t *m)
 	return msg;
 }
 
+int mbox_is_pending(mbox_t *m)
+{
+	return m->data ? 1 : 0;
+}
+
 void *mbox_pend(mbox_t *m, uint32_t timeout)
 {
 	void *pmsg;
 	struct task *task;
 	unsigned long flags;
-
-	if (invalid_mbox(m))
-		return NULL;
 
 	might_sleep();
 
@@ -60,20 +56,11 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 
 	/* no mbox message need to suspend the task */
 	task = get_current_task();
-	task_lock(task);
-	task->stat |= TASK_STAT_MBOX;
-	task->pend_stat = TASK_STAT_PEND_OK;
-	task->delay = timeout;
-	task->wait_event = to_event(m);
-	task_unlock(task);
-
-	event_task_wait(task, (struct event *)m);
+	event_task_wait(task, to_event(m), TASK_STAT_MBOX, timeout);
 	spin_unlock_irqrestore(&m->lock, flags);
 
 	sched();
 
-	spin_lock_irqsave(&m->lock, flags);
-	task_lock(task);
 	switch (task->pend_stat) {
 	case TASK_STAT_PEND_OK:
 		pmsg = task->msg;
@@ -85,15 +72,16 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 
 	case TASK_STAT_PEND_TO:
 	default:
-		event_task_remove(task, (struct event *)m);
 		pmsg = NULL;
+		spin_lock_irqsave(&m->lock, flags);
+		event_task_remove(task, (struct event *)m);
+		spin_unlock_irqrestore(&m->lock, flags);
 		break;
 	}
 
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->wait_event = NULL;
-	task_unlock(task);
-	spin_unlock_irqrestore(&m->lock, flags);
+	task->msg = NULL;
 
 	return pmsg;
 }
@@ -104,18 +92,15 @@ int mbox_post(mbox_t *m, void *pmsg)
 	unsigned long flags;
 	struct task *task;
 
-	if (invalid_mbox(m) || !pmsg)
+	if (!pmsg)
 		return -EINVAL;
 
 	spin_lock_irqsave(&m->lock, flags);
-	if (event_has_waiter(to_event(m))) {
-		task = event_highest_task_ready((struct event *)m, pmsg,
+	task = event_highest_task_ready((struct event *)m, pmsg,
 				TASK_STAT_MBOX, TASK_STAT_PEND_OK);
-		if (task) {
-			spin_unlock_irqrestore(&m->lock, flags);
-			sched();
-		}
-
+	if (task) {
+		spin_unlock_irqrestore(&m->lock, flags);
+		sched_task(task);
 		return 0;
 	}
 
@@ -137,8 +122,9 @@ int mbox_post_opt(mbox_t *m, void *pmsg, int opt)
 	int ret = 0;
 	unsigned long flags;
 	int nr_tasks = 0;
+	struct task *task;
 
-	if (invalid_mbox(m) || !pmsg)
+	if (!pmsg)
 		return -EINVAL;
 
 	/*
@@ -146,24 +132,25 @@ int mbox_post_opt(mbox_t *m, void *pmsg, int opt)
 	 * all the waitting task
 	 */
 	spin_lock_irqsave(&m->lock, flags);
-	if (event_has_waiter(to_event(m))) {
-		if (opt & OS_POST_OPT_BROADCAST) {
-			while (event_has_waiter(to_event(m))) {
-				event_highest_task_ready((struct event *)m,
-						pmsg, TASK_STAT_MBOX,
-						TASK_STAT_PEND_OK);
-				nr_tasks++;
-			}
-		} else {
-			event_highest_task_ready((struct event *)m,
+	if (opt & OS_POST_OPT_BROADCAST) {
+		while (event_has_waiter(to_event(m))) {
+			task = event_highest_task_ready((struct event *)m,
 					pmsg, TASK_STAT_MBOX,
 					TASK_STAT_PEND_OK);
-			nr_tasks++;
+			if (task)
+				nr_tasks++;
 		}
+	} else {
+		task = event_highest_task_ready((struct event *)m,
+				pmsg, TASK_STAT_MBOX,
+				TASK_STAT_PEND_OK);
+		if (task)
+			nr_tasks++;
+	}
 
+	if (nr_tasks) {
 		spin_unlock_irqrestore(&m->lock, flags);
-		sched();
-
+		cpus_resched();
 		return 0;
 	}
 
