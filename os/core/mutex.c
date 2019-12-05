@@ -59,8 +59,6 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 		m->data = (void *)task;
 		m->cnt = task->pid;
 
-		wmb();
-
 		/* to be done  need furture design */
 		task->lock_event = to_event(m);
 		spin_unlock(&m->lock);
@@ -105,7 +103,6 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->wait_event = NULL;
-	mb();
 
 	return ret;
 }

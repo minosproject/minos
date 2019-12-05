@@ -403,7 +403,7 @@ static void global_switch_out(struct pcpu *pcpu,
 		prio = next->prio;
 
 	os_prio_cur[cpuid] = prio;
-	wmb();
+	mb();
 
 	/* release the kernel lock now */
 	kernel_unlock();
@@ -450,6 +450,7 @@ void switch_to_task(struct task *cur, struct task *next)
 	} else {
 		recal_task_run_time(cur, pcpu, 0);
 		cur->stat = TASK_STAT_RDY;
+		wnb();
 	}
 
 	do_hooks((void *)cur, NULL, OS_HOOK_TASK_SWITCH_OUT);
@@ -546,8 +547,6 @@ void global_sched(struct pcpu *pcpu, struct task *cur)
 	}
 
 	next = get_next_global_run_task(pcpu);
-	mb();
-
 	if (cur != next) {
 		set_next_task(next, pcpu->pcpu_id);
 		arch_switch_task_sw();
@@ -567,8 +566,6 @@ void local_sched(struct pcpu *pcpu, struct task *cur)
 
 	/* get the next run task from the local list */
 	next = get_next_local_run_task(pcpu);
-	mb();
-
 	if (next == cur)
 		return;
 
