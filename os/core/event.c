@@ -21,13 +21,12 @@
 #include <minos/mm.h>
 #include <minos/smp.h>
 
-void event_init(struct event *event, int type, void *pdata, char *name)
+void event_init(struct event *event, int type, void *pdata)
 {
 	event->type = type;
 	spin_lock_init(&event->lock);
 	init_list(&event->wait_list);
 	event->data = pdata;
-	strncpy(event->name, name, MIN(strlen(name), OS_EVENT_NAME_SIZE));
 }
 
 void event_task_wait(struct task *task, void *ev, int stat, uint32_t to)

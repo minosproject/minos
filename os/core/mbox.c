@@ -105,7 +105,7 @@ int mbox_post(mbox_t *m, void *pmsg)
 	}
 
 	if (m->data != NULL) {
-		pr_debug("mbox-%s is full\n", m->name);
+		pr_warn("mbox is full\n");
 		ret = -ENOSPC;
 	} else {
 		m->data = pmsg;
@@ -155,7 +155,7 @@ int mbox_post_opt(mbox_t *m, void *pmsg, int opt)
 	}
 
 	if (m->data != NULL) {
-		pr_debug("mbox-%s is full\n", m->name);
+		pr_warn("mbox is full\n");
 		ret = -ENOSPC;
 	} else {
 		m->data = pmsg;

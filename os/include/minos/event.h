@@ -19,8 +19,6 @@
 #define OS_POST_OPT_FRONT       0x02
 #define OS_POST_OPT_NO_SCHED    0x04
 
-#define OS_EVENT_NAME_SIZE	31
-
 struct event {
 	uint8_t type;				/* event type */
 	uint16_t owner;				/* event owner the pid */
@@ -30,8 +28,6 @@ struct event {
 	prio_t wait_grp;			/* realtime task waiting on this event */
 	prio_t wait_tbl[OS_RDY_TBL_SIZE];	/* wait bitmap */
 	struct list_head wait_list;		/* non realtime task waitting list */
-	struct list_head list;			/* link to the all event that created */
-	char name[OS_EVENT_NAME_SIZE];		/* event name */
 };
 
 #define to_event(e)	(struct event *)e
@@ -42,7 +38,7 @@ struct task *event_get_waiter(struct event *ev);
 struct task *event_highest_task_ready(struct event *ev, void *msg,
 		uint32_t msk, int pend_stat);
 
-void event_init(struct event *event, int type, void *pdata, char *name);
+void event_init(struct event *event, int type, void *pdata);
 void event_task_wait(struct task *task, void *ev, int stat, uint32_t to);
 
 static inline int event_has_waiter(struct event *ev)

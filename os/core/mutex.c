@@ -118,7 +118,7 @@ int mutex_post(mutex_t *m)
 
 	spin_lock(&m->lock);
 	if (task != (struct task *)m->data) {
-		pr_err("mutex-%s not belong to this task\n", m->name);
+		pr_err("mutex not belong to this task %d\n", task->pid);
 		spin_unlock(&m->lock);
 		return -EINVAL;
 	}

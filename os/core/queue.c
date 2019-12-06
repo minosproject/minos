@@ -43,7 +43,7 @@ int queue_init(queue_t *qt, int size, char *name)
 	q->q_cnt = 0;
 	q->q_size = size;
 
-	event_init(to_event(qt), OS_EVENT_TYPE_Q, (void *)q, name);
+	event_init(to_event(qt), OS_EVENT_TYPE_Q, (void *)q);
 	return 0;
 }
 

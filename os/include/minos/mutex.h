@@ -18,9 +18,9 @@ int mutex_del(mutex_t *mutex, int opt);
 int mutex_pend(mutex_t *m, uint32_t timeout);
 int mutex_post(mutex_t *m);
 
-static void inline mutex_init(mutex_t *mutex, char *name)
+static void inline mutex_init(mutex_t *mutex)
 {
-	event_init(to_event(mutex), OS_EVENT_TYPE_MUTEX, NULL, name);
+	event_init(to_event(mutex), OS_EVENT_TYPE_MUTEX, NULL);
 	mutex->cnt = OS_MUTEX_AVAILABLE;
 }
 
