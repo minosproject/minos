@@ -66,7 +66,8 @@ static void *create_vm_irqchip_of(struct device_node *node, void *arg)
 	func = (vdev_init_t)of_device_node_match(node,
 			virqchip_start, virqchip_end);
 	if (!func) {
-		pr_warn("virq-chip :%s not found\n", node->compatible);
+		pr_warn("virq-chip :%s not found\n", node->compatible ?
+				node->compatible : "Null");
 		node->class = DT_CLASS_PDEV;
 		return NULL;
 	}
@@ -289,8 +290,13 @@ int create_vm_resource_of(struct vm *vm, void *data)
 	 * of this vm
 	 */
 	of_iterate_all_node(node, create_vm_irqchip_of, vm);
-	if (!vm->virq_chip)
-		panic("can not create virq chip for vm\n");
+	if (!vm->virq_chip) {
+		if (vm_is_native(vm))
+			panic("can not create virq chip for vm\n");
+		else
+			pr_err("create virq chip failed for vm\n");
+		return -ENOENT;
+	}
 
 	of_iterate_all_node_loop(node, __create_vm_resource_of, vm);
 
