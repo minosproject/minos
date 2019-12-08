@@ -131,7 +131,7 @@ static int fdt_setup_cmdline(struct vm *vm)
 
 	new_cmdline = (char *)fdt_getprop(hv_dtb, node, "cmdline", &len);
 	if (!new_cmdline || len <= 0) {
-		pr_info("no new cmdline using default\n");
+		pr_notice("no new cmdline using default\n");
 		return 0;
 	}
 
@@ -167,7 +167,7 @@ static int fdt_setup_cpu(struct vm *vm)
 
 	node = fdt_subnode_offset(dtb, offset, "cpu-map");
 	if (node > 0) {
-		pr_info("delete cpu-map node\n");
+		pr_notice("delete cpu-map node\n");
 		fdt_del_node(dtb, node);
 	}
 
@@ -176,7 +176,7 @@ static int fdt_setup_cpu(struct vm *vm)
 		sprintf(name, "cpu@%x", ((i / 4) << 8) + (i % 4));
 		node = fdt_subnode_offset(dtb, offset, name);
 		if (node >= 0) {
-			pr_info("delete vcpu %s for vm%d\n", name, vm->vmid);
+			pr_notice("delete vcpu %s for vm%d\n", name, vm->vmid);
 			fdt_del_node(dtb, node);
 		}
 	}
@@ -204,7 +204,7 @@ static int fdt_setup_memory(struct vm *vm)
 
 	size_cell = fdt_n_size_cells(dtb, offset);
 	address_cell = fdt_n_addr_cells(dtb, offset);
-	pr_info("%s size-cells:%d address-cells:%d\n",
+	pr_notice("%s size-cells:%d address-cells:%d\n",
 			__func__, size_cell, address_cell);
 
 	if ((size_cell < 1) || (address_cell < 1))
@@ -223,7 +223,7 @@ static int fdt_setup_memory(struct vm *vm)
 		mstart = va->start;
 		msize = va->size;
 
-		pr_info("add memory region to vm%d 0x%p 0x%p\n",
+		pr_notice("add memory region to vm%d 0x%p 0x%p\n",
 				vm->vmid, mstart, msize);
 
 		if (address_cell == 1) {

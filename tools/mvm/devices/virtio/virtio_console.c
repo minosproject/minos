@@ -594,9 +594,9 @@ virtio_console_config_backend(struct virtio_console_backend *be)
 		tcsetattr(slave_fd, TCSAFLUSH, &tio);
 		be->pts_fd = slave_fd;
 
-		pr_info("***********************************************\n");
-		pr_info("virt-console backend redirected to %s\n", pts_name);
-		pr_info("***********************************************\n");
+		pr_notice("***********************************************\n");
+		pr_notice("virt-console backend redirected to %s\n", pts_name);
+		pr_notice("***********************************************\n");
 
 		flags = fcntl(fd, F_GETFL);
 		fcntl(fd, F_SETFL, flags | O_NONBLOCK);
@@ -986,7 +986,7 @@ static int virtio_console_setup(struct vdev *vdev, void *data, int os)
 				strcpy(buf + slen, cmdline);
 		}
 
-		pr_info("update cmdline -  %s\n", buf);
+		pr_notice("update cmdline -  %s\n", buf);
 		fdt_setprop(data, offset, "bootargs", buf, slen + len + 1);
 		break;
 	default:

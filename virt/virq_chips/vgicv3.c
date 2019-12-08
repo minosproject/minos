@@ -531,7 +531,7 @@ static void vgic_deinit(struct vdev *vdev)
 
 static void vgic_reset(struct vdev *vdev)
 {
-	pr_info("vgic device reset\n");
+	pr_notice("vgic device reset\n");
 }
 
 static int64_t gicv3_read_lr(int lr)
@@ -719,7 +719,7 @@ struct virq_chip *vgicv3_virqchip_init(struct vm *vm,
 	unsigned long size, flags = 0;
 	struct virq_chip *vc;
 
-	pr_info("create vgicv3 for vm-%d\n", vm->vmid);
+	pr_notice("create vgicv3 for vm-%d\n", vm->vmid);
 
 	ret = translate_device_address_index(node, &gicd_base,
 			&gicd_size, 0);
@@ -728,7 +728,7 @@ struct virq_chip *vgicv3_virqchip_init(struct vm *vm,
 	if (ret || (gicd_size == 0) || (gicr_size == 0))
 		return NULL;
 
-	pr_info("vgicv3 address 0x%x 0x%x 0x%x 0x%x\n",
+	pr_notice("vgicv3 address 0x%x 0x%x 0x%x 0x%x\n",
 				gicd_base, gicd_size,
 				gicr_base, gicr_size);
 

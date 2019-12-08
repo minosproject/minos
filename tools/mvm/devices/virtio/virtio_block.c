@@ -346,15 +346,15 @@ virtio_blk_init(struct vdev *vdev, char *opts)
 	/* init mutex attribute properly to avoid deadlock */
 	rc = pthread_mutexattr_init(&attr);
 	if (rc)
-		pr_info("mutexattr init failed with erro %d!\n", rc);
+		pr_notice("mutexattr init failed with erro %d!\n", rc);
 	rc = pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
 	if (rc)
-		pr_info("virtio_blk: mutexattr_settype failed with "
+		pr_notice("virtio_blk: mutexattr_settype failed with "
 					"error %d!\n", rc);
 
 	rc = pthread_mutex_init(&blk->mtx, &attr);
 	if (rc)
-		pr_info("virtio_blk: pthread_mutex_init failed with "
+		pr_notice("virtio_blk: pthread_mutex_init failed with "
 					"error %d!\n", rc);
 
 	sprintf(blk->ident, "Minos--%02X%02X-%02X%02X-%02X%02X",
@@ -402,7 +402,7 @@ virtio_blk_deinit(struct vdev *vdev)
 	if (!blk)
 		return;
 
-	pr_info("virtio_blk: deinit\n");
+	pr_notice("virtio_blk: deinit\n");
 	bctxt = blk->bc;
 	if (blockif_flush_all(bctxt)) {
 		pr_warn("vrito_blk:"
@@ -437,7 +437,7 @@ static int virtio_blk_reset(struct vdev *vdev)
 	if (!blk)
 		return -EINVAL;
 
-	pr_info("virtio_blk: device reset requested !\n");
+	pr_notice("virtio_blk: device reset requested !\n");
 	virtio_device_reset(&blk->virtio_dev);
 	blockif_set_wce(blk->bc, blk->original_wce);
 

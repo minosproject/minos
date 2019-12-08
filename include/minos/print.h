@@ -17,6 +17,6 @@ void change_log_level(unsigned int level);
 #define pr_warn(...)	level_print(PRINT_LEVEL_WARN,  "WRN " __VA_ARGS__)
 #define pr_err(...)	level_print(PRINT_LEVEL_ERROR, "ERR " __VA_ARGS__)
 #define pr_fatal(...)	level_print(PRINT_LEVEL_FATAL, "FAT " __VA_ARGS__)
-#define printf(...)	level_print(PRINT_LEVEL_INFO,  "INF " __VA_ARGS__)
+#define printf(...)	level_print(PRINT_LEVEL_NOTICE, "NIC " __VA_ARGS__)
 
 #endif

@@ -359,7 +359,7 @@ static int vgicv2_mmio_write(struct vdev *vdev, gp_regs *regs,
 
 static void vgicv2_reset(struct vdev *vdev)
 {
-	pr_info("vgicv2 device reset\n");
+	pr_notice("vgicv2 device reset\n");
 }
 
 static void vgicv2_deinit(struct vdev *vdev)
@@ -573,7 +573,7 @@ static struct virq_chip *vgicv2_virqchip_init(struct vm *vm,
 	uint64_t gicd_base, gicd_size;
 	uint64_t gicc_base, gicc_size;
 
-	pr_info("create vgicv2 for vm-%d\n", vm->vmid);
+	pr_notice("create vgicv2 for vm-%d\n", vm->vmid);
 
 	ret = translate_device_address_index(node, &gicd_base,
 			&gicd_size, 0);
@@ -582,7 +582,7 @@ static struct virq_chip *vgicv2_virqchip_init(struct vm *vm,
 	if (ret || (gicd_size == 0) || (gicc_size == 0))
 		return NULL;
 
-	pr_info("vgicv2 address 0x%x 0x%x 0x%x 0x%x\n",
+	pr_notice("vgicv2 address 0x%x 0x%x 0x%x 0x%x\n",
 				gicd_base, gicd_size,
 				gicc_base, gicc_size);
 
@@ -611,7 +611,7 @@ static struct virq_chip *vgicv2_virqchip_init(struct vm *vm,
 	 */
 	if (vgicv2_info.gicv_base != 0) {
 		flags |= VIRQCHIP_F_HW_VIRT;
-		pr_info("map gicc 0x%x to gicv 0x%x size 0x%x\n",
+		pr_notice("map gicc 0x%x to gicv 0x%x size 0x%x\n",
 				gicc_base, vgicv2_info.gicv_base, gicc_size);
 
 		create_guest_mapping(&vm->mm, gicc_base,
@@ -703,7 +703,7 @@ int vgicv2_init(uint64_t *data, int len)
 
 	vtr = readl_relaxed((void *)vgicv2_info.gich_base + GICH_VTR);
 	gicv2_nr_lrs = (vtr & 0x3f) + 1;
-	pr_info("vgicv2 vtr 0x%x nr_lrs : 0x%d\n", vtr, gicv2_nr_lrs);
+	pr_notice("vgicv2 vtr 0x%x nr_lrs : 0x%d\n", vtr, gicv2_nr_lrs);
 
 	register_task_vmodule("gicv2", gicv2_vmodule_init);
 

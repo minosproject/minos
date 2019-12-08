@@ -183,7 +183,7 @@ static int inline add_page_section(phy_addr_t base, size_t size)
 		return 0;
 	}
 
-	pr_info("PAGE  SECTION: 0x%p ---> 0x%p [0x%x]\n", mem_base,
+	pr_notice("PAGE  SECTION: 0x%p ---> 0x%p [0x%x]\n", mem_base,
 			mem_base + real_size, real_size);
 
 	ms = &mem_sections[nr_sections];
@@ -263,7 +263,7 @@ static int add_block_section(phy_addr_t base, size_t size, int type)
 	free_blocks += ms->nr_blocks;
 	nr_sections++;
 
-	pr_info("BLOCK SECTION: 0x%p ---> 0x%p [0x%p]\n", mem_base,
+	pr_notice("BLOCK SECTION: 0x%p ---> 0x%p [0x%p]\n", mem_base,
 			mem_base + size, size);
 
 	/*
@@ -358,7 +358,7 @@ static int mem_sections_init(void)
 	struct mem_block *block;
 
 	mem_start = (unsigned long)bootmem_end;
-	pr_info("code_start:0x%x code_end:0x%x\n",
+	pr_notice("code_start:0x%x code_end:0x%x\n",
 			code_base, mem_start);
 
 	mem_start = BALIGN(mem_start, sizeof(unsigned long));
@@ -366,7 +366,7 @@ static int mem_sections_init(void)
 
 	mem_start = BALIGN(mem_start, sizeof(unsigned long));
 	mem_start = blocks_bitmap_init(mem_start);
-	pr_info("code_start after blocks_init:0x%x\n", mem_start);
+	pr_notice("code_start after blocks_init:0x%x\n", mem_start);
 
 	/*
 	 * find the boot section, boot section need always MEM_BLOCK
@@ -400,7 +400,7 @@ static int mem_sections_init(void)
 	}
 
 	mem_end = BALIGN(mem_start, MEM_BLOCK_SIZE);
-	pr_info("minos : free_memory_start:0x%x\n", mem_end);
+	pr_notice("minos : free_memory_start:0x%x\n", mem_end);
 
 	/*
 	 * deal with the boot section, need to update the
@@ -438,7 +438,7 @@ static int mem_sections_init(void)
 	/* add left bootmem to slab allocator */
 	boot_block_size = bootmem_page_base - bootmem_start;
 	if (boot_block_size > SLAB_MIN_SIZE) {
-		pr_info("add left boot mem to slab 0x%p->0x%x\n",
+		pr_notice("add left bootmem to slab 0x%p->0x%x\n",
 				bootmem_start, boot_block_size);
 		add_slab_mem((unsigned long)bootmem_start,
 				boot_block_size);
@@ -843,7 +843,7 @@ void add_slab_mem(unsigned long base, size_t size)
 	if (size < SLAB_MIN_SIZE)
 		return;
 
-	pr_info("add mem : 0x%x : 0x%x to slab\n", base, size);
+	pr_info("add slab mem : 0x%x : 0x%x to slab\n", base, size);
 
 	/*
 	 * this function will be only called on boot
@@ -1367,7 +1367,7 @@ free_slab:
 
 static void slab_init(void)
 {
-	pr_info("slab memory allocator init...\n");
+	pr_notice("slab memory allocator init...\n");
 	memset(pslab, 0, sizeof(struct slab));
 	init_list(&pslab->block_list);
 	pslab->pool = slab_pool;
@@ -1400,7 +1400,7 @@ int mm_do_init(void)
 	 * parsing the memroy region to the hypervisor
 	 * and convert it to the memory section
 	 */
-	pr_info("dynamic memory allocator init..\n");
+	pr_notice("dynamic memory allocator init..\n");
 
 	slab_init();
 	page_pool_init();

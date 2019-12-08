@@ -337,7 +337,7 @@ static int bcm2836_irq_init(struct device_node *node)
 	void *base;
 	int b;
 
-	pr_info("boardcom bcm2836 l1 interrupt init\n");
+	pr_notice("boardcom bcm2836 l1 interrupt init\n");
 
 	bcm2836_base = (void *)0x40000000;
 	io_remap(0x40000000, 0x40000000, 0x100);

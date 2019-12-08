@@ -95,7 +95,7 @@ void *map_vm_memory(struct vm *vm)
 	if (addr == (void *)-1)
 		return NULL;
 
-	pr_info("vm-%d mmap address in vm0: 0x%lx mmap:0x%lx\n",
+	pr_notice("vm-%d mmap address in vm0: 0x%lx mmap:0x%lx\n",
 			vm->vmid, vm->hvm_paddr, (unsigned long)addr);
 
 	return addr;
@@ -122,22 +122,22 @@ static int create_new_vm(struct vm *vm)
 		return -EIO;
 	}
 
-	pr_info("create new vm *\n");
-	pr_info("        -name       : %s\n", info.name);
-	pr_info("        -os_type    : %s\n", info.os_type);
-	pr_info("        -nr_vcpu    : %d\n", info.nr_vcpu);
-	pr_info("        -bit64      : %d\n",
+	pr_notice("create new vm *\n");
+	pr_notice("        -name       : %s\n", info.name);
+	pr_notice("        -os_type    : %s\n", info.os_type);
+	pr_notice("        -nr_vcpu    : %d\n", info.nr_vcpu);
+	pr_notice("        -bit64      : %d\n",
 			!!vm->flags & VM_FLAGS_64BIT);
 #ifdef CONFIG_AARCH32
-	pr_info("        -mem_size   : 0x%llx\n", info.mem_size);
-	pr_info("        -mem_base  : 0x%llx\n", info.mem_base);
-	pr_info("        -entry      : 0x%llx\n", info.entry);
-	pr_info("        -setup_data : 0x%llx\n", info.setup_data);
+	pr_notice("        -mem_size   : 0x%llx\n", info.mem_size);
+	pr_notice("        -mem_base  : 0x%llx\n", info.mem_base);
+	pr_notice("        -entry      : 0x%llx\n", info.entry);
+	pr_notice("        -setup_data : 0x%llx\n", info.setup_data);
 #else
-	pr_info("        -mem_size   : 0x%lx\n", info.mem_size);
-	pr_info("        -mem_base  : 0x%lx\n", info.mem_base);
-	pr_info("        -entry      : 0x%lx\n", info.entry);
-	pr_info("        -setup_data : 0x%lx\n", info.setup_data);
+	pr_notice("        -mem_size   : 0x%lx\n", info.mem_size);
+	pr_notice("        -mem_base  : 0x%lx\n", info.mem_base);
+	pr_notice("        -entry      : 0x%lx\n", info.entry);
+	pr_notice("        -setup_data : 0x%lx\n", info.setup_data);
 #endif
 
 	vmid = ioctl(fd, IOCTL_CREATE_VM, &info);
@@ -248,7 +248,7 @@ static void signal_handler(int signum)
 {
 	int vmid = 0xfff;
 
-	pr_info("recevied signal %i\n", signum);
+	pr_notice("recevied signal %i\n", signum);
 
 	switch (signum) {
 	case SIGTERM:
@@ -260,7 +260,7 @@ static void signal_handler(int signum)
 		if (mvm_vm)
 			vmid = mvm_vm->vmid;
 
-		pr_info("shutdown vm-%d\n", vmid);
+		pr_notice("shutdown vm-%d\n", vmid);
 		vm_shutdown(mvm_vm);
 		break;
 	default:
@@ -477,11 +477,11 @@ static int vcpu_handle_common_trap(struct vm *vm, int trap_reason,
 		break;
 	case VMTRAP_REASON_VM_SUSPEND:
 		vm->state = VM_STAT_SUSPEND;
-		pr_info("vm-%d is suspend\n", vm->vmid);
+		pr_notice("vm-%d is suspend\n", vm->vmid);
 		break;
 	case VMTRAP_REASON_VM_RESUMED:
 		vm->state = VM_STAT_RUNNING;
-		pr_info("vm-%d is resumed\n", vm->vmid);
+		pr_notice("vm-%d is resumed\n", vm->vmid);
 		break;
 	case VMTRAP_REASON_GET_TIME:
 		*trap_result = (unsigned long)time(NULL);
@@ -575,9 +575,9 @@ void *vm_vcpu_thread(void *data)
 
 int __vm_shutdown(struct vm *vm)
 {
-	pr_info("***************************\n");
-	pr_info("vm-%d shutdown exit mvm\n", vm->vmid);
-	pr_info("***************************\n");
+	pr_notice("***************************\n");
+	pr_notice("vm-%d shutdown exit mvm\n", vm->vmid);
+	pr_notice("***************************\n");
 
 	destroy_vm(vm);
 	exit(0);
@@ -603,9 +603,9 @@ int __vm_reboot(struct vm *vm)
 	struct vdev *vdev;
 
 	/* hypervisor has been disable the vcpu */
-	pr_info("***************************\n");
-	pr_info("reboot the vm-%d\n", vm->vmid);
-	pr_info("***************************\n");
+	pr_notice("***************************\n");
+	pr_notice("reboot the vm-%d\n", vm->vmid);
+	pr_notice("***************************\n");
 
 	list_for_each_entry(vdev, &vm->vdev_list, list) {
 		if (vdev->ops->reset)
@@ -645,7 +645,7 @@ int vm_reboot(struct vm *vm)
 
 static void handle_vm_event(struct vm *vm, struct mvm_node *node)
 {
-	pr_info("handle vm event %d\n", node->type);
+	pr_notice("handle vm event %d\n", node->type);
 
 	switch (node->type) {
 	case VMTRAP_REASON_WDT_TIMEOUT:

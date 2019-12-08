@@ -162,7 +162,7 @@ static void virtio_dev_deinit(struct vdev *vdev)
 
 static void virtio_dev_reset(struct vdev *vdev)
 {
-	pr_info("virtio device reset\n");
+	pr_notice("virtio device reset\n");
 }
 
 static void *virtio_create_device(struct vm *vm, struct device_node *node)
@@ -174,7 +174,7 @@ static void *virtio_create_device(struct vm *vm, struct device_node *node)
 	unsigned long flags;
 	struct virtio_device *virtio_dev = NULL;
 
-	pr_info("create virtio-mmio device for vm-%d\n", vm->vmid);
+	pr_notice("create virtio-mmio device for vm-%d\n", vm->vmid);
 
 	ret = translate_device_address(node, &base, &size);
 	if (ret || (size == 0))

@@ -55,21 +55,21 @@ static void dump_bootimg_hdr(boot_img_hdr *hdr)
 	memset(buf, 0, 1024);
 	strncpy(buf, (char *)hdr->magic, BOOT_MAGIC_SIZE);
 
-	pr_info("boot image infomation :\n");
-	pr_info("magic        - %s\n", buf);
-	pr_info("kernel_size  - 0x%x\n", hdr->kernel_size);
-	pr_info("kernel_addr  - 0x%x\n", hdr->kernel_addr);
-	pr_info("ramdisk_size - 0x%x\n", hdr->ramdisk_size);
-	pr_info("ramdisk_addr - 0x%x\n", hdr->ramdisk_addr);
-	pr_info("dtb_size     - 0x%x\n", hdr->second_size);
-	pr_info("dtb_addr     - 0x%x\n", hdr->second_addr);
-	pr_info("tags_addr    - 0x%x\n", hdr->tags_addr);
-	pr_info("page_size    - 0x%x\n", hdr->page_size);
+	pr_notice("boot image infomation :\n");
+	pr_notice("magic        - %s\n", buf);
+	pr_notice("kernel_size  - 0x%x\n", hdr->kernel_size);
+	pr_notice("kernel_addr  - 0x%x\n", hdr->kernel_addr);
+	pr_notice("ramdisk_size - 0x%x\n", hdr->ramdisk_size);
+	pr_notice("ramdisk_addr - 0x%x\n", hdr->ramdisk_addr);
+	pr_notice("dtb_size     - 0x%x\n", hdr->second_size);
+	pr_notice("dtb_addr     - 0x%x\n", hdr->second_addr);
+	pr_notice("tags_addr    - 0x%x\n", hdr->tags_addr);
+	pr_notice("page_size    - 0x%x\n", hdr->page_size);
 
 	strncpy(buf, (char *)hdr->name, BOOT_NAME_SIZE);
-	pr_info("name         - %s\n", buf);
+	pr_notice("name         - %s\n", buf);
 	strncpy(buf, (char *)hdr->cmdline, BOOT_ARGS_SIZE);
-	pr_info("cmdline      - %s\n", buf);
+	pr_notice("cmdline      - %s\n", buf);
 }
 
 int read_bootimage_header(int fd, boot_img_hdr *hdr)

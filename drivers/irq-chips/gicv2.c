@@ -316,7 +316,7 @@ static void gicv2_dist_init(void)
 	type = readl_gicd(GICD_TYPER);
 	nr_lines = 32 * ((type & GICD_TYPE_LINES) + 1);
 	gic_cpus = 1 + ((type & GICD_TYPE_CPUS) >> 5);
-	pr_info("GICv2: %d lines, %d cpu%s%s (IID %x).\n",
+	pr_notice("GICv2: %d lines, %d cpu%s%s (IID %x).\n",
 		nr_lines, gic_cpus, (gic_cpus == 1) ? "" : "s",
 		(type & GICD_TYPE_SEC) ? ", secure" : "",
 		readl_gicd(GICD_IIDR));
@@ -354,7 +354,7 @@ static int gicv2_init(struct device_node *node)
 {
 	uint64_t array[10];
 
-	pr_info("*** gicv2 init ***\n");
+	pr_notice("*** gicv2 init ***\n");
 	memset(array, 0, sizeof(array));
 
 	translate_device_address_index(node, &array[0], &array[1], 0);
@@ -362,7 +362,7 @@ static int gicv2_init(struct device_node *node)
 	translate_device_address_index(node, &array[4], &array[5], 2);
 	translate_device_address_index(node, &array[6], &array[7], 3);
 
-	pr_info("gicv2 information: gic_dist_addr=%p size=0x%x "
+	pr_notice("gicv2 information: gic_dist_addr=%p size=0x%x "
 		"gic_cpu_addr=%p size=0x%x gic_hyp_addr=%p size=0x%x "
 		"gic_vcpu_addr=%p size=0x%x\n",
 		array[0], array[1], array[2], array[3],
@@ -382,7 +382,7 @@ static int gicv2_init(struct device_node *node)
 	if (gicv2_is_aliased((unsigned long)array[2],
 				(unsigned long)array[3])) {
 		gicv2_cbase += 0xf000;
-		pr_info("gicv2 : adjust cpu interface base to 0x%x\n",
+		pr_notice("gicv2 : adjust cpu interface base to 0x%x\n",
 				(unsigned long)gicv2_cbase);
 	}
 

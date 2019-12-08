@@ -98,7 +98,7 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 	}
 
 	if (vcpu->task->stat == TASK_STAT_STOPPED) {
-		pr_info("vcpu-%d of vm-%d power on from vm suspend 0x%p\n",
+		pr_notice("vcpu-%d of vm-%d power on from vm suspend 0x%p\n",
 				vcpu->vcpu_id, vcpu->vm->vmid, entry);
 		os->ops->vcpu_power_on(vcpu, entry);
 		vcpu_online(vcpu);
@@ -316,7 +316,7 @@ void vcpu_power_off_call(void *data)
 	}
 
 	set_vcpu_stop(vcpu);
-	pr_info("power off vcpu-%d-%d done\n", get_vmid(vcpu),
+	pr_notice("power off vcpu-%d-%d done\n", get_vmid(vcpu),
 			get_vcpu_id(vcpu));
 
 	/*
@@ -351,7 +351,7 @@ int vcpu_power_off(struct vcpu *vcpu, int timeout)
 	} else {
 		/* just set it stat then force sched to another task */
 		set_vcpu_stop(vcpu);
-		pr_info("power off vcpu-%d-%d done\n", get_vmid(vcpu),
+		pr_notice("power off vcpu-%d-%d done\n", get_vmid(vcpu),
 				get_vcpu_id(vcpu));
 	}
 
@@ -501,7 +501,7 @@ static int __vm_power_off(struct vm *vm, void *args)
 		panic("hvm can not call power_off_vm\n");
 
 	/* set the vm to offline state */
-	pr_info("power off vm-%d\n", vm->vmid);
+	pr_notice("power off vm-%d\n", vm->vmid);
 	preempt_disable();
 	vm->state = VM_STAT_OFFLINE;
 
@@ -517,7 +517,7 @@ static int __vm_power_off(struct vm *vm, void *args)
 	}
 
 	if (args == NULL) {
-		pr_info("vm shutdown request by itself\n");
+		pr_notice("vm shutdown request by itself\n");
 		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
 			VMTRAP_REASON_SHUTDOWN, 0, NULL);
 		set_need_resched();
@@ -617,7 +617,7 @@ static int __vm_reset(struct vm *vm, void *args)
 		panic("hvm can not call reset vm\n");
 
 	/* set the vm to offline state */
-	pr_info("reset vm-%d\n", vm->vmid);
+	pr_notice("reset vm-%d\n", vm->vmid);
 	preempt_disable();
 	vm->state = VM_STAT_REBOOT;
 
@@ -648,7 +648,7 @@ static int __vm_reset(struct vm *vm, void *args)
 	vm_virq_reset(vm);
 
 	if (args == NULL) {
-		pr_info("vm reset trigger by itself\n");
+		pr_notice("vm reset trigger by itself\n");
 		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
 			VMTRAP_REASON_REBOOT, 0, NULL);
 		set_need_resched();
@@ -688,7 +688,7 @@ static int vm_resume(struct vm *vm)
 {
 	struct vcpu *vcpu;
 
-	pr_info("vm-%d resumed\n", vm->vmid);
+	pr_notice("vm-%d resumed\n", vm->vmid);
 
 	vm_for_each_vcpu(vm, vcpu) {
 		if (get_vcpu_id(vcpu) == 0)
@@ -708,7 +708,7 @@ static int __vm_suspend(struct vm *vm)
 {
 	struct vcpu *vcpu = get_current_vcpu();
 
-	pr_info("suspend vm-%d\n", vm->vmid);
+	pr_notice("suspend vm-%d\n", vm->vmid);
 	if (get_vcpu_id(vcpu) != 0) {
 		pr_err("vm suspend can only called by vcpu0\n");
 		return -EPERM;
@@ -859,7 +859,7 @@ int vm_vcpus_init(struct vm *vm)
 	struct vcpu *vcpu;
 
 	vm_for_each_vcpu(vm, vcpu) {
-		pr_info("vm-%d vcpu-%d affnity to pcpu-%d\n",
+		pr_notice("vm-%d vcpu-%d affnity to pcpu-%d\n",
 				vm->vmid, vcpu->vcpu_id, vcpu_affinity(vcpu));
 
 		task_vmodules_init(vcpu->task);
@@ -1010,16 +1010,16 @@ static void *create_native_vm_of(struct device_node *node, void *arg)
 	if (ret)
 		return NULL;
 
-	pr_info("**** create new vm ****\n");
-	pr_info("    vmid: %d\n", vmtag.vmid);
-	pr_info("    name: %s\n", vmtag.name);
-	pr_info("    os_type: %s\n", vmtag.os_type);
-	pr_info("    nr_vcpu: %d\n", vmtag.nr_vcpu);
-	pr_info("    entry: 0x%p\n", vmtag.entry);
-	pr_info("    setup_data: 0x%p\n", vmtag.setup_data);
-	pr_info("    %s-bit vm\n", vmtag.flags & VM_FLAGS_64BIT ? "64" : "32");
-	pr_info("    flags: 0x%x\n", vmtag.flags);
-	pr_info("    affinity: %d %d %d %d %d %d %d %d\n",
+	pr_notice("**** create new vm ****\n");
+	pr_notice("    vmid: %d\n", vmtag.vmid);
+	pr_notice("    name: %s\n", vmtag.name);
+	pr_notice("    os_type: %s\n", vmtag.os_type);
+	pr_notice("    nr_vcpu: %d\n", vmtag.nr_vcpu);
+	pr_notice("    entry: 0x%p\n", vmtag.entry);
+	pr_notice("    setup_data: 0x%p\n", vmtag.setup_data);
+	pr_notice("    %s-bit vm\n", vmtag.flags & VM_FLAGS_64BIT ? "64" : "32");
+	pr_notice("    flags: 0x%x\n", vmtag.flags);
+	pr_notice("    affinity: %d %d %d %d %d %d %d %d\n",
 			vmtag.vcpu_affinity[0], vmtag.vcpu_affinity[1],
 			vmtag.vcpu_affinity[2], vmtag.vcpu_affinity[3],
 			vmtag.vcpu_affinity[4], vmtag.vcpu_affinity[5],
@@ -1071,7 +1071,7 @@ static int of_create_vmboxs(void)
 		if (of_create_vmbox(child))
 			pr_err("create vmbox [%s] fail\n", child->name);
 		else
-			pr_info("create vmbox [%s] successful\n", child->name);
+			pr_notice("create vmbox [%s] successful\n", child->name);
 	}
 
 	return 0;

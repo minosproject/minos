@@ -241,7 +241,7 @@ int mm_do_init(void)
 	 * this memory allocator is design for mcu system
 	 * which does not include a MMU
 	 */
-	pr_info("simple memory allocator init...\n");
+	pr_notice("simple memory allocator init...\n");
 
 	/* at least one memory zoen for minos */
 	nr_mem_zone = 1;

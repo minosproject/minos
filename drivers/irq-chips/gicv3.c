@@ -365,7 +365,7 @@ int gicv3_init(struct device_node *node)
 	uint64_t array[10];
 	void *__gicr_rd_base = 0;
 
-	pr_info("*** gicv3 init ***\n");
+	pr_notice("*** gicv3 init ***\n");
 
 	memset(array, 0, sizeof(array));
 	translate_device_address_index(node, &array[0], &array[1], 0);
@@ -384,7 +384,7 @@ int gicv3_init(struct device_node *node)
 	gicd_base = (void *)(unsigned long)array[0];
 	__gicr_rd_base = (void *)(unsigned long)array[2];
 
-	pr_info("gicv3 gicd@0x%x gicr@0x%x\n", (unsigned long)gicd_base,
+	pr_notice("gicv3 gicd@0x%x gicr@0x%x\n", (unsigned long)gicd_base,
 			(unsigned long)__gicr_rd_base);
 
 	value = read_sysreg32(ICH_VTR_EL2);
@@ -407,7 +407,7 @@ int gicv3_init(struct device_node *node)
 
 	type = ioread32(gicd_base + GICD_TYPER);
 	nr_lines = 32 * ((type & 0x1f));
-	pr_info("gicv3 typer-0x%x nr_lines-%d\n", type, nr_lines);
+	pr_notice("gicv3 typer-0x%x nr_lines-%d\n", type, nr_lines);
 
 	/* alloc LOCAL_IRQS for each cpus */
 	irq_alloc_sgi(0, 16);

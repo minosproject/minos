@@ -638,7 +638,7 @@ virtio_net_proctx(struct virtio_net *net, struct virt_queue *vq)
 		tlen += vq->iovec[i].iov_len;
 	}
 
-	pr_info("virtio: packet send, %d %d bytes, %d segs\n\r", tlen, plen, out);
+	pr_notice("virtio: packet send, %d %d bytes, %d segs\n\r", tlen, plen, out);
 	net->virtio_net_tx(net, &vq->iovec[1], out - 1, plen);
 
 	/* chain is processed, release it and set tlen */
@@ -735,7 +735,7 @@ virtio_net_tx_thread(void *param)
 static int
 virtio_net_ping_ctlq(struct virt_queue *vq)
 {
-	pr_info("vtnet: control qnotify!\n\r");
+	pr_notice("vtnet: control qnotify!\n\r");
 	return 0;
 }
 #endif
@@ -806,7 +806,7 @@ virtio_net_tap_setup(struct virtio_net *net, char *devname)
 		pr_warn("open of tap device %s failed\n", devname);
 		return;
 	}
-	pr_info("open of tap device %s success!\n", devname);
+	pr_notice("open of tap device %s success!\n", devname);
 
 	/*
 	 * Set non-blocking and register for read
@@ -916,16 +916,16 @@ static int virtio_net_init(struct vdev *vdev, char *opts)
 	/* init mutex attribute properly to avoid deadlock */
 	rc = pthread_mutexattr_init(&attr);
 	if (rc)
-		pr_info("mutexattr init failed with erro %d!\n", rc);
+		pr_notice("mutexattr init failed with erro %d!\n", rc);
 
 	rc = pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
 	if (rc)
-		pr_info("virtio_net: mutexattr_settype failed with "
+		pr_notice("virtio_net: mutexattr_settype failed with "
 			"error %d!\n", rc);
 
 	rc = pthread_mutex_init(&net->mtx, &attr);
 	if (rc)
-		pr_info("virtio_net: pthread_mutex_init failed with "
+		pr_notice("virtio_net: pthread_mutex_init failed with "
 			"error %d!\n", rc);
 
 	virtio_set_feature(&net->virtio_dev, VIRTIO_F_VERSION_1);
@@ -1043,7 +1043,7 @@ virtio_net_deinit(struct vdev *vdev)
 	virtio_device_deinit(&net->virtio_dev);
 	free(net);
 
-	pr_info("%s: done\n", __func__);
+	pr_notice("%s: done\n", __func__);
 }
 
 static int virtio_net_event(struct vdev *vdev, int read,
@@ -1067,7 +1067,7 @@ static int virtio_net_reset(struct vdev *vdev)
 	if (!net)
 		return -EINVAL;
 
-	pr_info("vtnet: device reset requested !\n");
+	pr_notice("vtnet: device reset requested !\n");
 
 	net->resetting = 1;
 

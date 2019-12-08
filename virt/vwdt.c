@@ -183,7 +183,7 @@ static void inline vwdt_config_load(struct vwdt_dev *wdt, uint32_t v)
 
 	timeout = (v + WDT_CLK_RATE - 1) / WDT_CLK_RATE;
 	wdt->load_value = SECONDS(timeout);
-	pr_info("set the timeout value to 0x%x 0x%x\n",
+	pr_notice("set the timeout value to 0x%x 0x%x\n",
 			timeout, wdt->load_value);
 }
 
@@ -229,7 +229,7 @@ static void vwdt_reset(struct vdev *vdev)
 {
 	struct vwdt_dev *dev = vdev_to_vwdt(vdev);
 
-	pr_info("vwdt reset\n");
+	pr_notice("vwdt reset\n");
 
 	dev->int_enable = 0;
 	dev->access_lock = 1;
@@ -263,7 +263,7 @@ static void *vwdt_init(struct vm *vm, struct device_node *node)
 	uint64_t base, size;
 	unsigned long flags;
 
-	pr_info("create virtual watchdog for vm-%d\n", vm->vmid);
+	pr_notice("create virtual watchdog for vm-%d\n", vm->vmid);
 
 	ret = translate_device_address(node, &base, &size);
 	if (ret || (size == 0))

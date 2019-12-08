@@ -72,7 +72,7 @@ int fdt_spin_table_init(phy_addr_t *smp_holding)
 		else
 			smp_holding[i] = fdt32_to_cpu64(tmp[0], tmp[1]);
 
-		pr_info("%s using spin-table relase addr 0x%p\n",
+		pr_notice("%s using spin-table relase addr 0x%p\n",
 				name, smp_holding[i]);
 	}
 
@@ -86,7 +86,7 @@ static void fdt_setup_platform(void)
 
 	data = fdt_getprop(hv_dtb, 0, "model", &len);
 	if (data)
-		pr_info("model : %s\n", (char *)data);
+		pr_notice("model : %s\n", (char *)data);
 
 	/*
 	 * compatible may like arm,fvp-base\0arm,vexpress\0
@@ -94,7 +94,7 @@ static void fdt_setup_platform(void)
 	 */
 	data = fdt_getprop(hv_dtb, 0, "compatible", &len);
 	if (data) {
-		pr_info("platform : %s\n", (char *)data);
+		pr_notice("platform : %s\n", (char *)data);
 		platform_set_to((const char *)data);
 	}
 }
@@ -127,7 +127,7 @@ static int __fdt_parse_memory_info(int node, char *attr)
 	len = len / 4;
 	size_cell = fdt_n_size_cells(hv_dtb, node);
 	address_cell = fdt_n_addr_cells(hv_dtb, node);
-	pr_info("memory node address_cells:%d size_cells:%d\n",
+	pr_notice("memory node address_cells:%d size_cells:%d\n",
 			address_cell, size_cell);
 	if ((size_cell > 2) || (size_cell == 0)) {
 		pr_warn("memory node size_cells not correct\n");
@@ -172,7 +172,7 @@ static void __fdt_parse_dtb_mem(void)
 	 * 4K align
 	 */
 	size = fdt_totalsize(hv_dtb);
-	pr_info("DTB - 0x%x ---> 0x%x\n", (unsigned long)hv_dtb, size);
+	pr_notice("DTB - 0x%x ---> 0x%x\n", (unsigned long)hv_dtb, size);
 	size = BALIGN(size, PAGE_SIZE);
 	split_memory_region((phy_addr_t)hv_dtb, size, MEMORY_REGION_F_DTB);
 }
@@ -191,7 +191,7 @@ static void __fdt_parse_memreserve(void)
 		if (ret)
 			continue;
 
-		pr_info("find rev memory - id: %d addr: 0x%x size: 0x%x\n",
+		pr_notice("find rev memory - id: %d addr: 0x%x size: 0x%x\n",
 				i, address, size);
 		split_memory_region(address, size, MEMORY_REGION_F_RSV);
 	}
@@ -289,7 +289,7 @@ int fdt_early_init(void *setup_data)
 		hv_dtb = setup_data;
 	}
 
-	pr_info("using device tree @0x%x\n", hv_dtb);
+	pr_notice("using device tree @0x%x\n", hv_dtb);
 
 	if (fdt_check_header(hv_dtb)) {
 		pr_err("invaild dtb header\n");

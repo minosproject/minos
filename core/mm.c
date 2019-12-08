@@ -160,7 +160,7 @@ static void dump_memory_info(void)
 		else
 			name = mem_attr[type];
 
-		pr_info("MEM: 0x%p ---> 0x%p [0x%p] %s\n", region->phy_base,
+		pr_notice("MEM: 0x%p ---> 0x%p [0x%p] %s\n", region->phy_base,
 				region->phy_base + region->size,
 				region->size, name);
 	}

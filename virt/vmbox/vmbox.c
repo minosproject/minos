@@ -455,7 +455,7 @@ static int vmbox_device_attach(struct vmbox *vmbox, struct vmbox_device *vdev)
 	wmb();
 
 	__vmbox_device_online(_vc, vdev->devid);
-	pr_info("vmbox device %s online for vm%d\n", vmbox->name, vm->vmid);
+	pr_notice("vmbox device %s online for vm%d\n", vmbox->name, vm->vmid);
 
 	return 0;
 }
@@ -466,7 +466,7 @@ static void vmbox_con_online(struct vmbox_controller *vc)
 	struct vmbox *vmbox;
 	struct vm *vm = vc->vm;
 
-	pr_info("vmbox controller for vm%d is online\n", vm->vmid);
+	pr_notice("vmbox controller for vm%d is online\n", vm->vmid);
 
 	for (i = 0; i < vmbox_index; i++) {
 		vmbox = vmboxs[i];
@@ -586,13 +586,13 @@ static int vmbox_handle_dev_request(struct vmbox_controller *vc,
 		vdev->state = VMBOX_DEV_STAT_ONLINE;
 
 		if (!vdev->is_backend) {
-			pr_info("frontend vmbox device online\n");
+			pr_notice("frontend vmbox device online\n");
 			iowrite32(VMBOX_DEV_EVENT_ONLINE,
 					vdev->bro->dev_reg + VMBOX_DEV_IPC_TYPE);
 			send_virq_to_vm(vdev->bro->vm, vdev->bro->ipc_virq);
 			return 0;
 		} else {
-			pr_info("backend vmbox device online\n");
+			pr_notice("backend vmbox device online\n");
 			vmbox_device_attach(vmboxs[vdev->vmbox_id], vdev->bro);
 		}
 		break;

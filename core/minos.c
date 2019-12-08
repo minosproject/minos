@@ -47,7 +47,7 @@ void boot_main(void *setup_data)
 	allsymbols_init();
 	percpus_init();
 
-	pr_info("Starting Minos %s\n", MINOS_VERSION_STR);
+	pr_notice("Starting Minos %s\n", MINOS_VERSION_STR);
 
 	if (smp_processor_id() != 0)
 		panic("boot_main : cpu is not cpu0");
@@ -105,7 +105,7 @@ void boot_main(void *setup_data)
 
 void boot_secondary(void)
 {
-	pr_info("cpu-%d is up\n", smp_processor_id());
+	pr_notice("cpu-%d is up\n", smp_processor_id());
 
 	/*
 	 * need wait for all cpus up then excuted below

@@ -59,7 +59,7 @@ static int fdt_set_gicv2(void *dtb, int node)
 {
 	uint32_t regs[16];
 
-	pr_info("vm gic type is gic-v2\n");
+	pr_notice("vm gic type is gic-v2\n");
 	fdt_setprop(dtb, node, "compatible",
 			"arm,cortex-a15-gic", 19);
 
@@ -101,7 +101,7 @@ static int fdt_set_gicv3(void *dtb, int node)
 	uint32_t regs[20];
 	int its_node;
 
-	pr_info("vm gic type is gic-v3\n");
+	pr_notice("vm gic type is gic-v3\n");
 	fdt_setprop(dtb, node, "compatible", "arm,gic-v3", 11);
 
 	/* gicd */
@@ -162,7 +162,7 @@ static int fdt_set_gicv3(void *dtb, int node)
 
 static int fdt_set_gicv4(void *dtb, int node)
 {
-	pr_info("vm gic type is gic-v4\n");
+	pr_notice("vm gic type is gic-v4\n");
 	return 0;
 }
 
@@ -203,7 +203,7 @@ static int fdt_setup_commandline(void *dtb, char *cmdline)
 {
 	int nodeoffset;
 
-	pr_info("add cmdline - %s\n", cmdline);
+	pr_notice("add cmdline - %s\n", cmdline);
 
 	if (!cmdline || (strlen(cmdline) == 0))
 		return -EINVAL;
@@ -233,7 +233,7 @@ static int fdt_setup_cpu(void *dtb, int vcpus)
 	 */
 	offset = fdt_path_offset(dtb, "/cpus/cpu-map");
 	if (offset > 0) {
-		pr_info("delete cpu-map node\n");
+		pr_notice("delete cpu-map node\n");
 		fdt_del_node(dtb, offset);
 	}
 
@@ -244,7 +244,7 @@ static int fdt_setup_cpu(void *dtb, int vcpus)
 		sprintf(name, "cpu@%d", i);
 		node = fdt_subnode_offset(dtb, offset, name);
 		if (node >= 0) {
-			pr_info("        - delete %s\n", name);
+			pr_notice("        - delete %s\n", name);
 			fdt_del_node(dtb, node);
 		}
 	}
@@ -297,13 +297,13 @@ static int fdt_setup_memory(void *dtb, unsigned long mstart,
 #endif
 		args[3] = cpu_to_fdt32(msize);
 		size_cell = sizeof(uint32_t) * 4;
-		pr_info("setup memory 0x%x 0x%x 0x%x 0x%x\n",
+		pr_notice("setup memory 0x%x 0x%x 0x%x 0x%x\n",
 				args[0], args[1], args[2], args[3]);
 	} else {
 		args[0] = cpu_to_fdt32(mstart);
 		args[1] = cpu_to_fdt32(msize);
 		size_cell = sizeof(uint32_t) * 2;
-		pr_info("setup memory 0x%x 0x%x\n", args[0], args[1]);
+		pr_notice("setup memory 0x%x 0x%x\n", args[0], args[1]);
 	}
 
 	return fdt_setprop(dtb, offset, "reg",
@@ -322,7 +322,7 @@ static int fdt_setup_ramdisk(void *dtb, uint32_t start, uint32_t size)
 			return offset;
 	}
 
-	pr_info("set ramdisk : 0x%x 0x%x\n", start, size);
+	pr_notice("set ramdisk : 0x%x 0x%x\n", start, size);
 	fdt_setprop_cell(dtb, offset, "linux,initrd-end", start + size);
 	fdt_setprop_cell(dtb, offset, "linux,initrd-start", start);
 

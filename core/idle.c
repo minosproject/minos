@@ -99,7 +99,7 @@ static void os_clean(void)
 
 	size = (unsigned long)&__init_end -
 		(unsigned long)&__init_start;
-	pr_info("release unused memory [0x%x 0x%x]\n",
+	pr_notice("release unused memory [0x%x 0x%x]\n",
 			(unsigned long)&__init_start, size);
 
 	add_slab_mem((unsigned long)&__init_start, size);

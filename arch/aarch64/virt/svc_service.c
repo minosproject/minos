@@ -76,7 +76,7 @@ static void parse_svc_desc(unsigned long start, unsigned long end,
 
 static int svc_service_init(void)
 {
-	pr_info("parsing SMC/HVC handler\n");
+	pr_notice("parsing SMC/HVC handler\n");
 
 	parse_svc_desc((unsigned long)&__hvc_handler_start,
 		       (unsigned long)&__hvc_handler_end, hvc_descs);

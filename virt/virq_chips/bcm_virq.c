@@ -454,7 +454,7 @@ static int bcm2836_inject_spi(struct vcpu *vcpu, uint32_t virq)
 
 	dev = (struct bcm2836_virq *)vm->virq_chip->inc_pdata;
 	if (bcm2836_get_spi_bank(dev, virq, &base, &bit, &bank)) {
-		pr_info("get virq bank failed %d\n", virq);
+		pr_notice("get virq bank failed %d\n", virq);
 		return -EINVAL;
 	}
 

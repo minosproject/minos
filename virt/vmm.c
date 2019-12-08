@@ -461,15 +461,15 @@ static void dump_vmm_areas(struct mm_struct *mm)
 {
 	struct vmm_area *va;
 
-	pr_info("***** free vmm areas *****\n");
+	pr_debug("***** free vmm areas *****\n");
 	list_for_each_entry(va, &mm->vmm_area_free, list) {
-		pr_info("vmm_area: start:0x%p ---> 0x%p 0x%p\n",
+		pr_debug("vmm_area: start:0x%p ---> 0x%p 0x%p\n",
 				va->start, va->end, va->size);
 	}
 
-	pr_info("***** used vmm areas *****\n");
+	pr_debug("***** used vmm areas *****\n");
 	list_for_each_entry(va, &mm->vmm_area_used, list) {
-		pr_info("vmm_area: start:0x%p ---> 0x%p 0x%p\n",
+		pr_debug("vmm_area: start:0x%p ---> 0x%p 0x%p\n",
 				va->start, va->end, va->size);
 	}
 }
@@ -910,7 +910,7 @@ int vm_mm_init(struct vm *vm)
 		size = end - base;
 
 		if ((va->size < PAGE_SIZE) || (size == 0) || (base >= end)) {
-			pr_info("drop unused vmm_area 0x%p ---> 0x%p @0x%x\n",
+			pr_debug("drop unused vmm_area 0x%p ---> 0x%p @0x%x\n",
 					va->start, va->end, va->size);
 			list_del(&va->list);
 			free(va);
@@ -921,7 +921,7 @@ int vm_mm_init(struct vm *vm)
 
 		if ((base != va->start) || (va->end != end) ||
 				(size != va->size)) {
-			pr_info("adjust vmm_area: 0x%p->0x%p 0x%p->0x%p 0x%x->0x%x\n",
+			pr_debug("adjust vmm_area: 0x%p->0x%p 0x%p->0x%p 0x%x->0x%x\n",
 					va->start, base, va->end, end, va->size, size);
 			va->start = base;
 			va->end = end;

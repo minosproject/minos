@@ -237,7 +237,8 @@ static int create_vm_pdev_of(struct vm *vm, struct device_node *node)
 	ret += create_pdev_iomem_of(vm, node);
 	ret += create_pdev_virq_of(vm, node);
 
-	pr_notice("create %s [%s]\n", node->name, ret ? "fail" : "ok");
+	if (ret)
+		pr_notice("create %s fail\n", node->name);
 
 	return ret;
 }

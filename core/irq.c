@@ -63,7 +63,7 @@ static int do_handle_host_irq(struct irq_desc *irq_desc)
 	int ret;
 
 	if (cpuid != irq_desc->affinity) {
-		pr_info("irq %d do not belong to this cpu\n", irq_desc->hno);
+		pr_notice("irq %d do not belong to this cpu\n", irq_desc->hno);
 		ret =  -EINVAL;
 		goto out;
 	}

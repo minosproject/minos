@@ -55,7 +55,7 @@ static int raspberry3_setup_hvm(struct vm *vm, void *dtb)
 			continue;
 
 		addr = BCM2836_RELEASE_ADDR + i * sizeof(uint64_t);
-		pr_info("vcpu-%d release addr redirect to 0x%p\n", i, addr);
+		pr_notice("vcpu-%d release addr redirect to 0x%p\n", i, addr);
 		tmp[0] = cpu_to_fdt32(addr >> 32);
 		tmp[1] = cpu_to_fdt32(addr & 0xffffffff);
 
@@ -82,7 +82,7 @@ static int raspberry3_setup_hvm(struct vm *vm, void *dtb)
 	for (i = 40; i <= 52; i++)
 		request_virq(vm, i, 0);
 
-	pr_info("raspberry3 setup vm done\n");
+	pr_notice("raspberry3 setup vm done\n");
 
 	return 0;
 }

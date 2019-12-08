@@ -126,21 +126,21 @@ static int timers_arch_init(void)
 			return -ENOENT;
 		}
 
-		pr_info("%s : irq-%d flags-0x%x\n", timer_name[i],
+		pr_notice("%s : irq-%d flags-0x%x\n", timer_name[i],
 				info->irq, info->flags);
 	}
 
 	ret = of_get_u32_array(node, "clock-frequency", &cpu_khz, 1);
 	if (cpu_khz > 0) {
 		cpu_khz = cpu_khz / 1000;
-		pr_info("get timer clock freq from dt %d\n", cpu_khz);
+		pr_notice("get timer clock freq from dt %d\n", cpu_khz);
 	} else {
 		cpu_khz = read_sysreg32(CNTFRQ_EL0) / 1000;
-		pr_info("get timer clock freq from reg %d\n", cpu_khz);
+		pr_notice("get timer clock freq from reg %d\n", cpu_khz);
 	}
 
 	boot_tick = read_sysreg64(CNTPCT_EL0);
-	pr_info("boot ticks is :0x%x\n", boot_tick);
+	pr_notice("boot ticks is :0x%x\n", boot_tick);
 
 	if (platform->time_init)
 		platform->time_init();

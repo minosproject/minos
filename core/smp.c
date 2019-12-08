@@ -155,7 +155,7 @@ void smp_cpus_up(void)
 			continue;
 		}
 
-		pr_info("waiting 2 seconds for cpu-%d up\n", i);
+		pr_notice("waiting 2 seconds for cpu-%d up\n", i);
 		while ((smp_affinity_id[i] == 0) && (cnt < 2000)) {
 			mdelay(1);
 			cnt++;

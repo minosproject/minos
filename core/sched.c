@@ -519,7 +519,7 @@ unsigned long sched_tick_handler(unsigned long data)
 		list_del(&task->stat_list);
 		list_add_tail(&pcpu->ready_list, &task->stat_list);
 	} else
-		pr_info("task is not ready now\n");
+		pr_notice("task is not ready now\n");
 
 	set_need_resched();
 
@@ -789,7 +789,7 @@ static void __used *of_setup_pcpu(struct device_node *node, void *data)
 	if (of_get_string(node, "sched_class", class, 15) <= 0)
 		return NULL;
 
-	pr_info("sched class of pcpu-%d: %s\n", cpuid, class);
+	pr_notice("sched class of pcpu-%d: %s\n", cpuid, class);
 
 	if (!strcmp(class, "local")) {
 		pcpu = get_per_cpu(pcpu, cpuid);

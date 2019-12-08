@@ -60,7 +60,7 @@ static int mcr_mrc_cp15_handler(gp_regs *reg, uint32_t esr_value)
 	case HSR_CPREG32(ACTLR):
 		break;
 	default:
-		pr_info("mcr_mrc_cp15_handler 0x%x\n", esr_value);
+		pr_notice("mcr_mrc_cp15_handler 0x%x\n", esr_value);
 		break;
 	}
 
@@ -279,7 +279,7 @@ static int dataabort_tfl_handler(gp_regs *regs, uint32_t esr_value)
 		}
 		break;
 	default:
-		pr_info("unsupport data abort type this time %d @0x%p\n",
+		pr_notice("unsupport data abort type this time %d @0x%p\n",
 				dabt->dfsc & ~FSC_LL_MASK, paddr);
 		inject_virtual_abort();
 		break;

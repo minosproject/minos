@@ -227,7 +227,7 @@ static void vrtc_alarm_function(unsigned long data)
 static void vrtc_reset(struct vdev *vdev)
 {
 	/* do nothing here */
-	pr_info("vrtc reset\n");
+	pr_notice("vrtc reset\n");
 }
 
 static void vrtc_deinit(struct vdev *vdev)
@@ -252,7 +252,7 @@ static void *vrtc_init(struct vm *vm, struct device_node *node)
 	uint64_t base, size;
 	unsigned long flags;
 
-	pr_info("create virtual rtc for vm-%d\n", vm->vmid);
+	pr_notice("create virtual rtc for vm-%d\n", vm->vmid);
 
 	ret = translate_device_address(node, &base, &size);
 	if (ret || (size == 0))

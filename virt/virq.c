@@ -122,7 +122,7 @@ static int guest_irq_handler(uint32_t irq, void *data)
 	struct virq_desc *desc = (struct virq_desc *)data;
 
 	if ((!desc) || (!virq_is_hw(desc))) {
-		pr_info("virq %d is not a hw irq\n", desc->vno);
+		pr_notice("virq %d is not a hw irq\n", desc->vno);
 		return -EINVAL;
 	}
 

@@ -108,7 +108,7 @@ static int raspberry4_setup_hvm(struct vm *vm, void *dtb)
 			continue;
 
 		addr = BCM2838_RELEASE_ADDR + i * sizeof(uint64_t);
-		pr_info("vcpu-%d release addr redirect to 0x%p\n", i, addr);
+		pr_notice("vcpu-%d release addr redirect to 0x%p\n", i, addr);
 		tmp[0] = cpu_to_fdt32(addr >> 32);
 		tmp[1] = cpu_to_fdt32(addr & 0xffffffff);
 
@@ -140,7 +140,7 @@ static int raspberry4_setup_hvm(struct vm *vm, void *dtb)
 	/* create pcie address mapping for VM0 */
 	create_guest_mapping(&vm->mm, 0x600000000, 0x600000000, 0x4000000, VM_IO);
 
-	pr_info("raspberry4 setup vm done\n");
+	pr_notice("raspberry4 setup vm done\n");
 
 	return 0;
 }

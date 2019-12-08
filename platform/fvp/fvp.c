@@ -51,7 +51,7 @@ static int inline fvp_setup_hvm_of(struct vm *vm, void *data)
 		return 0;
 
 	if (!strcmp((char *)val, "arm,armv7-timer-mem")) {
-		pr_info("delete the armv7 mem timer\n");
+		pr_notice("delete the armv7 mem timer\n");
 		fdt_del_node(data, node);
 	}
 

@@ -221,7 +221,7 @@ static int dtb_add_virtio(struct vdev *vdev, void *dtb)
 				3 * sizeof(uint32_t));
 	}
 
-	pr_info("add vdev success addr-%p virq-%d\n",
+	pr_notice("add vdev success addr-%p virq-%d\n",
 			vdev->guest_iomem, vdev->gvm_irq);
 	return 0;
 }

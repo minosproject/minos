@@ -32,7 +32,7 @@ static int hvc_be_init(struct vm *vm, struct vmbox *vmbox,
 	struct vmm_area *va;
 	void *dtb = vm->setup_data;
 
-	pr_info("register hvc platform device for vm%d\n", vm->vmid);
+	pr_notice("register hvc platform device for vm%d\n", vm->vmid);
 
 	vc = vmbox_get_controller(vm);
 	if (!vc)

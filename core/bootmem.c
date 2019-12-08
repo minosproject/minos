@@ -103,7 +103,7 @@ void bootmem_init(void)
 	bootmem_size = bootmem_end - bootmem_start;
 	bootmem_page_base = bootmem_end;
 
-	pr_info("bootmem start-0x%p end-0x%p size-0x%x\n",
+	pr_notice("bootmem start-0x%p end-0x%p size-0x%x\n",
 			(unsigned long)bootmem_start,
 			(unsigned long)bootmem_end,
 			(unsigned long)bootmem_size);

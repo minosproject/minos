@@ -35,10 +35,10 @@ static void rt_task(void *data)
 	while (1) {
 		ret = mutex_pend(&rt_mutex, 100);
 		if (ret) {
-			pr_info("wait mutex timeout\n");
+			pr_notice("wait mutex timeout\n");
 			continue;
 		}
-		pr_info("rt_task-%d test on cpu-%d\n",
+		pr_notice("rt_task-%d test on cpu-%d\n",
 				task_id, smp_processor_id());
 		mdelay(100);
 		mutex_post(&rt_mutex);
@@ -128,7 +128,7 @@ void test_task(void *data)
 			continue;
 		}
 
-		pr_info("test task 1 on %d\n", smp_processor_id());
+		pr_notice("test task 1 on %d\n", smp_processor_id());
 		mdelay(100);
 		mutex_post(&rt_mutex);
 
@@ -147,7 +147,7 @@ void test_task2(void *data)
 			continue;
 		}
 
-		pr_info("test task 2 on %d\n", smp_processor_id());
+		pr_notice("test task 2 on %d\n", smp_processor_id());
 		mdelay(100);
 		mutex_post(&rt_mutex);
 
@@ -158,7 +158,7 @@ void test_task2(void *data)
 void test_task3(void *data)
 {
 	while (1) {
-		pr_info("test task 3 on %d\n", smp_processor_id());
+		pr_notice("test task 3 on %d\n", smp_processor_id());
 		mdelay(100);
 		msleep(100);
 	}

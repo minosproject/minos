@@ -34,7 +34,7 @@ static int std_smc_handler(gp_regs *c,
 
 	case PSCI_0_2_FN64_CPU_ON:
 	case PSCI_0_2_FN_CPU_ON:
-		pr_info("request vcpu on\n");
+		pr_notice("request vcpu on\n");
 		ret = vcpu_power_on(get_current_vcpu(),
 				args[0], args[1], args[2]);
 		if (ret)
@@ -43,7 +43,7 @@ static int std_smc_handler(gp_regs *c,
 
 	case PSCI_0_2_FN_CPU_OFF:
 		/* virtual vcpu only support freeze mode */
-		pr_info("request vcpu off\n");
+		pr_notice("request vcpu off\n");
 		ret = vcpu_off(get_current_vcpu());
 		if (ret)
 			SVC_RET1(c, PSCI_RET_INTERNAL_FAILURE);

@@ -27,7 +27,7 @@
 #include <minos/sched.h>
 
 #ifndef CONFIG_LOG_LEVEL
-#define CONFIG_LOG_LEVEL	PRINT_LEVEL_INFO
+#define CONFIG_LOG_LEVEL	PRINT_LEVEL_NOTICE
 #endif
 
 extern struct task *__current_tasks[NR_CPUS];
