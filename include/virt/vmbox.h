@@ -56,7 +56,7 @@ struct vmbox_hook_ops {
 struct vmbox_controller {
 	void *pa;
 	void *va;
-	void *pdata;
+	struct vm *vm;
 	int dev_cnt;
 	int status;
 	uint32_t virq;
@@ -100,14 +100,8 @@ struct vmbox_controller {
 #define VMBOX_DEV_IPC_EVENT		0x30	/* WO trigger a config event */
 #define VMBOX_DEV_IPC_TYPE		0x34	/* RW */
 #define VMBOX_DEV_IPC_ACK		0x38	/* event ack */
-#define VMBOX_DEV_BACKEND_ONLINE	0x3C	/* only for client device */
+#define VMBOX_DEV_VDEV_ONLINE		0x3C	/* only for client device */
 
-/*
- * VMBOX_REG_DEV_STATUS register member
- * [0 : 1] RO for host, and update by client, indicate the device state
- * [2 : 2] WO by host, POWER ON bit, to inform device need power on
- * [3 : 3] WO by host, POWER OFF bit, to inform device need to power off
- */
 #define VMBOX_DEV_EVENT_ONLINE		0x1
 #define VMBOX_DEV_EVENT_OFFLINE		0x2
 #define VMBOX_DEV_EVENT_OPENED		0x3

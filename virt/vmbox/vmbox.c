@@ -356,7 +356,7 @@ struct vmbox_controller *vmbox_get_controller(struct vm *vm)
 	struct vmbox_controller *vc;
 
 	list_for_each_entry(vc, &vmbox_con_list, list) {
-		if (vc->pdata == (void *)vm)
+		if (vc->vm == vm)
 			return vc;
 	}
 
@@ -382,7 +382,7 @@ __vmbox_device_online(struct vmbox_controller *vc, int id)
 	if (vc->status) {
 		iowrite32(VMBOX_CON_INT_TYPE_DEV_ONLINE,
 			iomem + VMBOX_CON_INT_STATUS);
-		send_virq_to_vm((struct vm *)vc->pdata, vc->virq);
+		send_virq_to_vm(vc->vm, vc->virq);
 	}
 }
 
@@ -451,11 +451,11 @@ static int vmbox_device_attach(struct vmbox *vmbox, struct vmbox_device *vdev)
 	iowrite32(vmbox->devid[1], iomem + VMBOX_DEV_VENDOR_ID);
 	iowrite32(vdev->vring_virq, iomem + VMBOX_DEV_VRING_IRQ);
 	iowrite32(vdev->ipc_virq, iomem + VMBOX_DEV_IPC_IRQ);
-	vdev->state = VMBOX_DEV_STAT_ONLINE;
 
 	wmb();
 
 	__vmbox_device_online(_vc, vdev->devid);
+	pr_info("vmbox device %s online for vm%d\n", vmbox->name, vm->vmid);
 
 	return 0;
 }
@@ -464,7 +464,9 @@ static void vmbox_con_online(struct vmbox_controller *vc)
 {
 	int i;
 	struct vmbox *vmbox;
-	struct vm *vm = vc->pdata;
+	struct vm *vm = vc->vm;
+
+	pr_info("vmbox controller for vm%d is online\n", vm->vmid);
 
 	for (i = 0; i < vmbox_index; i++) {
 		vmbox = vmboxs[i];
@@ -541,6 +543,9 @@ static int vmbox_handle_dev_request(struct vmbox_controller *vc,
 
 	switch (reg) {
 	case VMBOX_DEV_VRING_EVENT:
+		if (!vdev->bro->state)
+			return 0;
+
 		send_virq_to_vm(vdev->bro->vm, vdev->bro->vring_virq);
 		break;
 	case VMBOX_DEV_IPC_EVENT:
@@ -548,8 +553,9 @@ static int vmbox_handle_dev_request(struct vmbox_controller *vc,
 		 * write the event_reg and send a virq to the vm
 		 * wait last event finised
 		 */
-		if (!vdev->is_backend && !vdev->state)
+		if (!vdev->bro->state)
 			return 0;
+#if 0
 		do {
 			/* here will cause deadlock need to be fixed later */
 			reg = ioread32(vdev->bro->dev_reg + VMBOX_DEV_IPC_TYPE);
@@ -559,28 +565,36 @@ static int vmbox_handle_dev_request(struct vmbox_controller *vc,
 				return 0;
 			sched();
 		} while (1);
+#endif
 
 		iowrite32(*value, vdev->bro->dev_reg + VMBOX_DEV_IPC_TYPE);
 		send_virq_to_vm(vdev->bro->vm, vdev->bro->ipc_virq);
 		break;
 	case VMBOX_DEV_IPC_ACK:
-		/* clear otherside's event type register */
 		iowrite32(0, vdev->dev_reg + VMBOX_DEV_IPC_TYPE);
 		break;
-	case VMBOX_DEV_BACKEND_ONLINE:
+	case VMBOX_DEV_VDEV_ONLINE:
 		/*
-		 * when host write this reg, it will send a event irq to
-		 * the clien device to notice the client that need to do
-		 * some thing for me
+		 * when vmbox driver write this register, it means that
+		 * this device is ok to receive irq or handle the related
+		 * event
 		 *
-		 * when client write this register, need to update the same
-		 * reg in host to inform host that the device is ready
+		 * for backend, it will invoke the frontend device, for
+		 * frontend device, it just update the related status and
+		 * then send a virq to backend
 		 */
-		if (!vdev->is_backend)
-			return 0;
+		vdev->state = VMBOX_DEV_STAT_ONLINE;
 
-		/* make the host device online */
-		vmbox_device_attach(vmboxs[vdev->vmbox_id], vdev->bro);
+		if (!vdev->is_backend) {
+			pr_info("frontend vmbox device online\n");
+			iowrite32(VMBOX_DEV_EVENT_ONLINE,
+					vdev->bro->dev_reg + VMBOX_DEV_IPC_TYPE);
+			send_virq_to_vm(vdev->bro->vm, vdev->bro->ipc_virq);
+			return 0;
+		} else {
+			pr_info("backend vmbox device online\n");
+			vmbox_device_attach(vmboxs[vdev->vmbox_id], vdev->bro);
+		}
 		break;
 	default:
 		pr_err("unsupport reg 0x%x\n", reg);
@@ -649,7 +663,7 @@ static int __of_setup_vmbox_con_virqs(struct vmbox_controller *vcon,
 {
 	int size = 0;
 	uint32_t tmp[10];
-	struct vm *vm = vcon->pdata;
+	struct vm *vm = vcon->vm;
 	struct virq_chip *vc = vm->virq_chip;
 
 	if (!vc->generate_virq) {
@@ -715,7 +729,7 @@ static int vm_create_vmbox_controller(struct vm *vm)
 
 	vc->va = (void *)va->start;
 	map_vmm_area(&vm->mm, va, (unsigned long)vc->pa);
-	vc->pdata = vm;
+	vc->vm = vm;
 	memset(vc->pa, 0, VMBOX_CON_DEV_BASE);
 
 	host_vdev_init(vm, &vc->vdev, (unsigned long)vc->va, PAGE_SIZE);
@@ -745,11 +759,7 @@ int vmbox_register_platdev(struct vmbox_device *vdev, void *dtb, char *type)
 		return -ENOENT;
 	}
 
-	memset(node_name, 0, 128);
-	sprintf(node_name, "minos,%s", type);
-	fdt_setprop(dtb, node, "compatible",
-			node_name, strlen(node_name) + 1);
-
+	fdt_setprop(dtb, node, "compatible", type, strlen(type) + 1);
 	__of_setup_vmbox_iomem(dtb, node, (unsigned long)vdev->iomem,
 			vdev->iomem_size);
 	return 0;
@@ -758,6 +768,7 @@ int vmbox_register_platdev(struct vmbox_device *vdev, void *dtb, char *type)
 static int vmbox_device_do_hooks(struct vm *vm)
 {
 	int i;
+	struct vmbox_device *vdev;
 	struct vmbox_hook *hook;
 	struct vmbox *vmbox;
 
@@ -767,10 +778,17 @@ static int vmbox_device_do_hooks(struct vm *vm)
 		if (!hook)
 			continue;
 
-		if (hook->ops->vmbox_be_init)
-			hook->ops->vmbox_be_init(vm, vmbox, vmbox->devices[0]);
-		if (hook->ops->vmbox_fe_init)
-			hook->ops->vmbox_fe_init(vm, vmbox, vmbox->devices[1]);
+		if (hook->ops->vmbox_be_init &&
+				(vmbox->owner[0] == vm->vmid)) {
+			vdev = vmbox->devices[0];
+			hook->ops->vmbox_be_init(vdev->vm, vmbox, vdev);
+		}
+
+		if (hook->ops->vmbox_fe_init &&
+				(vmbox->owner[1] == vm->vmid)) {
+			vdev = vmbox->devices[1];
+			hook->ops->vmbox_fe_init(vdev->vm, vmbox, vdev);
+		}
 	}
 
 	return 0;

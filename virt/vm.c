@@ -1069,9 +1069,9 @@ static int of_create_vmboxs(void)
 	/* parse each mailbox entry and create it */
 	of_node_for_each_child(mailboxes, child) {
 		if (of_create_vmbox(child))
-			pr_err("create mailbox [%s] fail\n", child->name);
+			pr_err("create vmbox [%s] fail\n", child->name);
 		else
-			pr_info("create mailbox [%s] successful\n", child->name);
+			pr_info("create vmbox [%s] successful\n", child->name);
 	}
 
 	return 0;

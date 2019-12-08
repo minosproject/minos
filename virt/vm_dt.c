@@ -117,12 +117,15 @@ static int fdt_setup_cmdline(struct vm *vm)
 	if (chosen_node < 0) {
 		chosen_node = fdt_add_subnode(dtb, 0, "chosen");
 		if (chosen_node < 0) {
-			pr_err("add chosen node failed for vm0\n");
+			pr_err("add chosen node failed for vm%d\n", vm->vmid);
 			return chosen_node;
 		}
 	}
 
-	node = fdt_path_offset(hv_dtb, "/vms/vm0");
+	len = sprintf(buf, "/vms/vm%d", vm->vmid);
+	buf[len] = 0;
+
+	node = fdt_path_offset(hv_dtb, buf);
 	if (node < 0)
 		return 0;
 
@@ -173,7 +176,7 @@ static int fdt_setup_cpu(struct vm *vm)
 		sprintf(name, "cpu@%x", ((i / 4) << 8) + (i % 4));
 		node = fdt_subnode_offset(dtb, offset, name);
 		if (node >= 0) {
-			pr_info("delete vcpu %s for vm0\n", name);
+			pr_info("delete vcpu %s for vm%d\n", name, vm->vmid);
 			fdt_del_node(dtb, node);
 		}
 	}
@@ -220,7 +223,8 @@ static int fdt_setup_memory(struct vm *vm)
 		mstart = va->start;
 		msize = va->size;
 
-		pr_info("add memory region to vm0 0x%p 0x%p\n", mstart, msize);
+		pr_info("add memory region to vm%d 0x%p 0x%p\n",
+				vm->vmid, mstart, msize);
 
 		if (address_cell == 1) {
 			*args++ = cpu_to_fdt32(mstart);

@@ -25,12 +25,14 @@
 #include <asm/io.h>
 #include <virt/vmbox.h>
 
-static int hvc_fe_init(struct vm *vm, struct vmbox *vmbox,
+static int hvc_be_init(struct vm *vm, struct vmbox *vmbox,
 		struct vmbox_device *vdev)
 {
 	struct vmbox_controller *vc;
 	struct vmm_area *va;
 	void *dtb = vm->setup_data;
+
+	pr_info("register hvc platform device for vm%d\n", vm->vmid);
 
 	vc = vmbox_get_controller(vm);
 	if (!vc)
@@ -44,11 +46,11 @@ static int hvc_fe_init(struct vm *vm, struct vmbox *vmbox,
 	vdev->iomem_size = vmbox->shmem_size;
 	map_vmm_area(&vm->mm, va, (unsigned long)vmbox->shmem);
 
-	return vmbox_register_platdev(vdev, dtb, vmbox->name);
+	return vmbox_register_platdev(vdev, dtb, "minos,hvc-be");
 }
 
 static struct vmbox_hook_ops hvc_ops = {
-	.vmbox_fe_init = hvc_fe_init,
+	.vmbox_be_init = hvc_be_init,
 };
 
 static int vmbox_hvc_init(void)
