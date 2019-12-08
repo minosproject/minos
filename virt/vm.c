@@ -45,6 +45,7 @@ DEFINE_SPIN_LOCK(vms_lock);
 static DECLARE_BITMAP(vmid_bitmap, CONFIG_MAX_VM);
 
 static int aff_current;
+static int native_vcpus;
 DECLARE_BITMAP(vcpu_aff_bitmap, NR_CPUS);
 DEFINE_SPIN_LOCK(affinity_lock);
 
@@ -389,6 +390,11 @@ static int vcpu_affinity_init(void)
 
 	aff_current = find_first_zero_bit(vcpu_aff_bitmap, NR_CPUS);
 
+	for (i = 0; i < NR_CPUS; i++) {
+		if (test_bit(i, vcpu_aff_bitmap))
+			native_vcpus++;
+	}
+
 	return 0;
 }
 
@@ -402,7 +408,7 @@ void get_vcpu_affinity(uint32_t *aff, int nr)
 
 	if (nr == NR_CPUS)
 		vm0_vcpu0_ok = 1;
-	else if (nr > (NR_CPUS - vm0->vcpu_nr))
+	else if (nr > (NR_CPUS - native_vcpus))
 		vm0_vcpus_ok = 1;
 
 	spin_lock(&affinity_lock);
