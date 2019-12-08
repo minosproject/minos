@@ -106,6 +106,16 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 
 static int misc_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 {
+	struct vm *vm = get_current_vm();
+
+	switch (id) {
+	case HVC_GET_VMID:
+		HVC_RET1(c, vm->vmid);
+		break;
+	default:
+		break;
+	}
+
 	HVC_RET1(c, -EINVAL);
 }
 
