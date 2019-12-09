@@ -157,3 +157,5 @@ Minos支持两种方式启动VM，静态方式和动态方式，静态方式是�
   fatload mmc 0:1 0x33e00000 vm1_dtb.img
   fatload mmc 0:1 0x34000000 vm1_ramdisk.img
   ```
+
+
