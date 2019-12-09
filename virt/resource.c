@@ -99,6 +99,9 @@ int parse_vm_info_of(struct device_node *node, struct vmtag *vmtag)
 	if (of_get_bool(node, "vm_32bit"))
 		vmtag->flags &= ~VM_FLAGS_64BIT;
 
+	if (of_get_bool(node, "native_wfi"))
+		vmtag->flags |= VM_FLAGS_NATIVE_WFI;
+
 	return 0;
 }
 

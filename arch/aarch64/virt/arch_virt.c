@@ -95,8 +95,8 @@ static void aarch64_system_state_init(struct task *task, void *c)
 
 	/*
 	 * HVC : enable hyper call function
-	 * TWI : trap wfi
-	 * TWE : trap wfe
+	 * TWI : trap wfi - default enable, disable by dts
+	 * TWE : trap wfe - default disable
 	 * TIDCP : Trap implementation defined functionality
 	 * IMP : physical irq routing
 	 * FMO : physical firq routing
@@ -109,11 +109,18 @@ static void aarch64_system_state_init(struct task *task, void *c)
 	 * RW : low level is 64bit, when 0 is 32 bit
 	 * VM : enable virtualzation
 	 */
-	context->hcr_el2 = 0ul | HCR_EL2_HVC | HCR_EL2_TWI | \
+	context->hcr_el2 = 0ul | HCR_EL2_HVC | HCR_EL2_VM | \
 		     HCR_EL2_TIDCP | HCR_EL2_IMO | HCR_EL2_FMO | \
 		     HCR_EL2_BSU_IS | HCR_EL2_FB | HCR_EL2_PTW | \
-		     HCR_EL2_TSC | HCR_EL2_TACR | HCR_EL2_AMO | \
-		     HCR_EL2_VM;
+		     HCR_EL2_TSC | HCR_EL2_TACR | HCR_EL2_AMO;
+
+	/*
+	 * usually there will be so many wfis from the VM
+	 * in some case this will have much infulence to
+	 * the system, add this flag to disable WFI trap.
+	 */
+	if (!(vcpu->vm->flags & VM_FLAGS_NATIVE_WFI))
+		context->hcr_el2 |= HCR_EL2_TWI;
 
 	if (task_is_64bit(task))
 		context->hcr_el2 |= HCR_EL2_RW;
