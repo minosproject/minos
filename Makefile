@@ -182,7 +182,7 @@ MBUILD_IMAGE 	:= minos.bin
 MBUILD_IMAGE_ELF := minos.elf
 MBUILD_IMAGE_SYMBOLS := allsymbols.o
 
-all: include/config/auto.conf $(version_h) minos
+all: include/config/config.h $(version_h) minos
 
 minos-dirs	:= $(patsubst %/,%,$(filter %/, $(core-y) $(external-y) $(drivers-y) $(libs-y)))
 
@@ -256,8 +256,8 @@ $(version_h) : Makefile
 	$(Q) mkdir -p include/config
 	$(Q) $(call filechk_version.h)
 
-PHONY += include/config/auto.conf
-include/config/auto.conf:
+PHONY += include/config/config.h
+include/config/config.h:
 	$(Q)test -e include/config/config.h -a -e $@ || (		\
 	echo >&2;							\
 	echo >&2 "  ERROR: Minos configuration is invalid.";		\
