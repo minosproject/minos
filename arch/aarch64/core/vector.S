@@ -61,7 +61,6 @@ arch_switch_task_sw:
 	str	x0, [sp, #-8]!
 	mrs	x0, esr_el2
 	str	x0, [sp, #-8]!
-	dsb	sy
 
 	mrs	x0, daif
 	mrs	x1, nzcv
@@ -87,19 +86,15 @@ arch_switch_task_sw:
 
 	lsl	arg1, cpuid, #3
 	ldr	arg5, =__current_tasks	/* get the next task */
-	dsb	ld
 	add	ct_addr, arg5, arg1
 	ldr	ct, [ct_addr]
-	dsb	ld
 
 	ldr	arg5, =__next_tasks
-	dsb	ld
 	add	nt_addr, arg5, arg1
 	ldr	nt, [nt_addr]
 
 	mov	arg2, sp		/* save the current stack to task */
 	str	arg2, [ct]
-	dsb	st
 
 	mov	arg0, ct
 	mov	arg1, nt
@@ -108,10 +103,8 @@ arch_switch_task_sw:
 	dsb	sy
 
 	bl	switch_to_task
-	dsb	sy
 
 	str	nt, [ct_addr]		/* current = next */
-	dsb	st
 
 	ldr	x0, [sp], #8		/* restore the register */
 	msr	elr_el2, x0
@@ -119,7 +112,6 @@ arch_switch_task_sw:
 	msr	spsr_el2, x0
 	ldr	x0, [sp], #8
 	msr	esr_el2, x0
-	isb
 	ldp     x0, x1, [sp], #16
 	ldp     x2, x3, [sp], #16
 	ldp     x4, x5, [sp], #16
@@ -143,7 +135,6 @@ arch_switch_task_sw:
 	.type __sync_handler "function"
 	.cfi_startproc
 __sync_handler:
-	//save_gp_regs
 	stp	x29, x30, [sp, #-16]!
 	stp	x27, x28, [sp, #-16]!
 	stp	x25, x26, [sp, #-16]!
@@ -170,16 +161,13 @@ __sync_handler:
 
 	mov	x0, sp
 	bl	sync_c_handler			// go to the c handler
-	dsb	sy
 
-	//restore_gp_regs
 	ldr	x0, [sp], #8
 	msr	elr_el2, x0
 	ldr	x0, [sp], #8
 	msr	spsr_el2, x0
 	ldr	x0, [sp], #8
 	msr	esr_el2, x0
-	isb
 	ldp     x0, x1, [sp], #16
 	ldp     x2, x3, [sp], #16
 	ldp     x4, x5, [sp], #16
@@ -229,7 +217,6 @@ __irq_handler:
 
 	mov	arg0, sp
 	bl	irq_c_handler		/* call the c irq handler */
-	nop
 
 	mrs	arg4, MPIDR_EL1		/* get the cpuid */
 #ifdef	CONFIG_MPIDR_SHIFT
@@ -244,39 +231,32 @@ __irq_handler:
 	add	cpuid, arg2, arg1
 
 	ldr	arg5, =__current_tasks
-	dsb	ld
 	lsl	arg1, cpuid, #3
 	add	ct_addr, arg5, arg1
 	ldr	ct, [ct_addr]
-	dsb	ld	
 
 	ldr	arg1, =__irq_stack_end	/* get the irq stack of the current cpu */
 	sub	arg1, arg1, cpuid, lsl #CONFIG_TASK_STACK_SHIFT
 
 	mov	arg0, sp
 	str	arg0, [ct]		/* store the current task's stack */
-	dsb	st
 
 	mov	sp, arg1
 	mov	arg0, ct
 	bl	irq_return_handler	/* to check whether need switch to a new task */
 
 	ldr	arg5, =__next_tasks	/* check whether need to switch to a new task */
-	dsb	ld
 	lsl	arg1, cpuid, #3
 	add	nt_addr, arg5, arg1
 	ldr	nt, [nt_addr]
-	dsb	ld
 
 	ldr	arg2, [ct]		/* load the stack of the current task */
-	dsb	ld
 
 	cmp	ct, nt
 	beq	__switch_to_task
 
 	ldr	arg2, [nt]
 	str	nt, [ct_addr]		/* current task = next task */
-	dsb 	sy
 
 __switch_to_task:
 	mov	sp, arg2		/* load the task's stack */
@@ -287,7 +267,6 @@ __switch_to_task:
 	msr	spsr_el2, x0
 	ldr	x0, [sp], #8
 	msr	esr_el2, x0
-	isb
 	ldp     x0, x1, [sp], #16
 	ldp     x2, x3, [sp], #16
 	ldp     x4, x5, [sp], #16
