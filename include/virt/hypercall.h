@@ -30,5 +30,6 @@
 #define HVC_CHANGE_LOG_LEVEL		HVC_VM0_FN(14)
 
 #define HVC_GET_VMID			HVC_MISC_FN(0)
+#define HVC_SCHED_OUT			HVC_MISC_FN(1)
 
 #endif

@@ -112,6 +112,10 @@ static int misc_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 	case HVC_GET_VMID:
 		HVC_RET1(c, vm->vmid);
 		break;
+	case HVC_SCHED_OUT:
+		sched();
+		HVC_RET1(c, 0);
+		break;
 	default:
 		break;
 	}
