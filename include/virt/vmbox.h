@@ -10,13 +10,16 @@
 
 struct vmbox_device {
 	int devid;
-	int vmbox_id;
 	int is_backend;
 	int state;
 	struct vm *vm;
+	struct vmbox *vmbox;
+
 	uint32_t vring_virq;
 	uint32_t ipc_virq;
-	void *dev_reg;
+	uint32_t ipc_type;
+	spinlock_t lock;
+
 	unsigned long iomem;
 	size_t iomem_size;
 	struct vmbox_controller *vc;
@@ -54,12 +57,15 @@ struct vmbox_hook_ops {
 };
 
 struct vmbox_controller {
-	void *pa;
 	void *va;
 	struct vm *vm;
 	int dev_cnt;
 	int status;
+
 	uint32_t virq;
+	uint32_t irq_state;
+	uint32_t dev_state;
+
 	struct list_head list;
 	struct vdev vdev;
 	struct vmbox_device *devices[32];
@@ -98,15 +104,10 @@ struct vmbox_controller {
 #define VMBOX_DEV_IPC_IRQ		0x28	/* RO */
 #define VMBOX_DEV_VRING_EVENT		0x2c	/* WO trigger a vring event */
 #define VMBOX_DEV_IPC_EVENT		0x30	/* WO trigger a config event */
-#define VMBOX_DEV_IPC_TYPE		0x34	/* RW */
-#define VMBOX_DEV_IPC_ACK		0x38	/* event ack */
-#define VMBOX_DEV_VDEV_ONLINE		0x3C	/* only for client device */
+#define VMBOX_DEV_VDEV_ONLINE		0x34	/* only for client device */
+#define VMBOX_DEV_IPC_TYPE		0x38	/* read and clear */
 
-#define VMBOX_DEV_EVENT_ONLINE		0x1
-#define VMBOX_DEV_EVENT_OFFLINE		0x2
-#define VMBOX_DEV_EVENT_OPENED		0x3
-#define VMBOX_DEV_EVENT_CLOSED		0x4
-#define VMBOX_DEV_EVENT_USER_BASE	0x1000
+#define VMBOX_DEV_IPC_COUNT		32
 
 int register_vmbox_hook(char *name, struct vmbox_hook_ops *ops);
 int of_create_vmbox(struct device_node *node);

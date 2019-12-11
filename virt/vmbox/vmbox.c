@@ -33,7 +33,7 @@
 #define BE_IDX		0
 #define FE_IDX		1
 
-#define VMBOX_DEV_VIRTQ_HEADER_SIZE	0x100
+#define VMBOX_IPC_ALL_ENTRY_SIZE	0x100
 
 struct vmbox_info {
 	int owner[2];
@@ -182,7 +182,7 @@ vmbox_virtq_vring_size(unsigned int qsz, unsigned long align)
 
 static inline size_t get_vmbox_iomem_header_size(struct vmbox_info *vinfo)
 {
-	size_t size = VMBOX_DEV_VIRTQ_HEADER_SIZE;
+	size_t size = VMBOX_IPC_ALL_ENTRY_SIZE;
 
 	/*
 	 * calculate the vring desc size first, each vmbox will
@@ -213,7 +213,8 @@ static struct vmbox_device *create_vmbox_device(struct vmbox *vmbox, int idx)
 	if (!vdev)
 		return NULL;
 
-	vdev->vmbox_id = vmbox->id;
+	spin_lock_init(&vdev->lock);
+	vdev->vmbox= vmbox;
 	vdev->is_backend = (idx == BE_IDX);
 	vdev->vm = get_vm_by_id(vmbox->owner[idx]);
 
@@ -282,6 +283,10 @@ static int create_vmbox(struct vmbox_info *vinfo)
 	 * that get_io_pages can not get memory which bigger than
 	 * 2M. if need to get memory bigger than 2M can use
 	 * alloc_mem_block and map these memory to IO memory ?
+	 *
+	 * if the vmbox use fix shared memory size, the shmem_size
+	 * will be set before this fucntion, otherwise it means
+	 * the vmbox is use virtq mode
 	 */
 	if (!vinfo->shmem_size) {
 		iomem_size = get_vmbox_iomem_size(vinfo);
@@ -290,7 +295,6 @@ static int create_vmbox(struct vmbox_info *vinfo)
 		iomem_size = PAGE_BALIGN(vinfo->shmem_size);
 	}
 
-	vmbox->shmem_size = iomem_size;
 	vmbox->shmem = get_io_pages(PAGE_NR(iomem_size));
 	if (!vmbox->shmem)
 		panic("no more memory for %s\n", vinfo->type);
@@ -298,6 +302,10 @@ static int create_vmbox(struct vmbox_info *vinfo)
 	/* init all the header memory to zero */
 	if (!vinfo->shmem_size)
 		memset(vmbox->shmem, 0, get_vmbox_iomem_header_size(vinfo));
+	else
+		memset(vmbox->shmem, 0, VMBOX_IPC_ALL_ENTRY_SIZE);
+
+	vmbox->shmem_size = iomem_size;
 
 	if (create_vmbox_devices(vmbox))
 		pr_err("create vmbox device for %s failed\n", vmbox->name);
@@ -363,32 +371,8 @@ struct vmbox_controller *vmbox_get_controller(struct vm *vm)
 	return NULL;
 }
 
-static void inline
-__vmbox_device_online(struct vmbox_controller *vc, int id)
-{
-	uint32_t value;
-	void *iomem;
-
-	/* set the device online for the VM */
-	iomem = vc->pa;
-	value = ioread32(iomem + VMBOX_CON_DEV_STAT);
-	value |= (1 << id);
-	iowrite32(value, iomem + VMBOX_CON_DEV_STAT);
-
-	/*
-	 * if the controller of this vmbox_device is areadly
-	 * online then send a virq to the VM
-	 */
-	if (vc->status) {
-		iowrite32(VMBOX_CON_INT_TYPE_DEV_ONLINE,
-			iomem + VMBOX_CON_INT_STATUS);
-		send_virq_to_vm(vc->vm, vc->virq);
-	}
-}
-
 static int vmbox_device_attach(struct vmbox *vmbox, struct vmbox_device *vdev)
 {
-	void *iomem;
 	struct vmm_area *va;
 	struct vm *vm = vdev->vm;
 	struct vmbox_controller *_vc;
@@ -404,10 +388,6 @@ static int vmbox_device_attach(struct vmbox *vmbox, struct vmbox_device *vdev)
 	}
 
 	vdev->vc = _vc;
-	iomem = _vc->pa + VMBOX_CON_DEV_BASE + _vc->dev_cnt *
-		VMBOX_CON_DEV_SIZE;
-
-	vdev->dev_reg = iomem;
 	vdev->vring_virq = alloc_vm_virq(vm);
 	vdev->ipc_virq = alloc_vm_virq(vm);
 	if (!vdev->vring_virq || !vdev->ipc_virq)
@@ -416,7 +396,7 @@ static int vmbox_device_attach(struct vmbox *vmbox, struct vmbox_device *vdev)
 	/* platform device has already alloc virtual memory */
 	if (!vdev->iomem) {
 		va = alloc_free_vmm_area(&vm->mm, vmbox->shmem_size,
-				PAGE_MASK, VM_MAP_PT | VM_IO);
+				PAGE_MASK, VM_MAP_P2P);
 		if (!va)
 			return -ENOMEM;
 		vdev->iomem = va->start;
@@ -426,36 +406,20 @@ static int vmbox_device_attach(struct vmbox *vmbox, struct vmbox_device *vdev)
 
 	vdev->devid = _vc->dev_cnt++;
 	_vc->devices[vdev->devid] = vdev;
-
-	/* write the device information to the controller */
-	memset(vdev->dev_reg, 0, VMBOX_CON_DEV_SIZE);
-	iowrite32(vdev->devid | VMBOX_DEVICE_MAGIC, iomem + VMBOX_DEV_ID);
-	iowrite32(vmbox->vqs, iomem + VMBOX_DEV_VQS);
-	iowrite32(vmbox->vring_num, iomem + VMBOX_DEV_VRING_NUM);
-	iowrite32(vmbox->vring_size, iomem + VMBOX_DEV_VRING_SIZE);
-	iowrite32((unsigned long)vdev->iomem >> 32,
-			iomem + VMBOX_DEV_VRING_BASE_HI);
-	iowrite32((unsigned long)vdev->iomem & 0xffffffff,
-			iomem + VMBOX_DEV_VRING_BASE_LOW);
-	iowrite32(vdev->iomem_size, iomem + VMBOX_DEV_MEM_SIZE);
-
-	/*
-	 * client device and host device's device id, which
-	 * is paired
-	 */
-	if (vdev->is_backend)
-		iowrite32(vmbox->devid[0], iomem + VMBOX_DEV_DEVICE_ID);
-	else
-		iowrite32(vmbox->devid[0] + 1, iomem + VMBOX_DEV_DEVICE_ID);
-
-	iowrite32(vmbox->devid[1], iomem + VMBOX_DEV_VENDOR_ID);
-	iowrite32(vdev->vring_virq, iomem + VMBOX_DEV_VRING_IRQ);
-	iowrite32(vdev->ipc_virq, iomem + VMBOX_DEV_IPC_IRQ);
-
 	wmb();
 
-	__vmbox_device_online(_vc, vdev->devid);
-	pr_notice("vmbox device %s online for vm%d\n", vmbox->name, vm->vmid);
+	/*
+	 * set the device online for the vm
+	 * if the controller of this vmbox_device is areadly
+	 * online then send a virq to the VM, or if there
+	 * are pending virqs for this controller, send a virq
+	 * too
+	 */
+	 _vc->dev_state |= (1 << vdev->devid);
+	 _vc->irq_state |= VMBOX_CON_INT_TYPE_DEV_ONLINE;
+
+	if (_vc->status)
+		send_virq_to_vm(_vc->vm, _vc->virq);
 
 	return 0;
 }
@@ -487,39 +451,106 @@ static void vmbox_con_online(struct vmbox_controller *vc)
 				pr_err("vmbox device attached failed\n");
 		}
 	}
+
+	/*
+	 * if there are devices online on this controller, and
+	 * there is pending virqs, send the virq to the VM
+	 */
+	if (vc->irq_state)
+		send_virq_to_vm(vc->vm, vc->virq);
 }
 
-static int vmbox_con_read(struct vdev *vdev, gp_regs *regs,
-		unsigned long address, unsigned long *value)
-{
-	panic("Can not trap read IO operation for vmbox controller\n");
-	return 0;
-}
-
-static int vmbox_handle_con_request(struct vmbox_controller *vc,
+static int vmbox_handle_con_read(struct vmbox_controller *vc,
 		unsigned long offset, unsigned long *value)
 {
-	uint32_t v;
-
 	switch (offset) {
-	case VMBOX_CON_ONLINE:
-		vc->status = 1;
-		vmbox_con_online(vc);
+	case VMBOX_CON_DEV_STAT:
+		*value = vc->dev_state;
 		break;
 	case VMBOX_CON_INT_STATUS:
-		/* write value to clear the cosponding irq */
-		v = ioread32(vc->pa + VMBOX_CON_INT_STATUS);
-		v &= ~(*value);
-		iowrite32(v, vc->pa + VMBOX_CON_INT_STATUS);
+		/* once read, clear the status */
+		*value = vc->irq_state;
+		vc->irq_state = 0;
 		break;
 	default:
+		*value = 0;
 		break;
 	}
 
 	return 0;
 }
 
-static int vmbox_handle_dev_request(struct vmbox_controller *vc,
+static int inline __vmbox_handle_dev_read(struct vmbox_device *vdev,
+		int reg, unsigned long *v)
+{
+	unsigned long flags;
+	struct vmbox *vmbox = vdev->vmbox;
+
+	switch (reg) {
+	case VMBOX_DEV_IPC_TYPE:
+		/* read and clear */
+		spin_lock_irqsave(&vdev->lock, flags);
+		*v = vdev->ipc_type;
+		vdev->ipc_type = 0;
+		spin_unlock_irqrestore(&vdev->lock, flags);
+		break;
+
+	case VMBOX_DEV_DEVICE_ID:
+		if (vdev->is_backend)
+			*v = vmbox->devid[0];
+		else
+			*v = vmbox->devid[0] + 1;
+		break;
+
+	case VMBOX_DEV_VQS:
+		*v = vmbox->vqs;
+		break;
+
+	case VMBOX_DEV_VRING_NUM:
+		*v = vmbox->vring_num;
+		break;
+
+	case VMBOX_DEV_VRING_SIZE:
+		*v = vmbox->vring_size;
+		break;
+
+	case VMBOX_DEV_VRING_BASE_HI:
+		*v = (unsigned long)vdev->iomem >> 32;
+		break;
+
+	case VMBOX_DEV_VRING_BASE_LOW:
+		*v = (unsigned long)vdev->iomem & 0xffffffff;
+		break;
+
+	case VMBOX_DEV_MEM_SIZE:
+		*v = vdev->iomem_size;
+		break;
+
+	case VMBOX_DEV_ID:
+		*v = vdev->devid | VMBOX_DEVICE_MAGIC;
+		break;
+
+	case VMBOX_DEV_VENDOR_ID:
+		*v = vmbox->devid[1];
+		break;
+
+	case VMBOX_DEV_VRING_IRQ:
+		*v = vdev->vring_virq;
+		break;
+
+	case VMBOX_DEV_IPC_IRQ:
+		*v = vdev->ipc_virq;
+		break;
+
+	default:
+		*v = 0;
+		break;
+	}
+
+	return 0;
+}
+
+static int vmbox_handle_dev_read(struct vmbox_controller *vc,
 		unsigned long offset, unsigned long *value)
 {
 	int devid;
@@ -541,9 +572,63 @@ static int vmbox_handle_dev_request(struct vmbox_controller *vc,
 		return -ENOENT;
 	}
 
+	return __vmbox_handle_dev_read(vdev, reg, value);
+}
+
+static int vmbox_con_read(struct vdev *vdev, gp_regs *regs,
+		unsigned long address, unsigned long *value)
+{
+	struct vmbox_controller *vc = vdev_to_vmbox_con(vdev);
+	unsigned long offset = address - (unsigned long)vc->va;
+
+	if (offset < VMBOX_CON_DEV_BASE)
+		return vmbox_handle_con_read(vc, offset, value);
+	else
+		return vmbox_handle_dev_read(vc, offset, value);
+}
+
+static int vmbox_handle_con_write(struct vmbox_controller *vc,
+		unsigned long offset, unsigned long *value)
+{
+	switch (offset) {
+	case VMBOX_CON_ONLINE:
+		vc->status = 1;
+		vmbox_con_online(vc);
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+static int vmbox_handle_dev_write(struct vmbox_controller *vc,
+		unsigned long offset, unsigned long *value)
+{
+	int devid, need_notify = 0;
+	uint32_t reg;
+	unsigned long flags;
+	struct vmbox_device *vdev, *bro;
+
+	offset -= VMBOX_CON_DEV_BASE;
+	devid = offset / VMBOX_CON_DEV_SIZE;
+	reg = offset % VMBOX_CON_DEV_SIZE;
+
+	if (devid >= sizeof(vc->devices)) {
+		pr_err("vmbox devid invaild %d\n");
+		return -EINVAL;
+	}
+
+	vdev = vc->devices[devid];
+	if (!vdev) {
+		pr_err("no such device %d\n", devid);
+		return -ENOENT;
+	}
+	bro = vdev->bro;
+
 	switch (reg) {
 	case VMBOX_DEV_VRING_EVENT:
-		if (!vdev->bro->state)
+		if (!bro->state)
 			return 0;
 
 		send_virq_to_vm(vdev->bro->vm, vdev->bro->vring_virq);
@@ -553,25 +638,18 @@ static int vmbox_handle_dev_request(struct vmbox_controller *vc,
 		 * write the event_reg and send a virq to the vm
 		 * wait last event finised
 		 */
-		if (!vdev->bro->state)
+		if (!bro->state || (*value >= VMBOX_DEV_IPC_COUNT))
 			return 0;
-#if 0
-		do {
-			/* here will cause deadlock need to be fixed later */
-			reg = ioread32(vdev->bro->dev_reg + VMBOX_DEV_IPC_TYPE);
-			if (reg == 0)
-				break;
-			if (reg == *value)
-				return 0;
-			sched();
-		} while (1);
-#endif
 
-		iowrite32(*value, vdev->bro->dev_reg + VMBOX_DEV_IPC_TYPE);
-		send_virq_to_vm(vdev->bro->vm, vdev->bro->ipc_virq);
-		break;
-	case VMBOX_DEV_IPC_ACK:
-		iowrite32(0, vdev->dev_reg + VMBOX_DEV_IPC_TYPE);
+		spin_lock_irqsave(&bro->lock, flags);
+		if (!(bro->ipc_type & (1 << *value))) {
+			bro->ipc_type |= (1 << *value);
+			need_notify = 1;
+		}
+		spin_unlock_irqrestore(&bro->lock, flags);
+
+		if (need_notify)
+			send_virq_to_vm(vdev->bro->vm, vdev->bro->ipc_virq);
 		break;
 	case VMBOX_DEV_VDEV_ONLINE:
 		/*
@@ -584,17 +662,11 @@ static int vmbox_handle_dev_request(struct vmbox_controller *vc,
 		 * then send a virq to backend
 		 */
 		vdev->state = VMBOX_DEV_STAT_ONLINE;
+		pr_notice("vmbox device %s online for vm%d\n",
+				vdev->vmbox->name, vdev->vm->vmid);
 
-		if (!vdev->is_backend) {
-			pr_notice("frontend vmbox device online\n");
-			iowrite32(VMBOX_DEV_EVENT_ONLINE,
-					vdev->bro->dev_reg + VMBOX_DEV_IPC_TYPE);
-			send_virq_to_vm(vdev->bro->vm, vdev->bro->ipc_virq);
-			return 0;
-		} else {
-			pr_notice("backend vmbox device online\n");
-			vmbox_device_attach(vmboxs[vdev->vmbox_id], vdev->bro);
-		}
+		if (vdev->is_backend)
+			vmbox_device_attach(vdev->vmbox, vdev->bro);
 		break;
 	default:
 		pr_err("unsupport reg 0x%x\n", reg);
@@ -611,9 +683,9 @@ static int vmbox_con_write(struct vdev *vdev, gp_regs *regs,
 	unsigned long offset = address - (unsigned long)vc->va;
 
 	if (offset < VMBOX_CON_DEV_BASE)
-		return vmbox_handle_con_request(vc, offset, value);
+		return vmbox_handle_con_write(vc, offset, value);
 	else
-		return vmbox_handle_dev_request(vc, offset, value);
+		return vmbox_handle_dev_write(vc, offset, value);
 }
 
 static void vmbox_con_deinit(struct vdev *vdev)
@@ -721,17 +793,14 @@ static int vm_create_vmbox_controller(struct vm *vm)
 		return -ENOENT;
 	}
 
-	vc->pa = get_io_page();
-	if (!vc->pa) {
-		free(vc);
-		return -ENOMEM;
-	}
-
 	vc->va = (void *)va->start;
-	map_vmm_area(&vm->mm, va, (unsigned long)vc->pa);
 	vc->vm = vm;
-	memset(vc->pa, 0, VMBOX_CON_DEV_BASE);
 
+	/*
+	 * register the vmbox controller for the vm, all the
+	 * operation (read/write) on the virtual address will
+	 * be trap to hypervisor
+	 */
 	host_vdev_init(vm, &vc->vdev, (unsigned long)vc->va, PAGE_SIZE);
 	vc->vdev.read = vmbox_con_read;
 	vc->vdev.write = vmbox_con_write;
