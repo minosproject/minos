@@ -396,7 +396,7 @@ static int vmbox_device_attach(struct vmbox *vmbox, struct vmbox_device *vdev)
 	/* platform device has already alloc virtual memory */
 	if (!vdev->iomem) {
 		va = alloc_free_vmm_area(&vm->mm, vmbox->shmem_size,
-				PAGE_MASK, VM_MAP_P2P);
+				PAGE_MASK, VM_MAP_P2P | VM_IO);
 		if (!va)
 			return -ENOMEM;
 		vdev->iomem = va->start;
@@ -631,7 +631,7 @@ static int vmbox_handle_dev_write(struct vmbox_controller *vc,
 		if (!bro->state)
 			return 0;
 
-		send_virq_to_vm(vdev->bro->vm, vdev->bro->vring_virq);
+		send_virq_to_vm(bro->vm, bro->vring_virq);
 		break;
 	case VMBOX_DEV_IPC_EVENT:
 		/*
@@ -649,7 +649,7 @@ static int vmbox_handle_dev_write(struct vmbox_controller *vc,
 		spin_unlock_irqrestore(&bro->lock, flags);
 
 		if (need_notify)
-			send_virq_to_vm(vdev->bro->vm, vdev->bro->ipc_virq);
+			send_virq_to_vm(bro->vm, bro->ipc_virq);
 		break;
 	case VMBOX_DEV_VDEV_ONLINE:
 		/*
