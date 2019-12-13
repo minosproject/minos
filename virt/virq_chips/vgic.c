@@ -16,8 +16,8 @@
 
 #include <minos/minos.h>
 #include <virt/virq.h>
-#include <minos/of.h>
 #include <virt/virq_chip.h>
+#include <minos/of.h>
 #include <libfdt/libfdt.h>
 
 /*
@@ -47,7 +47,6 @@ int vgic_irq_enter_to_guest(struct vcpu *vcpu, void *data)
 	 */
 	int id = 0;
 	struct virq_desc *virq, *n;
-	struct virq_chip *vc = vcpu->vm->virq_chip;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
 
 	list_for_each_entry_safe(virq, n, &virq_struct->pending_list, list) {
@@ -56,7 +55,7 @@ int vgic_irq_enter_to_guest(struct vcpu *vcpu, void *data)
 			virq->state = 0;
 			if (virq->id != VIRQ_INVALID_ID) {
 				virqchip_update_virq(vcpu, virq, VIRQ_ACTION_CLEAR);
-				clear_bit(virq->id, virq_struct->irq_bitmap);
+				ffs_table_unmask_bit(&virq_struct->lrs_table, virq->id);
 				virq->id = VIRQ_INVALID_ID;
 			}
 			list_del(&virq->list);
@@ -78,15 +77,13 @@ int vgic_irq_enter_to_guest(struct vcpu *vcpu, void *data)
 			goto __do_send_virq;
 
 		/* allocate a id for the virq */
-		id = find_next_zero_bit(virq_struct->irq_bitmap, vc->nr_lrs, 0);
-		if (id == vc->nr_lrs) {
+		id = ffs_table_get_and_mask_one_bit(&virq_struct->lrs_table);
+		if (id < 0) {
 			pr_warn("virq id is full can not send all virq\n");
 			break;
 		}
 
 		virq->id = id;
-		set_bit(id, virq_struct->irq_bitmap);
-
 __do_send_virq:
 		virqchip_send_virq(vcpu, virq);
 		virq->state = VIRQ_STATE_PENDING;
@@ -124,7 +121,7 @@ int vgic_irq_exit_from_guest(struct vcpu *vcpu, void *data)
 		if (status == VIRQ_STATE_INACTIVE) {
 			if (!virq_is_pending(virq)) {
 				virqchip_update_virq(vcpu, virq, VIRQ_ACTION_CLEAR);
-				clear_bit(virq->id, virq_struct->irq_bitmap);
+				ffs_table_unmask_bit(&virq_struct->lrs_table, virq->id);
 				virq->state = VIRQ_STATE_INACTIVE;
 				list_del(&virq->list);
 				virq->id = VIRQ_INVALID_ID;
@@ -150,3 +147,24 @@ int vgic_generate_virq(uint32_t *array, int virq)
 
 	return 3;
 }
+
+static int vgic_vcpu_init(void *item, void *contex)
+{
+#if defined(CONFIG_VIRQCHIP_VGICV2) || defined(CONFIG_VIRQCHIP_VGICV3)
+	struct vcpu *vcpu = (struct vcpu *)item;
+	struct virq_chip *vc = vcpu->vm->virq_chip;
+
+	if (vc->nr_lrs > FFS_TABLE_NR_BITS)
+		panic("BUG : Minos virq chiq only support max %d lrs\n",
+				FFS_TABLE_NR_BITS);
+
+	ffs_table_init_and_unmask(&vcpu->virq_struct->lrs_table, vc->nr_lrs);
+#endif
+	return 0;
+}
+
+int vcpu_vgic_hook_init(void)
+{
+	return register_hook(vgic_vcpu_init, OS_HOOK_VCPU_INIT);
+}
+module_initcall(vcpu_vgic_hook_init);

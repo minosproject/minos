@@ -135,7 +135,7 @@ int split_memory_region(phy_addr_t base, size_t size, uint32_t flags)
 
 int memory_region_type(struct memory_region *region)
 {
-	return ffs_table[region->flags & 0xff];
+	return ffs_one_table[region->flags & 0xff];
 }
 
 static void dump_memory_info(void)

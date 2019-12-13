@@ -132,7 +132,8 @@ typedef void (*void_func_t)(void);
 
 #define NR_CPUS		CONFIG_NR_CPUS
 
-extern uint8_t const ffs_table[256];
+extern uint8_t const ffs_one_table[256];
+extern uint8_t const ffs_zero_table[256];
 
 typedef uint32_t flag_t;
 

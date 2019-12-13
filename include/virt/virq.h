@@ -87,7 +87,7 @@ struct virq_struct {
 	struct virq_desc local_desc[VM_LOCAL_VIRQ_NR];
 #if defined(CONFIG_VIRQCHIP_VGICV2) || defined(CONFIG_VIRQCHIP_VGICV3)
 #define MAX_NR_LRS 64
-	DECLARE_BITMAP(irq_bitmap, MAX_NR_LRS);
+	struct ffs_table lrs_table;
 #endif
 };
 
@@ -225,5 +225,11 @@ static void inline release_gvm_virq(struct vm *vm, int virq)
 {
 	return release_vm_virq(vm, virq);
 }
+
+struct virq_chip *alloc_virq_chip(void);
+int virqchip_get_virq_state(struct vcpu *vcpu, struct virq_desc *virq);
+void virqchip_send_virq(struct vcpu *vcpu, struct virq_desc *virq);
+void virqchip_update_virq(struct vcpu *vcpu,
+		struct virq_desc *virq, int action);
 
 #endif

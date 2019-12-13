@@ -178,8 +178,8 @@ struct task *get_highest_task(uint8_t group, prio_t *ready)
 {
 	uint8_t x, y;
 	
-	y = ffs_table[group];
-	x = ffs_table[ready[y]];
+	y = ffs_one_table[group];
+	x = ffs_one_table[ready[y]];
 
 	return os_task_table[(y << 3) + x];
 }
@@ -250,8 +250,8 @@ static void sched_new(struct pcpu *pcpu)
 			continue;
 		}
 
-		y = ffs_table[rdy_grp];
-		x = ffs_table[rdy_table[y]];
+		y = ffs_one_table[rdy_grp];
+		x = ffs_one_table[rdy_table[y]];
 		p = (y << 3) + x;
 		ncpu_highest[i] = p;
 
@@ -300,8 +300,8 @@ static void sched_new(struct pcpu *pcpu)
 	if (__os_rdy_table == 0)
 		return;
 
-	y = ffs_table[os_rdy_grp];
-	x = ffs_table[os_rdy_table[y]];
+	y = ffs_one_table[os_rdy_grp];
+	x = ffs_one_table[os_rdy_table[y]];
 	p = (y << 3) + x;
 	os_highest_rdy[0] = p;
 	dsb();

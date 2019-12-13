@@ -877,8 +877,10 @@ int vm_vcpus_init(struct vm *vm)
 	}
 
 	/* some task will excuted after this function */
-	vm_for_each_vcpu(vm, vcpu)
+	vm_for_each_vcpu(vm, vcpu) {
+		do_hooks(vcpu, NULL, OS_HOOK_VCPU_INIT);
 		vm->os->ops->vcpu_init(vcpu);
+	}
 
 	return 0;
 }
