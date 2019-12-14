@@ -23,6 +23,7 @@
 			vm_name = "rpi4_linux_host";
 			type = "linux";
 			vm_32bit;
+			native_wfi;
 			vcpus = <2>;
 			entry = <0x0 0x00008000>;
 			setup_data = <0x0 0x03e00000>;
@@ -37,6 +38,7 @@
 			vm_name = "rpi4_vm1";
 			type = "linux";
 			vm_32bit;
+			native_wfi;
 			vcpus = <1>;
 			entry = <0x0 0x30008000>;
 			setup_data = <0x0 0x33e00000>;

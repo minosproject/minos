@@ -21,7 +21,8 @@
 			vmid = <0>;
 			vm_name = "fvp_linux_host";
 			type = "linux";
-			vcpus = <1>;
+			native_wfi;
+			vcpus = <2>;
 			entry = <0x0 0x80080000>;
 			setup_data = <0x0 0x83e00000>;
 			vcpu_affinity = <0 1 2 3>;
@@ -36,7 +37,8 @@
 			vcpus = <1>;
 			entry = <0x0 0x90080000>;
 			setup_data = <0x0 0x97e00000>;
-			vcpu_affinity = <1>;
+			vcpu_affinity = <2>;
+			native_wfi;
 			memory = <0x0 0x90000000 0x0 0x08000000>;
 		};
 
