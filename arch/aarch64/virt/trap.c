@@ -490,6 +490,9 @@ void sync_from_lower_EL_handler(gp_regs *data)
 	 * how to deal with the return value
 	 * TBD
 	 */
+	if (ec->irq_safe)
+		local_irq_enable();
+
 	data->elr_elx += ec->ret_addr_adjust;
 	ec->handler(data, esr_value);
 out:
