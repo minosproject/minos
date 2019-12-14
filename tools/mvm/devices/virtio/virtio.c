@@ -213,11 +213,10 @@ int virtq_get_descs(struct virt_queue *vq,
 	uint32_t count;
 	int iov_index = 0, ret;
 
-	rmb();
-
 	last_avail_idx = vq->last_avail_idx;
 	avail_idx = vq->avail->idx;
 	vq->avail_idx = avail_idx;
+	mb();
 
 	/* to avoid uint16_t overflow */
 	count = (uint16_t)((uint32_t)avail_idx - last_avail_idx);
