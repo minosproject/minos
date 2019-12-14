@@ -128,8 +128,8 @@ static inline void ffs_table_unmask_bit(struct ffs_table *tbl, int bit)
 {
 	int x, y;
 
-	x = bit >> 3;
-	y = bit % 8;
+	y = bit >> 3;
+	x = bit % 8;
 
 	tbl->grp |= (1 << y);
 	tbl->bits[y] |= (1 << x);

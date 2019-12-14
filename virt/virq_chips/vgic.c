@@ -154,6 +154,9 @@ static int vgic_vcpu_init(void *item, void *contex)
 	struct vcpu *vcpu = (struct vcpu *)item;
 	struct virq_chip *vc = vcpu->vm->virq_chip;
 
+	if (!(vc->flags & VIRQCHIP_F_HW_VIRT))
+		return 0;
+
 	if (vc->nr_lrs > FFS_TABLE_NR_BITS)
 		panic("BUG : Minos virq chiq only support max %d lrs\n",
 				FFS_TABLE_NR_BITS);
