@@ -208,10 +208,17 @@ void kick_vcpu(struct vcpu *vcpu, int preempt)
 	unsigned long flags;
 
 	task_lock_irqsave(vcpu->task, flags);
+
+	/*
+	 * if vcpu need preempt, ususally it will caused
+	 * by a hardware irq arrive
+	 */
 	if (!task_is_ready(vcpu->task)) {
 		vcpu->task->stat = TASK_STAT_RDY;
 		set_task_ready(vcpu->task, preempt);
-	}
+	} else if (preempt && (current->affinity != vcpu_affinity(vcpu)))
+		pcpu_resched(vcpu_affinity(vcpu));
+
 	task_unlock_irqrestore(vcpu->task, flags);
 }
 

@@ -40,6 +40,18 @@ static void inline virq_kick_vcpu(struct vcpu *vcpu,
 		struct virq_desc *desc)
 {
 	kick_vcpu(vcpu, virq_is_hw(desc));
+
+	/*
+	 * if the virq is not hardware virq, when the native
+	 * wfi is enabled for the target vcpu, the target vcpu
+	 * may not receive the virq immediately, and may wait
+	 * last physical irq come, then this pcpu can wakeup
+	 * from the WFI mode, so here need to send a phyical
+	 * irq to the target pcpu
+	 */
+	if (!virq_is_hw(desc) && (vcpu->vm->flags & VM_FLAGS_NATIVE_WFI) &&
+			(current->affinity != vcpu_affinity(vcpu)))
+		pcpu_resched(vcpu_affinity(vcpu));
 }
 
 static int inline __send_virq(struct vcpu *vcpu, struct virq_desc *desc)
