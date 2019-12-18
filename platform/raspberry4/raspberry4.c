@@ -203,8 +203,42 @@ static void raspberry4_system_shutdown(void)
  */
 static void raspberry4_parse_mem_info(void)
 {
-	add_memory_region(0x40000000, 0xbc000000, MEMORY_REGION_F_NORMAL);
-	//add_memory_region(0x00000000, 0x3b400000, MEMORY_REGION_F_NORMAL);
+	int node, len;
+	fdt32_t *v;
+	unsigned long base, size;
+
+	/*
+	 * need to parse other memory region to support 2G or 4G
+	 * rpi-4 version, currently, use a simple way, the memory
+	 * information will store in bootargs/extra-memory field in
+	 * minos device tree
+	 */
+	if (!hv_dtb)
+		return;
+
+	node = fdt_path_offset(hv_dtb, "/chosen");
+	if (node <= 0)
+		return;
+
+	v = (fdt32_t *)fdt_getprop(hv_dtb, node, "extra-memory", &len);
+	if (!v || (len < 8))
+		return;
+
+	len = len / 4;
+	if (len % 2 != 0) {
+		pr_err("wrong memory config in extra-memory\n");
+		return;
+	}
+
+	while (len > 0) {
+		base = fdt32_to_cpu(v[0]);
+		size = fdt32_to_cpu(v[1]);
+
+		pr_notice("register extra memory region 0x%x 0x%x\n", base, size);
+		add_memory_region(base, size, MEMORY_REGION_F_NORMAL);
+		len -= 2;
+		v += 2;
+	}
 }
 
 static struct platform platform_raspberry4 = {

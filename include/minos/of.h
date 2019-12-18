@@ -16,6 +16,7 @@ typedef fdt64_t of64_t;
 typedef void * (*of_iterate_fn)(struct device_node *, void *arg);
 
 extern struct device_node *hv_node;
+extern void *hv_dtb;
 
 #define of_node_for_each_child(node, child)	\
 	for (child = node->child; child != NULL; child = child->sibling)
