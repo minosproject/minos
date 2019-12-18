@@ -258,8 +258,5 @@ int virtual_timer_irq_handler(uint32_t irq, void *data)
 	write_sysreg32(value, CNTV_CTL_EL0);
 	dsb();
 
-	if (!vm_is_native(vcpu->vm))
-		irq = GVM_VIRT_TIMER_INT;
-
-	return send_virq_to_vcpu(vcpu, irq);
+	return send_virq_to_vcpu(vcpu, vcpu->vm->vtimer_virq);
 }

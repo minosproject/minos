@@ -85,6 +85,7 @@ struct vm {
 	struct virq_desc *vspi_desc;
 	unsigned long *vspi_map;
 	struct virq_chip *virq_chip;
+	uint32_t vtimer_virq;
 
 	void *vmcs;
 	void *hvm_vmcs;
