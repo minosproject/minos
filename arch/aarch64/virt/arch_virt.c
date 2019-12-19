@@ -28,7 +28,6 @@
 #include <minos/platform.h>
 #include <minos/task.h>
 #include <virt/vm.h>
-#include <common/gvm.h>
 #include <asm/vtimer.h>
 #include <virt/virq.h>
 
