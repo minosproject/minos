@@ -22,9 +22,14 @@
 LIST_HEAD(os_list);
 struct os *default_os;
 
+extern void arch_init_vcpu(struct vcpu *vcpu, void *entry, void *arg);
+
 static void default_vcpu_init(struct vcpu *vcpu)
 {
-	vcpu_online(vcpu);
+	if (get_vcpu_id(vcpu) == 0) {
+		arch_init_vcpu(vcpu, (void *)vcpu->vm->entry_point, NULL);
+		vcpu_online(vcpu);
+	}
 }
 
 struct os_ops default_os_ops = {

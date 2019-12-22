@@ -75,6 +75,7 @@ struct vm {
 	struct mm_struct mm;
 	struct os *os;
 	struct list_head vm_list;
+	struct device_node *dev_node;	/* the device node in dts */
 
 	unsigned long time_offset;
 
@@ -91,6 +92,8 @@ struct vm {
 	void *hvm_vmcs;
 	void *resource;
 } __align(sizeof(unsigned long));
+
+#define vm_name(vm)	devnode_name(vm->dev_node)
 
 extern struct vm *vms[CONFIG_MAX_VM];
 

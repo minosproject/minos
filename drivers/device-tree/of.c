@@ -415,22 +415,12 @@ static void *__iterate_device_node(struct device_node *node,
 void *of_iterate_all_node_loop(struct device_node *node,
 		of_iterate_fn func, void *arg)
 {
-	if (!device_node_is_root(node)) {
-		pr_err("root_device_node is not root\n");
-		return NULL;
-	}
-
 	return __iterate_device_node(node, func, arg, 1);
 }
 
 void *of_iterate_all_node(struct device_node *node,
 		of_iterate_fn func, void *arg)
 {
-	if (!device_node_is_root(node)) {
-		pr_err("root_device_node is not root\n");
-		return NULL;
-	}
-
 	return __iterate_device_node(node, func, arg, 0);
 }
 

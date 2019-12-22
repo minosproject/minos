@@ -32,6 +32,12 @@ static int hvc_be_init(struct vm *vm, struct vmbox *vmbox,
 	struct vmm_area *va;
 	void *dtb = vm->setup_data;
 
+	/*
+	 * only linux system need do this
+	 */
+	if (vmbox->flags & VMBOX_F_PLATFORM_DEV)
+		return 0;
+
 	pr_notice("register hvc platform device for vm%d\n", vm->vmid);
 
 	vc = vmbox_get_controller(vm);

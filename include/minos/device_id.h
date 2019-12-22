@@ -43,6 +43,8 @@ struct device_node {
 	unsigned long flags;
 };
 
+#define devnode_name(node)	node->name
+
 struct module_id {
 	const char *name;
 	char **comp;

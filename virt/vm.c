@@ -790,19 +790,42 @@ int vm_create_host_vdev(struct vm *vm)
 
 static int vm_create_resource(struct vm *vm)
 {
+	char name[32];
+	struct device_node *node;
+
 	/* 
+	 * here need to create the resource based on the vm's
+	 * os, when the os is a linux system, usually it will
+	 * used device tree, if the os is rtos, need to write
+	 * the iomem and virqs in the hypervisor's device tree
+	 *
+	 * here to check whether there are information in the
+	 * hypervisor's dts, if not then try to parsing the dtb
+	 * of the VM
+	 *
 	 * first map the dtb address to the hypervisor, here
 	 * map these native VM's memory as read only
 	 */
-	create_host_mapping((vir_addr_t)vm->setup_data,
-			(phy_addr_t)vm->setup_data, MEM_BLOCK_SIZE, VM_RO);
+	memset(name, 0, 32);
+	sprintf(name, "vm%d_bdi", vm->vmid);
 
-	if (of_data(vm->setup_data)) {
-		vm->flags |= VM_FLAGS_SETUP_OF;
-		create_vm_resource_of(vm, vm->setup_data);
+	node = of_find_node_by_name(vm->dev_node, name);
+	if (node)
+		create_vm_resource_common(vm, node);
+
+	if (vm->setup_data) {
+		create_host_mapping((vir_addr_t)vm->setup_data,
+				(phy_addr_t)vm->setup_data,
+				MEM_BLOCK_SIZE, VM_RO);
+
+		if (of_data(vm->setup_data)) {
+			vm->flags |= VM_FLAGS_SETUP_OF;
+			create_vm_resource_of(vm, vm->setup_data);
+		}
+
+		destroy_host_mapping((vir_addr_t)vm->setup_data,
+				MEM_BLOCK_SIZE);
 	}
-
-	destroy_host_mapping((vir_addr_t)vm->setup_data, MEM_BLOCK_SIZE);
 
 	return 0;
 }
@@ -1046,6 +1069,8 @@ static void *create_native_vm_of(struct device_node *node, void *arg)
 		return NULL;
 	}
 
+	vm->dev_node = node;
+
 	/* parse the memory information of the vm from dtb */
 	ret = of_get_u64_array(node, "memory", meminfo, 2 * VM_MAX_MEM_REGIONS);
 	if ((ret <= 0) || ((ret % 2) != 0)) {
@@ -1068,7 +1093,11 @@ static void *create_native_vm_of(struct device_node *node, void *arg)
 static void parse_and_create_vms(void)
 {
 #ifdef CONFIG_DEVICE_TREE
-	of_iterate_all_node_loop(hv_node, create_native_vm_of, NULL);
+	struct device_node *node;
+
+	node = of_find_node_by_name(hv_node, "vms");
+	if (node)
+		of_iterate_all_node_loop(node, create_native_vm_of, NULL);
 #endif
 }
 

@@ -451,7 +451,7 @@ static int vgicv2_create_vgicc(struct vm *vm,
 {
 	struct vgicc *vgicc;
 
-	vgicc = zalloc(sizeof(struct vdev));
+	vgicc = zalloc(sizeof(*vgicc));
 	if (!vgicc) {
 		pr_err("no memory for vgicv2 vgicc\n");
 		return -ENOMEM;

@@ -771,7 +771,7 @@ static void add_vmbox_con_to_vm(struct vm *vm, struct vmbox_controller *vc)
 	__of_setup_vmbox_con_virqs(vc, dtb, node);
 }
 
-static int vm_create_vmbox_controller(struct vm *vm)
+static int __vm_create_vmbox_controller_dynamic(struct vm *vm)
 {
 	struct vmbox_controller *vc;
 	struct vmm_area *va;
@@ -812,6 +812,68 @@ static int vm_create_vmbox_controller(struct vm *vm)
 	add_vmbox_con_to_vm(vm, vc);
 
 	return 0;
+}
+
+static int __vm_create_vmbox_controller_static(struct vm *vm)
+{
+	int ret;
+	uint32_t irq;
+	struct device_node *vc_node;
+	unsigned long base, size, flags;
+	struct vmbox_controller *vc;
+	struct device_node *node = vm->dev_node;
+	char *comp[] = {
+		"minos,vmbox-controller",
+		NULL
+	};
+
+	vc_node = of_find_node_by_compatible(node, comp);
+	if (!vc_node)
+		return -EAGAIN;
+
+	ret = of_translate_address_index(vc_node, &base, &size, 0);
+	if (ret || (size == 0))
+		return -ENOENT;
+
+	ret = get_device_irq_index(vc_node, &irq, &flags, 0);
+	if (ret || (irq < 32))
+		return -ENOENT;
+
+	vc = zalloc(sizeof(*vc));
+	if (!vc)
+		return -ENOMEM;
+
+	vc->va = (void *)base;
+	vc->vm = vm;
+	vc->virq = irq;
+
+	host_vdev_init(vm, &vc->vdev, base, PAGE_SIZE);
+	vc->vdev.read = vmbox_con_read;
+	vc->vdev.write = vmbox_con_write;
+	vc->vdev.deinit = vmbox_con_deinit;
+	vc->vdev.reset = vmbox_con_reset;
+
+	list_add_tail(&vmbox_con_list, &vc->list);
+
+	return 0;
+}
+
+static int vm_create_vmbox_controller(struct vm *vm)
+{
+	int ret = -EAGAIN;
+
+	/*
+	 * first find whether need to create a static vmbox
+	 * controller from the device tree
+	 */
+	ret = __vm_create_vmbox_controller_static(vm);
+	if (!ret)
+		return 0;
+
+	if (ret != -EAGAIN)
+		return ret;
+
+	return __vm_create_vmbox_controller_dynamic(vm);
 }
 
 int vmbox_register_platdev(struct vmbox_device *vdev, void *dtb, char *type)

@@ -32,14 +32,40 @@
 		vm1 {
 			device_type = "virtual_machine";
 			vmid = <1>;
-			vm_name = "fvp_linux_vm1";
-			type = "linux";
+			vm_name = "fvp_zephyr_vm1";
+			type = "zephyr";
 			vcpus = <1>;
-			entry = <0x0 0x90080000>;
-			setup_data = <0x0 0x97e00000>;
+			entry = <0x0 0x90000388>;
+			setup_data = <0x0 0x0>;
 			vcpu_affinity = <2>;
 			native_wfi;
-			memory = <0x0 0x90000000 0x0 0x08000000>;
+			memory = <0x0 0x90000000 0x0 0x00200000>;
+
+			vm1_bdi {
+				#address-cells = <0x1>;
+				#size-cells = <0x1>;
+
+				vtimer_irq = <27>;
+				iomem = <0x1c0a0000 0x1000>;	/* the iomem of uart1 */
+				virqs = <38 38>;
+
+				virq_chip@1 {
+					compatible = "arm,gicv2";
+					#address-cells = <0x1>;
+					#size-cells = <0x1>;
+					reg = <0x2f000000 0x10000>,
+						<0x2c000000 0x2000>,
+						<0x2c010000 0x2000>,
+						<0x2c02f000 0x2000>;
+				};
+
+				vmbox_controller@20000000 {
+					virtual_device;
+					compatible = "minos,vmbox-controller";
+					reg = <0x20000000 0x1000>;
+					interrupts = <0 10 4>;
+				};
+			};
 		};
 
 		vmboxs {
@@ -49,7 +75,6 @@
 				vmbox-owner = <0x1 0x0>;
 				vmbox-shmem-size = <8192>;	/* 8192 8K rx2048 */
 				vmbox-id = <0x3420 0xffff>;
-				platform-device;
 			};
 
 			vmbox_veth@1 {

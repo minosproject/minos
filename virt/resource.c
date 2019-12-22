@@ -35,7 +35,7 @@ static int create_vm_vdev_of(struct vm *vm, struct device_node *node)
 {
 	vdev_init_t func;
 
-	if (!node->compatible)
+	if (!node->compatible || node->class != DT_CLASS_VDEV)
 		return -EINVAL;
 
 	func = (vdev_init_t)of_device_node_match(node,
@@ -329,6 +329,109 @@ int create_vm_resource_of(struct vm *vm, void *data)
 	/* here we can free all the device node to save memory */
 	of_release_all_node(node);
 	return 0;
+}
+
+static int create_vm_virqchip_common(struct vm *vm, struct device_node *node)
+{
+	char name[32];
+	struct device_node *virq_node;
+
+	memset(name, 0, 32);
+	sprintf(name, "virq_chip@%d", vm->vmid);
+	virq_node = of_find_node_by_name(node, name);
+	if (!virq_node)
+		return -ENOENT;
+
+	/* set the class to DT_CLASS_IRQCHIP temp */
+	virq_node->class = DT_CLASS_IRQCHIP;
+	create_vm_irqchip_of(virq_node, vm);
+	if (!vm->virq_chip)
+		pr_err("no virq chip for %s\n", vm_name(vm));
+
+	virq_node->class = DT_CLASS_OTHER;
+
+	return 0;
+}
+
+static int inline
+create_vm_vtimer_common(struct vm *vm, struct device_node *node)
+{
+	of_get_u32_array(node, "vtimer_irq", &vm->vtimer_virq, 1);
+	if ((vm->vtimer_virq > 31) || (vm->vtimer_virq < 16))
+		pr_warn("wrong vtimer virq for vm\n");
+
+	return 0;
+}
+
+static int create_vm_iomem_common(struct vm *vm, struct device_node *node)
+{
+	fdt32_t *data;
+	int len, i;
+	unsigned long base, size;
+
+	data = (fdt32_t *)of_getprop(node, "iomem", &len);
+	if (!data || (len == 0) || (len % 8))
+		return -EINVAL;
+
+	len = len / 8;
+
+	for (i = 0; i < len; i++) {
+		base = fdt32_to_cpu(data[0]);
+		size = fdt32_to_cpu(data[1]);
+
+		split_vmm_area(&vm->mm, base, base, size, VM_IO | VM_MAP_PT);
+		create_guest_mapping(&vm->mm, base, base, size, VM_IO);
+
+		data += 2;
+	}
+
+	return 0;
+}
+
+static int create_vm_virqs_common(struct vm *vm, struct device_node *node)
+{
+	fdt32_t *data;
+	int len, i;
+	uint32_t phy, vir;
+
+	data = (fdt32_t *)of_getprop(node, "virqs", &len);
+	if (!data || (len == 0) || (len % 8))
+		return -EINVAL;
+
+	len = len / 8;
+
+	for (i = 0; i < len; i++) {
+		phy = fdt32_to_cpu(data[0]);
+		vir = fdt32_to_cpu(data[1]);
+		request_hw_virq(vm, vir, phy, 0);
+		data += 2;
+	}
+
+	return 0;
+}
+
+static void *create_vm_vdev_common(struct device_node *node, void *vm)
+{
+	create_vm_vdev_of(vm, node);
+
+	return NULL;
+}
+
+int create_vm_resource_common(struct vm *vm, struct device_node *node)
+{
+	int ret;
+
+	ret = create_vm_virqchip_common(vm, node);
+	if (ret)
+		pr_warn("virqchip is not found in hv dts\n");
+
+	ret += create_vm_vtimer_common(vm, node);
+	ret += create_vm_iomem_common(vm, node);
+	ret += create_vm_virqs_common(vm, node);
+
+	of_iterate_all_node_loop(node, create_vm_vdev_common, vm);
+
+	return ret;
 }
 
 static int resource_init(void)

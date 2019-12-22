@@ -18,7 +18,7 @@
  * 0x20000000 -> 0xffffffff [Normal memory]
  */
 
-#define GVM_VIRT_TIMER_INT	27
+#define GVM_VIRT_TIMER_INT		27
 
 #define GIC_IRQ				9
 
