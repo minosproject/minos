@@ -211,7 +211,7 @@ SECTIONS
 	.irq_stack : {
 		. = ALIGN(64);
 		__irq_stack_start = .;
-		. = . + (CONFIG_NR_CPUS * CONFIG_EXCEPTION_SIZE);
+		. = . + (CONFIG_NR_CPUS * CONFIG_EXCEPTION_STACK_SIZE);
 		__irq_stack_end = .;
 	}
 

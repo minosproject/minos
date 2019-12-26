@@ -1,0 +1,2 @@
+config VMBOX
+	def_bool y

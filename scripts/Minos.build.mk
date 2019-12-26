@@ -18,7 +18,7 @@ EXTRA_LDFLAGS  :=
 include scripts/Minos.config.mk
 
 # Read auto.conf if it exists, otherwise ignore
--include include/config/auto.conf
+-include .config
 
 # The filename Kbuild has precedence over Makefile add Makefile
 kbuild-dir := $(if $(filter /%,$(src)),$(src),$(srctree)/$(src))

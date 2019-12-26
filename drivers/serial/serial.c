@@ -31,19 +31,19 @@ char serial_pl011_getc(void);
 
 int serial_init(void)
 {
-#ifdef CONFIG_PLATFORM_ARMADA
+#ifdef CONFIG_SOC_MARVELL_A3700
 	return mvebu_serial_probe((void *)0xd0012000);
 #endif
 
-#ifdef CONFIG_PLATFORM_FVP
+#ifdef CONFIG_SOC_FVP
 	return  pl011_init((void *)0x1c0a0000, 24000000, 115200);
 #endif
 
-#ifdef CONFIG_PLATFORM_RASPBERRY3
+#ifdef CONFIG_SOC_BCM2837
 	return bcm283x_mu_init((void *)0x3f215040, 250000000, 115200);
 #endif
 
-#ifdef CONFIG_PLATFORM_RASPBERRY4
+#ifdef CONFIG_SOC_BCM2838
 	return bcm283x_mu_init((void *)0xfe215040, 250000000, 115200);
 #endif
 
@@ -52,30 +52,30 @@ int serial_init(void)
 
 void serial_putc(char ch)
 {
-#ifdef CONFIG_PLATFORM_ARMADA
+#ifdef CONFIG_SOC_MARVELL_A3700
 	serial_mvebu_putc(ch);
 #endif
 
-#ifdef CONFIG_PLATFORM_FVP
+#ifdef CONFIG_SOC_FVP
 	serial_pl011_putc(ch);
 #endif
 
-#if defined(CONFIG_PLATFORM_RASPBERRY3) || defined(CONFIG_PLATFORM_RASPBERRY4)
+#if defined(CONFIG_SOC_BCM2837) || defined(CONFIG_SOC_BCM2838)
 	bcm283x_mu_putc(ch);
 #endif
 }
 
 char serial_getc(void)
 {
-#ifdef CONFIG_PLATFORM_ARMADA
+#ifdef CONFIG_SOC_MARVELL_A3700
 	return serial_mvebu_getc();
 #endif
 
-#ifdef CONFIG_PLATFORM_FVP
+#ifdef CONFIG_SOC_FVP
 	return serial_pl011_getc();
 #endif
 
-#if defined(CONFIG_PLATFORM_RASPBERRY3) || defined(CONFIG_PLATFORM_RASPBERRY4)
+#if defined(CONFIG_SOC_BCM2837) || defined(CONFIG_SOC_BCM2838)
 	return bcm283x_mu_getc();
 #endif
 	return 0;

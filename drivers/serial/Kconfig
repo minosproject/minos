@@ -1,0 +1,26 @@
+menu "Serial Drivers"
+
+config SERIAL
+	def_bool y
+
+if SERIAL
+config SERIAL_BCM283X_MU
+	bool "support bcm283x mu serial"
+	default n
+	help
+	  serial driver for rpi-3b
+
+config SERIAL_MVEBU_A3700
+	bool "support marvell a3700 serial driver"
+	default n
+	help
+	  serial driver for a3700 soc
+
+config SERIAL_PL011
+	bool "pl011 serial driver"
+	default n
+	help
+	  serial driver for pl011
+endif
+
+endmenu

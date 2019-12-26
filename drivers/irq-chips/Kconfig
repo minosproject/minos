@@ -1,0 +1,21 @@
+menu "Interrupt Controller Driver"
+
+config IRQCHIP_GICV3
+	bool "gicv3 driver"
+	default n
+	help
+	  "GICv3 interrupt controller driver"
+
+config IRQCHIP_GICV2
+	bool "gicv2 driver"
+	default n
+	help
+	  "GICv2 interrupt controller driver"
+
+config IRQCHIP_BCM2836
+	bool "bcm2836/2835 interrupt controller driver"
+	default n
+	help
+	  "interrupt controller driver for raspberry PI 3"
+
+endmenu

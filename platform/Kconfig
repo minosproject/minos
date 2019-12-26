@@ -1,0 +1,21 @@
+menu "Platform Configuration"
+
+choice
+	prompt "SOC current used"
+	default SOC_FVP
+	config SOC_FVP
+		bool "arm fix virtual platform"
+	config SOC_MARVELL_A3700
+		bool "marvell a3700 SOC"
+	config SOC_BCM2837
+		bool "bcm2837 SOC"
+	config SOC_BCM2838
+		bool "bcm2838 SOC"
+endchoice
+
+source "platform/espressobin/Kconfig"
+source "platform/fvp/Kconfig"
+source "platform/raspberry3/Kconfig"
+source "platform/raspberry4/Kconfig"
+
+endmenu

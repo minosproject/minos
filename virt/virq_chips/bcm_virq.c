@@ -499,8 +499,8 @@ int bcm2836_send_virq(struct vcpu *vcpu, uint32_t virq)
 
 static int bcm2838_generate_virq(uint32_t *addr, int virq)
 {
-	array[0] = cpu_to_of32(i / 32);
-	array[1] = cpu_to_of32(i % 32);
+	addr[0] = cpu_to_of32(virq / 32);
+	addr[1] = cpu_to_of32(virq % 32);
 
 	return 2;
 }

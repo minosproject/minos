@@ -168,7 +168,7 @@ drivers-y	:= drivers/ platform/
 external-y	:= external/
 libs-y		:=
 
--include include/config/auto.conf
+-include .config
 drivers-$(CONFIG_VIRT) += virt/
 
 # The arch Makefile can set ARCH_{CPP,A,C}FLAGS to override the default
@@ -220,13 +220,13 @@ PHONY += $(clean-dirs) clean distclean
 $(clean-dirs):
 	$(Q) $(MAKE) $(clean)=$(patsubst _clean_%,%,$@)
 
-minos: $(minos-deps) tools/generate_allsymbols.py
+minos: $(minos-deps) scripts/generate_allsymbols.py
 	$(Q) echo "  LD      .tmp.minos.elf"
 	$(Q) $(LD) $(minos_LDFLAGS) -o .tmp.minos.elf $(MBUILD_MINOS_INIT) $(MBUILD_MINOS_MAIN) $(MBUILD_MINOS_LIBS)
 	$(Q) echo "  NM      .tmp.minos.symbols"
 	$(Q) $(NM) -n .tmp.minos.elf > .tmp.minos.symbols
 	$(Q) echo "  PYTHON  allsymbols.S"
-	$(Q) python3 tools/generate_allsymbols.py .tmp.minos.symbols allsymbols.S
+	$(Q) python3 scripts/generate_allsymbols.py .tmp.minos.symbols allsymbols.S
 	$(Q) echo "  CC      $(MBUILD_IMAGE_SYMBOLS)"
 	$(Q) $(CC) $(CCFLAG) $(MBUILD_CFLAGS) -c allsymbols.S -o $(MBUILD_IMAGE_SYMBOLS)
 	$(Q) echo "  LD      $(MBUILD_IMAGE_ELF)"
@@ -252,19 +252,26 @@ define filechk_version.h
 	echo '#define MINOS_VERSION_STR "v$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION) $(NAME)"' >> $@;)
 endef
 
+PHONY += scriptconfig iscriptconfig menuconfig guiconfig dumpvarsconfig
+
+PYTHONCMD ?= python
+kpython := PYTHONPATH=$(srctree)/scripts/Kconfiglib:$$PYTHONPATH $(PYTHONCMD)
+KCONFIG ?= $(srctree)/Kconfig
+
+ifneq ($(filter scriptconfig,$(MAKECMDGOALS)),)
+ifndef SCRIPT
+$(error Use "make scriptconfig SCRIPT=<path to script> [SCRIPT_ARG=<argument>]")
+endif
+endif
+
 $(version_h) : Makefile
 	$(Q) mkdir -p include/config
 	$(Q) $(call filechk_version.h)
 
 PHONY += include/config/config.h
-include/config/config.h:
-	$(Q)test -e include/config/config.h -a -e $@ || (		\
-	echo >&2;							\
-	echo >&2 "  ERROR: Minos configuration is invalid.";		\
-	echo >&2 "         include/config/autoconf.h or $@ are missing.";\
-	echo >&2 "         Run 'make xxx_defconfig' on minos src to fix it.";	\
-	echo >&2 ;							\
-	/bin/false)
+include/config/config.h: .config
+	$(Q) mkdir -p include/config
+	$(Q) $(kpython) $(srctree)/scripts/Kconfiglib/genconfig.py --header-path=include/config/config.h
 
 dtbs: FORCE
 	$(Q) $(MAKE) $(build)=$@
@@ -286,19 +293,36 @@ distclean: clean
 	$(Q) rm -f tags cscope.in.out cscope.out cscope.po.out
 	$(Q) cd tools/mvm && make clean
 
+scriptconfig:
+	$(Q)$(kpython) $(SCRIPT) $(Kconfig) $(if $(SCRIPT_ARG),"$(SCRIPT_ARG)")
+
+iscriptconfig:
+	$(Q)$(kpython) -i -c \
+	  "import kconfiglib; \
+	   kconf = kconfiglib.Kconfig('$(Kconfig)'); \
+	   print('A Kconfig instance \'kconf\' for the architecture $(ARCH) has been created.')"
+
+menuconfig:
+	$(Q)$(kpython) $(srctree)/scripts/Kconfiglib/menuconfig.py $(Kconfig)
+
+guiconfig:
+	$(Q)$(kpython) $(srctree)/scripts/Kconfiglib/guiconfig.py $(Kconfig)
+
+dumpvarsconfig:
+	$(Q)$(kpython) $(srctree)/scripts/Kconfiglib/examples/dumpvars.py $(Kconfig)
+
+genconfig:
+	$(Q)$(kpython) $(srctree)/scripts/Kconfiglib/genconfig.py $(Kconfig)
+
 %defconfig:
 	$(Q)test -e configs/$@ || (		\
 	echo >&2;			\
 	echo >&2 "  ERROR: $@ doest exist.";		\
 	echo >&2 ;							\
 	/bin/false)
-	$(Q) echo "  GEN      .config configs/$@"
+	$(Q) echo "  GEN      .config From configs/$@"
 	$(Q) mkdir -p include/config
-	$(Q) cp configs/$@ $(srctree)/.config
-# Generate include/config/config.h and include/config/auto.conf
-	$(Q) echo "  PYTHON  include/config/config.h"
-	$(Q) echo "  PYTHON  include/config/auto.conf"
-	$(Q) python $(srctree)/tools/generate_mvconfig.py $(srctree)/.config $(srctree)/include/config
+	$(Q) python $(srctree)/scripts/Kconfiglib/defconfig.py $(Kconfig) configs/$@
 
 endif
 

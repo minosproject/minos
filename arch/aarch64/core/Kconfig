@@ -1,0 +1,40 @@
+menu "Minos aarch64 Arch Feature"
+
+config NR_CPUS_CLUSTER0
+	int "cpu number in cluster0"
+	default 4
+	help
+	  cpu count in SOC cluster0, this
+	  will help to caculate the cpuid
+
+config NR_CPUS_CLUSTER1
+	int "cpu number in cluster1"
+	default 0
+	help
+	  cpu count in SOC cluster1, this
+	  will help to caculate the cpuid
+
+config MPIDR_SHIFT
+	bool "shifted affinities support"
+	default n
+	help
+	  The FVP_Base_RevC-2xAEMv8A FVP only supports shifted
+	  affinities, which is not compatible with legacy GIC
+	  configurations. Therefore this FVP does not support
+	  these legacy GIC configurations
+
+
+config PLATFORM_ADDRESS_RANGE
+	int "the virtual memory range of the system"
+	default 40
+	help
+	  the virtual memory range of the system range
+	  is 0x0 - 2^PLATFORM_ADDRESS_RANGE
+
+config EXCEPTION_STACK_SIZE
+	hex "the stack size of the exception vector"
+	default 0x2000
+	help
+	  the stack size of the exception vector
+
+endmenu

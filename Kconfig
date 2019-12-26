@@ -1,0 +1,13 @@
+# Kconfig - main configuration options for Minos
+#
+# Copyright (c) 2019 Min Le <lemin9538@gmail.com>
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+mainmenu "Minos $ARCH Configuration"
+
+config SRCARCH
+	string
+	option env="SRCARCH"
+
+source "arch/$(SRCARCH)/Kconfig"

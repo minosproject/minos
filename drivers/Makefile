@@ -1,4 +1,4 @@
-obj-y += serial/
+obj-$(CONFIG_SERIAL) += serial/
 obj-y += irq-chips/
-obj-y += device-tree/
+obj-$(CONFIG_DEVICE_TREE) += device-tree/
 obj-y += device_id.o

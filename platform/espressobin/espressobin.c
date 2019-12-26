@@ -17,6 +17,7 @@
 #include <asm/cpu.h>
 #include <minos/mm.h>
 #include <virt/vmm.h>
+#include <virt/vm.h>
 #include <minos/platform.h>
 
 #ifdef CONFIG_VIRT

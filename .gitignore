@@ -113,3 +113,7 @@ all.config
 allsymbols.S
 tmp.minos.symbols
 *.dtb
+*.py[co]
+tools/Kconfiglib/build/
+*.egg-info/
+tools/Kconfiglib/dist/

@@ -1,0 +1,2 @@
+menu "Minos aarch64 virtualaztion features"
+endmenu

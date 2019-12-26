@@ -1,0 +1,35 @@
+if SOC_FVP
+
+config MINOS_START_ADDRESS
+	hex "memory start address of system"
+	default 0xc0000000
+
+config MINOS_ENTRY_ADDRESS
+	hex "entry address of system"
+	default 0xc0008000
+	help
+	  the entry address is the start address plus
+	  nr_cpus * TASK_STACK_SIZE
+
+config MINOS_RAM_SIZE
+	hex "memory size for Minos"
+	default 0x40000000
+	range 0x10000000 0x40000000
+	help
+	  the memory size for Minos
+
+config NR_CPUS
+	int "number of cpu in system"
+	default 4
+	help
+	  how many cpu in current system
+
+config UART_BASE
+	hex "uart controller iomem base address"
+	default 0x1c0a0000
+
+config UART_IO_SIZE
+	hex "uart controller iomem size"
+	default 0x1000
+
+endif

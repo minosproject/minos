@@ -1,0 +1,33 @@
+menu "Minos Virtualization Configuration"
+
+config VIRT
+	bool "virtualization support"
+	select STACK_PAGE_ALIGN
+
+if VIRT
+
+config VIRTIO_MMIO
+	def_bool y
+
+config MAX_VM
+	int "max virtual machine that system support"
+	default 64
+
+config VRTC_PL031
+	bool "vrtc pl031 support"
+	default y
+	help
+	  vrtc pl031 driver for Minos
+
+config VWDT_SP805
+	bool "vwdt sp805 support"
+	default y
+	help
+	  vwdt sp805 support for Minos
+
+source "virt/virq_chips/Kconfig"
+source "virt/vmbox/Kconfig"
+
+endif
+
+endmenu

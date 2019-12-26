@@ -1,0 +1,22 @@
+menu "Virqchip controller support"
+
+config VIRQCHIP_VGICV2
+	bool "virqchip vgicv2 support"
+	default y
+	help
+	  vgicv2 virtual interrupt controller drvier
+
+config VIRQCHIP_VGICV3
+	bool "virqchip vgicv3 support"
+	default y
+	help
+	  vgicv3 virtual interrupt controller drvier
+
+config VIRQCHIP_BCM2836
+	bool "virqchip bcm2835 driver"
+	default n
+	help
+	  boardcom bcm2835 virtual interrupt controller
+	  driver
+
+endmenu
