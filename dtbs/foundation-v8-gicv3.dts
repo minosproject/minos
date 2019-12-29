@@ -68,23 +68,45 @@
 			};
 		};
 
+		vm2 {
+			device_type = "virtual_machine";
+			vmid = <2>;
+			vm_name = "fvp_linux_vm2";
+			type = "linux";
+			vcpus = <1>;
+			entry = <0x0 0x90280000>;
+			setup_data = <0x0 0x97e00000>;
+			vcpu_affinity = <3>;
+			native_wfi;
+			memory = <0x0 0x90200000 0x0 0x07e00000>;
+		};
+
 		vmboxs {
 			vmbox_hvc@0 {
 				compatible = "minos,vmbox";
 				vmbox-type = "hvc";
 				vmbox-owner = <0x1 0x0>;
-				vmbox-shmem-size = <8192>;	/* 8192 8K rx2048 */
+				vmbox-shmem-size = <8192>;
 				vmbox-id = <0x3420 0xffff>;
 			};
 
 			vmbox_veth@1 {
 				compatible = "minos,veth";
 				vmbox-type = "veth";
-				vmbox-owner = <0x0 0x1>;
+				vmbox-owner = <0x0 0x2>;
 				vmbox-id = <0x3430 0xffff>;
 				vmbox-vqs = <2>;
 				vmbox-vrings = <16>;
 				vmbox-vring-size = <2048>;
+			};
+
+			vmbox_hvc@2 {
+				compatible = "minos,vmbox";
+				vmbox-type = "hvc";
+				vmbox-owner = <0x2 0x0>;
+				vmbox-shmem-size = <8192>;
+				vmbox-id = <0x3420 0xffff>;
+				platform-device;
 			};
 		};
 	};
