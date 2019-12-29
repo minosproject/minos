@@ -8,6 +8,8 @@
 
 #define VMBOX_DEV_STAT_ONLINE	0x1
 
+#define VMBOX_IPC_ALL_ENTRY_SIZE	0x100
+
 struct vmbox_device {
 	int devid;
 	int is_backend;
@@ -109,6 +111,7 @@ struct vmbox_controller {
 
 #define VMBOX_DEV_IPC_COUNT		32
 
+int setup_vm_vmbox(struct vm *vm);
 int register_vmbox_hook(char *name, struct vmbox_hook_ops *ops);
 int of_create_vmbox(struct device_node *node);
 struct vmbox_controller *vmbox_get_controller(struct vm *vm);

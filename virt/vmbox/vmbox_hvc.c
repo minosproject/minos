@@ -25,38 +25,58 @@
 #include <asm/io.h>
 #include <virt/vmbox.h>
 
+#define BUF_0_SIZE	4096
+#define BUF_1_SIZE	2048
+
+/*
+ * at least 8K size for the transfer buffer, and
+ * in or out buffer size need 2^ align
+ */
+struct hvc_ring {
+	volatile uint32_t ridx;
+	volatile uint32_t widx;
+	uint32_t size;
+	char buf[0];
+};
+
 static int hvc_be_init(struct vm *vm, struct vmbox *vmbox,
 		struct vmbox_device *vdev)
 {
-	struct vmbox_controller *vc;
-	struct vmm_area *va;
 	void *dtb = vm->setup_data;
 
 	/*
 	 * only linux system need do this
 	 */
-	if (vmbox->flags & VMBOX_F_PLATFORM_DEV)
+	if (!(vmbox->flags & VMBOX_F_PLATFORM_DEV))
 		return 0;
 
 	pr_notice("register hvc platform device for vm%d\n", vm->vmid);
 
-	vc = vmbox_get_controller(vm);
-	if (!vc)
-		return -ENOENT;
-
-	va = alloc_free_vmm_area(&vm->mm, vmbox->shmem_size,
-			PAGE_MASK, VM_MAP_PT | VM_IO);
-	if (!va)
-		return -ENOMEM;
-	vdev->iomem = va->start;
-	vdev->iomem_size = vmbox->shmem_size;
-	map_vmm_area(&vm->mm, va, (unsigned long)vmbox->shmem);
-
 	return vmbox_register_platdev(vdev, dtb, "minos,hvc-be");
+}
+
+static int hvc_vmbox_init(struct vmbox *vmbox)
+{
+	void *base = vmbox->shmem + VMBOX_IPC_ALL_ENTRY_SIZE;
+	int header_size = sizeof(struct hvc_ring);
+	struct hvc_ring *ring;
+
+	ring = (struct hvc_ring *)(base);
+	ring->ridx = 0;
+	ring->widx = 0;
+	ring->size = BUF_0_SIZE;
+
+	ring = (struct hvc_ring *)(base + header_size + BUF_0_SIZE);
+	ring->ridx = 0;
+	ring->widx = 0;
+	ring->size = BUF_1_SIZE;
+
+	return 0;
 }
 
 static struct vmbox_hook_ops hvc_ops = {
 	.vmbox_be_init = hvc_be_init,
+	.vmbox_init = hvc_vmbox_init,
 };
 
 static int vmbox_hvc_init(void)

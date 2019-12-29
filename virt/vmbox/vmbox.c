@@ -33,8 +33,6 @@
 #define BE_IDX		0
 #define FE_IDX		1
 
-#define VMBOX_IPC_ALL_ENTRY_SIZE	0x100
-
 struct vmbox_info {
 	int owner[2];
 	uint32_t id[2];
@@ -371,21 +369,11 @@ struct vmbox_controller *vmbox_get_controller(struct vm *vm)
 	return NULL;
 }
 
-static int vmbox_device_attach(struct vmbox *vmbox, struct vmbox_device *vdev)
+static int vmbox_device_attach(struct vmbox_controller *_vc,
+		struct vmbox *vmbox, struct vmbox_device *vdev)
 {
 	struct vmm_area *va;
 	struct vm *vm = vdev->vm;
-	struct vmbox_controller *_vc;
-
-	/*
-	 * find the real vmbox which this vmbox device
-	 * should connected to
-	 */
-	_vc = vmbox_get_controller(vm);
-	if (!_vc) {
-		pr_err("can not find vmbox_controller for vmbox dev\n");
-		return -ENOENT;
-	}
 
 	vdev->vc = _vc;
 	vdev->vring_virq = alloc_vm_virq(vm);
@@ -393,20 +381,17 @@ static int vmbox_device_attach(struct vmbox *vmbox, struct vmbox_device *vdev)
 	if (!vdev->vring_virq || !vdev->ipc_virq)
 		return -ENOSPC;
 
-	/* platform device has already alloc virtual memory */
-	if (!vdev->iomem) {
-		va = alloc_free_vmm_area(&vm->mm, vmbox->shmem_size,
-				PAGE_MASK, VM_MAP_P2P | VM_IO);
-		if (!va)
-			return -ENOMEM;
-		vdev->iomem = va->start;
-		vdev->iomem_size = vmbox->shmem_size;
-		map_vmm_area(&vm->mm, va, (unsigned long)vmbox->shmem);
-	}
+	va = alloc_free_vmm_area(&vm->mm, vmbox->shmem_size,
+			PAGE_MASK, VM_MAP_P2P | VM_IO);
+	if (!va)
+		return -ENOMEM;
+
+	vdev->iomem = va->start;
+	vdev->iomem_size = vmbox->shmem_size;
+	map_vmm_area(&vm->mm, va, (unsigned long)vmbox->shmem);
 
 	vdev->devid = _vc->dev_cnt++;
 	_vc->devices[vdev->devid] = vdev;
-	wmb();
 
 	/*
 	 * set the device online for the vm
@@ -416,21 +401,17 @@ static int vmbox_device_attach(struct vmbox *vmbox, struct vmbox_device *vdev)
 	 * too
 	 */
 	 _vc->dev_state |= (1 << vdev->devid);
-	 _vc->irq_state |= VMBOX_CON_INT_TYPE_DEV_ONLINE;
-
-	if (_vc->status)
-		send_virq_to_vm(_vc->vm, _vc->virq);
+	 _vc->irq_state |= (1 << VMBOX_CON_INT_TYPE_DEV_ONLINE);
+	wmb();
 
 	return 0;
 }
 
-static void vmbox_con_online(struct vmbox_controller *vc)
+static void vmbox_device_attach_to_vm(struct vmbox_controller *_vc)
 {
 	int i;
 	struct vmbox *vmbox;
-	struct vm *vm = vc->vm;
-
-	pr_notice("vmbox controller for vm%d is online\n", vm->vmid);
+	struct vm *vm = _vc->vm;
 
 	for (i = 0; i < vmbox_index; i++) {
 		vmbox = vmboxs[i];
@@ -445,19 +426,23 @@ static void vmbox_con_online(struct vmbox_controller *vc)
 		 * it's status to power on, at this time, get the host
 		 * device which the client device connected to, and
 		 * report the host device to the VM
+		 *
+		 * but in order to support freertos which can not allocated
+		 * device dynamicly, need to record all the device before
+		 * the vm started
 		 */
 		if ((vmbox->owner[BE_IDX] == vm->vmid)) {
-			if (vmbox_device_attach(vmbox, vmbox->devices[BE_IDX]))
+			if (vmbox_device_attach(_vc,
+					vmbox, vmbox->devices[BE_IDX]))
+				pr_err("vmbox device attached failed\n");
+		}
+
+		if ((vmbox->owner[FE_IDX]) == vm->vmid) {
+			if (vmbox_device_attach(_vc,
+					vmbox, vmbox->devices[FE_IDX]))
 				pr_err("vmbox device attached failed\n");
 		}
 	}
-
-	/*
-	 * if there are devices online on this controller, and
-	 * there is pending virqs, send the virq to the VM
-	 */
-	if (vc->irq_state)
-		send_virq_to_vm(vc->vm, vc->virq);
 }
 
 static int vmbox_handle_con_read(struct vmbox_controller *vc,
@@ -593,7 +578,7 @@ static int vmbox_handle_con_write(struct vmbox_controller *vc,
 	switch (offset) {
 	case VMBOX_CON_ONLINE:
 		vc->status = 1;
-		vmbox_con_online(vc);
+		vmbox_device_attach_to_vm(vc);
 		break;
 	default:
 		break;
@@ -657,16 +642,21 @@ static int vmbox_handle_dev_write(struct vmbox_controller *vc,
 		 * this device is ok to receive irq or handle the related
 		 * event
 		 *
-		 * for backend, it will invoke the frontend device, for
-		 * frontend device, it just update the related status and
-		 * then send a virq to backend
+		 * if otherside already online need to send a virq to
+		 * the otherside to inform the status change
 		 */
-		vdev->state = VMBOX_DEV_STAT_ONLINE;
 		pr_notice("vmbox device %s online for vm%d\n",
 				vdev->vmbox->name, vdev->vm->vmid);
+		vdev->state = VMBOX_DEV_STAT_ONLINE;
 
-		if (vdev->is_backend)
-			vmbox_device_attach(vdev->vmbox, vdev->bro);
+		if (bro->state == VMBOX_DEV_STAT_ONLINE) {
+			spin_lock_irqsave(&bro->lock, flags);
+			bro->ipc_type |= (1 << 0);
+			spin_unlock_irqrestore(&bro->lock, flags);
+
+			send_virq_to_vm(bro->vm, bro->ipc_virq);
+		}
+
 		break;
 	default:
 		pr_err("unsupport reg 0x%x\n", reg);
@@ -839,6 +829,9 @@ static int __vm_create_vmbox_controller_static(struct vm *vm)
 	if (ret || (irq < 32))
 		return -ENOENT;
 
+	split_vmm_area(&vm->mm, base, base, size, 0);
+	request_virq(vm, irq, 0);
+
 	vc = zalloc(sizeof(*vc));
 	if (!vc)
 		return -ENOMEM;
@@ -925,7 +918,7 @@ static int vmbox_device_do_hooks(struct vm *vm)
 	return 0;
 }
 
-int of_setup_vm_vmbox(struct vm *vm)
+int setup_vm_vmbox(struct vm *vm)
 {
 	int ret;
 

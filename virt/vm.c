@@ -834,6 +834,8 @@ static void setup_vm(struct vm *vm)
 {
 	if (vm->flags & VM_FLAGS_SETUP_OF)
 		fdt_vm_init(vm);
+	else
+		setup_vm_vmbox(vm);
 }
 
 void destroy_vm(struct vm *vm)

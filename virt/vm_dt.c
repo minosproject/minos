@@ -24,9 +24,8 @@
 #include <config/config.h>
 #include <virt/virq_chip.h>
 #include <virt/virq.h>
+#include <virt/vmbox.h>
 #include <common/hypervisor.h>
-
-extern void of_setup_vm_vmbox(struct vm *vm);
 
 static int fdt_setup_other(struct vm *vm)
 {
@@ -278,7 +277,7 @@ void fdt_vm_init(struct vm *vm)
 	fdt_setup_cmdline(vm);
 	fdt_setup_cpu(vm);
 	fdt_setup_memory(vm);
-	of_setup_vm_vmbox(vm);
+	setup_vm_vmbox(vm);
 	fdt_setup_other(vm);
 
 	if (platform->setup_hvm && vm_is_hvm(vm))
