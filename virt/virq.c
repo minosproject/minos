@@ -59,9 +59,6 @@ static int inline __send_virq(struct vcpu *vcpu, struct virq_desc *desc)
 	unsigned long flags;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
 
-	if ((vcpu->vm->vmid == 1) && (desc->vno == 38))
-		pr_notice("send virq 38 to vm\n");
-
 	spin_lock_irqsave(&virq_struct->lock, flags);
 
 	/*

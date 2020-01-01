@@ -8,7 +8,7 @@
 	#size-cells = <0x2>;
 
 	chosen {
-		bootargs = "console=ttyAMA0 earlycon=pl011,0x1c090000 loglevel=8 consolelog=9 root=/dev/vda2 rw";
+		bootargs = "console=ttyAMA1 earlycon=pl011,0x1c0a0000 loglevel=8 consolelog=9 root=/dev/vda2 rw";
 	};
 
 	aliases {
@@ -46,8 +46,6 @@
 				#size-cells = <0x1>;
 
 				vtimer_irq = <27>;
-				iomem = <0x1c0a0000 0x1000>;	/* the iomem of uart1 */
-				virqs = <38 38>;
 
 				virq_chip@1 {
 					compatible = "arm,gicv2";
