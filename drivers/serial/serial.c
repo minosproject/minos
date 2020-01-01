@@ -36,7 +36,7 @@ int serial_init(void)
 #endif
 
 #ifdef CONFIG_PLATFORM_FVP
-	return  pl011_init((void *)0x1c090000, 24000000, 115200);
+	return  pl011_init((void *)0x1c0a0000, 24000000, 115200);
 #endif
 
 #ifdef CONFIG_PLATFORM_RASPBERRY3
