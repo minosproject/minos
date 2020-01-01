@@ -27,9 +27,25 @@
 extern void sync_from_lower_EL_handler(gp_regs *data);
 #endif
 
-void bad_mode(void)
+void bad_mode(gp_regs *regs)
 {
+#ifdef CONFIG_VIRT
+	if (taken_from_guest(regs))
+		pr_fatal("Bad error from virutal machine\n");
+	else
+#endif
+		pr_fatal("Bad error from Minos\n");
+
+	arch_dump_register(regs);
+
 	panic("Bad error received\n");
+}
+
+void bad_mode_serr(gp_regs *regs)
+{
+	pr_fatal("Serror happends\n");
+
+	bad_mode(regs);
 }
 
 void sync_from_current_EL_handler(gp_regs *data)
@@ -55,4 +71,3 @@ void sync_c_handler(gp_regs *regs)
 #endif
 	sync_from_current_EL_handler(regs);
 }
-

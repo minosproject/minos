@@ -54,7 +54,7 @@ void arch_clear_virq_flag(void)
 	dsb();
 }
 
-static void dump_register(gp_regs *regs)
+void arch_dump_register(gp_regs *regs)
 {
 	unsigned long spsr;
 
@@ -106,7 +106,7 @@ void arch_dump_stack(gp_regs *regs, unsigned long *stack)
 	}
 
 	stack_base = current_sp() - sizeof(struct task_info);
-	dump_register(regs);
+	arch_dump_register(regs);
 
 	if (!stack) {
 		if (regs) {

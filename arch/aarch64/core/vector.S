@@ -22,6 +22,8 @@
 
 	.global __irq_handler
 	.global __sync_handler
+	.global __bad_mode
+	.global __bad_mode_serr
 	.global arch_switch_task_sw
 
 arg0		.req	x0
@@ -39,6 +41,51 @@ nt_addr		.req	x25	/* next task address */
 ct		.req	x26	/* current task */
 nt		.req	x27	/* next task */
 
+.macro save_gp_regs
+	stp	x29, x30, [sp, #-16]!
+	stp	x27, x28, [sp, #-16]!
+	stp	x25, x26, [sp, #-16]!
+	stp	x23, x24, [sp, #-16]!
+	stp	x21, x22, [sp, #-16]!
+	stp	x19, x20, [sp, #-16]!
+	stp	x17, x18, [sp, #-16]!
+	stp     x15, x16, [sp, #-16]!
+	stp     x13, x14, [sp, #-16]!
+	stp     x11, x12, [sp, #-16]!
+	stp     x9, x10, [sp, #-16]!
+	stp     x7, x8, [sp, #-16]!
+	stp     x5, x6, [sp, #-16]!
+	stp     x3, x4, [sp, #-16]!
+	stp     x1, x2, [sp, #-16]!
+	str	x0, [sp, #-8]!
+	mrs	x0, esr_el2
+	str	x0, [sp, #-8]!
+	mrs	x0, spsr_el2
+	str	x0, [sp, #-8]!
+	mrs	x0, elr_el2
+	str	x0, [sp, #-8]!
+	dsb	sy
+.endm
+
+	.type __bad_mode "function"
+	.cfi_startproc
+__bad_mode:
+	save_gp_regs
+	mov	x0, sp
+	b	bad_mode	/* will never return */
+lb:
+	b	lb
+	.cfi_endproc
+
+	.type __bad_mode_serr "function"
+	.cfi_startproc
+__bad_mode_serr:
+	save_gp_regs
+	mov	x0, sp
+	b	bad_mode_serr
+ls:
+	b	ls
+	.cfi_endproc
 
 	.type arch_switch_task_sw "function"
 	.cfi_startproc

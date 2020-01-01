@@ -335,6 +335,7 @@ void inv_dcache_all(void);
 int arch_taken_from_guest(gp_regs *regs);
 void arch_switch_task_sw(void);
 void arch_dump_stack(gp_regs *regs, unsigned long *sp);
+void arch_dump_register(gp_regs *regs);
 unsigned long arch_get_fp(void);
 unsigned long arch_get_sp(void);
 unsigned long arch_get_lr(void);
