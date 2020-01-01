@@ -47,6 +47,43 @@
 			memory = <0x0 0x30000000 0x0 0x7200000>;
 		};
 
+		vm2 {
+			device_type = "virtual_machine";
+			vmid = <2>;
+			vm_name = "fvp_zephyr_vm2";
+			type = "zephyr";
+			vcpus = <1>;
+			entry = <0x0 0x37200388>;
+			setup_data = <0x0 0x0>;
+			vcpu_affinity = <3>;
+			native_wfi;
+			memory = <0x0 0x37200000 0x0 0x00200000>;
+
+			vm2_bdi {
+				#address-cells = <0x1>;
+				#size-cells = <0x1>;
+
+				vtimer_irq = <27>;
+
+				virq_chip@2 {
+					compatible = "arm,gicv2";
+					#address-cells = <0x1>;
+					#size-cells = <0x1>;
+					reg = <0x2f000000 0x10000>,
+						<0x2c000000 0x2000>,
+						<0x2c010000 0x2000>,
+						<0x2c02f000 0x2000>;
+				};
+
+				vmbox_controller@20000000 {
+					virtual_device;
+					compatible = "minos,vmbox-controller";
+					reg = <0x20000000 0x1000>;
+					interrupts = <0 10 4>;
+				};
+			};
+		};
+
 		vmboxs {
 			vmbox_hvc@0 {
 				compatible = "minos,vmbox";
@@ -65,6 +102,14 @@
 				vmbox-vqs = <2>;
 				vmbox-vrings = <16>;
 				vmbox-vring-size = <2048>;
+			};
+
+			vmbox_hvc@2 {
+				compatible = "minos,vmbox";
+				vmbox-type = "hvc";
+				vmbox-owner = <0x2 0x0>;
+				vmbox-shmem-size = <8192>;
+				vmbox-id = <0x3420 0xffff>;
 			};
 		};
 	};
