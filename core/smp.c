@@ -22,6 +22,8 @@
 
 #define SMP_CALL_LOCKED		(1 << 0)
 
+#define SMP_FUNCTION_CALL_IRQ	CONFIG_SMP_FUNCTION_CALL_IRQ
+
 extern unsigned char __smp_affinity_id;
 uint64_t *smp_affinity_id;
 phy_addr_t smp_holding_address[CONFIG_NR_CPUS];

@@ -47,10 +47,32 @@ config MINOS_RESCHED_IRQ
 	int "default resched IRQ number"
 	default 7
 
+config SMP_FUNCTION_CALL_IRQ
+	int "default smp cpu function call irq number"
+	default 6
+
 config SMP
 	bool "SMP system"
 	help
 	  smp system
+
+config NR_SGI_IRQS
+	int "SGI irq count for each cpu"
+	default 16
+	help
+	  how many SGI irq for each cpu
+
+config NR_PPI_IRQS
+	int "Percpu irq count for each cpu"
+	default 16
+	help
+	  how many percpu irq for each cpu
+
+config NR_SPI_IRQS
+	int "SPI irq count for each cpu"
+	default 256
+	help
+	  how many spi irq in system
 
 config OS_REALTIME_CORE0
 	bool "all realtime task will affinity to core 0"

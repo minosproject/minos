@@ -409,13 +409,6 @@ int gicv3_init(struct device_node *node)
 	nr_lines = 32 * ((type & 0x1f));
 	pr_notice("gicv3 typer-0x%x nr_lines-%d\n", type, nr_lines);
 
-	/* alloc LOCAL_IRQS for each cpus */
-	irq_alloc_sgi(0, 16);
-	irq_alloc_ppi(16, 16);
-
-	/* alloc SPI irqs */
-	irq_alloc_spi(32, nr_lines);
-
 	/* default all golbal IRQS to level, active low */
 	for (i = GICV3_NR_LOCAL_IRQS; i < nr_lines; i += 16)
 		iowrite32(0, gicd_base + GICD_ICFGR + (i / 16) * 4);

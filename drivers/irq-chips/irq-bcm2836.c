@@ -355,11 +355,8 @@ static int bcm2836_irq_init(struct device_node *node)
 	 * the bcm2835 is not percpu so :
 	 * bcm2836 id  : 0 - 31
 	 * bcm2835 id  : 32 - 127
+	 * enable mailbox0 interrupt for each core
 	 */
-	irq_alloc_sgi(0, 16);
-	irq_alloc_ppi(16, 16);
-
-	/* enable mailbox0 interrupt for each core */
 	writel_relaxed(1, bcm2836_base + LOCAL_MAILBOX_INT_CONTROL0);
 	writel_relaxed(1, bcm2836_base + LOCAL_MAILBOX_INT_CONTROL0 + 0x4);
 	writel_relaxed(1, bcm2836_base + LOCAL_MAILBOX_INT_CONTROL0 + 0x8);
@@ -374,8 +371,6 @@ static int bcm2836_irq_init(struct device_node *node)
 		intc.enable[b] = base + reg_enable[b];
 		intc.disable[b] = base + reg_disable[b];
 	}
-
-	irq_alloc_spi(32, 96);
 
 	/*
 	 * request the irq handler for the bcm2835 inc

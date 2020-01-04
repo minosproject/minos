@@ -301,6 +301,11 @@ int send_virq_to_vm(struct vm *vm, uint32_t virq)
 	struct virq_desc *desc;
 	struct vcpu *vcpu;
 
+	/*
+	 * only can send SPI virq in this function
+	 * if sending virq to dedicate vcpu please
+	 * use send_virq_to_vcpu()
+	 */
 	if ((!vm) || (virq < VM_LOCAL_VIRQ_NR))
 		return -EINVAL;
 

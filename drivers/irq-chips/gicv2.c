@@ -322,8 +322,6 @@ static void gicv2_dist_init(void)
 		readl_gicd(GICD_IIDR));
 
 
-	irq_alloc_spi(32, nr_lines);
-
 	/* Default all global IRQs to level, active low */
 	for ( i = 32; i < nr_lines; i += 16 )
 		writel_gicd(0x0, GICD_ICFGR + (i / 16) * 4);
@@ -387,9 +385,6 @@ static int gicv2_init(struct device_node *node)
 	}
 
 	spin_lock(&gicv2_lock);
-
-	irq_alloc_sgi(0, 16);
-	irq_alloc_ppi(16, 16);
 
 	gicv2_dist_init();
 	gicv2_cpu_init();

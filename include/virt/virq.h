@@ -22,8 +22,8 @@ struct irqtag;
 #define VIRQ_AFFINITY_VM_ANY	(0xffff)
 #define VIRQ_AFFINITY_VCPU_ANY	(0xff)
 
-#define VM_SGI_VIRQ_NR		(16)
-#define VM_PPI_VIRQ_NR		(16)
+#define VM_SGI_VIRQ_NR		(CONFIG_NR_SGI_IRQS)
+#define VM_PPI_VIRQ_NR		(CONFIG_NR_PPI_IRQS)
 #define VM_LOCAL_VIRQ_NR	(VM_SGI_VIRQ_NR + VM_PPI_VIRQ_NR)
 
 #ifndef CONFIG_HVM_SPI_VIRQ_NR
@@ -55,14 +55,6 @@ struct irqtag;
 #define VIRQF_CAN_WAKEUP	(1 << 4)
 #define VIRQF_ENABLE		(1 << 5)
 
-enum virq_domain_type {
-	VIRQ_DOMAIN_SGI = 0,
-	VIRQ_DOMAIN_PPI,
-	VIRQ_DOMAIN_SPI,
-	VIRQ_DOMAIN_LPI,
-	VIRQ_DOMAIN_MAX,
-};
-
 struct virq_desc {
 	uint8_t id;
 	uint8_t state;
@@ -75,7 +67,7 @@ struct virq_desc {
 	uint16_t hno;
 	uint32_t flags;
 	struct list_head list;
-} __packed__;
+};
 
 struct virq_struct {
 	uint32_t active_count;

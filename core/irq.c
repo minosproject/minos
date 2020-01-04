@@ -22,24 +22,27 @@
 #include <minos/sched.h>
 #include <minos/of.h>
 
-DEFINE_PER_CPU(struct irq_desc **, sgi_irqs);
-DEFINE_PER_CPU(struct irq_desc **, ppi_irqs);
+#define NR_PERCPU_IRQS		(CONFIG_NR_PPI_IRQS + CONFIG_NR_SGI_IRQS)
+#define PERCPU_IRQ_DESC_SIZE	(NR_PERCPU_IRQS * NR_CPUS)
+#define SPI_IRQ_DESC_SIZE	CONFIG_NR_SPI_IRQS
+#define SPI_IRQ_BASE		NR_PERCPU_IRQS
+#define MAX_IRQ_COUNT		(CONFIG_NR_SPI_IRQS + NR_PERCPU_IRQS)
 
 static struct irq_chip *irq_chip;
-static struct irq_domain *irq_domains[IRQ_DOMAIN_MAX];
 
-static struct irq_desc *alloc_irq_desc(void)
-{
-	struct irq_desc *irq;
+static int default_irq_handler(uint32_t irq, void *data);
 
-	irq = (struct irq_desc *)zalloc(sizeof(struct irq_desc));
-	if (!irq)
-		return NULL;
+static struct irq_desc percpu_irq_descs[PERCPU_IRQ_DESC_SIZE] = {
+	[0 ... (PERCPU_IRQ_DESC_SIZE - 1)] = {
+		default_irq_handler,
+	},
+};
 
-	spin_lock_init(&irq->lock);
-
-	return irq;
-}
+static struct irq_desc spi_irq_descs[SPI_IRQ_DESC_SIZE] = {
+	[0 ... (SPI_IRQ_DESC_SIZE - 1)] = {
+		default_irq_handler,
+	},
+};
 
 void send_sgi(uint32_t sgi, int cpu)
 {
@@ -57,9 +60,14 @@ void send_sgi(uint32_t sgi, int cpu)
 	irq_chip->send_sgi(sgi, SGI_TO_LIST, &mask);
 }
 
-static int do_handle_host_irq(struct irq_desc *irq_desc)
+static int default_irq_handler(uint32_t irq, void *data)
 {
-	uint32_t cpuid = smp_processor_id();
+	pr_warn("irq %d is not register\n", irq);
+	return 0;
+}
+
+static inline int do_handle_host_irq(int cpuid, struct irq_desc *irq_desc)
+{
 	int ret;
 
 	if (cpuid != irq_desc->affinity) {
@@ -68,16 +76,7 @@ static int do_handle_host_irq(struct irq_desc *irq_desc)
 		goto out;
 	}
 
-	if (!irq_desc->handler) {
-		pr_err("Irq is not register by MINOS\n");
-		ret = -EINVAL;
-		goto out;
-	}
-
 	ret = irq_desc->handler(irq_desc->hno, irq_desc->pdata);
-	if (ret)
-		pr_debug("handle irq:%d fail in minos\n", irq_desc->hno);
-
 out:
 	/*
 	 * 1: if the hw irq is to vcpu do not dir it
@@ -89,270 +88,28 @@ out:
 	return ret;
 }
 
-int register_irq_domain(int type, struct irq_domain_ops *ops)
+static inline struct irq_desc *get_irq_desc_cpu(int cpuid, uint32_t irq)
 {
-	struct irq_domain *domain;
-
-	if (type >= IRQ_DOMAIN_MAX)
-		return -EINVAL;
-
-	domain = (struct irq_domain *)zalloc(sizeof(struct irq_domain));
-	if (!domain)
-		return -ENOMEM;
-
-	domain->type = type;
-	domain->ops = ops;
-	irq_domains[type] = domain;
-
-	return 0;
-}
-
-static struct irq_desc **spi_alloc_irqs(uint32_t start,
-		uint32_t count, int type)
-{
-	struct irq_desc *desc;
-	struct irq_desc **irqs;
-	uint32_t size;
-	int i;
-
-	size = count * sizeof(struct irq_desc *);
-	irqs = (struct irq_desc **)zalloc(size);
-	if (!irqs)
+	if (irq >= MAX_IRQ_COUNT)
 		return NULL;
 
-	for (i = 0; i < count; i++) {
-		desc = alloc_irq_desc();
-		if (!desc) {
-			pr_err("No more memory for irq desc\n");
-			return irqs;
-		}
+	if (irq < SPI_IRQ_BASE)
+		return &percpu_irq_descs[cpuid * NR_PERCPU_IRQS + irq];
 
-		desc->hno = i + start;
-		irqs[i] = desc;
-	}
-
-	return irqs;
+	return &spi_irq_descs[irq - SPI_IRQ_BASE];
 }
 
-static struct irq_desc *spi_get_irq_desc(struct irq_domain *d, uint32_t irq)
-{
-	if ((irq < d->start) || (irq >= (d->start + d->count)))
-		return NULL;
-
-	return (d->irqs[irq - d->start]);
-}
-
-static int spi_int_handler(struct irq_domain *d, struct irq_desc *irq_desc)
-{
-	return do_handle_host_irq(irq_desc);
-}
-
-struct irq_domain_ops spi_domain_ops = {
-	.alloc_irqs = spi_alloc_irqs,
-	.get_irq_desc = spi_get_irq_desc,
-	.irq_handler = spi_int_handler,
-};
-
-static struct irq_desc **local_alloc_irqs(uint32_t start,
-		uint32_t count, int type)
-{
-	struct irq_desc **irqs, **tmp = NULL;
-	struct irq_desc *desc;
-	uint32_t size;
-	uint32_t i, j;
-	unsigned long addr;
-
-	/*
-	 * each cpu will have its local irqs
-	 */
-	size = count * sizeof(struct irq_desc *) * CONFIG_NR_CPUS;
-	irqs = (struct irq_desc **)zalloc(size);
-	if (!irqs)
-		return NULL;
-
-	addr = (unsigned long)irqs;
-	for (i = 0; i < CONFIG_NR_CPUS; i++) {
-		if (type == IRQ_DOMAIN_SGI)
-			get_per_cpu(sgi_irqs, i) = (struct irq_desc **)addr;
-		else if (type == IRQ_DOMAIN_PPI)
-			get_per_cpu(ppi_irqs, i) = (struct irq_desc **)addr;
-
-		addr += count * sizeof(struct irq_desc *);
-	}
-
-	/*
-	 * alloc a irq_desc for each cpu
-	 */
-	for (i = 0; i < CONFIG_NR_CPUS; i++) {
-		if (type == IRQ_DOMAIN_SGI)
-			tmp = get_per_cpu(sgi_irqs, i);
-		else if (type == IRQ_DOMAIN_PPI)
-			tmp = get_per_cpu(ppi_irqs, i);
-
-		for (j = 0; j < count; j++) {
-			desc = alloc_irq_desc();
-			if (!desc) {
-				pr_err("No more memory for local irq desc\n");
-				return irqs;
-			}
-
-			desc->hno = start + j;
-			desc->affinity = i;
-			tmp[j] = desc;
-		}
-	}
-
-	return irqs;
-}
-
-static struct irq_desc *local_get_irq_desc(struct irq_domain *d, uint32_t irq)
-{
-	struct irq_desc **irqs = NULL;
-
-	if ((irq < d->start) || (irq >= (d->start + d->count)))
-		return NULL;
-
-	if (d->type == IRQ_DOMAIN_SGI)
-		irqs = get_cpu_var(sgi_irqs);
-	else if(d->type == IRQ_DOMAIN_PPI)
-		irqs = get_cpu_var(ppi_irqs);
-
-	return irqs[irq - d->start];
-}
-
-static int local_int_handler(struct irq_domain *d, struct irq_desc *irq_desc)
-{
-	return do_handle_host_irq(irq_desc);
-}
-
-struct irq_domain_ops local_domain_ops = {
-	.alloc_irqs = local_alloc_irqs,
-	.get_irq_desc = local_get_irq_desc,
-	.irq_handler = local_int_handler,
-};
-
-static int irq_domain_create_irqs(struct irq_domain *d,
-		uint32_t start, uint32_t cnt)
-{
-	struct irq_desc **irqs;
-
-	if ((cnt == 0) || (cnt >= 1024)) {
-		pr_err("%s: invaild irq cnt %d\n", __func__, cnt);
-		return -EINVAL;
-	}
-
-	if (d->irqs) {
-		pr_err("irq desc table has been created\n");
-		return -EINVAL;
-	}
-
-	irqs = d->ops->alloc_irqs(start, cnt, d->type);
-	if (!irqs)
-		return -ENOMEM;
-
-	d->start = start;
-	d->count = cnt;
-	d->irqs = irqs;
-
-	return 0;
-}
-
-static int alloc_irqs(uint32_t start, uint32_t cnt, int type)
-{
-	int ret;
-	struct irq_domain *domain;
-
-	if (type >= IRQ_DOMAIN_MAX)
-		return -EINVAL;
-
-	domain = irq_domains[type];
-	if (!domain)
-		return -ENOENT;
-
-	/*
-	 * need to check wheter the irq number is
-	 * duplicate in the other domain TBD
-	 */
-	ret = irq_domain_create_irqs(domain, start, cnt);
-	if (ret) {
-		pr_err("add domain:%d irqs failed\n", type);
-		goto out;
-	}
-
-out:
-	return ret;
-}
-
-int irq_alloc_spi(uint32_t start, uint32_t cnt)
-{
-	return alloc_irqs(start, cnt, IRQ_DOMAIN_SPI);
-}
-
-int irq_alloc_sgi(uint32_t start, uint32_t cnt)
-{
-	return alloc_irqs(start, cnt, IRQ_DOMAIN_SGI);
-}
-
-int irq_alloc_ppi(uint32_t start, uint32_t cnt)
-{
-	return alloc_irqs(start, cnt, IRQ_DOMAIN_PPI);
-}
-
-int irq_alloc_lpi(uint32_t start, uint32_t cnt)
-{
-	return alloc_irqs(start, cnt, IRQ_DOMAIN_LPI);
-}
-
-int irq_alloc_special(uint32_t start, uint32_t cnt)
-{
-	return alloc_irqs(start, cnt, IRQ_DOMAIN_SPECIAL);
-}
-
-static struct irq_domain *get_irq_domain(uint32_t irq)
-{
-	int i;
-	struct irq_domain *domain;
-
-	for (i = 0; i < IRQ_DOMAIN_MAX; i++) {
-		domain = irq_domains[i];
-		if (!domain)
-			continue;
-
-		if ((irq >= domain->start) &&
-			(irq < domain->start + domain->count))
-			return domain;
-	}
-
-	return NULL;
-}
-
+/*
+ * notice, when used this function to get the percpu
+ * irqs need to lock the kernel to invoid the thread
+ * sched out from this cpu and running on another cpu
+ *
+ * so usually, percpu irq will handle in kernel contex
+ * and not in task context
+ */
 struct irq_desc *get_irq_desc(uint32_t irq)
 {
-	struct irq_domain *domain;
-
-	domain = get_irq_domain(irq);
-	if (!domain)
-		return NULL;
-
-	return domain->ops->get_irq_desc(domain, irq);
-}
-
-static struct irq_desc *get_irq_desc_cpu(uint32_t irq, int cpu)
-{
-	struct irq_desc **irq_descs;
-
-	if (irq >= NR_LOCAL_IRQS)
-		return NULL;
-
-	if (irq >= PPI_IRQ_BASE) {
-		irq_descs = get_per_cpu(ppi_irqs, cpu);
-		return irq_descs[irq - PPI_IRQ_BASE];
-	} else {
-		irq_descs = get_per_cpu(sgi_irqs, cpu);
-		return irq_descs[irq - SGI_IRQ_BASE];
-	}
-
-	return NULL;
+	return get_irq_desc_cpu(smp_processor_id(), irq);
 }
 
 void __irq_enable(uint32_t irq, int enable)
@@ -369,6 +126,7 @@ void __irq_enable(uint32_t irq, int enable)
 	 * which do not set the bit, so here force to excute
 	 * the action
 	 */
+	spin_lock(&irq_desc->lock);
 	if (enable) {
 		irq_chip->irq_unmask(irq);
 		irq_desc->flags &= ~IRQ_FLAGS_MASKED;
@@ -376,6 +134,7 @@ void __irq_enable(uint32_t irq, int enable)
 		irq_chip->irq_mask(irq);
 		irq_desc->flags |= IRQ_FLAGS_MASKED;
 	 }
+	spin_unlock(&irq_desc->lock);
 }
 
 void irq_clear_pending(uint32_t irq)
@@ -428,78 +187,27 @@ out:
 	spin_unlock(&irq_desc->lock);
 }
 
-static int do_bad_int(uint32_t irq)
-{
-	pr_debug("Handle bad irq do nothing %d\n", irq);
-	irq_chip->irq_dir(irq);
-
-	return 0;
-}
-
 int do_irq_handler(void)
 {
 	uint32_t irq;
 	struct irq_desc *irq_desc;
-	struct irq_domain *d;
-	int ret = 0;
+	int cpuid = smp_processor_id();
 
 	while (1) {
 		irq = irq_chip->get_pending_irq();
-		if (irq == BAD_IRQ)
+		if (irq >= BAD_IRQ)
 			return 0;
-
-		d = get_irq_domain(irq);
-		if (unlikely(!d)) {
-			ret = -ENOENT;
-			goto error;
-		}
 
 		irq_chip->irq_eoi(irq);
 
-		irq_desc = d->ops->get_irq_desc(d, irq);
+		irq_desc = get_irq_desc_cpu(cpuid, irq);
 		if (unlikely(!irq_desc)) {
 			pr_err("irq is not actived %d\n", irq);
-			ret = -EINVAL;
-			goto error;
+			irq_chip->irq_dir(irq);
+			continue;
 		}
 
-		if (d->ops->irq_handler(d, irq_desc))
-			pr_warn("handing %d irq failed\n", irq);
-	}
-
-	return 0;
-
-error:
-	do_bad_int(irq);
-	return ret;
-}
-
-int request_irq_percpu(uint32_t irq, irq_handle_t handler,
-		unsigned long flags, char *name, void *data)
-{
-	int i;
-	struct irq_desc *irq_desc;
-	unsigned long flag;
-
-	if (irq >= NR_LOCAL_IRQS)
-		return -EINVAL;
-
-	for (i = 0; i < NR_CPUS; i++) {
-		irq_desc = get_irq_desc_cpu(irq, i);
-		if (!irq_desc)
-			continue;
-
-		spin_lock_irqsave(&irq_desc->lock, flag);
-		irq_desc->handler = handler;
-		irq_desc->pdata = data;
-		irq_desc->name = name;
-		irq_desc->flags |= flags;
-
-		/* enable the irq here */
-		irq_chip->irq_unmask_cpu(irq, i);
-		irq_desc->flags &= ~IRQ_FLAGS_MASKED;
-
-		spin_unlock_irqrestore(&irq_desc->lock, flag);
+		do_handle_host_irq(cpuid, irq_desc);
 	}
 
 	return 0;
@@ -516,6 +224,39 @@ int irq_xlate(struct device_node *node, uint32_t *intspec,
 	return -ENOENT;
 }
 
+int request_irq_percpu(uint32_t irq, irq_handle_t handler,
+		unsigned long flags, char *name, void *data)
+{
+	int i;
+	struct irq_desc *irq_desc;
+	unsigned long flag;
+
+	unused_arg(name);
+
+	if ((irq >= NR_PERCPU_IRQS) || !handler)
+		return -EINVAL;
+
+	for (i = 0; i < NR_CPUS; i++) {
+		irq_desc = get_irq_desc_cpu(i, irq);
+		if (!irq_desc)
+			continue;
+
+		spin_lock_irqsave(&irq_desc->lock, flag);
+		irq_desc->handler = handler;
+		irq_desc->pdata = data;
+		irq_desc->flags |= flags;
+		irq_desc->affinity = i;
+		irq_desc->hno = irq;
+
+		/* enable the irq here */
+		irq_chip->irq_unmask_cpu(irq, i);
+		irq_desc->flags &= ~IRQ_FLAGS_MASKED;
+
+		spin_unlock_irqrestore(&irq_desc->lock, flag);
+	}
+
+	return 0;
+}
 
 int request_irq(uint32_t irq, irq_handle_t handler,
 		unsigned long flags, char *name, void *data)
@@ -523,6 +264,8 @@ int request_irq(uint32_t irq, irq_handle_t handler,
 	int type;
 	struct irq_desc *irq_desc;
 	unsigned long flag;
+
+	unused_arg(name);
 
 	if (!handler)
 		return -EINVAL;
@@ -537,12 +280,15 @@ int request_irq(uint32_t irq, irq_handle_t handler,
 	spin_lock_irqsave(&irq_desc->lock, flag);
 	irq_desc->handler = handler;
 	irq_desc->pdata = data;
-	irq_desc->name = name;
 	irq_desc->flags |= flags;
+	irq_desc->hno = irq;
 
 	/* enable the hw irq and set the mask bit */
 	irq_chip->irq_unmask(irq);
 	irq_desc->flags &= ~IRQ_FLAGS_MASKED;
+
+	if (irq < SPI_IRQ_BASE)
+		irq_desc->affinity = smp_processor_id();
 
 	spin_unlock_irqrestore(&irq_desc->lock, flag);
 
@@ -583,11 +329,6 @@ static void of_irq_init(void)
 
 int irq_init(void)
 {
-	register_irq_domain(IRQ_DOMAIN_SPI, &spi_domain_ops);
-	register_irq_domain(IRQ_DOMAIN_SGI, &local_domain_ops);
-	register_irq_domain(IRQ_DOMAIN_PPI, &local_domain_ops);
-	register_irq_domain(IRQ_DOMAIN_SPECIAL, &spi_domain_ops);
-
 #ifdef CONFIG_DEVICE_TREE
 	of_irq_init();
 #endif
