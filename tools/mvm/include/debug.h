@@ -10,7 +10,8 @@ extern int verbose;
 	} while (0)
 
 #define pr_err(...)	printf("[ERROR] " __VA_ARGS__)
-#define pr_notice(...)	printf("[INFO ] " __VA_ARGS__)
+#define pr_notice(...)	printf("[NIC  ] " __VA_ARGS__)
+#define pr_info(...)	printf("[INFO ] " __VA_ARGS__)
 #define pr_warn(...)	printf("[WARN ] " __VA_ARGS__)
 
 #endif

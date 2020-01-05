@@ -762,6 +762,12 @@ static int mvm_open_images(struct vm *vm, struct vm_config *config)
 			return -ENOENT;
 		}
 
+		if (config->tc_image[0]) {
+			vm->tc_fd = open(config->tc_image, O_RDONLY | O_NONBLOCK);
+			if (vm->tc_fd)
+				pr_err("open tc static image failed\n");
+		}
+
 		if (!(vm->flags & VM_FLAGS_NO_RAMDISK)) {
 			vm->rfd = open(config->ramdisk_image,
 					O_RDONLY | O_NONBLOCK);
@@ -880,6 +886,7 @@ static struct option options[] = {
 	{"gicv2",	no_argument,	   NULL, '1'},
 	{"gicv4",	no_argument,	   NULL, '2'},
 	{"earlyprintk",	no_argument,	   NULL, '3'},
+	{"tc_file",	required_argument, NULL, 'T'},
 	{"help",	no_argument,	   NULL, 'h'},
 	{NULL,		0,		   NULL,  0}
 };
@@ -1111,6 +1118,14 @@ int main(int argc, char **argv)
 				goto exit;
 			}
 			strcpy(global_config->ramdisk_image, optarg);
+			break;
+		case 'T':		// for xnu tc_static file
+			if (strlen(optarg) > 255) {
+				pr_err("tc file image name is too long\n");
+				ret = -EINVAL;
+				goto exit;
+			}
+			strcpy(global_config->tc_image, optarg);
 			break;
 		default:
 			break;

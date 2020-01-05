@@ -26,6 +26,7 @@ struct vm_config {
 	char kernel_image[256];
 	char dtb_image[256];
 	char ramdisk_image[256];
+	char tc_image[256];
 };
 
 /*
@@ -40,6 +41,8 @@ struct vm {
 	int kfd;
 	int dfd;
 	int rfd;
+	int tfd;
+	int tc_fd;
 	int state;
 	unsigned long flags;
 	struct vm_os *os;
