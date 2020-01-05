@@ -22,6 +22,7 @@
 #include <virt/virq.h>
 #include <virt/virtio.h>
 #include <virt/vmcs.h>
+#include <virt/os.h>
 
 static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 {
@@ -89,8 +90,8 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 		ret = virtio_mmio_init(vm, args[1], args[2], &hbase);
 		HVC_RET2(c, ret, hbase);
 		break;
-	case HVC_VM_CREATE_HOST_VDEV:
-		ret = vm_create_host_vdev(vm);
+	case HVC_VM_CREATE_RESOURCE:
+		ret = os_create_guest_vm_resource(vm);
 		HVC_RET1(c, ret);
 		break;
 	case HVC_CHANGE_LOG_LEVEL:

@@ -417,9 +417,18 @@ static void *create_vm_vdev_common(struct device_node *node, void *vm)
 	return NULL;
 }
 
-int create_vm_resource_common(struct vm *vm, struct device_node *node)
+int create_native_vm_resource_common(struct vm *vm)
 {
 	int ret;
+	char name[32];
+	struct device_node *node;
+
+	memset(name, 0, 32);
+	sprintf(name, "vm%d_bdi", vm->vmid);
+
+	node = of_find_node_by_name(vm->dev_node, name);
+	if (!node)
+		return -ENOENT;
 
 	ret = create_vm_virqchip_common(vm, node);
 	if (ret)

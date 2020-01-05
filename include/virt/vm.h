@@ -91,6 +91,8 @@ struct vm {
 	void *vmcs;
 	void *hvm_vmcs;
 	void *resource;
+
+	void *os_data;
 } __align(sizeof(unsigned long));
 
 #define vm_name(vm)	devnode_name(vm->dev_node)
@@ -212,5 +214,7 @@ int create_vm_mmap(int vmid,  unsigned long offset,
 		unsigned long size, unsigned long *addr);
 int vm_create_host_vdev(struct vm *vm);
 int request_vm_virqs(struct vm *vm, int base, int nr);
+
+void arch_init_vcpu(struct vcpu *vcpu, void *entry, void *arg);
 
 #endif

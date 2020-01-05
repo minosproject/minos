@@ -53,6 +53,6 @@ struct vmtag {
 #define IOCTL_VIRTIO_MMIO_INIT		0xf00d
 #define IOCTL_VIRTIO_MMIO_DEINIT	0xf00e
 #define IOCTL_REQUEST_VIRQ		0xf00f
-#define IOCTL_CREATE_HOST_VDEV		0xf010
+#define IOCTL_CREATE_VM_RESOURCE	0xf010
 
 #endif

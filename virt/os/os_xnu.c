@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 Min Le (lemin9538@gmail.com)
+ * Copyright (C) 2018 Min Le (lemin9538@gmail.com)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -25,5 +25,12 @@
 #include <virt/virq_chip.h>
 #include <virt/virq.h>
 #include <virt/vmbox.h>
-#include <common/hypervisor.h>
+#include <minos/sched.h>
+#include <minos/arch.h>
+#include <virt/os.h>
+#include <virt/resource.h>
 
+static int os_xnu_init(void)
+{
+	return register_os("xnu", OS_TYPE_XNU, &os_xnu_ops);
+}

@@ -35,7 +35,6 @@
 #include <virt/vmbox.h>
 
 extern void virqs_init(void);
-extern void fdt_vm_init(struct vm *vm);
 
 struct vm *vms[CONFIG_MAX_VM];
 static int total_vms = 0;
@@ -79,7 +78,6 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 {
 	int cpuid;
 	struct vcpu *vcpu;
-	struct os *os = caller->vm->os;
 
 	cpuid = affinity_to_cpuid(affinity);
 
@@ -101,7 +99,7 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 	if (vcpu->task->stat == TASK_STAT_STOPPED) {
 		pr_notice("vcpu-%d of vm-%d power on from vm suspend 0x%p\n",
 				vcpu->vcpu_id, vcpu->vm->vmid, entry);
-		os->ops->vcpu_power_on(vcpu, entry);
+		os_vcpu_power_on(vcpu, entry);
 		vcpu_online(vcpu);
 	} else {
 		pr_err("vcpu_power_on : invalid vcpu state\n");
@@ -456,12 +454,6 @@ static int vmtag_check_and_config(struct vmtag *tag)
 	if (tag->mem_base == 0)
 		tag->mem_base = GVM_NORMAL_MEM_START;
 
-	if (tag->mem_base < GVM_NORMAL_MEM_START)
-		return -EINVAL;
-
-	if ((tag->mem_base + size) >= GVM_NORMAL_MEM_END)
-		return -EINVAL;;
-
 	if (!has_enough_memory(size))
 		return -EINVAL;
 
@@ -771,27 +763,18 @@ int vm_suspend(int vmid)
 	return __vm_suspend(vm);
 }
 
-
-int vm_create_host_vdev(struct vm *vm)
+static void setup_vm(struct vm *vm)
 {
-	phy_addr_t addr;
-
 	/*
-	 * convert the guest's memory to hypervisor's memory space
-	 * do not need to map again, since all the guest VM's memory
-	 * has been mapped when mm_init()
+	 * here need first map the setup data into the
+	 * hypervisor memory space, in case data abort, sine
+	 * there may by many place use the setup memory
 	 */
-	addr = translate_vm_address(vm, (unsigned long)vm->setup_data);
-	if (!addr)
-		return -ENOMEM;
-
-	return create_vm_resource_of(vm, (void *)addr);
-}
-
-static int vm_create_resource(struct vm *vm)
-{
-	char name[32];
-	struct device_node *node;
+	if (vm->setup_data) {
+		create_host_mapping((vir_addr_t)vm->setup_data,
+				(phy_addr_t)vm->setup_data,
+				MEM_BLOCK_SIZE, VM_RO);
+	}
 
 	/* 
 	 * here need to create the resource based on the vm's
@@ -806,36 +789,14 @@ static int vm_create_resource(struct vm *vm)
 	 * first map the dtb address to the hypervisor, here
 	 * map these native VM's memory as read only
 	 */
-	memset(name, 0, 32);
-	sprintf(name, "vm%d_bdi", vm->vmid);
-
-	node = of_find_node_by_name(vm->dev_node, name);
-	if (node)
-		create_vm_resource_common(vm, node);
+	os_create_native_vm_resource(vm);
+	os_setup_vm(vm);
+	setup_vm_vmbox(vm);
 
 	if (vm->setup_data) {
-		create_host_mapping((vir_addr_t)vm->setup_data,
-				(phy_addr_t)vm->setup_data,
-				MEM_BLOCK_SIZE, VM_RO);
-
-		if (of_data(vm->setup_data)) {
-			vm->flags |= VM_FLAGS_SETUP_OF;
-			create_vm_resource_of(vm, vm->setup_data);
-		}
-
 		destroy_host_mapping((vir_addr_t)vm->setup_data,
 				MEM_BLOCK_SIZE);
 	}
-
-	return 0;
-}
-
-static void setup_vm(struct vm *vm)
-{
-	if (vm->flags & VM_FLAGS_SETUP_OF)
-		fdt_vm_init(vm);
-	else
-		setup_vm_vmbox(vm);
 }
 
 void destroy_vm(struct vm *vm)
@@ -911,7 +872,7 @@ int vm_vcpus_init(struct vm *vm)
 	/* some task will excuted after this function */
 	vm_for_each_vcpu(vm, vcpu) {
 		do_hooks(vcpu, NULL, OS_HOOK_VCPU_INIT);
-		vm->os->ops->vcpu_init(vcpu);
+		os_vcpu_init(vcpu);
 	}
 
 	return 0;
@@ -1158,7 +1119,7 @@ int virt_init(void)
 		 * - init the vmodule state for each vcpu
 		 * - prepare the vcpu for bootup
 		 */
-		vm_create_resource(vm);
+		os_vm_init(vm);
 		setup_vm(vm);
 		vm_mm_init(vm);
 		vm->state = VM_STAT_ONLINE;
