@@ -13,8 +13,8 @@ config MINOS_ENTRY_ADDRESS
 
 config MINOS_RAM_SIZE
 	hex "memory size for Minos"
-	default 0x40000000
-	range 0x10000000 0x40000000
+	default 0x4000000
+	range 0x1000000 0x4000000
 	help
 	  the memory size for Minos
 
