@@ -50,11 +50,11 @@ static int default_create_native_vm_resource(struct vm *vm)
 }
 
 struct os_ops default_os_ops = {
-	.vcpu_init		   = default_vcpu_init,
-	.vcpu_power_on		   = default_vcpu_power_on,
-	.vm_setup		   = default_vm_setup,
-	.create_guest_vm_resource  = default_create_guest_vm_resource,
-	.create_native_vm_resource = default_create_native_vm_resource,
+	.vcpu_init	= default_vcpu_init,
+	.vcpu_power_on	= default_vcpu_power_on,
+	.vm_setup	= default_vm_setup,
+	.create_gvm_res = default_create_guest_vm_resource,
+	.create_nvm_res = default_create_native_vm_resource,
 };
 
 static int os_default_init(void)

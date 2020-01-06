@@ -330,6 +330,12 @@ static void linux_vm_setup(struct vm *vm)
 
 static int linux_create_native_vm_resource(struct vm *vm)
 {
+	/*
+	 * first check whether there are some resource need
+	 * to created from the hypervisor's dts
+	 */
+	create_native_vm_resource_common(vm);
+
 	if (vm->setup_data) {
 		if (of_data(vm->setup_data)) {
 			vm->flags |= VM_FLAGS_SETUP_OF;
@@ -357,11 +363,11 @@ static int linux_create_guest_vm_resource(struct vm *vm)
 }
 
 struct os_ops linux_os_ops = {
-	.vcpu_init = linux_vcpu_init,
-	.vcpu_power_on = linux_vcpu_power_on,
-	.vm_setup = linux_vm_setup,
-	.create_native_vm_resource = linux_create_native_vm_resource,
-	.create_guest_vm_resource = linux_create_guest_vm_resource,
+	.vcpu_init 	= linux_vcpu_init,
+	.vcpu_power_on 	= linux_vcpu_power_on,
+	.vm_setup 	= linux_vm_setup,
+	.create_nvm_res = linux_create_native_vm_resource,
+	.create_gvm_res = linux_create_guest_vm_resource,
 };
 
 static int os_linux_init(void)

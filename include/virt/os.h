@@ -18,8 +18,8 @@ struct os_ops {
 	void (*vcpu_init)(struct vcpu *vcpu);
 	void (*vcpu_power_on)(struct vcpu *vcpu, unsigned long entry);
 	void (*vm_setup)(struct vm *vm);
-	int (*create_guest_vm_resource)(struct vm *vm);
-	int (*create_native_vm_resource)(struct vm *vm);
+	int (*create_gvm_res)(struct vm *vm);
+	int (*create_nvm_res)(struct vm *vm);
 };
 
 struct os {
@@ -31,6 +31,7 @@ struct os {
 int register_os(char *name, int type, struct os_ops *ops);
 struct os *alloc_os(char *name, int type);
 struct os *get_vm_os(char *type);
+void os_vm_init(struct vm *vm);
 void os_setup_vm(struct vm *vm);
 void os_vcpu_init(struct vcpu *vcpu);
 void os_vcpu_power_on(struct vcpu *vcpu, unsigned long entry);

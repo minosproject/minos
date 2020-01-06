@@ -68,16 +68,16 @@ void os_setup_vm(struct vm *vm)
 
 int os_create_native_vm_resource(struct vm *vm)
 {
-	if (vm->os->ops->create_native_vm_resource)
-		return vm->os->ops->create_native_vm_resource(vm);
+	if (vm->os->ops->create_nvm_res)
+		return vm->os->ops->create_nvm_res(vm);
 
 	return 0;
 }
 
 int os_create_guest_vm_resource(struct vm *vm)
 {
-	if (vm->os->ops->create_guest_vm_resource)
-		return vm->os->ops->create_guest_vm_resource(vm);
+	if (vm->os->ops->create_gvm_res)
+		return vm->os->ops->create_gvm_res(vm);
 
 	return 0;
 }

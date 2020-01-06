@@ -25,6 +25,8 @@
 #define VM_FLAGS_SETUP_OTHER		(1 << 11)
 #define VM_FLAGS_SETUP_MASK		(0xf00)
 
+#define VM_FLAGS_XNU_APPLE		(1 << 12)
+
 struct vmtag {
 	uint32_t vmid;
 	char name[VM_NAME_SIZE];
