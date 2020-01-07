@@ -76,9 +76,13 @@ static void xnu_vm_exit(struct vm *vm)
 
 static int xnu_setup_env(struct vm *vm, char *cmdline)
 {
+	size_t i;
+	uint64_t *value;
+	struct xnu_dt_node_prop *dt_prop;
 	struct xnu_os_data *od = (struct xnu_os_data *)vm->os_data;
 	struct xnu_arm64_boot_args *arg = (struct xnu_arm64_boot_args *)
 		(vm->mmap + VA_OFFSET(od->bootarg_load_base));
+	char *dtb = (char *)(vm->mmap + VA_OFFSET(od->dtb_load_base));
 
 	memset(arg, 0, sizeof(struct xnu_arm64_boot_args));
 	arg->revision = XNU_ARM64_KBOOT_ARGS_REVISION2;
@@ -90,8 +94,30 @@ static int xnu_setup_env(struct vm *vm, char *cmdline)
 	arg->dtb = VA2PA(od->ramdisk_load_base);
 	arg->dtb_length = od->dtb_size;
 	arg->mem_size_actual = 0;
-
+	arg->boot_flags = 0;
 	strncpy(arg->cmdline, cmdline, strlen(cmdline) + 1);
+
+	/*
+	 * add the ramdisk information to the dtb, just search
+	 * the string "MemoryMapReserved-0"
+	 */
+	for (i = 0; i < od->dtb_size; i++) {
+		if (strncmp(dtb + i, "MemoryMapReserved-0",
+				XNU_DT_PROP_NAME_LENGTH) == 0) {
+			dt_prop = (struct xnu_dt_node_prop *)dtb;
+			break;
+		}
+	}
+
+	if (!dt_prop) {
+		pr_err("Can't find the ramdisk node\n");
+		return -ENOENT;
+	}
+
+	strncpy(dt_prop->name, "RAMDisk", XNU_DT_PROP_NAME_LENGTH);
+	value = (uint64_t *)&dt_prop->value;
+	value[0] = VA2PA(od->ramdisk_load_base);
+	value[1] = od->ramdisk_size;
 
 	return 0;
 }

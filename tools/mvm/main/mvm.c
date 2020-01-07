@@ -389,9 +389,9 @@ static struct vm_os *get_vm_os(char *os_type)
 	return default_os;
 }
 
-static int vm_create_host_vdev(struct vm *vm)
+static int vm_create_resource(struct vm *vm)
 {
-	return ioctl(vm->vm_fd, IOCTL_CREATE_HOST_VDEV, NULL);
+	return ioctl(vm->vm_fd, IOCTL_CREATE_VM_RESOURCE, NULL);
 }
 
 static int vm_vdev_init(struct vm *vm, struct vm_config *config)
@@ -862,7 +862,7 @@ static int mvm_main(struct vm_config *config)
 	if (ret)
 		return ret;
 
-	ret = vm_create_host_vdev(vm);
+	ret = vm_create_resource(vm);
 	if (ret)
 		pr_warn("failed to create some host virtual devices\n");
 

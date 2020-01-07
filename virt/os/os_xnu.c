@@ -51,7 +51,19 @@ static void xnu_vm_init(struct vm *vm)
 
 static void xnu_vcpu_init(struct vcpu *vcpu)
 {
+	gp_regs *regs;
 
+	/*
+	 * xnu will use X0 to store the boot argument
+	 * so set the setup data address to x0
+	 */
+	if (get_vcpu_id(vcpu) == 0) {
+		arch_init_vcpu(vcpu, (void *)vcpu->vm->entry_point, NULL);
+		regs = (gp_regs *)vcpu->task->stack_base;
+		regs->x0 = (uint64_t)vcpu->vm->setup_data;
+
+		vcpu_online(vcpu);
+	}
 }
 
 static void xnu_vcpu_power_on(struct vcpu *vcpu, unsigned long entry)

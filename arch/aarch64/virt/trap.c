@@ -42,11 +42,6 @@ static inline void inject_virtual_data_abort(uint32_t esr_value)
 {
 	uint64_t hcr_el2 = read_sysreg(HCR_EL2) | HCR_EL2_VSE;
 
-	if (taken_from_el1(reg->spsr_el1))
-		esr_el1 |= (EC_DATAABORT_TWE << 26);
-	else
-		esr_el1 |= (EC_DATAABORT_TFL << 24);
-
 	write_sysreg(hcr_el2, HCR_EL2);
 	write_sysreg(esr_value, ESR_EL1);
 	wmb();
