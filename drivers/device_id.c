@@ -53,3 +53,8 @@ char *virtio_match_table[] = {
 	"virtio,mmio",
 	NULL
 };
+
+char *aic_match_table[] = {
+	"aic",
+	NULL
+};

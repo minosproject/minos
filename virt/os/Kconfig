@@ -1,0 +1,12 @@
+menu "VM operating system support"
+
+config OS_LINUX_SUPPORT
+	bool "Support linux based virtual machine"
+	default y
+
+config OS_XNU_SUPPORT
+	bool "Support xnu based virtual machine"
+	default y
+	select VIRQCHIP_AIC
+
+endmenu

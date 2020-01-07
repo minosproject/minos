@@ -30,9 +30,18 @@
 #include <virt/os.h>
 #include <virt/resource.h>
 
+struct virq_chip *create_aic_virqchip(struct vm *vm,
+		unsigned long base, unsigned long size);
+
 static int xnu_create_gvm_res_apple(struct vm *vm)
 {
+	vm->virq_chip = create_aic_virqchip(vm, 0x0, 0x6000);
+	if (!vm->virq_chip) {
+		pr_err("create virq chiq for apple soc failed\n");
+		return -EINVAL;
+	}
 
+	return 0;
 }
 
 static void xnu_vm_init(struct vm *vm)

@@ -19,4 +19,10 @@ config VIRQCHIP_BCM2836
 	  boardcom bcm2835 virtual interrupt controller
 	  driver
 
+config VIRQCHIP_AIC
+	bool "Support Apple Interrupt Controller"
+	default n
+	help
+	  support virtual AIC
+
 endmenu

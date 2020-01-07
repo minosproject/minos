@@ -182,6 +182,6 @@ struct virq_chip *create_aic_virqchip(struct vm *vm,
 static struct virq_chip *aic_virqchip_init(struct vm *vm,
 		struct device_node *node)
 {
-	return create_aic_virqchip(vm);
+	return create_aic_virqchip(vm, AIC_IO_BASE, AIC_IO_SIZE);
 }
 VIRQCHIP_DECLARE(vaic_virqchip, aic_match_table, aic_virqchip_init);

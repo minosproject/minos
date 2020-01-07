@@ -86,5 +86,6 @@ extern char *bcmirq_match_table[];
 extern char *pl031_match_table[];
 extern char *sp805_match_table[];
 extern char *virtio_match_table[];
+extern char *aic_match_table[];
 
 #endif

@@ -1,5 +1,10 @@
 if SOC_BCM2837
 
+config PLATFORM_BCM2837
+	def_bool y
+	select VIRQCHIP_BCM2836
+	select IRQCHIP_BCM2836
+
 config MINOS_START_ADDRESS
 	hex "memory start address of system"
 	default 0x28000000

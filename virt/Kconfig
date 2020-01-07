@@ -27,6 +27,7 @@ config VWDT_SP805
 
 source "virt/virq_chips/Kconfig"
 source "virt/vmbox/Kconfig"
+source "virt/os/Kconfig"
 
 endif
 
