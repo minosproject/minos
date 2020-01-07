@@ -33,11 +33,23 @@ extern void sync_from_lower_EL_handler(gp_regs *data);
 
 static struct sync_desc *sync_descs[MAX_SYNC_TYPE] __align_cache_line;
 
-static inline void inject_virtual_abort(void)
+static inline int taken_from_el1(uint64_t spsr)
+{
+	return ((spsr & 0xf) != AARCH64_SPSR_EL0t);
+}
+
+static inline void inject_virtual_data_abort(uint32_t esr_value)
 {
 	uint64_t hcr_el2 = read_sysreg(HCR_EL2) | HCR_EL2_VSE;
 
+	if (taken_from_el1(reg->spsr_el1))
+		esr_el1 |= (EC_DATAABORT_TWE << 26);
+	else
+		esr_el1 |= (EC_DATAABORT_TFL << 24);
+
 	write_sysreg(hcr_el2, HCR_EL2);
+	write_sysreg(esr_value, ESR_EL1);
+	wmb();
 }
 
 static int unknown_handler(gp_regs *reg, uint32_t esr_value)
@@ -272,7 +284,7 @@ static int dataabort_tfl_handler(gp_regs *regs, uint32_t esr_value)
 			 * if failed to handle the mmio trap inject a
 			 * sync error to guest vm to generate a fault
 			 */
-			inject_virtual_abort();
+			inject_virtual_data_abort(esr_value);
 		} else {
 			if (!dabt->write)
 				set_reg_value(regs, dabt->reg, value);
@@ -281,7 +293,7 @@ static int dataabort_tfl_handler(gp_regs *regs, uint32_t esr_value)
 	default:
 		pr_notice("unsupport data abort type this time %d @0x%p\n",
 				dabt->dfsc & ~FSC_LL_MASK, paddr);
-		inject_virtual_abort();
+		inject_virtual_data_abort(esr_value);
 		break;
 	}
 
@@ -476,7 +488,7 @@ void sync_from_lower_EL_handler(gp_regs *data)
 	if ((!vcpu) || (vcpu->task->affinity != cpuid))
 		panic("this vcpu is not belong to the pcpu");
 
-	exit_from_guest(get_current_vcpu(), data);
+	exit_from_guest(vcpu, data);
 
 	esr_value = data->esr_elx;
 	ec_type = (esr_value & 0xfc000000) >> 26;
@@ -486,10 +498,6 @@ void sync_from_lower_EL_handler(gp_regs *data)
 	if (ec == NULL)
 		goto out;
 
-	/*
-	 * how to deal with the return value
-	 * TBD
-	 */
 	if (ec->irq_safe)
 		local_irq_enable();
 

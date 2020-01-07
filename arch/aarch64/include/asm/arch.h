@@ -8,6 +8,15 @@
 
 #define SP_SIZE	 CONFIG_TASK_STACK_SIZE
 
+/*
+ * in hypervisor:
+ * elr_elx equals to elr_el2
+ * spsr_elx equals to spsr_el2
+ * esr_elx equals to esr_el2
+ *
+ * these register of EL1 will save and restore by
+ * arch/aarch64/virt/arch_virt.c
+ */
 typedef struct aarch64_regs {
 	uint64_t elr_elx;
 	uint64_t spsr_elx;
