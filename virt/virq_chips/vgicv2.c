@@ -39,6 +39,7 @@ struct vgicv2_dev {
 	unsigned long gicc_base;
 	unsigned long gicc_size;
 	uint8_t gic_cpu_id[8];
+	int nr_lrs;
 };
 
 struct vgicv2_info {
@@ -544,22 +545,38 @@ static int gicv2_update_virq(struct vcpu *vcpu,
 	return 0;
 }
 
+static int vgicv2_vcpu_init(struct vcpu *vcpu, void *d, unsigned long flags)
+{
+	struct vgicv2_dev *dev = (struct vgicv2_dev *)d;
+
+	if (!(flags & VIRQCHIP_F_HW_VIRT))
+		return 0;
+
+	if (dev->nr_lrs > FFS_TABLE_NR_BITS)
+		panic("BUG : Minos virq chiq only support max %d lrs\n",
+				FFS_TABLE_NR_BITS);
+
+	ffs_table_init_and_unmask(&vcpu->virq_struct->lrs_table, dev->nr_lrs);
+
+	return 0;
+}
+
 static int vgicv2_init_virqchip(struct virq_chip *vc,
-		void *dev, unsigned long flags)
+		struct vgicv2_dev *dev, unsigned long flags)
 {
 	if (flags & VIRQCHIP_F_HW_VIRT) {
-		vc->nr_lrs = gicv2_nr_lrs;
 		vc->exit_from_guest = vgic_irq_exit_from_guest;
 		vc->enter_to_guest = vgic_irq_enter_to_guest;
 		vc->send_virq = gicv2_send_virq;
 		vc->update_virq = gicv2_update_virq;
 		vc->get_virq_state = gicv2_get_virq_state;
+		dev->nr_lrs = gicv2_nr_lrs;
 	}
 
 	vc->xlate = gic_xlate_irq;
 	vc->generate_virq = vgic_generate_virq;
+	vc->vcpu_init = vgicv2_vcpu_init;
 	vc->flags = flags;
-	vc->inc_pdata = dev;
 
 	return 0;
 }
@@ -625,6 +642,7 @@ static struct virq_chip *vgicv2_virqchip_init(struct vm *vm,
 	if (!vc)
 		return NULL;
 
+	vc->inc_pdata = dev;
 	vgicv2_init_virqchip(vc, dev, flags);
 
 	return vc;

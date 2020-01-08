@@ -148,26 +148,19 @@ int vgic_generate_virq(uint32_t *array, int virq)
 	return 3;
 }
 
-static int vgic_vcpu_init(void *item, void *contex)
+static int virq_chip_vcpu_init(void *item, void *contex)
 {
-#if defined(CONFIG_VIRQCHIP_VGICV2) || defined(CONFIG_VIRQCHIP_VGICV3)
 	struct vcpu *vcpu = (struct vcpu *)item;
 	struct virq_chip *vc = vcpu->vm->virq_chip;
 
-	if (!(vc->flags & VIRQCHIP_F_HW_VIRT))
-		return 0;
+	if (vc && vc->vcpu_init)
+		return vc->vcpu_init(vcpu, vc->inc_pdata, vc->flags);
 
-	if (vc->nr_lrs > FFS_TABLE_NR_BITS)
-		panic("BUG : Minos virq chiq only support max %d lrs\n",
-				FFS_TABLE_NR_BITS);
-
-	ffs_table_init_and_unmask(&vcpu->virq_struct->lrs_table, vc->nr_lrs);
-#endif
 	return 0;
 }
 
 int vcpu_vgic_hook_init(void)
 {
-	return register_hook(vgic_vcpu_init, OS_HOOK_VCPU_INIT);
+	return register_hook(virq_chip_vcpu_init, OS_HOOK_VCPU_INIT);
 }
 module_initcall(vcpu_vgic_hook_init);

@@ -18,11 +18,7 @@ struct virq_chip {
 	int (*send_virq)(struct vcpu *vcpu, struct virq_desc *virq);
 	int (*get_virq_state)(struct vcpu *vcpu, struct virq_desc *virq);
 	int (*update_virq)(struct vcpu *vcpu, struct virq_desc *virq, int action);
-
-	/* for vgicv2 and vgicv3 that support hw virtualaztion */
-#if defined(CONFIG_VIRQCHIP_VGICV2) || defined(CONFIG_VIRQCHIP_VGICV3)
-	int nr_lrs;
-#endif
+	int (*vcpu_init)(struct vcpu *vcpu, void *pdata, unsigned long flags);
 
 	void *inc_pdata;
 	unsigned long flags;

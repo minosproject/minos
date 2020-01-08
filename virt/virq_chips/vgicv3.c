@@ -689,11 +689,27 @@ static int gicv3_generate_virq(uint32_t *array, int virq)
 	return vgic_generate_virq(array, virq);
 }
 
+static int vgicv3_vcpu_init(struct vcpu *vcpu, void *d, unsigned long flags)
+{
+	struct vgicv3_dev *dev = (struct vgicv3_dev *)d;
+
+	if (!(flags & VIRQCHIP_F_HW_VIRT))
+		return 0;
+
+	if (dev->nr_lrs > FFS_TABLE_NR_BITS)
+		panic("BUG : Minos virq chiq only support max %d lrs\n",
+				FFS_TABLE_NR_BITS);
+
+	ffs_table_init_and_unmask(&vcpu->virq_struct->lrs_table, dev->nr_lrs);
+
+	return 0;
+}
+
 static void vgicv3_init_virqchip(struct virq_chip *vc,
 		struct vgicv3_dev *dev, unsigned long flags)
 {
 	if (flags & VIRQCHIP_F_HW_VIRT) {
-		vc->nr_lrs = gicv3_nr_lr;
+		dev->nr_lrs = gicv3_nr_lr;
 		vc->exit_from_guest = vgic_irq_exit_from_guest;
 		vc->enter_to_guest = vgic_irq_enter_to_guest;
 		vc->xlate = gic_xlate_irq;
@@ -701,11 +717,14 @@ static void vgicv3_init_virqchip(struct virq_chip *vc,
 		vc->send_virq = gicv3_send_virq;
 		vc->update_virq = gicv3_update_virq;
 		vc->get_virq_state = gicv3_get_virq_state;
+		vc->vcpu_init = vgicv3_vcpu_init;
 		vc->flags = flags;
 	} else {
 		pr_warn("***WARN***vgicv3 currently only" \
 				"support hard virt mode\n");
 	}
+
+	vc->inc_pdata = dev;
 }
 
 struct virq_chip *vgicv3_virqchip_init(struct vm *vm,
@@ -760,6 +779,7 @@ struct virq_chip *vgicv3_virqchip_init(struct vm *vm,
 	vc = alloc_virq_chip();
 	if (!vc)
 		return NULL;
+
 	if (vgicv3_info.gicd_base != 0)
 		flags |= VIRQCHIP_F_HW_VIRT;
 

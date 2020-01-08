@@ -89,7 +89,7 @@ static int xnu_setup_env(struct vm *vm, char *cmdline)
 	arg->version = XNU_ARM64_KBOOT_ARGS_VERSION;
 	arg->virt_base = od->kernel_load_base & ~0x3fffffff;
 	arg->phys_base = XNU_KERNEL_BASE;
-	arg->mem_size = 1 * 1024 * 1024;	/* fix 1GB */
+	arg->mem_size = vm->mem_size;			/* fix 1GB */
 	arg->top_of_kdata = VA2PA(od->load_end);
 	arg->dtb = VA2PA(od->ramdisk_load_base);
 	arg->dtb_length = od->dtb_size;

@@ -35,7 +35,7 @@ struct virq_chip *create_aic_virqchip(struct vm *vm,
 
 static int xnu_create_gvm_res_apple(struct vm *vm)
 {
-	vm->virq_chip = create_aic_virqchip(vm, 0x0, 0x6000);
+	vm->virq_chip = create_aic_virqchip(vm, 0x200000000, 0x6000);
 	if (!vm->virq_chip) {
 		pr_err("create virq chiq for apple soc failed\n");
 		return -EINVAL;
@@ -82,7 +82,7 @@ static int xnu_create_gvm_res(struct vm *vm)
 	 * if for apple soc currently only support few soc
 	 * apple use AIC and it's own timer controller
 	 */
-	if (vm->flags & VM_FLAGS_XNU_APPLE)
+//	if (vm->flags & VM_FLAGS_XNU_APPLE)
 		xnu_create_gvm_res_apple(vm);
 
 	return 0;

@@ -46,7 +46,7 @@ static int virqchip_enter_to_guest(void *item, void *data)
 			arch_set_virq_flag();
 	}
 
-	if (vc->enter_to_guest)
+	if (vc && vc->enter_to_guest)
 		vc->enter_to_guest(vcpu, vc->inc_pdata);
 out:
 	spin_unlock_irqrestore(&virq_struct->lock, flags);
@@ -60,7 +60,7 @@ static int virqchip_exit_from_guest(void *item, void *data)
 	struct virq_struct *virq_struct = vcpu->virq_struct;
 	struct virq_chip *vc = vcpu->vm->virq_chip;
 
-	if (vc->exit_from_guest) {
+	if (vc && vc->exit_from_guest) {
 		spin_lock_irqsave(&virq_struct->lock, flags);
 		vc->exit_from_guest(vcpu, vc->inc_pdata);
 		spin_unlock_irqrestore(&virq_struct->lock, flags);

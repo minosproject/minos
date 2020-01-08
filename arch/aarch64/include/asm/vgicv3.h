@@ -31,6 +31,7 @@ struct vgicv3_dev {
 	struct vdev vdev;
 	struct vgic_gicd gicd;
 	struct vgic_gicr *gicr[NR_CPUS];
+	int nr_lrs;
 };
 
 #define GIC_TYPE_GICD		(0x0)

@@ -773,7 +773,7 @@ static void setup_vm(struct vm *vm)
 	if (vm->setup_data) {
 		create_host_mapping((vir_addr_t)vm->setup_data,
 				(phy_addr_t)vm->setup_data,
-				MEM_BLOCK_SIZE, VM_RO);
+				MEM_BLOCK_SIZE, 0);
 	}
 
 	/* 
@@ -1087,8 +1087,6 @@ static int of_create_vmboxs(void)
 int virt_init(void)
 {
 	struct vm *vm;
-
-	virqs_init();
 
 	/* parse the vm information from dtb */
 	parse_and_create_vms();

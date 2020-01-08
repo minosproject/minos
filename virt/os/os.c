@@ -25,8 +25,8 @@ int register_os(char *name, int type, struct os_ops *ops)
 {
 	struct os *os;
 
-	if (oses[type] != NULL) {
-		pr_err("os [%d] has already register\n", type);
+	if (!ops || (oses[type] != NULL)) {
+		pr_err("os [%d] error already register or no ops\n", type);
 		return -EEXIST;
 	}
 
@@ -35,6 +35,7 @@ int register_os(char *name, int type, struct os_ops *ops)
 		return -ENOMEM;
 
 	os->type = type;
+	os->ops = ops;
 	strncpy(os->name, name, sizeof(os->name) - 1);
 	oses[type] = os;
 

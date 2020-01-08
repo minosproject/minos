@@ -174,9 +174,9 @@ struct virq_chip *create_aic_virqchip(struct vm *vm,
 	vc->enter_to_guest = aic_enter_to_guest;
 	vc->generate_virq = aic_generate_virq;
 	vc->update_virq = aic_update_virq;
-	vc->inc_pdata = NULL;
+	vc->inc_pdata = aic;
 
-	return NULL;
+	return vc;
 }
 
 static struct virq_chip *aic_virqchip_init(struct vm *vm,
