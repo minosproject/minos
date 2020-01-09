@@ -125,6 +125,7 @@ static void aarch64_system_state_init(struct task *task, void *c)
 		context->hcr_el2 |= HCR_EL2_RW;
 
 	context->vmpidr = 0x00000000 | get_vcpu_id(task_to_vcpu(task));
+	context->cpacr = 0x3;
 
 	if (vm_is_native(vcpu->vm))
 		context->vpidr = read_sysreg(VPIDR_EL2);
