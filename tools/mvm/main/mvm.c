@@ -998,7 +998,7 @@ int main(int argc, char **argv)
 	int run_as_daemon = 0;
 	struct vmtag *vmtag;
 	struct device_info *device_info;
-	static char *optstr = "K:R:S:c:C:m:i:s:n:D:V:t:b:rv?hd0123";
+	static char *optstr = "K:R:S:c:C:m:i:s:n:D:V:t:T:b:rv?hd0123";
 
 	global_config = calloc(1, sizeof(struct vm_config));
 	if (!global_config)
