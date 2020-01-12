@@ -30,6 +30,7 @@
 #include <virt/vm.h>
 #include <asm/vtimer.h>
 #include <virt/virq.h>
+#include <virt/os.h>
 
 struct aarch64_system_context {
 	uint64_t vbar_el1;
@@ -125,12 +126,20 @@ static void aarch64_system_state_init(struct task *task, void *c)
 		context->hcr_el2 |= HCR_EL2_RW;
 
 	context->vmpidr = 0x00000000 | get_vcpu_id(task_to_vcpu(task));
-	context->cpacr = 0x3;
+	context->cpacr = 0x3 << 20;
 
 	if (vm_is_native(vcpu->vm))
 		context->vpidr = read_sysreg(VPIDR_EL2);
 	else
 		context->vpidr = 0x410fc050;	/* arm fvp */
+
+	/*
+	 * enable dc zva trap, the apple soc use zva size 64
+	 * fixed, which may not equal to the target platform
+	 * so need trap dc zva
+	 */
+	if (vcpu->vm->os->type == OS_TYPE_XNU)
+		context->hcr_el2 |= HCR_EL2_TDZ;
 }
 
 static void aarch64_system_state_resume(struct task *task, void *c)

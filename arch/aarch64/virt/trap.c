@@ -188,6 +188,16 @@ static int smc_aarch64_handler(gp_regs *reg, uint32_t esr_value)
 	return arm_svc_handler(reg, esr_value, 1);
 }
 
+static int dczva_for_apple_soc(gp_regs *reg, unsigned long va)
+{
+	unsigned long pa = guest_va_to_pa(va, 0);
+
+	memset((void *)pa, 0, 0x40);
+	wmb();
+
+	return 0;
+}
+
 static int access_system_reg_handler(gp_regs *reg, uint32_t esr_value)
 {
 	unsigned long ret = 0;
@@ -214,6 +224,10 @@ static int access_system_reg_handler(gp_regs *reg, uint32_t esr_value)
 	case ESR_SYSREG_CNTP_CTL_EL0:
 	case ESR_SYSREG_CNTP_CVAL_EL0:
 		return vtimer_sysreg_simulation(reg, esr_value);
+
+	case ESR_SYSREG_DCZVA:
+		/* temp workround for apple */
+		return dczva_for_apple_soc(reg, get_reg_value(reg, regindex));
 	}
 
 	return ret;
