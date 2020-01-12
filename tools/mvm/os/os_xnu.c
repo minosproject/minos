@@ -91,11 +91,21 @@ static int xnu_setup_env(struct vm *vm, char *cmdline)
 	arg->phys_base = XNU_KERNEL_BASE;
 	arg->mem_size = vm->mem_size;			/* fix 1GB */
 	arg->top_of_kdata = VA2PA(od->load_end);
-	arg->dtb = VA2PA(od->ramdisk_load_base);
+	arg->dtb = od->dtb_load_base;
 	arg->dtb_length = od->dtb_size;
 	arg->mem_size_actual = 0;
 	arg->boot_flags = 0;
 	strncpy(arg->cmdline, cmdline, strlen(cmdline) + 1);
+
+	pr_info("xnu bootarg revision - %d\n", arg->revision);
+	pr_info("xnu bootarg version  - %d\n", arg->version);
+	pr_info("xnu bootarg virtbase - 0x%lx\n", arg->virt_base);
+	pr_info("xnu bootarg physbase - 0x%lx\n", arg->phys_base);
+	pr_info("xnu bootarg mem_size - 0x%lx\n", arg->mem_size);
+	pr_info("xnu bootarg tok      - 0x%lx\n", arg->top_of_kdata);
+	pr_info("xnu bootarg dtb      - 0x%lx\n", arg->dtb);
+	pr_info("xnu bootarg dtb_size - 0x%x\n", arg->dtb_length);
+	pr_info("xnu bootarg cmdline  - %s\n", arg->cmdline);
 
 	/*
 	 * add the ramdisk information to the dtb, just search
@@ -104,7 +114,7 @@ static int xnu_setup_env(struct vm *vm, char *cmdline)
 	for (i = 0; i < od->dtb_size; i++) {
 		if (strncmp(dtb + i, "MemoryMapReserved-0",
 				XNU_DT_PROP_NAME_LENGTH) == 0) {
-			dt_prop = (struct xnu_dt_node_prop *)dtb;
+			dt_prop = (struct xnu_dt_node_prop *)(dtb + i);
 			break;
 		}
 	}
@@ -116,7 +126,7 @@ static int xnu_setup_env(struct vm *vm, char *cmdline)
 
 	strncpy(dt_prop->name, "RAMDisk", XNU_DT_PROP_NAME_LENGTH);
 	value = (uint64_t *)&dt_prop->value;
-	value[0] = VA2PA(od->ramdisk_load_base);
+	value[0] = od->ramdisk_load_base;
 	value[1] = od->ramdisk_size;
 
 	return 0;
@@ -131,8 +141,10 @@ static int inline xnu_load_raw_data(int fd, void *base,
 	if (file_size == 0)
 		return 0;
 
-	if (lseek(fd, file_off, SEEK_SET) == -1)
+	if (lseek(fd, file_off, SEEK_SET) == -1) {
+		pr_info("lseek failed for fd-%d\n", fd);
 		return -EIO;
+	}
 
 	ret = read(fd, base + offset, file_size);
 	if (ret <= 0)
@@ -145,6 +157,7 @@ static int xnu_load_kernel_image(struct vm *vm)
 {
 	int ret;
 	void *vm_base = vm->mmap;
+	unsigned long offset;
 	struct xnu_os_data *od = (struct xnu_os_data *)vm->os_data;
 	struct xnu_segment_cmd64 *root = od->root;
 	struct segment_cmd64 *cmd;
@@ -154,10 +167,19 @@ static int xnu_load_kernel_image(struct vm *vm)
 
 	while (root) {
 		cmd = root->cmd;
-		ret = xnu_load_raw_data(vm->kfd, vm_base, VA_OFFSET(cmd->vm_addr),
+		offset = VA_OFFSET(cmd->vm_addr);
+
+		ret = xnu_load_raw_data(vm->kfd, vm_base, offset,
 				cmd->file_off, cmd->file_size);
 		if (ret)
 			return ret;
+
+		if (cmd->vm_size > cmd->file_size) {
+			pr_info("memset for 0x%lx ---> 0x%lx\n", cmd->vm_addr + cmd->file_size,
+					cmd->vm_size - cmd->file_size);
+			memset(vm_base + cmd->file_size + offset, 0,
+					cmd->vm_size - cmd->file_size);
+		}
 
 		root = root->next;
 	}

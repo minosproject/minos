@@ -92,8 +92,10 @@ void *map_vm_memory(struct vm *vm)
 
 	addr = mmap(NULL, vm->mem_size, PROT_READ | PROT_WRITE,
 			MAP_SHARED, vm->vm_fd, 0);
-	if (addr == (void *)-1)
+	if (addr == (void *)-1) {
+		pr_err("mmap vm memory failed\n");
 		return NULL;
+	}
 
 	pr_notice("vm-%d mmap address in vm0: 0x%lx mmap:0x%lx\n",
 			vm->vmid, vm->hvm_paddr, (unsigned long)addr);
