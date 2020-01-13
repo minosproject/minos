@@ -26,6 +26,7 @@
 static int virqchip_enter_to_guest(void *item, void *data)
 {
 	unsigned long flags;
+	int fiq = 0, no_pending, no_active;
 	struct vcpu *vcpu = (struct vcpu *)item;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
 	struct virq_chip *vc = vcpu->vm->virq_chip;
@@ -37,19 +38,26 @@ static int virqchip_enter_to_guest(void *item, void *data)
 	 */
 	spin_lock_irqsave(&virq_struct->lock, flags);
 
-	if (!(vc->flags & VIRQCHIP_F_HW_VIRT)) {
-		if (is_list_empty(&virq_struct->pending_list) &&
-				is_list_empty(&virq_struct->active_list)) {
+	no_pending = is_list_empty(&virq_struct->pending_list);
+	no_active = is_list_empty(&virq_struct->active_list);
+
+	if (no_pending && no_active) {
+		if (!(vc->flags & VIRQCHIP_F_HW_VIRT))
 			arch_clear_virq_flag();
-			goto out;
-		} else
-			arch_set_virq_flag();
+	} else if (!no_pending) {
+		if (vc && vc->enter_to_guest)
+			fiq = vc->enter_to_guest(vcpu, vc->inc_pdata);
+
+		if (!(vc->flags & VIRQCHIP_F_HW_VIRT)) {
+			if (fiq)
+				arch_set_vfiq_flag();
+			else
+				arch_set_virq_flag();
+		}
 	}
 
-	if (vc && vc->enter_to_guest)
-		vc->enter_to_guest(vcpu, vc->inc_pdata);
-out:
 	spin_unlock_irqrestore(&virq_struct->lock, flags);
+
 	return 0;
 }
 

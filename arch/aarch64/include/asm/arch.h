@@ -349,6 +349,8 @@ unsigned long arch_get_fp(void);
 unsigned long arch_get_sp(void);
 unsigned long arch_get_lr(void);
 void arch_set_virq_flag(void);
+void arch_set_vfiq_flag(void);
+void arch_clear_vfiq_flag(void);
 void arch_clear_virq_flag(void);
 void arch_smp_init(phy_addr_t *smp_h_addr);
 int __arch_init(void);

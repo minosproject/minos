@@ -51,6 +51,7 @@ struct irqtag;
 #define VIRQS_HW		(1 << 3)
 #define VIRQS_CAN_WAKEUP	(1 << 4)
 #define VIRQS_REQUESTED		(1 << 6)
+#define VIRQS_FIQ		(1 << 7)
 
 #define VIRQF_CAN_WAKEUP	(1 << 4)
 #define VIRQF_ENABLE		(1 << 5)
@@ -163,6 +164,21 @@ static int inline virq_is_requested(struct virq_desc *d)
 	return (d->flags & VIRQS_REQUESTED);
 }
 
+static void inline __virq_set_fiq(struct virq_desc *d)
+{
+	d->flags |= VIRQS_FIQ;
+}
+
+static int inline virq_is_fiq(struct virq_desc *d)
+{
+	return (d->flags & VIRQS_FIQ);
+}
+
+static void inline virq_clear_fiq(struct virq_desc *d)
+{
+	d->flags &= ~VIRQS_FIQ;
+}
+
 int virq_enable(struct vcpu *vcpu, uint32_t virq);
 int virq_disable(struct vcpu *vcpu, uint32_t virq);
 void vcpu_virq_struct_init(struct vcpu *vcpu);
@@ -181,6 +197,7 @@ uint32_t virq_get_pr(struct vcpu *vcpu, uint32_t virq);
 uint32_t virq_get_state(struct vcpu *vcpu, uint32_t virq);
 int virq_can_request(struct vcpu *vcpu, uint32_t virq);
 uint32_t get_pending_virq(struct vcpu *vcpu);
+int virq_set_fiq(struct vcpu *vcpu, uint32_t virq);
 
 int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq);
 int send_virq_to_vm(struct vm *vm, uint32_t virq);

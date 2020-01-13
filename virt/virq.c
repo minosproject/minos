@@ -269,6 +269,18 @@ int virq_enable(struct vcpu *vcpu, uint32_t virq)
 	return 0;
 }
 
+int virq_set_fiq(struct vcpu *vcpu, uint32_t virq)
+{
+	struct virq_desc *desc;
+
+	desc = get_virq_desc(vcpu, virq);
+	if (!desc)
+		return -ENOENT;
+
+	__virq_set_fiq(desc);
+	return 0;
+}
+
 int virq_disable(struct vcpu *vcpu, uint32_t virq)
 {
 	struct virq_desc *desc;

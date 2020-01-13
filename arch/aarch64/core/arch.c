@@ -43,6 +43,17 @@ void arch_set_virq_flag(void)
 	dsb();
 }
 
+void arch_set_vfiq_flag(void)
+{
+	uint64_t hcr_el2;
+
+	dsb();
+	hcr_el2 = read_sysreg(HCR_EL2);
+	hcr_el2 |= HCR_EL2_VF;
+	write_sysreg(hcr_el2, HCR_EL2);
+	dsb();
+}
+
 void arch_clear_virq_flag(void)
 {
 	uint64_t hcr_el2;
@@ -50,6 +61,18 @@ void arch_clear_virq_flag(void)
 	dsb();
 	hcr_el2 = read_sysreg(HCR_EL2);
 	hcr_el2 &= ~HCR_EL2_VI;
+	hcr_el2 &= ~HCR_EL2_VF;
+	write_sysreg(hcr_el2, HCR_EL2);
+	dsb();
+}
+
+void arch_clear_vfiq_flag(void)
+{
+	uint64_t hcr_el2;
+
+	dsb();
+	hcr_el2 = read_sysreg(HCR_EL2);
+	hcr_el2 &= ~HCR_EL2_VF;
 	write_sysreg(hcr_el2, HCR_EL2);
 	dsb();
 }
@@ -182,7 +205,9 @@ arch_initcall_percpu(aarch64_init_percpu);
 
 int arch_early_init(void *setup_data)
 {
+	uint64_t value = read_sysreg(ID_ISAR5_EL1);
 	pr_notice("current EL is 0x%x\n", GET_EL(read_CurrentEl()));
+	pr_notice("sha id is 0x%x\n", value);
 
 #ifdef CONFIG_VIRT
 	if (!IS_IN_EL2())

@@ -47,6 +47,7 @@ src	+= devices/virtio/virtio_net.c
 src	+= os/os_linux.c
 src	+= os/os_xnu.c
 src	+= os/os_other.c
+src	+= devices/s3c_uart.c
 
 INCLUDE_DIR = ../../include include/libfdt include
 

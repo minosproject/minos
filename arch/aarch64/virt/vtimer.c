@@ -120,7 +120,7 @@ static void vtimer_state_init(struct task *task, void *context)
 	if (vm_is_native(vcpu->vm))
 		vtimer->virq = __hw_phy_irq;
 	else
-		vtimer->virq = 30;
+		vtimer->virq = vcpu->vm->vtimer_virq;
 	vtimer->cnt_ctl = 0;
 	vtimer->cnt_cval = 0;
 }

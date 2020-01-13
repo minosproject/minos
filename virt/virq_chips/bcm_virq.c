@@ -520,6 +520,7 @@ static int bcm2836_update_virq(struct vcpu *vcpu,
 
 static int bcm2836_enter_to_guest(struct vcpu *vcpu, void *data)
 {
+	int fiq = 0;
 	struct virq_desc *virq, *n;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
 

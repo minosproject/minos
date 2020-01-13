@@ -35,11 +35,13 @@ struct virq_chip *create_aic_virqchip(struct vm *vm,
 
 static int xnu_create_gvm_res_apple(struct vm *vm)
 {
-	vm->virq_chip = create_aic_virqchip(vm, 0x200000000, 0x6000);
+	vm->virq_chip = create_aic_virqchip(vm, 0x20e100000, 0x100000);
 	if (!vm->virq_chip) {
 		pr_err("create virq chiq for apple soc failed\n");
 		return -EINVAL;
 	}
+
+	vm->vtimer_virq = 27;
 
 	return 0;
 }
@@ -64,6 +66,8 @@ static void xnu_vcpu_init(struct vcpu *vcpu)
 
 		vcpu_online(vcpu);
 	}
+
+	virq_set_fiq(vcpu, vcpu->vm->vtimer_virq);
 }
 
 static void xnu_vcpu_power_on(struct vcpu *vcpu, unsigned long entry)

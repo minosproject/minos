@@ -122,7 +122,29 @@ static int aic_update_virq(struct vcpu *vcpu,
 
 static int aic_enter_to_guest(struct vcpu *vcpu, void *data)
 {
-	return 0;
+	int fiq = 0;
+	struct virq_desc *virq, *n;
+	struct virq_struct *virq_struct = vcpu->virq_struct;
+
+	list_for_each_entry_safe(virq, n, &virq_struct->pending_list, list) {
+		if (!virq_is_pending(virq)) {
+			pr_err("virq is not request %d\n", virq->vno);
+			list_del(&virq->list);
+			virq->list.next = NULL;
+			continue;
+		}
+
+		virq_clear_pending(virq);
+		virq->state = VIRQ_STATE_ACTIVE;
+		list_del(&virq->list);
+		list_add_tail(&virq_struct->active_list, &virq->list);
+
+		if (virq_is_fiq(virq))
+			fiq = 1;
+		break;
+	}
+
+	return fiq;
 }
 
 static void aic_virq_deinit(struct vdev *vdev)
@@ -138,12 +160,14 @@ static void aic_virq_reset(struct vdev *vdev)
 static int aic_virq_read(struct vdev *vdev, gp_regs *reg,
 		unsigned long address, unsigned long *read_value)
 {
+	pr_notice("%s\n", __func__);
 	return 0;
 }
 
 static int aic_virq_write(struct vdev *vdev, gp_regs *reg,
 		unsigned long address, unsigned long *value)
 {
+	pr_notice("%s\n", __func__);
 	return 0;
 }
 

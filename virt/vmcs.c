@@ -56,6 +56,7 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 			sched();
 		else
 			cpu_relax();
+		mb();
 	}
 
 	vmcs->trap_type = type;

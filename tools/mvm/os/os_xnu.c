@@ -74,6 +74,8 @@ static void xnu_vm_exit(struct vm *vm)
 
 }
 
+extern int create_s3c_uart(struct vm *vm);
+
 static int xnu_setup_env(struct vm *vm, char *cmdline)
 {
 	size_t i;
@@ -83,6 +85,8 @@ static int xnu_setup_env(struct vm *vm, char *cmdline)
 	struct xnu_arm64_boot_args *arg = (struct xnu_arm64_boot_args *)
 		(vm->mmap + VA_OFFSET(od->bootarg_load_base));
 	char *dtb = (char *)(vm->mmap + VA_OFFSET(od->dtb_load_base));
+
+	create_s3c_uart(vm);
 
 	memset(arg, 0, sizeof(struct xnu_arm64_boot_args));
 	arg->revision = XNU_ARM64_KBOOT_ARGS_REVISION2;
