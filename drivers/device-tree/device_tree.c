@@ -289,6 +289,10 @@ int fdt_early_init(void *setup_data)
 		hv_dtb = setup_data;
 	}
 
+#ifdef CONFIG_DTB_LOAD_ADDRESS
+	hv_dtb = (void *)CONFIG_DTB_LOAD_ADDRESS;
+#endif
+
 	pr_notice("using device tree @0x%x\n", hv_dtb);
 
 	if (fdt_check_header(hv_dtb)) {

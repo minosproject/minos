@@ -1,0 +1,175 @@
+/dts-v1/;
+
+/ {
+	interrupt-parent = < 0x01 >;
+	#address-cells = < 0x02 >;
+	#size-cells = < 0x02 >;
+	compatible = "khadas,vim3";
+	model = "Khadas VIM3";
+
+	psci {
+		compatible = "arm,psci-1.0";
+		method = "smc";
+	};
+
+	soc {
+		compatible = "simple-bus";
+		#address-cells = < 0x02 >;
+		#size-cells = < 0x02 >;
+		ranges;
+
+		interrupt-controller@ffc01000 {
+			compatible = "arm,gic-400";
+			reg = < 0x00 0xffc01000 0x00 0x1000 0x00 0xffc02000 0x00 0x2000 0x00 0xffc04000 0x00 0x2000 0x00 0xffc06000 0x00 0x2000 >;
+			interrupt-controller;
+			interrupts = < 0x01 0x09 0xff04 >;
+			#interrupt-cells = < 0x03 >;
+			#address-cells = < 0x00 >;
+			phandle = < 0x01 >;
+		};
+	};
+
+	timer {
+		compatible = "arm,armv8-timer";
+		interrupts = < 0x01 0x0d 0xff08 0x01 0x0e 0xff08 0x01 0x0b 0xff08 0x01 0x0a 0xff08 >;
+		arm,no-tick-in-suspend;
+	};
+
+	cpus {
+		#address-cells = < 0x02 >;
+		#size-cells = < 0x00 >;
+
+		cpu-map {
+
+			cluster0 {
+
+				core0 {
+					cpu = < 0x0a >;
+				};
+
+				core1 {
+					cpu = < 0x0b >;
+				};
+			};
+
+			cluster1 {
+
+				core0 {
+					cpu = < 0x0c >;
+				};
+
+				core1 {
+					cpu = < 0x0d >;
+				};
+
+				core2 {
+					cpu = < 0x0e >;
+				};
+
+				core3 {
+					cpu = < 0x0f >;
+				};
+			};
+		};
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			reg = < 0x00 0x00 >;
+			enable-method = "psci";
+			capacity-dmips-mhz = < 0x250 >;
+			next-level-cache = < 0x46 >;
+			#cooling-cells = < 0x02 >;
+			cpu-supply = < 0x47 >;
+			operating-points-v2 = < 0x48 >;
+			clocks = < 0x02 0xbb >;
+			clock-latency = < 0xc350 >;
+			phandle = < 0x0a >;
+		};
+
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			reg = < 0x00 0x01 >;
+			enable-method = "psci";
+			capacity-dmips-mhz = < 0x250 >;
+			next-level-cache = < 0x46 >;
+			#cooling-cells = < 0x02 >;
+			cpu-supply = < 0x47 >;
+			operating-points-v2 = < 0x48 >;
+			clocks = < 0x02 0xbb >;
+			clock-latency = < 0xc350 >;
+			phandle = < 0x0b >;
+		};
+
+		cpu@100 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a73";
+			reg = < 0x00 0x100 >;
+			enable-method = "psci";
+			capacity-dmips-mhz = < 0x400 >;
+			next-level-cache = < 0x46 >;
+			#cooling-cells = < 0x02 >;
+			cpu-supply = < 0x49 >;
+			operating-points-v2 = < 0x4a >;
+			clocks = < 0x02 0xe0 >;
+			clock-latency = < 0xc350 >;
+			phandle = < 0x0c >;
+		};
+
+		cpu@101 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a73";
+			reg = < 0x00 0x101 >;
+			enable-method = "psci";
+			capacity-dmips-mhz = < 0x400 >;
+			next-level-cache = < 0x46 >;
+			#cooling-cells = < 0x02 >;
+			cpu-supply = < 0x49 >;
+			operating-points-v2 = < 0x4a >;
+			clocks = < 0x02 0xe0 >;
+			clock-latency = < 0xc350 >;
+			phandle = < 0x0d >;
+		};
+
+		cpu@102 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a73";
+			reg = < 0x00 0x102 >;
+			enable-method = "psci";
+			capacity-dmips-mhz = < 0x400 >;
+			next-level-cache = < 0x46 >;
+			#cooling-cells = < 0x02 >;
+			cpu-supply = < 0x49 >;
+			operating-points-v2 = < 0x4a >;
+			clocks = < 0x02 0xe0 >;
+			clock-latency = < 0xc350 >;
+			phandle = < 0x0e >;
+		};
+
+		cpu@103 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a73";
+			reg = < 0x00 0x103 >;
+			enable-method = "psci";
+			capacity-dmips-mhz = < 0x400 >;
+			next-level-cache = < 0x46 >;
+			#cooling-cells = < 0x02 >;
+			cpu-supply = < 0x49 >;
+			operating-points-v2 = < 0x4a >;
+			clocks = < 0x02 0xe0 >;
+			clock-latency = < 0xc350 >;
+			phandle = < 0x0f >;
+		};
+
+		l2-cache0 {
+			compatible = "cache";
+			phandle = < 0x46 >;
+		};
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = < 0x00 0x00 0x00 0xed800000 >;
+	};
+};

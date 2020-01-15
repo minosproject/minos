@@ -2,34 +2,38 @@ if SOC_AMLOGIC
 
 config MINOS_START_ADDRESS
 	hex "memory start address of system"
-	default 0x37400000
+	default 0xeb800000
 
 config MINOS_ENTRY_ADDRESS
 	hex "entry address of system"
-	default 0x37408000
+	default 0xeb80c000
 	help
 	  the entry address is the start address plus
-	  nr_cpus * TASK_STACK_SIZE
+	  nr_cpus * TASK_STACK_SIZE, the kvim3 has 6 cores
 
 config MINOS_RAM_SIZE
 	hex "memory size for Minos"
-	default 0x4000000
+	default 0x2000000
 	range 0x1000000 0x4000000
 	help
 	  the memory size for Minos
 
 config NR_CPUS
 	int "number of cpu in system"
-	default 4
+	default 6
 	help
 	  how many cpu in current system
 
 config UART_BASE
-	hex "uart controller iomem base address"
-	default 0xfe215040
+	hex "uart controller memory base"
+	default 0xff803000
 
 config UART_IO_SIZE
 	hex "uart controller iomem size"
 	default 0x1000
+
+config DTB_LOAD_ADDRESS
+	hex
+	default 0xed600000
 
 endif

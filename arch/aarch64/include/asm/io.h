@@ -106,4 +106,15 @@ static inline uint64_t __raw_readq(const volatile void *addr)
 #define iowrite32(v, addr)	writel_relaxed((v), (addr))
 #define iowrite64(v, addr)	writeq_relaxed((v), (addr))
 
+#define readb(addr)		readb_relaxed(addr)
+#define readw(addr)		readw_relaxed(addr)
+#define readl(addr)		readl_relaxed(addr)
+#define readq(addr)		readq_relaxed(addr)
+
+#define writeb(v, addr)		writeb_relaxed((v), (addr))
+#define writew(v, addr)		writew_relaxed((v), (addr))
+#define writel(v, addr)		writel_relaxed((v), (addr))
+#define writeq(v, addr)		writeq_relaxed((v), (addr))
+
+
 #endif

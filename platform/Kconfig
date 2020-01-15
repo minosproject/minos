@@ -2,7 +2,6 @@ menu "Platform Configuration"
 
 choice
 	prompt "SOC current used"
-	default SOC_FVP
 	config SOC_FVP
 		bool "arm fix virtual platform"
 	config SOC_MARVELL_A3700

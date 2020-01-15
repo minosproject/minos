@@ -21,6 +21,13 @@ config SERIAL_PL011
 	default n
 	help
 	  serial driver for pl011
+
+config SERIAL_AMLOGIC
+	bool "meson for amlogic soc"
+	default n
+	help
+	  serial driver for amlogic soc
+
 endif
 
 endmenu

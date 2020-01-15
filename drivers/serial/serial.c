@@ -29,6 +29,10 @@ int pl011_init(void *addr, int clock, int baud);
 void serial_pl011_putc(char ch);
 char serial_pl011_getc(void);
 
+char meson_serial_getc(void);
+void meson_serial_putc(char c);
+int meson_serial_init(void);
+
 int serial_init(void)
 {
 #ifdef CONFIG_SOC_MARVELL_A3700
@@ -47,6 +51,10 @@ int serial_init(void)
 	return bcm283x_mu_init((void *)0xfe215040, 250000000, 115200);
 #endif
 
+#ifdef CONFIG_SOC_AMLOGIC
+	return meson_serial_init();
+#endif
+
 	return 0;
 }
 
@@ -63,6 +71,10 @@ void serial_putc(char ch)
 #if defined(CONFIG_SOC_BCM2837) || defined(CONFIG_SOC_BCM2838)
 	bcm283x_mu_putc(ch);
 #endif
+
+#ifdef CONFIG_SOC_AMLOGIC
+	meson_serial_putc(ch);
+#endif
 }
 
 char serial_getc(void)
@@ -77,6 +89,10 @@ char serial_getc(void)
 
 #if defined(CONFIG_SOC_BCM2837) || defined(CONFIG_SOC_BCM2838)
 	return bcm283x_mu_getc();
+#endif
+
+#ifdef CONFIG_SOC_AMLOGIC
+	return meson_serial_getc();
 #endif
 	return 0;
 }
