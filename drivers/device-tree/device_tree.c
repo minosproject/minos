@@ -274,32 +274,9 @@ int fdt_parse_memory_info(void)
 	return 0;
 }
 
-int fdt_early_init(void *setup_data)
+int fdt_early_init(void)
 {
-	/*
-	 * the dtb file need to store at the end of the os memory
-	 * region and the size can not beyond 2M, also it must
-	 * 4K align, memory management will not protect this area
-	 * so please put the dtb data to a right place
-	 */
-	if (!hv_dtb && !setup_data) {
-		pr_fatal("can not find device tree data\n");
-		BUG();
-	} else {
-		hv_dtb = setup_data;
-	}
-
-#ifdef CONFIG_DTB_LOAD_ADDRESS
-	hv_dtb = (void *)CONFIG_DTB_LOAD_ADDRESS;
-#endif
-
 	pr_notice("using device tree @0x%x\n", hv_dtb);
-
-	if (fdt_check_header(hv_dtb)) {
-		pr_err("invaild dtb header\n");
-		hv_dtb = NULL;
-		return -EINVAL;
-	}
 
 	/*
 	 * set up the platform from the dtb file then get the spin

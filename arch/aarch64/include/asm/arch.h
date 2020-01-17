@@ -354,7 +354,7 @@ void arch_clear_vfiq_flag(void);
 void arch_clear_virq_flag(void);
 void arch_smp_init(phy_addr_t *smp_h_addr);
 int __arch_init(void);
-int arch_early_init(void *data);
+int arch_early_init(void);
 void arch_init_task(struct task *task, void *entry, void *data);
 
 #endif

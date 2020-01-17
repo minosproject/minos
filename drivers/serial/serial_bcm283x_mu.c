@@ -19,6 +19,7 @@
 #include <minos/mmu.h>
 #include <minos/init.h>
 #include <config/config.h>
+#include <minos/console.h>
 
 #define AUX_MU_IO	0x00
 #define AUX_MU_IER	0x04
@@ -46,7 +47,7 @@ static inline void __bcm283x_mu_putc(char c)
 	iowrite32(c, serial_base + AUX_MU_IO);
 }
 
-int bcm283x_mu_putc(char c)
+void bcm283x_mu_putc(char c)
 {
 	if (c == '\n')
 		__bcm283x_mu_putc('\r');
@@ -67,7 +68,7 @@ char bcm283x_mu_getc(void)
 	return (int)data;
 }
 
-int bcm283x_mu_init(void *base, int clk, int baud)
+int bcm283x_mu_init(char *arg)
 {
 #if 0
 	uint32_t divider;
@@ -84,3 +85,5 @@ int bcm283x_mu_init(void *base, int clk, int baud)
 
 	return 0;
 }
+DEFINE_CONSOLE(bcm283x, "bcm283x_mu", bcm283x_mu_init,
+		bcm283x_mu_putc, bcm283x_mu_getc);

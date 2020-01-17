@@ -868,6 +868,27 @@ int get_device_irq_index(struct device_node *node, uint32_t *irq,
 	return irq_xlate(node, irqv, irq_cells, irq, flags);
 }
 
+int of_get_console_name(void *dtb, char **name)
+{
+	int node,  len;
+	const void *data = NULL;
+
+	if (dtb && !fdt_check_header(dtb)) {
+		node = fdt_path_offset(dtb, "/chosen");
+		if (node <= 0)
+			return -ENOENT;
+
+		data = fdt_getprop(dtb, node, "minos,stdout", &len);
+		if (!data || (len == 0))
+			return -ENOENT;
+
+		*name = (char *)data;
+		return 0;
+	}
+
+	return -ENOENT;
+}
+
 void *of_device_node_match(struct device_node *node, void *s, void *e)
 {
 	int i, count;

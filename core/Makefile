@@ -28,3 +28,4 @@ obj-y += flag.o
 obj-y += delay.o
 obj-y += core.o
 obj-y += hook.o
+obj-y += console.o

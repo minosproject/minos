@@ -20,7 +20,7 @@
 #include <minos/print.h>
 #include <minos/preempt.h>
 #include <config/config.h>
-#include <minos/serial.h>
+#include <minos/console.h>
 #include <minos/smp.h>
 #include <minos/time.h>
 #include <minos/task.h>
@@ -133,7 +133,7 @@ int level_print(int level, char *fmt, ...)
 
 	spin_lock_irqsave(&print_lock, flags);
 	for(i = 0; i < printed; i++)
-		serial_putc(buf[i]);
+		console_putc(buf[i]);
 	spin_unlock_irqrestore(&print_lock, flags);
 
 	return printed;

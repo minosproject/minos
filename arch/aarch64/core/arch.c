@@ -26,11 +26,13 @@
 #include <minos/of.h>
 #include <minos/platform.h>
 #include <minos/task.h>
+#include <minos/console.h>
 
 extern int el2_stage1_init(void);
-extern int fdt_early_init(void *setup_data);
+extern int fdt_early_init(void);
 extern int fdt_init(void);
 extern int fdt_spin_table_init(phy_addr_t *smp_holding);
+void boot_main(void);
 
 void arch_set_virq_flag(void)
 {
@@ -203,11 +205,12 @@ static int aarch64_init_percpu(void)
 }
 arch_initcall_percpu(aarch64_init_percpu);
 
-int arch_early_init(void *setup_data)
+int arch_early_init(void)
 {
 	uint64_t value = read_sysreg(ID_ISAR5_EL1);
+
 	pr_notice("current EL is 0x%x\n", GET_EL(read_CurrentEl()));
-	pr_notice("sha id is 0x%x\n", value);
+	pr_notice("ID_ISAR5_EL1: 0x%x\n", value);
 
 #ifdef CONFIG_VIRT
 	if (!IS_IN_EL2())
@@ -215,7 +218,7 @@ int arch_early_init(void *setup_data)
 #endif
 
 #ifdef CONFIG_DEVICE_TREE
-	fdt_early_init(setup_data);
+	fdt_early_init();
 #endif
 	return 0;
 }
@@ -233,4 +236,39 @@ void arch_smp_init(phy_addr_t *smp_h_addr)
 #ifdef CONFIG_DEVICE_TREE
 	fdt_spin_table_init(smp_h_addr);
 #endif
+}
+
+void arch_main(void *dtb)
+{
+	char *name = NULL;
+
+	pr_notice("Minos dtb address: 0x%x\n", dtb);
+
+	/*
+	 * the dtb file need to store at the end of the os memory
+	 * region and the size can not beyond 2M, also it must
+	 * 4K align, memory management will not protect this area
+	 * so please put the dtb data to a right place
+	 */
+#ifdef CONFIG_DTB_LOAD_ADDRESS
+	hv_dtb = (void *)CONFIG_DTB_LOAD_ADDRESS;
+#endif
+
+	if (!hv_dtb && !dtb)
+		BUG();
+	else
+		hv_dtb = dtb;
+
+	if (fdt_check_header(hv_dtb)) {
+		pr_err("Bad device tree address: 0x%p\n", hv_dtb);
+		BUG();
+	}
+
+	of_get_console_name(hv_dtb, &name);
+	console_init(name);
+
+	/*
+	 * here start the kernel
+	 */
+	boot_main();
 }

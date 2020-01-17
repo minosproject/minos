@@ -42,7 +42,7 @@ extern int vmodules_init(void);
 extern int virt_init(void);
 #endif
 
-void boot_main(void *setup_data)
+void boot_main(void)
 {
 	allsymbols_init();
 	percpus_init();
@@ -60,7 +60,7 @@ void boot_main(void *setup_data)
 	 */
 	bootmem_init();
 
-	early_init(setup_data);
+	early_init();
 	early_init_percpu();
 
 	mm_init();

@@ -7,6 +7,10 @@
 	compatible = "khadas,vim3";
 	model = "Khadas VIM3";
 
+	chosen {
+		minos,stdout = "aml_meson";
+	};
+
 	psci {
 		compatible = "arm,psci-1.0";
 		method = "smc";

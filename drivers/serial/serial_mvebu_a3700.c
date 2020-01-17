@@ -7,6 +7,7 @@
 #include <minos/minos.h>
 #include <asm/io.h>
 #include <config/config.h>
+#include <minos/console.h>
 
 static void *base = (void *)CONFIG_UART_BASE;
 
@@ -42,7 +43,7 @@ static inline void __serial_putc(char ch)
 	iowrite32(ch, base + UART_TX_REG);
 }
 
-void serial_mvebu_putc(char ch)
+static void serial_mvebu_putc(char ch)
 {
 	if (ch == '\n')
 		__serial_putc('\r');
@@ -50,7 +51,7 @@ void serial_mvebu_putc(char ch)
 	__serial_putc(ch);
 }
 
-char serial_mvebu_getc(void)
+static char serial_mvebu_getc(void)
 {
 	while (!(ioread32(base + UART_STATUS_REG) & UART_STATUS_RX_RDY));
 
@@ -74,7 +75,7 @@ static int mvebu_serial_setbrg(int baudrate)
 	return 0;
 }
 
-int mvebu_serial_probe(void *addr)
+static int mvebu_serial_probe(char *addr)
 {
 	base = addr;
 
@@ -90,3 +91,5 @@ int mvebu_serial_probe(void *addr)
 
 	return 0;
 }
+DEFINE_CONSOLE(mvebu, "mvebu", mvebu_serial_probe,
+		serial_mvebu_putc, serial_mvebu_getc);

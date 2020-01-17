@@ -305,7 +305,7 @@ int create_vm_resource_of(struct vm *vm, void *data)
 {
 	struct device_node *node;
 
-	if (!vm || (vm->flags & VM_FLAGS_NO_OF_RES))
+	if (!vm || (vm->flags & VM_FLAGS_NO_OF_RESOURCE))
 		return -EINVAL;
 
 	node = of_parse_device_tree(data);

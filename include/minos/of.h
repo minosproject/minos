@@ -147,4 +147,6 @@ static inline int translate_device_address(struct device_node *node,
 int get_device_irq_index(struct device_node *node, uint32_t *irq,
 		unsigned long *flags, int index);
 
+int of_get_console_name(void *dtb, char **name);
+
 #endif

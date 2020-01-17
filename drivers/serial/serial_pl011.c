@@ -16,14 +16,14 @@
 
 #include <minos/errno.h>
 #include <asm/io.h>
-#include <minos/mmu.h>
 #include <minos/init.h>
 #include <config/config.h>
 #include "pl011.h"
+#include <minos/console.h>
 
 static volatile void *base = (void *)CONFIG_UART_BASE;
 
-int pl011_init(void *addr, int clock, int baudrate)
+static int __pl011_init(void *addr, int clock, int baudrate)
 {
 	unsigned int temp;
 	unsigned int divider;
@@ -59,7 +59,12 @@ int pl011_init(void *addr, int clock, int baudrate)
 	return 0;
 }
 
-void serial_pl011_putc(char c)
+static int pl011_init(char *arg)
+{
+	return __pl011_init((void *)CONFIG_UART_BASE, 24000000, 115200);
+}
+
+static void serial_pl011_putc(char c)
 {
 	while (ioread32(base + UARTFR) & PL011_FR_BUSY_FLAG);
 
@@ -69,9 +74,12 @@ void serial_pl011_putc(char c)
 	iowrite32(c, base + UARTDR);
 }
 
-char serial_pl011_getc(void)
+static char serial_pl011_getc(void)
 {
 	while (ioread32(base + UARTFR) & PL011_FR_BUSY_FLAG);
 
 	return ioread32(base + UARTDR);
 }
+
+DEFINE_CONSOLE(pl011, "pl011", pl011_init,
+		serial_pl011_putc, serial_pl011_getc);

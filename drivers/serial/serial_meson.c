@@ -16,7 +16,7 @@
 
 #include <minos/minos.h>
 #include <asm/io.h>
-#include <minos/mmu.h>
+#include <minos/console.h>
 
 struct meson_uart {
 	u32 wfifo;
@@ -46,7 +46,7 @@ struct meson_uart {
 
 static volatile struct meson_uart *uart = (struct meson_uart *)0xff803000;
 
-int meson_serial_init(void)
+static int meson_serial_init(char *arg)
 {
 #if 0
 	u32 val;
@@ -62,7 +62,7 @@ int meson_serial_init(void)
 	return 0;
 }
 
-int meson_serial_getc(void)
+static char meson_serial_getc(void)
 {
 	if (readl(&uart->status) & AML_UART_RX_EMPTY)
 		return -EAGAIN;
@@ -77,10 +77,12 @@ static inline void __meson_serial_putc(char c)
 	writel(c, &uart->wfifo);
 }
 
-void meson_serial_putc(char c)
+static void meson_serial_putc(char c)
 {
 	if (c == '\n')
 		__meson_serial_putc('\r');
 
 	__meson_serial_putc(c);
 }
+DEFINE_CONSOLE(aml_meson, "aml_meson", meson_serial_init,
+		meson_serial_putc, meson_serial_getc);

@@ -164,12 +164,8 @@ mmu_on:
 	dsb sy
 	isb
 
-	/* init the uart for hypervisor */
-	bl	serial_init
-	dsb	sy
-
-	mov	x0, x27		//restore the dtb address
-	bl	boot_main
+	mov	x0, x27		// restore the dtb address
+	bl	arch_main
 	nop
 
 secondary_start_up:

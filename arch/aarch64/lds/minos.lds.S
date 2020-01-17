@@ -93,6 +93,12 @@ SECTIONS
 	}
 	__vdev_end = .;
 
+	__console_start = .;
+	.__console : {
+		*(.__console)
+	}
+	__console_end = .;
+
 	. = ALIGN(8);
 
 	__sync_desc_start = .;
@@ -241,14 +247,14 @@ SECTIONS
 	__symbols_start = .;
 
 	.__symbols__ : {
-		*(.__symbols__)
+		KEEP(*(.__symbols__))
 	}
 
 	.rodata : {
-		*(.rodata)
+		KEEP(*(.rodata))
 	}
 	.rodata.str1.8 : {
-		*(.rodata.str1.8)
+		KEEP(*(.rodata.str1.8))
 	}
 
 	__code_end = .;
