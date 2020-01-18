@@ -250,14 +250,14 @@ void arch_main(void *dtb)
 	 * 4K align, memory management will not protect this area
 	 * so please put the dtb data to a right place
 	 */
-#ifdef CONFIG_DTB_LOAD_ADDRESS
-	hv_dtb = (void *)CONFIG_DTB_LOAD_ADDRESS;
-#endif
-
 	if (!hv_dtb && !dtb)
 		BUG();
 	else
 		hv_dtb = dtb;
+
+#ifdef CONFIG_DTB_LOAD_ADDRESS
+	hv_dtb = (void *)CONFIG_DTB_LOAD_ADDRESS;
+#endif
 
 	if (fdt_check_header(hv_dtb)) {
 		pr_err("Bad device tree address: 0x%p\n", hv_dtb);

@@ -112,7 +112,7 @@ static int fdt_setup_cmdline(struct vm *vm)
 {
 	int node, len, chosen_node;
 	char *new_cmdline;
-	char buf[512];
+	char buf[128];
 	void *dtb = vm->setup_data;
 	extern void *hv_dtb;
 
@@ -138,17 +138,14 @@ static int fdt_setup_cmdline(struct vm *vm)
 		return 0;
 	}
 
-	if (len >= 512)
-		pr_warn("new cmdline is too big %d\n", len);
+	pr_notice("New cmdline: %s\n", new_cmdline);
 
 	/*
 	 * can not directly using new_cmdline in fdt_setprop
 	 * do not know why, there may a issue in libfdt or
 	 * other reason
 	 */
-	buf[511] = 0;
-	strncpy(buf, new_cmdline, MIN(511, len));
-	fdt_setprop(dtb, chosen_node, "bootargs", buf, len);
+	fdt_setprop(dtb, chosen_node, "bootargs", new_cmdline, len);
 
 	return 0;
 }
@@ -176,7 +173,7 @@ static int fdt_setup_cpu(struct vm *vm)
 
 	memset(name, 0, 16);
 	for (i = vm->vcpu_nr; i < CONFIG_MAX_CPU_NR; i++) {
-		sprintf(name, "cpu@%x", ((i / 4) << 8) + (i % 4));
+		sprintf(name, "cpu@%x", cpuid_to_affinity(i));
 		node = fdt_subnode_offset(dtb, offset, name);
 		if (node >= 0) {
 			pr_notice("delete vcpu %s for vm%d\n", name, vm->vmid);

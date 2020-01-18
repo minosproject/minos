@@ -45,7 +45,7 @@ int fdt_spin_table_init(phy_addr_t *smp_holding)
 	}
 
 	for (i = 0; i < CONFIG_NR_CPUS; i++) {
-		sprintf(name, "cpu@%d", i);
+		sprintf(name, "cpu@%x", cpuid_to_affinity(i));
 		node = of_get_node_by_name(hv_dtb, offset, name);
 		if (node <= 0) {
 			pr_err("can not find %s\n", name);

@@ -76,7 +76,7 @@ CONFIG_OS_XNU_SUPPORT=y
 #
 # Interrupt Controller Driver
 #
-CONFIG_IRQCHIP_GICV3=y
+# CONFIG_IRQCHIP_GICV3 is not set
 CONFIG_IRQCHIP_GICV2=y
 # CONFIG_IRQCHIP_BCM2836 is not set
 # end of Interrupt Controller Driver
