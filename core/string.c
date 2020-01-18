@@ -18,6 +18,7 @@
 #include <minos/string.h>
 #include <minos/errno.h>
 #include <minos/varlist.h>
+#include <minos/console.h>
 
 #define PRINTF_DEC		0X0001
 #define PRINTF_HEX		0x0002
@@ -28,6 +29,8 @@
 #define PRINTF_UNSIGNED		0X0100
 #define PRINTF_SIGNED		0x0200
 
+typedef char *(*vsprintf_t)(char *dst, const char *src, int size);
+
 long absolute(long num)
 {
 	if (num > 0)
@@ -37,7 +40,7 @@ long absolute(long num)
 
 long num_to_str(char *buf, unsigned long num, int b)
 {
-	char hex[] ="0123456789abcdef";
+	static char hex[] ="0123456789abcdef";
 	long m, len, res;
 	char tmp_buf[64];
 	char *tmp = tmp_buf;
@@ -46,13 +49,14 @@ long num_to_str(char *buf, unsigned long num, int b)
 	if (bdho == 32)
 		bdho = 16;
 
-	memset(tmp_buf, '0', 64);
+	memset(tmp_buf, '0', 16);
 
 	do {
 		m = num % bdho;
 		num = num / bdho;
 		*tmp++ = hex[m];
 	} while (num >= bdho);
+
 	if (num != 0)
 		*tmp++ = hex[num];
 
@@ -62,7 +66,7 @@ long num_to_str(char *buf, unsigned long num, int b)
 		res = len = tmp - tmp_buf;
 
 	while (len > 0) {
-		*buf++ = tmp_buf[len-1];
+		*buf++ = tmp_buf[len - 1];
 		len--;
 	}
 
@@ -132,117 +136,130 @@ int numbric(char *buf, unsigned long num, int flag)
 	int len = 0;
 
 	switch (flag & PRINTF_MASK) {
-		case PRINTF_DEC:
-			if (flag &PRINTF_SIGNED)
-				len = itoa(buf, (signed long)num);
-			else
-				len = uitoa(buf, num);
-			break;
-		case PRINTF_HEX:
-			len = hextoa(buf, num);
-			break;
-		case PRINTF_OCT:
-			len = octtoa(buf, num);
-			break;
-		case PRINTF_BIN:
-			len = bintoa(buf, num);
-			break;
-		case PRINTF_POINTER:
-			len = ptoa(buf, num);
-		default:
-			break;
+	case PRINTF_DEC:
+		if (flag &PRINTF_SIGNED)
+			len = itoa(buf, (signed long)num);
+		else
+			len = uitoa(buf, num);
+		break;
+	case PRINTF_HEX:
+		len = hextoa(buf, num);
+		break;
+	case PRINTF_OCT:
+		len = octtoa(buf, num);
+		break;
+	case PRINTF_BIN:
+		len = bintoa(buf, num);
+		break;
+	case PRINTF_POINTER:
+		len = ptoa(buf, num);
+	default:
+		break;
 	}
 
 	return len;
 }
 
-/*
- *for this function if the size over than 1024
- *this will cause an overfolow error,we will fix
- *this bug later
- */
+static inline char *console_vsprintf(char *dst, const char *src, int size)
+{
+	int i;
+
+	for (i = 0; i < size; i++)
+		console_putc(src[i]);
+
+	return (dst + size);
+}
+
+static inline char *memory_vsprintf(char *dst, const char *src, int size)
+{
+	int i;
+
+	for (i = 0; i < size; i++)
+		dst[i] = src[i];
+
+	return (dst + size);
+}
+
 int vsprintf(char *buf, const char *fmt, va_list arg)
 {
-	char *str;
-	int len;
-	char *tmp;
-	signed long number;
+	char *str, *tmp;
+	int len, ch;
+	char num_buf[96];		// 96 is enough for number
 	unsigned long unumber;
 	int flag = 0;
+	vsprintf_t vst;
 
 	if (buf == NULL)
-		return -1;
+		vst = console_vsprintf;
+	else
+		vst = memory_vsprintf;
 
 	for (str = buf; *fmt; fmt++) {
 
 		if (*fmt != '%') {
-			*str++ = *fmt;
+			str = vst(str, fmt, 1);
 			continue;
 		}
 
 		fmt++;
+
 		switch (*fmt) {
-			case 'd':
-				flag |= PRINTF_DEC | PRINTF_SIGNED;
-				break;
-			case 'p':
-				flag |= PRINTF_POINTER | PRINTF_UNSIGNED;
-				break;
-			case 'x':
-				flag |= PRINTF_HEX | PRINTF_UNSIGNED;
-				break;
-			case 'u':
-				flag |= PRINTF_DEC | PRINTF_UNSIGNED;
-				break;
-			case 's':
-				len = strlen(tmp = va_arg(arg, char *));
-				strncpy(str, tmp, len);
-				str += len;
-				continue;
-				break;
-			case 'c':
-				*str = (char)(va_arg(arg, int));
-				str++;
-				continue;
-				break;
-			case 'o':
-				flag |= PRINTF_DEC | PRINTF_SIGNED;
-				break;
-			case '%':
-				*str = '%';
-				str++;
-				continue;
-				break;
-			default:
-				*str = '%';
-				*(str+1) = *fmt;
-				str += 2;
-				continue;
-				break;
+		case 'd':
+			flag |= PRINTF_DEC | PRINTF_SIGNED;
+			break;
+		case 'p':
+			flag |= PRINTF_POINTER | PRINTF_UNSIGNED;
+			break;
+		case 'x':
+			flag |= PRINTF_HEX | PRINTF_UNSIGNED;
+			break;
+		case 'u':
+			flag |= PRINTF_DEC | PRINTF_UNSIGNED;
+			break;
+		case 's':
+			len = strlen(tmp = va_arg(arg, char *));
+			str = vst(str, (const char *)tmp, len);
+			continue;
+			break;
+		case 'c':
+			ch = (char)(va_arg(arg, int));
+			str = vst(str, (const char *)&ch, 1);
+			continue;
+			break;
+		case 'o':
+			flag |= PRINTF_DEC | PRINTF_SIGNED;
+			break;
+		case '%':
+			str = vst(str, "%", 1);
+			continue;
+			break;
+		default:
+			str = vst(str, "%", 1);
+			str = vst(str, fmt, 1);
+			continue;
+			break;
 		}
 
-		if(flag & PRINTF_UNSIGNED){
-			unumber = va_arg(arg, unsigned long);
-			len = numbric(str, unumber, flag);
-		} else {
+		unumber = va_arg(arg, unsigned long);
+		len = numbric(num_buf, unumber, flag);
+		str = vst(str, num_buf, len);
 
-			number = va_arg(arg, signed long);
-			len = numbric(str, number, flag);
-		}
-		str+=len;
 		flag = 0;
 	}
 
-	*str = 0;
+	ch = 0;
+	vst(str, (const char *)&ch, 1);
 
-	return str-buf;
+	return str - buf;
 }
-
 
 int sprintf(char *str, const char *format, ...)
 {
 	va_list arg;
 	int count;
+
+	if (!str)
+		return -EINVAL;
 
 	va_start(arg, format);
 	count = vsprintf(str, format, arg);

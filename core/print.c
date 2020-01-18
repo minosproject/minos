@@ -83,7 +83,7 @@ int level_print(int level, char *fmt, ...)
 {
 	va_list arg;
 	int printed, i, cpuid;
-	char buf[512];
+	char buf[64];
 	char *buffer = buf;
 	unsigned long flags;
 	int pid;
@@ -91,6 +91,8 @@ int level_print(int level, char *fmt, ...)
 
 	if (level > print_level)
 		return 0;
+
+	spin_lock_irqsave(&print_lock, flags);
 
 	cpuid = smp_processor_id();
 	task = __current_tasks[cpuid];
@@ -107,7 +109,7 @@ int level_print(int level, char *fmt, ...)
 
 	/* get the time of the log when it print */
 	buffer += get_print_time(buffer);
-	*buffer++ = ' ';
+	*buffer++ = '@';
 
 	/* add the processor id to the buffer */
 	*buffer++ = (cpuid / 10) + '0';
@@ -123,17 +125,17 @@ int level_print(int level, char *fmt, ...)
 	*buffer++ = ' ';
 
 	/*
-	 * TBD need to check the length of fmt
-	 * in case of buffer overflow
+	 * printf the header first then process the string
+	 * which wanna to show
 	 */
 	printed = buffer - buf;
-	va_start(arg, fmt);
-	printed += vsprintf(buffer, fmt, arg);
-	va_end(arg);
-
-	spin_lock_irqsave(&print_lock, flags);
 	for(i = 0; i < printed; i++)
 		console_putc(buf[i]);
+
+	va_start(arg, fmt);
+	printed += vsprintf(NULL, fmt, arg);
+	va_end(arg);
+
 	spin_unlock_irqrestore(&print_lock, flags);
 
 	return printed;
