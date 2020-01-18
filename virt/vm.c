@@ -79,6 +79,12 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 	int cpuid;
 	struct vcpu *vcpu;
 
+	/*
+	 * how to handle bit-little soc ? usually the hvm's
+	 * cpu map is as same as the true hardware, so here
+	 * if the VM is the VM0, the affinity is as same as
+	 * the real hardware
+	 */
 	cpuid = affinity_to_cpuid(affinity);
 
 	/*

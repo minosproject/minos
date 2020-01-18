@@ -155,6 +155,7 @@ static int fdt_setup_cpu(struct vm *vm)
 	int offset, node, i;
 	char name[16];
 	void *dtb = vm->setup_data;
+	uint64_t aff_id;
 
 	/*
 	 * delete unused vcpu for hvm
@@ -171,9 +172,13 @@ static int fdt_setup_cpu(struct vm *vm)
 		fdt_del_node(dtb, node);
 	}
 
-	memset(name, 0, 16);
 	for (i = vm->vcpu_nr; i < CONFIG_MAX_CPU_NR; i++) {
-		sprintf(name, "cpu@%x", cpuid_to_affinity(i));
+		if (vm_is_hvm(vm))
+			aff_id = cpuid_to_affinity(i);
+		else
+			aff_id = i;
+
+		sprintf(name, "cpu@%x", aff_id);
 		node = fdt_subnode_offset(dtb, offset, name);
 		if (node >= 0) {
 			pr_notice("delete vcpu %s for vm%d\n", name, vm->vmid);
@@ -283,7 +288,6 @@ static void fdt_vm_init(struct vm *vm)
 	fdt_pack(fdt);
 	flush_dcache_range((unsigned long)fdt, MAX_DTB_SIZE);
 }
-
 
 static void linux_vcpu_init(struct vcpu *vcpu)
 {
