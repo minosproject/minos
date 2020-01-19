@@ -27,7 +27,6 @@ static char mem_log_buf[MEM_CONSOLE_SIZE];
 
 static void mem_console_putc(char ch)
 {
-	*(volatile uint32_t *)0xff803000 = ch;
 	mem_log_buf[MEM_CONSOLE_IDX(widx++)] = ch;
 }
 
