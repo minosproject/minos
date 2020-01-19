@@ -166,12 +166,6 @@ static int fdt_setup_cpu(struct vm *vm)
 		return -ENOENT;
 	}
 
-	node = fdt_subnode_offset(dtb, offset, "cpu-map");
-	if (node > 0) {
-		pr_notice("delete cpu-map node\n");
-		fdt_del_node(dtb, node);
-	}
-
 	for (i = vm->vcpu_nr; i < CONFIG_MAX_CPU_NR; i++) {
 		if (vm_is_hvm(vm))
 			aff_id = cpuid_to_affinity(i);

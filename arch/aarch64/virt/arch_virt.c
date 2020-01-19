@@ -129,7 +129,7 @@ static void aarch64_system_state_init(struct task *task, void *c)
 	context->cpacr = 0x3 << 20;
 
 	if (vm_is_native(vcpu->vm))
-		context->vpidr = read_sysreg(VPIDR_EL2);
+		context->vpidr = read_sysreg32(MIDR_EL1);
 	else
 		context->vpidr = 0x410fc050;	/* arm fvp */
 

@@ -70,7 +70,7 @@ static void *gicv2_cbase;
 static void *gicv2_hbase;
 static int gicv2_nr_lines;
 
-static DEFINE_PER_CPU(uint8_t, gic_cpu_id);
+static uint8_t gic_cpu_mask[8] = { 0xff };
 
 extern int vgicv2_init(uint64_t *data, int len);
 extern int gic_xlate_irq(struct device_node *node,
@@ -204,8 +204,9 @@ static void gicv2_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *mask)
 		break;
 	case SGI_TO_LIST:
 		for_each_cpu(cpu, mask)
-			value |= (1 << cpu);
+			value |= gic_cpu_mask[cpu];
 
+		mb();
 		writel_gicd(GICD_SGI_TARGET_LIST |
 			(value << GICD_SGI_TARGET_SHIFT) | sgi,
 			GICD_SGIR);
@@ -262,8 +263,10 @@ static int gicv2_is_aliased(unsigned long base, unsigned long size)
 static void gicv2_cpu_init(void)
 {
 	int i;
+	int cpuid = smp_processor_id();
 
-	get_cpu_var(gic_cpu_id) = readl_gicd(GICD_ITARGETSR) & 0xff;
+	gic_cpu_mask[cpuid] = readl_gicd(GICD_ITARGETSR) & 0xff;
+	pr_notice("gicv2 gic mask of cpu%d: 0x%x\n", cpuid, gic_cpu_mask[cpuid]);
 
 	/* The first 32 interrupts (PPI and SGI) are banked per-cpu, so
 	 * even though they are controlled with GICD registers, they must
