@@ -52,15 +52,6 @@ do_start:
 	bl	smp_processor_id		// cpuid save to x19
 	mov	x19, x0
 
-#ifdef CONFIG_IRQCHIP_GICV3
-	mov	x0, #15
-	msr	ICC_SRE_EL2, x0
-	isb
-
-	msr	ICC_SRE_EL1, x0
-	isb
-#endif
-
 	msr	VTTBR_EL2, xzr
 	isb
 

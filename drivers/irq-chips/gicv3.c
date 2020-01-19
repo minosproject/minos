@@ -354,6 +354,14 @@ static int gicv3_gicr_init(void)
 	return 0;
 }
 
+static void inline gicv3_icc_sre_init(void)
+{
+#ifdef CONFIG_VIRT
+	write_sysreg(ICC_SRE_EL2, 0xf);
+#endif
+	write_sysreg(ICC_SRE_EL1, 0xf);
+}
+
 int gicv3_init(struct device_node *node)
 {
 	int i;
@@ -435,6 +443,7 @@ int gicv3_init(struct device_node *node)
 			GICD_CTLR_ARE_NS, gicd_base + GICD_CTLR);
 	isb();
 
+	gicv3_icc_sre_init();
 	gicv3_gicr_init();
 	gicv3_gicc_init();
 	gicv3_hyp_init();
@@ -452,6 +461,7 @@ int gicv3_secondary_init(void)
 {
 	spin_lock(&gicv3_lock);
 
+	gicv3_icc_sre_init();
 	gicv3_gicr_init();
 	gicv3_gicc_init();
 	gicv3_hyp_init();
