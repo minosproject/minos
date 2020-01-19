@@ -1191,8 +1191,9 @@ static void generate_resource_file(void)
 	while (head) {
 		printf("[IOMEM] start: 0x%lx size: 0x%lx\n",
 				head->vstart, head->size);
-		ret = sprintf(buf, "<0x%lx 0x%lx 0x%lx>,\n", head->vstart,
-				head->vstart, head->size);
+		ret = sprintf(buf, "<0x%lx 0x%lx 0x%lx>, /* 0x%lx ----> 0x%lx */\n",
+				head->vstart, head->vstart, head->size,
+				head->vstart, head->vstart + head->size);
 		write(fd, buf, ret);
 
 		prev = head;
