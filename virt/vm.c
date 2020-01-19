@@ -48,6 +48,8 @@ static int native_vcpus;
 DECLARE_BITMAP(vcpu_aff_bitmap, NR_CPUS);
 DEFINE_SPIN_LOCK(affinity_lock);
 
+#define VM_NR_CPUS_CLUSTER	256
+
 static inline void set_vcpu_ready(struct vcpu *vcpu)
 {
 	unsigned long flags;
@@ -73,11 +75,9 @@ void vcpu_online(struct vcpu *vcpu)
 	set_vcpu_ready(vcpu);
 }
 
-int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
-		unsigned long entry, unsigned long unsed)
+static int inline affinity_to_vcpuid(struct vm *vm, unsigned long affinity)
 {
-	int cpuid;
-	struct vcpu *vcpu;
+	int aff0, aff1;
 
 	/*
 	 * how to handle bit-little soc ? usually the hvm's
@@ -85,7 +85,22 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 	 * if the VM is the VM0, the affinity is as same as
 	 * the real hardware
 	 */
-	cpuid = affinity_to_cpuid(affinity);
+	if (vm_is_hvm(vm))
+		return affinity_to_cpuid(affinity);
+
+	aff1 = (affinity >> 8) & 0xff;
+	aff0 = affinity & 0xff;
+
+	return (aff1 * VM_NR_CPUS_CLUSTER) + aff0;
+}
+
+int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
+		unsigned long entry, unsigned long unsed)
+{
+	int cpuid;
+	struct vcpu *vcpu;
+
+	cpuid = affinity_to_vcpuid(caller->vm, affinity);
 
 	/*
 	 * resched the pcpu since it may have in the
@@ -95,7 +110,7 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 	 * vcpu belong the the same vm will not
 	 * at the same pcpu
 	 */
-	vcpu = get_vcpu_by_id(caller->vm->vmid, cpuid);
+	vcpu = get_vcpu_in_vm(caller->vm, cpuid);
 	if (!vcpu) {
 		pr_err("no such:%d->0x%x vcpu for this VM %s\n",
 				cpuid, affinity, caller->vm->name);
