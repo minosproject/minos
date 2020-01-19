@@ -82,6 +82,11 @@ static int __used destroy_guest_mapping(struct mm_struct *mm,
 {
 	unsigned long end;
 
+	if (!IS_PAGE_ALIGN(vir) || !IS_PAGE_ALIGN(size)) {
+		pr_warn("WARN: destroy guest mapping 0x%x---->0x%x\n",
+				vir, vir + size);
+	}
+
 	end = vir + size;
 	end = BALIGN(end, PAGE_SIZE);
 	vir = ALIGN(vir, PAGE_SIZE);

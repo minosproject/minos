@@ -64,10 +64,16 @@ typedef __pte_t pte_t;
 #define pgd_idx(vir)		((vir >> PGD_SHIFT) & (PAGE_MAPPING_COUNT - 1))
 #define pud_idx(vir)		((vir >> PUD_SHIFT) & (PAGE_MAPPING_COUNT - 1))
 #define pmd_idx(vir)		((vir >> PMD_SHIFT) & (PAGE_MAPPING_COUNT - 1))
-#define ptd_idx(vir)		((vir >> PTE_SHIFT) & (PAGE_MAPPING_COUNT - 1))
+#define pte_idx(vir)		((vir >> PTE_SHIFT) & (PAGE_MAPPING_COUNT - 1))
 
 #ifdef CONFIG_ARCH_AARCH64
-#define guest_pgd_idx(vir)	BUG()
+#define guest_pgd_idx(vir)		\
+	({				\
+		unsigned long idx;	\
+		BUG();			\
+		idx;			\
+	 })
+
 #define guest_pud_idx(vir)	((vir >> PUD_SHIFT) & ((PAGE_MAPPING_COUNT * 2) - 1))
 #define guest_pmd_idx(vir)	pmd_idx(vir)
 #define guest_pte_idx(vir)	pte_idx(vir)

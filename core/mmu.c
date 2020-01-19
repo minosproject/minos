@@ -25,7 +25,28 @@ extern unsigned char __el2_ttb0_pud;
 extern unsigned char __el2_ttb0_pmd_code;
 extern unsigned char __el2_ttb0_pmd_io;
 
-#define DESC_MASK(n) (~((1UL << (n)) - 1))
+#define DESC_MASK(n)		(~((1UL << (n)) - 1))
+
+#define PGD_DES_MASK		DESC_MASK(PGD_DES_OFFSET)
+#define PUD_DES_MASK		DESC_MASK(PUD_DES_OFFSET)
+#define PMD_DES_MASK		DESC_MASK(PMD_DES_OFFSET)
+#define PTE_DES_MASK		DESC_MASK(PTE_DES_OFFSET)
+
+#define pud_table_addr(pgd)	((pgd & 0x0000ffffffffffff) & PGD_DES_MASK)
+#define pmd_table_addr(pud)	((pud & 0x0000ffffffffffff) & PUD_DES_MASK)
+#define pte_table_addr(pmd)	((pmd & 0x0000ffffffffffff) & PMD_DES_MASK)
+
+#define IS_PUD_ALIGN(x)		(!((unsigned long)(x) & (PUD_MAP_SIZE - 1)))
+#define IS_PMD_ALIGN(x)		(!((unsigned long)(x) & (PMD_MAP_SIZE - 1)))
+
+#define ENTRY_MAP_SIZE(s, vaddr, ems)		\
+	({					\
+	size_t __ms;				\
+	__ms = BALIGN(vaddr, ems) - vaddr;	\
+	__ms = __ms ? __ms : ems;		\
+	if (__ms > s)				\
+		__ms = s;			\
+	__ms; })
 
 struct pagetable_attr {
 	int range_offset;
@@ -84,36 +105,7 @@ unsigned long page_table_description(unsigned long flags)
 	return arch_page_table_description(flags);
 }
 
-static int get_map_type(struct mapping_struct *info)
-{
-	struct pagetable_attr *config = info->config;
-	unsigned long a, b;
-
-	if (info->flags & VM_HOST) {
-		/* force to map as 2M block entry for host */
-		if (info->lvl == PMD)
-			return VM_DES_BLOCK;
-		else
-			return VM_DES_TABLE;
-	} else {
-		if (info->lvl == PTE)
-			return VM_DES_PAGE;
-	}
-
-	/*
-	 * check whether the map size is level map
-	 * size align and the virtual base aligin
-	 * FIX ME : whether need to check the physical base?
-	 */
-	a = (info->size) & (config->map_size - 1);
-	b = (info->vir_base) & (config->map_size - 1);
-	if (a || b)
-		return VM_DES_TABLE;
-	else
-		return VM_DES_BLOCK;
-}
-
-static unsigned long alloc_mapping_page(struct mm_struct *mm)
+static uint64_t alloc_mapping_page(struct mm_struct *mm)
 {
 	struct page *page;
 
@@ -125,150 +117,275 @@ static unsigned long alloc_mapping_page(struct mm_struct *mm)
 	page->next = mm->page_head;
 	mm->page_head = page;
 
-	return (unsigned long)(page_to_addr(page));
+	return (uint64_t)(page_to_addr(page));
 }
 
-static int create_page_entry(struct mm_struct *mm,
-		struct mapping_struct *info)
+static int build_pte_entry(struct mm_struct *mm,
+			   uint64_t *ptep,
+			   vir_addr_t vaddr,
+			   phy_addr_t paddr,
+			   size_t size,
+			   unsigned long flags)
 {
-	int i, map_type;
-	uint32_t offset, index;
-	uint64_t attr;
-	struct pagetable_attr *config = info->config;
-	unsigned long *tbase = (unsigned long *)info->table_base;
+	unsigned long offset;
+	uint64_t attr = page_table_description(flags | VM_DES_PAGE);
 
-	if (info->lvl != 3)
-		map_type = VM_DES_BLOCK;
-	else
-		map_type = VM_DES_PAGE;
+	if (size > PMD_MAP_SIZE)
+		return -EINVAL;
 
-	offset = config->range_offset;
-	attr = page_table_description(info->flags | map_type);
+	while (size > 0) {
+		if (flags & VM_HOST)
+			offset = pte_idx(vaddr);
+		else
+			offset = guest_pte_idx(vaddr);
 
-	index = (info->vir_base & config->offset_mask) >> offset;
+		*(ptep + offset) = attr | (paddr & PTE_DES_MASK);
 
-	for (i = 0; i < (info->size >> offset); i++) {
-		*(tbase + index) = attr | (info->phy_base &
-				DESC_MASK(config->des_offset));
-		info->vir_base += config->map_size;
-		info->phy_base += config->map_size;
-		index++;
+		size -= PTE_MAP_SIZE;
+		vaddr += PTE_MAP_SIZE;
+		paddr += PTE_MAP_SIZE;
 	}
 
 	return 0;
 }
 
-static int create_table_entry(struct mm_struct *mm,
-		struct mapping_struct *info)
+static int build_pmd_entry(struct mm_struct *mm,
+			   pmd_t *pmdp,
+			   vir_addr_t vaddr,
+			   phy_addr_t paddr,
+			   size_t size,
+			   unsigned long flags)
 {
-	size_t size, map_size;
-	unsigned long attr;
-	unsigned long value, offset;
-	int ret = 0, map_type, new_page;
-	struct mapping_struct map_info;
-	struct pagetable_attr *config = info->config;
-	unsigned long *tbase = (unsigned long *)info->table_base;
+	pmd_t pmd;
+	size_t map_size;
+	unsigned long offset;
+	int map_as_block = 0;
+	uint64_t t_attr = page_table_description(flags | VM_DES_TABLE);
+	uint64_t b_attr = page_table_description(flags | VM_DES_BLOCK);
 
-	size = info->size;
-	attr = page_table_description(info->flags | VM_DES_TABLE);
+	if (size > PUD_MAP_SIZE)
+		return -EINVAL;
 
+	/*
+	 * one entry in PUD can map 2M memory, PUD can mapped
+	 * as 2M block if need, if 2M block is enabled then need
+	 * only need check whether the previous mapping type
+	 */
 	while (size > 0) {
-		new_page = 0;
-		map_size = BALIGN(info->vir_base, config->map_size) - info->vir_base;
-		map_size = map_size ? map_size : config->map_size;
-		if (map_size > size)
-			map_size = size;
-
-		offset = (info->vir_base & config->offset_mask) >>
-			config->range_offset;
-		value = *(tbase + offset);
-
-		if (!value) {
-			value = alloc_mapping_page(mm);
-			if (!value)
-				return -ENOMEM;
-
-			new_page = 1;
-			memset((void *)value, 0, PAGE_SIZE);
-			*(tbase + offset) = attr | (value &
-					DESC_MASK(config->des_offset));
-		} else {
-			/* get the base address of the entry */
-			value = value & 0x0000ffffffffffff;
-			value = value >> config->des_offset;
-			value = value << config->des_offset;
-		}
-
-		memset(&map_info, 0, sizeof(struct mapping_struct));
-		map_info.table_base = value;
-		map_info.vir_base = info->vir_base;
-		map_info.phy_base = info->phy_base;
-		map_info.size = map_size;
-		map_info.lvl = info->lvl + 1;
-		map_info.flags = info->flags;
-		map_info.config = config->next;
-
 		/*
-		 * get next level map entry type, if the entry
-		 * has been already maped then force it to a
-		 * Table description
-		 *
-		 * FIX ME: if the attribute of the page table entry
-		 * is changed, such as from TABLE to BLOCK, need to
-		 * free the page table page --- TBD
+		 * check whether this region can be mapped as block, if
+		 * map as block, need check currently mapping type
 		 */
-		map_type = get_map_type(&map_info);
-
-		if (map_type == VM_DES_TABLE)
-			ret = create_table_entry(mm, &map_info);
+		map_size = ENTRY_MAP_SIZE(size, vaddr, PMD_MAP_SIZE);
+		if (flags & VM_HOST)
+			offset = pmd_idx(vaddr);
 		else
-			ret = create_page_entry(mm, &map_info);
-		if (ret) {
-			if (new_page) {
-				free((void *)value);
-				new_page = 0;
-			}
+			offset = guest_pmd_idx(vaddr);
 
-			return ret;
+		if (IS_PMD_ALIGN(vaddr) && IS_PMD_ALIGN(paddr) &&
+				(map_size == PMD_MAP_SIZE)) {
+			pr_debug("0x%x--->0x%x @0x%x mapping as PUD block\n",
+					vaddr, paddr, map_size);
+			map_as_block = 1;
 		}
 
-		info->vir_base += map_size;
+		pmd = *(pmdp + offset);
+
+		if (!pmd) {
+			if (map_as_block) {
+				*(pmdp + offset) = b_attr | (paddr & PMD_DES_MASK);
+				goto repeat;
+			} else {
+				pmd = (pmd_t)alloc_mapping_page(mm);
+				if (pmd)
+					return -ENOMEM;
+
+				*(pmdp + offset) = t_attr | (pmd & PMD_DES_MASK);
+			}
+		} else if (pmd && map_as_block){
+			pr_err("0x%x ---> 0x%x @0x%x already mapped\n",
+					vaddr, paddr, map_size);
+			goto repeat;
+		} else {
+			pmd = pmd_table_addr(pmd);
+		}
+
+		build_pte_entry(mm, (pte_t *)pmd,
+				vaddr, paddr, map_size, flags);
+
+repeat:
 		size -= map_size;
-		info->phy_base += map_size;
+		vaddr += map_size;
+		paddr += map_size;
+		map_as_block = 0;
 	}
 
-	return ret;
+	return 0;
+}
+
+static int build_pud_entry(struct mm_struct *mm,
+			   pud_t *pudp,
+			   vir_addr_t vaddr,
+			   phy_addr_t paddr,
+			   size_t size,
+			   unsigned long flags)
+{
+	pud_t pud;
+	size_t map_size;
+	unsigned long offset;
+	int map_as_block = 0;
+	uint64_t t_attr = page_table_description(flags | VM_DES_TABLE);
+	uint64_t b_attr = page_table_description(flags | VM_DES_BLOCK);
+
+	/*
+	 * one entry in PUD can map 1G  memory, PUD can mapped
+	 * as 1G block if need, if 1G block is enabled then need
+	 * only need check whether the previous mapping type
+	 */
+	while (size > 0) {
+		/*
+		 * check whether this region can be mapped as block, if
+		 * map as block, need check currently mapping type
+		 */
+		map_size = ENTRY_MAP_SIZE(size, vaddr, PUD_MAP_SIZE);
+		if (flags & VM_HOST)
+			offset = pud_idx(vaddr);
+		else
+			offset = guest_pud_idx(vaddr);
+
+		if (IS_PUD_ALIGN(vaddr) && IS_PUD_ALIGN(paddr) &&
+				(map_size == PUD_MAP_SIZE)) {
+			pr_debug("0x%x--->0x%x @0x%x mapping as PUD block\n",
+					vaddr, paddr, map_size);
+			map_as_block = 1;
+		}
+
+		/*
+		 * should need to support dynamic mapping? here do not
+		 * allowed to change the mapping entry, since:
+		 * 1 - for host, the mapping is point to point
+		 * 2 - for guest, the mapping will managed by vmm_area
+		 *
+		 * so if pud table has been already create but the region
+		 * can be mapped as block, means there are someting error
+		 */
+		pud = *(pudp + offset);
+
+		if (!pud) {
+			if (map_as_block) {
+				*(pudp + offset) = b_attr | (paddr & PUD_DES_MASK);
+				goto repeat;
+			} else {
+				pud = (pud_t)alloc_mapping_page(mm);
+				if (!pud)
+					return -ENOMEM;
+
+				*(pudp + offset) = t_attr | (pud & PUD_DES_MASK);
+			}
+		} else if (pud && map_as_block){
+			pr_err("0x%x ---> 0x%x @0x%x already mapped\n",
+					vaddr, paddr, map_size);
+			goto repeat;
+		} else {
+			pud = pmd_table_addr(pud);
+		}
+
+		build_pmd_entry(mm, (pmd_t *)pud,
+				vaddr, paddr, map_size, flags);
+
+repeat:
+		size -= map_size;
+		vaddr += map_size;
+		paddr += map_size;
+		map_as_block = 0;
+	}
+
+	return 0;
+}
+
+static int build_pgd_entry(struct mm_struct *mm,
+			   pgd_t *pgdp,
+			   vir_addr_t vaddr,
+			   phy_addr_t paddr,
+			   size_t size,
+			   unsigned long flags)
+{
+	pgd_t pgd;
+	size_t map_size;
+	unsigned long offset;
+	uint64_t attr = page_table_description(flags | VM_DES_TABLE);
+
+	/*
+	 * step 1: get the mapping size
+	 * step 2: check whether can mapped as block
+	 * step 3: check whether the entry has been aready mapped
+	 *
+	 * for block mapping - only support 1G 2M block mapping
+	 *
+	 * 4 level mapping table, one entry in PGD can map 512G
+	 * memory
+	 */
+	while (size > 0) {
+		map_size = ENTRY_MAP_SIZE(size, vaddr, PGD_MAP_SIZE);
+
+		if (flags & VM_HOST)
+			offset = pgd_idx(vaddr);
+		else
+			offset = guest_pgd_idx(vaddr);
+
+		pgd = *(pgdp + offset);
+		if (!pgd) {
+			pgd = (pgd_t)alloc_mapping_page(mm);
+			if (!pgd)
+				return -ENOMEM;
+
+			*(pgdp + offset) = attr | (pgd & PGD_DES_MASK);
+		} else
+			pgd = pud_table_addr(pgd);
+
+		build_pud_entry(mm, (pud_t *)pgd, vaddr,
+				paddr, map_size, flags);
+
+		size -= map_size;
+		vaddr += map_size;
+		paddr += map_size;
+	}
+
+	return 0;
+}
+
+static int inline create_table_entry(struct mm_struct *mm,
+				     uint64_t *tb,
+				     vir_addr_t vaddr,
+				     phy_addr_t paddr,
+				     size_t size,
+				     unsigned long flags)
+{
+	if (flags & VM_HOST) {
+		return build_pgd_entry(mm, (pgd_t *)tb,
+				vaddr, paddr, size, flags);
+	} else {
+		return build_pud_entry(mm, (pud_t *)tb,
+				vaddr, paddr, size, flags);
+	}
 }
 
 int create_mem_mapping(struct mm_struct *mm, vir_addr_t addr,
 		phy_addr_t phy, size_t size, unsigned long flags)
 {
 	int ret;
-	struct mapping_struct map_info;
+	unsigned long fl;
 
-	memset(&map_info, 0, sizeof(struct mapping_struct));
-	map_info.table_base = mm->pgd_base;
-	map_info.vir_base = addr;
-	map_info.phy_base = phy;
-	map_info.size = size;
-	map_info.flags = flags;
+	spin_lock_irqsave(&mm->mm_lock, fl);
 
-	if (flags & VM_HOST) {
-		map_info.lvl = PGD;
-		map_info.config = attrs[PGD];
-	} else {
-		map_info.lvl = PUD;
-		map_info.config = attrs[PUD];
-	}
+	ret = create_table_entry(mm, (uint64_t *)mm->pgd_base,
+			addr, phy, size, flags);
 
-	spin_lock(&mm->mm_lock);
-	ret = create_table_entry(mm, &map_info);
-	spin_unlock(&mm->mm_lock);
+	spin_unlock_irqrestore(&mm->mm_lock, fl);
 
 	if (ret)
 		pr_err("map fail 0x%x->0x%x size:%x\n", addr, phy, size);
 
-	/* need to flush the addr + size's mem's cache ? */
 	if (flags & VM_HOST)
 		flush_tlb_va_host(addr, size);
 	else
@@ -389,7 +506,6 @@ int destroy_mem_mapping(struct mm_struct *mm, unsigned long vir,
 {
 	struct mapping_struct map_info;
 
-	memset(&map_info, 0, sizeof(struct mapping_struct));
 	map_info.table_base = mm->pgd_base;
 	map_info.vir_base = vir;
 	map_info.lvl = PGD;
@@ -561,6 +677,11 @@ int create_host_mapping(vir_addr_t vir, phy_addr_t phy,
 int destroy_host_mapping(vir_addr_t vir, size_t size)
 {
 	unsigned long end;
+
+	if (!IS_PMD_ALIGN(vir) || !IS_PMD_ALIGN(size)) {
+		pr_warn("WARN: destroy host mapping 0x%x---->0x%x\n",
+				vir, vir + size);
+	}
 
 	end = vir + size;
 	end = BALIGN(end, MEM_BLOCK_SIZE);
