@@ -57,5 +57,8 @@ endfunc arch_get_sp
 
 func smc_call
 	smc	#0
+	ldr	x4, [sp]
+	stp	x0, x1, [x4, #0]
+	stp	x2, x3, [x4, #16]
 	ret
 endfunc smc_call

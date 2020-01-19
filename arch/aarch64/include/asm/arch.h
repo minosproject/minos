@@ -329,10 +329,6 @@ static inline void cpu_relax(void)
 	asm volatile("yield" ::: "memory");
 }
 
-extern unsigned long smc_call(uint32_t id, unsigned long a1,
-		unsigned long a2, unsigned long a3, unsigned long a4,
-		unsigned long a5, unsigned long a6);
-
 static inline void flush_icache_all(void)
 {
 	asm volatile("ic ialluis");

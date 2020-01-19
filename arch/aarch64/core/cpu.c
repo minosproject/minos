@@ -19,6 +19,7 @@
 #include <minos/arch.h>
 #include <minos/of.h>
 #include <asm/psci.h>
+#include <asm/svccc.h>
 #include <minos/mmu.h>
 
 extern unsigned char __smp_affinity_id;
@@ -27,7 +28,11 @@ extern phy_addr_t smp_holding_address[CONFIG_NR_CPUS];
 static inline unsigned long psci_fn(uint32_t id, unsigned long a1,
 		unsigned long a2, unsigned long a3)
 {
-	return smc_call(id, a1, a2, a3, 0, 0, 0);
+	struct arm_smc_res res;
+
+	smc_call(id, a1, a2, a3, 0, 0, 0, 0, &res);
+
+	return res.a0;
 }
 
 int psci_cpu_on(unsigned long cpu, unsigned long entry)
