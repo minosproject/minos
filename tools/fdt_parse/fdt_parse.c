@@ -967,12 +967,12 @@ static int register_iomem(struct device_node *node, uint64_t vaddr,
 	/*
 	 * need to merge or split the releated address
 	 */
-	uint64_t start, end, new_end = vaddr + size;
+	uint64_t start, end, new_end;
 	struct vdev_resource *head, *prev;
 
 	vaddr = vaddr & ~(4095);
-	end = ((vaddr + size) + 4095) & ~(4095);
-	size = end - vaddr;
+	new_end = ((vaddr + size) + 4095) & ~(4095);
+	size = new_end - vaddr;
 
 repeat:
 	head = prev = iomem_head;

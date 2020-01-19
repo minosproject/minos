@@ -62,6 +62,8 @@ struct aarch64_system_context {
 
 #define AARCH64_SYSTEM_VMODULE	"aarch64-system"
 
+static uint32_t mpidr_el1[NR_CPUS];
+
 void arch_init_vcpu(struct vcpu *vcpu, void *entry, void *arg)
 {
 	struct task *task = vcpu->task;
@@ -129,7 +131,7 @@ static void aarch64_system_state_init(struct task *task, void *c)
 	context->cpacr = 0x3 << 20;
 
 	if (vm_is_native(vcpu->vm))
-		context->vpidr = read_sysreg32(MIDR_EL1);
+		context->vpidr = mpidr_el1[vcpu_affinity(vcpu)];
 	else
 		context->vpidr = 0x410fc050;	/* arm fvp */
 
@@ -269,3 +271,11 @@ int virtual_timer_irq_handler(uint32_t irq, void *data)
 
 	return send_virq_to_vcpu(vcpu, vcpu->vm->vtimer_virq);
 }
+
+static int mpidr_el1_init(void)
+{
+	mpidr_el1[smp_processor_id()] = read_sysreg32(MIDR_EL1);
+
+	return 0;
+}
+arch_initcall_percpu(mpidr_el1_init);
