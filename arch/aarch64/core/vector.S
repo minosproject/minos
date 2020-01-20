@@ -284,6 +284,7 @@ __irq_handler:
 
 	ldr	arg1, =__irq_stack_end	/* get the irq stack of the current cpu */
 	sub	arg1, arg1, cpuid, lsl #CONFIG_TASK_STACK_SHIFT
+	sub	arg1, arg1, #TASK_INFO_SIZE
 
 	mov	arg0, sp
 	str	arg0, [ct]		/* store the current task's stack */

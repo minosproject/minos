@@ -31,6 +31,9 @@ static int virqchip_enter_to_guest(void *item, void *data)
 	struct virq_struct *virq_struct = vcpu->virq_struct;
 	struct virq_chip *vc = vcpu->vm->virq_chip;
 
+	if (!vc)
+		return -ENOENT;
+
 	/*
 	 * if there is no pending virq for this vcpu
 	 * clear the virq state in HCR_EL2 then just return
