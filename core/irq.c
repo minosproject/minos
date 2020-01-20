@@ -28,6 +28,8 @@
 #define SPI_IRQ_BASE		NR_PERCPU_IRQS
 #define MAX_IRQ_COUNT		(CONFIG_NR_SPI_IRQS + NR_PERCPU_IRQS)
 
+unsigned long cpu_irq_stack[NR_CPUS];
+
 static struct irq_chip *irq_chip;
 
 static int default_irq_handler(uint32_t irq, void *data);
@@ -329,6 +331,25 @@ static void of_irq_init(void)
 
 int irq_init(void)
 {
+	int i;
+	unsigned long stk;
+	int nr = CONFIG_TASK_STACK_SIZE >> PAGE_SHIFT;
+
+	/*
+	 * init the irq stack here, when exit the irq handler
+	 * it will switch to the irq stack to do the task
+	 * switch
+	 */
+	for (i = 0; i < NR_CPUS; i++) {
+		stk = (unsigned long)__get_free_pages(nr, nr);
+		if (!stk)
+			panic("No more memory\n");
+
+		stk = stk + CONFIG_TASK_STACK_SIZE - TASK_INFO_SIZE;
+		memset((void *)stk, 0, TASK_INFO_SIZE);
+		cpu_irq_stack[i] = stk;
+	}
+
 #ifdef CONFIG_DEVICE_TREE
 	of_irq_init();
 #endif

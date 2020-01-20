@@ -73,13 +73,6 @@ do_start:
 	mov	x2, #TASK_INFO_SIZE
 	bl	memset
 
-	ldr	x0, =__irq_stack_end
-	sub	x0, x0, x19, lsl #CONFIG_TASK_STACK_SHIFT
-	sub	x0, x0, #TASK_INFO_SIZE
-	mov	x1, 0
-	mov	x2, #TASK_INFO_SIZE
-	bl	memset
-
 	mov	sp, x0
 	mov	x28, x0		/* task info save to x28 */
 

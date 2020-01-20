@@ -206,21 +206,6 @@ SECTIONS
 
 	__init_end = .;
 
-	. = ALIGN(16);
-	__config_data_start = .;
-	.__config : {
-		*(.__config)
-	}
-	__config_data_end = .;
-	. = ALIGN(16);
-
-	.irq_stack : {
-		. = ALIGN(64);
-		__irq_stack_start = .;
-		. = . + (CONFIG_NR_CPUS * CONFIG_EXCEPTION_STACK_SIZE);
-		__irq_stack_end = .;
-	}
-
 	.el2_ttb0_pgd : {
 		. = ALIGN(4096);
 		__el2_ttb0_pgd = .;
