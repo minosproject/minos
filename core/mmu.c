@@ -197,7 +197,7 @@ static int build_pmd_entry(struct mm_struct *mm,
 				goto repeat;
 			} else {
 				pmd = (pmd_t)alloc_mapping_page(mm);
-				if (pmd)
+				if (!pmd)
 					return -ENOMEM;
 
 				*(pmdp + offset) = t_attr | (pmd & PMD_DES_MASK);

@@ -42,7 +42,7 @@ typedef __pte_t pte_t;
 #define PGD_SHIFT		PGD_RANGE_OFFSET
 #define PUD_SHIFT		PUD_RANGE_OFFSET
 #define PMD_SHIFT		PMD_RANGE_OFFSET
-#define PTE_SHIFT		PMD_RANGE_OFFSET
+#define PTE_SHIFT		PTE_RANGE_OFFSET
 
 #define PGD_MASK		(~(PGD_MAP_SIZE - 1))
 #define PUD_MASK		(~(PUD_MAP_SIZE - 1))
