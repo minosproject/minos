@@ -357,7 +357,7 @@ out:
 	return create_vmbox(&vinfo);
 }
 
-struct vmbox_controller *vmbox_get_controller(struct vm *vm)
+static struct vmbox_controller *vmbox_get_controller(struct vm *vm)
 {
 	struct vmbox_controller *vc;
 
@@ -739,11 +739,15 @@ static int __of_setup_vmbox_con_virqs(struct vmbox_controller *vcon,
 	return 0;
 }
 
-static void add_vmbox_con_to_vm(struct vm *vm, struct vmbox_controller *vc)
+static void of_add_vmbox_controller(struct vm *vm)
 {
 	int node;
 	char node_name[128];
 	void *dtb = vm->setup_data;
+	struct vmbox_controller *vc = vmbox_get_controller(vm);
+
+	if (!vc)
+		return;
 
 	memset(node_name, 0, 128);
 	sprintf(node_name, "vmbox-controller@%x", vc->va);
@@ -799,8 +803,6 @@ static int __vm_create_vmbox_controller_dynamic(struct vm *vm)
 
 	list_add_tail(&vmbox_con_list, &vc->list);
 
-	add_vmbox_con_to_vm(vm, vc);
-
 	return 0;
 }
 
@@ -851,7 +853,7 @@ static int __vm_create_vmbox_controller_static(struct vm *vm)
 	return 0;
 }
 
-static int vm_create_vmbox_controller(struct vm *vm)
+int create_vmbox_controller(struct vm *vm)
 {
 	int ret = -EAGAIN;
 
@@ -918,13 +920,10 @@ static int vmbox_device_do_hooks(struct vm *vm)
 	return 0;
 }
 
-int setup_vm_vmbox(struct vm *vm)
+int vmbox_init(struct vm *vm)
 {
-	int ret;
-
-	ret = vm_create_vmbox_controller(vm);
-	if (ret)
-		return ret;
+	if (vm->flags & VM_FLAGS_SETUP_OF)
+		of_add_vmbox_controller(vm);
 
 	return vmbox_device_do_hooks(vm);
 }

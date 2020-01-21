@@ -784,7 +784,7 @@ int vm_suspend(int vmid)
 	return __vm_suspend(vm);
 }
 
-static void setup_vm(struct vm *vm)
+static void vm_setup(struct vm *vm)
 {
 	/*
 	 * here need first map the setup data into the
@@ -811,8 +811,10 @@ static void setup_vm(struct vm *vm)
 	 * map these native VM's memory as read only
 	 */
 	os_create_native_vm_resource(vm);
+
+	create_vmbox_controller(vm);
+
 	os_setup_vm(vm);
-	setup_vm_vmbox(vm);
 
 	if (vm->setup_data) {
 		destroy_host_mapping((vir_addr_t)vm->setup_data,
@@ -1139,7 +1141,7 @@ int virt_init(void)
 		 * - prepare the vcpu for bootup
 		 */
 		os_vm_init(vm);
-		setup_vm(vm);
+		vm_setup(vm);
 		vm_mm_init(vm);
 		vm->state = VM_STAT_ONLINE;
 

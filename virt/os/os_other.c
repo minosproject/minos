@@ -20,6 +20,7 @@
 #include <virt/vm.h>
 #include <virt/resource.h>
 #include <virt/os.h>
+#include <virt/vmbox.h>
 
 static void default_vcpu_init(struct vcpu *vcpu)
 {
@@ -36,7 +37,7 @@ static void default_vcpu_power_on(struct vcpu *vcpu, unsigned long entry)
 
 static void default_vm_setup(struct vm *vm)
 {
-
+	vmbox_init(vm);
 }
 
 static int default_create_guest_vm_resource(struct vm *vm)

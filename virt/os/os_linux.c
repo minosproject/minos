@@ -276,6 +276,8 @@ static void fdt_vm_init(struct vm *vm)
 	fdt_setup_memory(vm);
 	fdt_setup_other(vm);
 
+	vmbox_init(vm);
+
 	if (platform->setup_hvm && vm_is_hvm(vm))
 		platform->setup_hvm(vm, fdt);
 
