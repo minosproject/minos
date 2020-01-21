@@ -2,6 +2,7 @@
 #define _MINOS_MINOS_H_
 
 #include <minos/types.h>
+#include <asm/asm-offset.h>
 #include <minos/string.h>
 #include <minos/print.h>
 #include <minos/list.h>

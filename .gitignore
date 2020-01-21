@@ -118,3 +118,4 @@ tools/Kconfiglib/build/
 *.egg-info/
 tools/Kconfiglib/dist/
 tools/fdt_parse/parse_dtb
+asm-offset.h

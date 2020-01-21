@@ -18,6 +18,7 @@
 #include <asm/aarch64_common.h>
 #include <asm/gic_reg.h>
 #include <config/config.h>
+#include <asm/asm-offset.h>
 
 #define SCTLR_EL2_VALUE		0x30c51878
 
