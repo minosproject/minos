@@ -25,6 +25,8 @@ extern unsigned char __el2_ttb0_pud;
 extern unsigned char __el2_ttb0_pmd_code;
 extern unsigned char __el2_ttb0_pmd_io;
 
+#define PHYSIC_ADDRESS_MASK	(0x0000ffffffffffff)
+
 #define DESC_MASK(n)		(~((1UL << (n)) - 1))
 
 #define PGD_DES_MASK		DESC_MASK(PGD_DES_OFFSET)
@@ -32,9 +34,9 @@ extern unsigned char __el2_ttb0_pmd_io;
 #define PMD_DES_MASK		DESC_MASK(PMD_DES_OFFSET)
 #define PTE_DES_MASK		DESC_MASK(PTE_DES_OFFSET)
 
-#define pud_table_addr(pgd)	((pgd & 0x0000ffffffffffff) & PGD_DES_MASK)
-#define pmd_table_addr(pud)	((pud & 0x0000ffffffffffff) & PUD_DES_MASK)
-#define pte_table_addr(pmd)	((pmd & 0x0000ffffffffffff) & PMD_DES_MASK)
+#define pud_table_addr(pgd)	((pgd & PHYSIC_ADDRESS_MASK) & PGD_DES_MASK)
+#define pmd_table_addr(pud)	((pud & PHYSIC_ADDRESS_MASK) & PUD_DES_MASK)
+#define pte_table_addr(pmd)	((pmd & PHYSIC_ADDRESS_MASK) & PMD_DES_MASK)
 
 #define IS_PUD_ALIGN(x)		(!((unsigned long)(x) & (PUD_MAP_SIZE - 1)))
 #define IS_PMD_ALIGN(x)		(!((unsigned long)(x) & (PMD_MAP_SIZE - 1)))
