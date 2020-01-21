@@ -46,7 +46,6 @@ static int get_print_time(char *buffer)
 	second = us / 1000000;
 	us = us % 1000000;
 
-	memset(buf, '0', 64);
 	len = uitoa(buf, second);
 	len = len > 8 ? 8 : len;
 	left = 8 - len;
