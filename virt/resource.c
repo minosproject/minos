@@ -374,20 +374,20 @@ static int create_vm_iomem_common(struct vm *vm, struct device_node *node)
 
 	/* vaddr paddr size */
 	data = (fdt32_t *)of_getprop(node, "iomem", &len);
-	if (!data || (len == 0) || (len % 12))
+	if (!data || (len == 0) || (len % 24))
 		return -EINVAL;
 
-	len = len / 12;
+	len = len / 24;
 
 	for (i = 0; i < len; i++) {
-		vaddr = fdt32_to_cpu(data[0]);
-		paddr = fdt32_to_cpu(data[1]);
-		size = fdt32_to_cpu(data[2]);
+		vaddr = fdt32_to_cpu64(data[0], data[1]);
+		paddr = fdt32_to_cpu64(data[2], data[3]);
+		size = fdt32_to_cpu64(data[4], data[5]);
 
 		split_vmm_area(&vm->mm, vaddr, paddr, size, VM_IO | VM_MAP_PT);
 		create_guest_mapping(&vm->mm, vaddr, paddr, size, VM_IO);
 
-		data += 3;
+		data += 6;
 	}
 
 	return 0;
