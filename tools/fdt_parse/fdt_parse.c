@@ -1028,6 +1028,7 @@ repeat:
 
 	memset(head, 0, sizeof(struct vdev_resource));
 	head->vstart = vaddr;
+	head->pstart = vaddr;
 	head->size = size;
 
 	head->next = iomem_head;
@@ -1188,11 +1189,14 @@ static void generate_resource_file(void)
 		return;
 
 	head = iomem_head;
+
 	while (head) {
 		printf("[IOMEM] start: 0x%lx size: 0x%lx\n",
 				head->vstart, head->size);
-		ret = sprintf(buf, "<0x%lx 0x%lx 0x%lx>, /* 0x%lx ----> 0x%lx */\n",
-				head->vstart, head->vstart, head->size,
+		ret = sprintf(buf, "<0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx>, /* 0x%lx ----> 0x%lx */\n",
+				head->vstart >> 32, head->vstart & 0xffffffff,
+				head->pstart >> 32, head->pstart & 0xffffffff,
+				head->size >> 32, head->size & 0xffffffff,
 				head->vstart, head->vstart + head->size);
 		write(fd, buf, ret);
 
