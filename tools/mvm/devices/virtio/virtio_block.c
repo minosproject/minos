@@ -414,7 +414,7 @@ virtio_blk_deinit(struct vdev *vdev)
 }
 
 static int virtio_blk_event(struct vdev *vdev, int read,
-		unsigned long addr, unsigned long *value)
+		uint64_t addr, uint64_t *value)
 {
 	struct virtio_blk *vblk;
 

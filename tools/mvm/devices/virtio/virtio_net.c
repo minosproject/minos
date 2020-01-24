@@ -1047,7 +1047,7 @@ virtio_net_deinit(struct vdev *vdev)
 }
 
 static int virtio_net_event(struct vdev *vdev, int read,
-		unsigned long addr, unsigned long *value)
+		uint64_t addr, uint64_t *value)
 {
 	struct virtio_net *net;
 

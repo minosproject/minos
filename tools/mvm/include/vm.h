@@ -76,7 +76,7 @@ extern struct vm *mvm_vm;
 	(unsigned long)(mvm_vm->mmap + ((gpa) - mvm_vm->mem_start))
 
 void *map_vm_memory(struct vm *vm);
-void *hvm_map_iomem(void *base, size_t size);
+void *hvm_map_iomem(unsigned long base, size_t size);
 
 static inline void send_virq_to_vm(int virq)
 {

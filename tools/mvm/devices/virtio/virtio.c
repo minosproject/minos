@@ -38,7 +38,7 @@
 #include <common/gvm.h>
 
 static int virtio_devices_nr;
-static void *virtio_iomem_base;
+static uint64_t virtio_iomem_base;
 static int virtio_device_index;
 
 static void *hv_virtio_mmio_init(struct vm *vm, void *gbase)
@@ -47,6 +47,12 @@ static void *hv_virtio_mmio_init(struct vm *vm, void *gbase)
 	void *map_base;
 	unsigned long args[2] = {(unsigned long)gbase, VIRTIO_DEVICE_IOMEM_SIZE};
 
+	/*
+	 * first let the hypervisor allocate 4K physic memory for
+	 * this virtio device
+	 *
+	 * then map the 4K memory into this process's memory space
+	 */
 	ret = ioctl(vm->vm_fd, IOCTL_VIRTIO_MMIO_INIT, args);
 	if (ret || !args[0] || !args[1]) {
 		pr_err("virtio mmio init failed in hypervisor\n");
@@ -90,7 +96,7 @@ int virtio_mmio_init(struct vm *vm)
 	 * and the total virtio mem space must PAGE_ALIGN
 	 */
 	virtio_devices_nr = VM_MAX_VIRTIO_DEVICES;
-	virtio_iomem_base = (void *)VM_VIRTIO_IOMEM_BASE;
+	virtio_iomem_base = VM_VIRTIO_IOMEM_BASE;
 	virtio_device_index = 0;
 
 	return 0;
@@ -656,13 +662,13 @@ static int virtio_mmio_read(struct virtio_device *dev,
 }
 
 static int virtio_mmio_write(struct virtio_device *dev,
-		unsigned long addr, unsigned long *value)
+		uint64_t addr, uint64_t *value)
 {
 	int ret = 0;
 	unsigned long offset;
 	uint32_t arg = (uint32_t)(*value);
 
-	offset = addr - (unsigned long)dev->vdev->guest_iomem;
+	offset = addr - dev->vdev->guest_iomem;
 	switch (offset) {
 	case VIRTIO_MMIO_STATUS:
 		ret = virtio_status_event(dev, arg);
@@ -684,7 +690,7 @@ static int virtio_mmio_write(struct virtio_device *dev,
 }
 
 int virtio_handle_mmio(struct virtio_device *dev, int write,
-		unsigned long addr, unsigned long *value)
+		uint64_t addr, uint64_t *value)
 {
 	if (write == VMTRAP_REASON_WRITE)
 		return virtio_mmio_write(dev, addr, value);

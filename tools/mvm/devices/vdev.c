@@ -41,7 +41,7 @@
 static int vdev_irq_base;
 static int vdev_irq_count;
 
-void *vdev_map_iomem(void *base, size_t size)
+void *vdev_map_iomem(unsigned long base, size_t size)
 {
 	return hvm_map_iomem(base, size);
 }

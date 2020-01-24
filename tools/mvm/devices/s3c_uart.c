@@ -66,7 +66,7 @@ static int s3c_uart_init(struct vdev *vdev, char *args)
 {
 	pr_info("create s3c uart\n");
 
-	vdev->guest_iomem = (void *)T7001_S3C_UART_BASE;
+	vdev->guest_iomem = T7001_S3C_UART_BASE;
 	vdev->iomem_size = T7001_S3C_UART_SIZE;
 
 	return 0;
@@ -92,7 +92,7 @@ int create_s3c_uart(struct vm *vm)
 	return create_vdev(vm, "s3c_uart", NULL);
 }
 
-static void s3c_uart_read_event(unsigned long reg, unsigned long *value)
+static void s3c_uart_read_event(unsigned long reg, uint64_t *value)
 {
 	switch (reg) {
 	case UTRSTAT:
@@ -106,7 +106,7 @@ static void s3c_uart_read_event(unsigned long reg, unsigned long *value)
 	}
 }
 
-static void s3c_uart_write_event(unsigned long reg, unsigned long *value)
+static void s3c_uart_write_event(unsigned long reg, uint64_t *value)
 {
 	switch (reg) {
 	case UTXH:
@@ -118,9 +118,9 @@ static void s3c_uart_write_event(unsigned long reg, unsigned long *value)
 }
 
 static int s3c_uart_event(struct vdev *vdev, int read,
-		unsigned long addr, unsigned long *value)
+		uint64_t addr, uint64_t *value)
 {
-	unsigned long reg = addr - (unsigned long)vdev->guest_iomem;
+	unsigned long reg = addr - vdev->guest_iomem;
 
 	if (read == 0)
 		s3c_uart_read_event(reg, value);

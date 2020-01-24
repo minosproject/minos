@@ -298,7 +298,7 @@ void print_usage(void)
 	exit(EXIT_FAILURE);
 }
 
-void *hvm_map_iomem(void *base, size_t size)
+void *hvm_map_iomem(unsigned long base, size_t size)
 {
 	void *iomem;
 	int fd = open("/dev/mvm/mvm0", O_RDWR);
@@ -309,7 +309,7 @@ void *hvm_map_iomem(void *base, size_t size)
 	}
 
 	iomem = mmap(NULL, size, PROT_READ | PROT_WRITE,
-			MAP_SHARED, fd, (unsigned long)base);
+			MAP_SHARED, fd, base);
 	close(fd);
 
 	return iomem;
@@ -318,7 +318,7 @@ void *hvm_map_iomem(void *base, size_t size)
 static int vm_create_vmcs(struct vm *vm)
 {
 	int ret;
-	void *vmcs;
+	unsigned long vmcs;
 
 	ret = ioctl(vm->vm_fd, IOCTL_CREATE_VMCS, &vmcs);
 	if (ret)
@@ -446,7 +446,7 @@ static void vmcs_ack(struct vmcs *vmcs)
 }
 
 static int vcpu_handle_mmio(struct vm *vm, int trap_reason,
-		unsigned long trap_data, unsigned long *trap_result)
+		uint64_t trap_data, uint64_t *trap_result)
 {
 	int ret = -EIO;
 	struct vdev *vdev;
@@ -469,7 +469,7 @@ static int vcpu_handle_mmio(struct vm *vm, int trap_reason,
 }
 
 static int vcpu_handle_common_trap(struct vm *vm, int trap_reason,
-		unsigned long trap_data, unsigned long *trap_result)
+		uint64_t trap_data, uint64_t *trap_result)
 {
 	switch (trap_reason) {
 	case VMTRAP_REASON_REBOOT:
@@ -486,7 +486,7 @@ static int vcpu_handle_common_trap(struct vm *vm, int trap_reason,
 		pr_notice("vm-%d is resumed\n", vm->vmid);
 		break;
 	case VMTRAP_REASON_GET_TIME:
-		*trap_result = (unsigned long)time(NULL);
+		*trap_result = (uint64_t)time(NULL);
 		break;
 	default:
 		break;
@@ -500,8 +500,8 @@ static void handle_vcpu_event(struct vmcs *vmcs)
 	int ret;
 	uint32_t trap_type = vmcs->trap_type;
 	uint32_t trap_reason = vmcs->trap_reason;
-	unsigned long trap_data = vmcs->trap_data;
-	unsigned long trap_result = vmcs->trap_result;
+	uint64_t trap_data = vmcs->trap_data;
+	uint64_t trap_result = vmcs->trap_result;
 
 	switch (trap_type) {
 	case VMTRAP_TYPE_COMMON:

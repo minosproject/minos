@@ -10,12 +10,12 @@ struct vdev;
 
 struct vdev_ops {
 	char *name;
-	int (*init)(struct vdev *, char *);
-	void (*deinit)(struct vdev *);
-	int (*reset)(struct vdev *);
-	int (*setup)(struct vdev *, void *data, int os);
-	int (*event)(struct vdev *, int,
-			unsigned long, unsigned long *);
+	int (*init)(struct vdev *vdev, char *args);
+	void (*deinit)(struct vdev *vdev);
+	int (*reset)(struct vdev *vdev);
+	int (*setup)(struct vdev *vdev, void *data, int os);
+	int (*event)(struct vdev *vdev, int type,
+			uint64_t addr, uint64_t *value);
 };
 
 #define VDEV_TYPE_PLATFORM	(0x0)
@@ -25,7 +25,7 @@ struct vdev {
 	struct vm *vm;
 	int gvm_irq;
 	void *iomem;
-	void *guest_iomem;
+	uint64_t guest_iomem;
 	size_t iomem_size;
 	struct vdev_ops *ops;
 	void *pdata;
@@ -43,7 +43,7 @@ extern void * __start_vdev_ops;
 extern void *__stop_vdev_ops;
 
 int create_vdev(struct vm *vm, char *class, char *args);
-void *vdev_map_iomem(void *iomem, size_t size);
+void *vdev_map_iomem(unsigned long iomem, size_t size);
 void vdev_unmap_iomem(void *iomem, size_t size);
 void vdev_setup_env(struct vm *vm, void *data, int os_type);
 void vdev_send_irq(struct vdev *vdev);

@@ -882,7 +882,7 @@ virtio_console_init(struct vdev *vdev, char *opts)
 }
 
 static int virtio_console_event(struct vdev *vdev, int read,
-		unsigned long addr, unsigned long *value)
+		uint64_t addr, uint64_t *value)
 {
 	struct virtio_console *vcon;
 	unsigned long offset;
@@ -898,7 +898,7 @@ static int virtio_console_event(struct vdev *vdev, int read,
 		return -EINVAL;
 
 	/* the early printk support */
-	offset = addr - (unsigned long)vcon->virtio_dev.vdev->guest_iomem;
+	offset = addr - vcon->virtio_dev.vdev->guest_iomem;
 	if (offset == 0x108) {
 		be = vcon->ports[0].arg;
 		if (!be || !be->open)
