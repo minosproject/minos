@@ -990,7 +990,7 @@ repeat:
 		} else if ((vaddr <= start) && (new_end >= end)) {
 			head->vstart = vaddr;
 			head->size = size;
-		} else if ((vaddr < start) && (new_end >= end)) {
+		} else if ((vaddr <= start) && (new_end < end) && (new_end >= start)) {
 			head->vstart = vaddr;
 			head->size = end - head->vstart;
 		} else if ((vaddr <= end) && (new_end > end)) {
