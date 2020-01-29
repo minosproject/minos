@@ -186,7 +186,7 @@ static int dtb_add_virtio(struct vdev *vdev, void *dtb)
 	int node, offset;
 	char buf[64];
 	uint32_t args[3];
-	void *addr;
+	uint64_t addr;
 
 	offset = fdt_path_offset(dtb, "/smb");
 	if (offset < 0) {
@@ -196,7 +196,7 @@ static int dtb_add_virtio(struct vdev *vdev, void *dtb)
 
 	memset(buf, 0, 64);
 	addr = vdev->guest_iomem;
-	sprintf(buf, "%s@%lx", vdev->name, (unsigned long)addr);
+	sprintf(buf, "%s@%lx", vdev->name, addr);
 	node = fdt_add_subnode(dtb, offset, buf);
 	if (node < 0) {
 		pr_err("add %s failed\n", vdev->name);
@@ -221,7 +221,7 @@ static int dtb_add_virtio(struct vdev *vdev, void *dtb)
 				3 * sizeof(uint32_t));
 	}
 
-	pr_notice("add vdev success addr-%p virq-%d\n",
+	pr_notice("add vdev success addr-0x%lx virq-%d\n",
 			vdev->guest_iomem, vdev->gvm_irq);
 	return 0;
 }
