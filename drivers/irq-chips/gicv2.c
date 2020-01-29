@@ -266,7 +266,7 @@ static void gicv2_cpu_init(void)
 	int cpuid = smp_processor_id();
 
 	gic_cpu_mask[cpuid] = readl_gicd(GICD_ITARGETSR) & 0xff;
-	pr_notice("gicv2 gic mask of cpu%d: 0x%x\n", cpuid, gic_cpu_mask[cpuid]);
+	pr_debug("gicv2 gic mask of cpu%d: 0x%x\n", cpuid, gic_cpu_mask[cpuid]);
 
 	/* The first 32 interrupts (PPI and SGI) are banked per-cpu, so
 	 * even though they are controlled with GICD registers, they must

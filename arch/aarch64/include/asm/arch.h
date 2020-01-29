@@ -164,9 +164,9 @@ static inline uint64_t cpuid_to_affinity(int cpuid)
 				(aff0 << MPIDR_EL1_AFF1_LSB);
 	}
 #else
-	if (cpuid < CONFIG_NR_CPUS_CLUSTER0)
+	if (cpuid < CONFIG_NR_CPUS_CLUSTER0) {
 		return cpuid;
-	else {
+	} else {
 		aff0 = cpuid - CONFIG_NR_CPUS_CLUSTER0;
 		aff1 = 1;
 

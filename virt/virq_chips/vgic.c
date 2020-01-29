@@ -79,7 +79,7 @@ int vgic_irq_enter_to_guest(struct vcpu *vcpu, void *data)
 		/* allocate a id for the virq */
 		id = ffs_table_get_and_mask_one_bit(&virq_struct->lrs_table);
 		if (id < 0) {
-			pr_warn("virq id is full can not send all virq\n");
+			pr_debug("virq id is full can not send %d\n", virq->vno);
 			break;
 		}
 

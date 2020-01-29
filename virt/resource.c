@@ -366,6 +366,11 @@ create_vm_vtimer_common(struct vm *vm, struct device_node *node)
 	return 0;
 }
 
+#define IOMEM_SIZE_CELLS	2
+#define IOMEM_ADDR_CELLS	2
+#define IOMEM_ENTRY_CNT		6
+#define IOMEM_ENTRY_SIZE	24
+
 static int create_vm_iomem_common(struct vm *vm, struct device_node *node)
 {
 	fdt32_t *data;
@@ -374,10 +379,10 @@ static int create_vm_iomem_common(struct vm *vm, struct device_node *node)
 
 	/* vaddr paddr size */
 	data = (fdt32_t *)of_getprop(node, "iomem", &len);
-	if (!data || (len == 0) || (len % 24))
+	if (!data || (len == 0) || (len % IOMEM_ENTRY_SIZE))
 		return -EINVAL;
 
-	len = len / 24;
+	len = len / IOMEM_ENTRY_SIZE;
 
 	for (i = 0; i < len; i++) {
 		vaddr = fdt32_to_cpu64(data[0], data[1]);
@@ -387,7 +392,7 @@ static int create_vm_iomem_common(struct vm *vm, struct device_node *node)
 		split_vmm_area(&vm->mm, vaddr, paddr, size, VM_IO | VM_MAP_PT);
 		create_guest_mapping(&vm->mm, vaddr, paddr, size, VM_IO);
 
-		data += 6;
+		data += IOMEM_ENTRY_CNT;
 	}
 
 	return 0;
@@ -428,7 +433,6 @@ int create_native_vm_resource_common(struct vm *vm)
 	char name[32];
 	struct device_node *node;
 
-	memset(name, 0, 32);
 	sprintf(name, "vm%d_bdi", vm->vmid);
 
 	node = of_find_node_by_name(vm->dev_node, name);

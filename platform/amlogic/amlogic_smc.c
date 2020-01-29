@@ -53,13 +53,23 @@
 
 static svc_handler_t amlogic_smc_fn[128];
 
+static int amlogic_unknown_smc(gp_regs *c, uint32_t id, unsigned long *args)
+{
+	struct arm_smc_res res;
+
+	smc_call(id, args[0], args[1], args[2], args[3], 0, 0, 0, &res);
+	SVC_RET4(c, res.a0, res.a1, res.a2, res.a3);
+
+	return 0;
+}
+
 static int sip_smc_handler(gp_regs *c, uint32_t id, unsigned long *args)
 {
 	struct vcpu *vcpu = get_current_vcpu();
 	struct vm *vm = vcpu->vm;
 	svc_handler_t fn;
 
-	pr_info("sip function for amlogic 0x%x\n", id);
+	pr_debug("sip function for amlogic 0x%x\n", id);
 
 	if (!vm_is_hvm(vm))
 		return -EPERM;
@@ -67,8 +77,8 @@ static int sip_smc_handler(gp_regs *c, uint32_t id, unsigned long *args)
 	fn = amlogic_smc_fn[id - AMLOGIC_SMC_BASE];
 	if (fn)
 		return fn(c, id, args);
-
-	return -EINVAL;
+	else
+		return amlogic_unknown_smc(c, id, args);
 }
 DEFINE_SMC_HANDLER("sip_smc_desc", SVC_STYPE_SIP,
 		SVC_STYPE_SIP, sip_smc_handler);

@@ -127,7 +127,17 @@ static void aarch64_system_state_init(struct task *task, void *c)
 	if (task_is_64bit(task))
 		context->hcr_el2 |= HCR_EL2_RW;
 
-	context->vmpidr = 0x00000000 | get_vcpu_id(task_to_vcpu(task));
+	/*
+	 * this require HVM's vcpu affinity need start with 0
+	 */
+	if (vm_is_hvm(vcpu->vm))
+		context->vmpidr = cpuid_to_affinity(
+				get_vcpu_id(task_to_vcpu(task)));
+	else
+		context->vmpidr = get_vcpu_id(task_to_vcpu(task));
+
+	pr_notice("vmpidr is 0x%x\n", context->vmpidr);
+
 	context->cpacr = 0x3 << 20;
 
 	if (vm_is_native(vcpu->vm))
