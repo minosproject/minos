@@ -196,7 +196,7 @@ static int dtb_add_virtio(struct vdev *vdev, void *dtb)
 
 	memset(buf, 0, 64);
 	addr = vdev->guest_iomem;
-	sprintf(buf, "%s@%lx", vdev->name, addr);
+	sprintf(buf, "%s@%"PRIx64, vdev->name, addr);
 	node = fdt_add_subnode(dtb, offset, buf);
 	if (node < 0) {
 		pr_err("add %s failed\n", vdev->name);
@@ -221,8 +221,6 @@ static int dtb_add_virtio(struct vdev *vdev, void *dtb)
 				3 * sizeof(uint32_t));
 	}
 
-	pr_notice("add vdev success addr-0x%lx virq-%d\n",
-			vdev->guest_iomem, vdev->gvm_irq);
 	return 0;
 }
 

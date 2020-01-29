@@ -41,7 +41,7 @@ static int virtio_devices_nr;
 static uint64_t virtio_iomem_base;
 static int virtio_device_index;
 
-static void *hv_virtio_mmio_init(struct vm *vm, void *gbase)
+static void *hv_virtio_mmio_init(struct vm *vm, uint64_t gbase)
 {
 	int ret = 0;
 	void *map_base;
@@ -59,15 +59,16 @@ static void *hv_virtio_mmio_init(struct vm *vm, void *gbase)
 		return INVALID_MMAP_ADDR;
 	}
 
-	map_base = vdev_map_iomem((void *)((unsigned long)args[0]),
+	map_base = vdev_map_iomem((unsigned long)args[0],
 			VIRTIO_DEVICE_IOMEM_SIZE);
 
 	return map_base;
 }
 
-static int hv_create_virtio_device(struct vm *vm, void **gbase, void **hbase)
+static int hv_create_virtio_device(struct vm *vm, uint64_t *gbase, void **hbase)
 {
-	void *__gbase, *__hbase;
+	uint64_t __gbase;
+	void *__hbase;
 
 	if (virtio_device_index >= virtio_devices_nr)
 		return -ENOENT;
@@ -400,7 +401,7 @@ void virtq_add_used_and_signal_n(struct virt_queue *vq,
 }
 
 static int __virtio_vdev_init(struct vdev *vdev,
-		void *gbase, void *hbase, int type, int rs)
+		uint64_t gbase, void *hbase, int type, int rs)
 {
 	if (!gbase || !hbase)
 		return -EINVAL;
@@ -414,7 +415,7 @@ static int __virtio_vdev_init(struct vdev *vdev,
 		return -ENOENT;
 	}
 
-	pr_debug("vdev : irq-%d hpa-0x%p gva-0x%p\n", vdev->gvm_irq,
+	pr_debug("vdev : irq-%d hpa-0x%p gva-0x%"PRIx64"\n", vdev->gvm_irq,
 			vdev->iomem, vdev->guest_iomem);
 
 	if (rs > VIRTQUEUE_MAX_SIZE)
@@ -478,7 +479,8 @@ void virtio_device_deinit(struct virtio_device *virt_dev)
 int virtio_device_init(struct virtio_device *virt_dev, struct vdev *vdev,
 		int type, int queue_nr, int rs, int iov_size)
 {
-	void *gbase, *hbase;
+	uint64_t gbase;
+	void *hbase;
 	int ret, i;
 	struct virt_queue *vq;
 
@@ -654,7 +656,7 @@ static int virtio_buffer_event(struct virtio_device *dev, uint32_t arg)
 }
 
 static int virtio_mmio_read(struct virtio_device *dev,
-		unsigned long addr, unsigned long *value)
+		uint64_t addr, uint64_t *value)
 {
 	pr_err("current guest can read the value directly\n");
 

@@ -103,11 +103,11 @@ static int xnu_setup_env(struct vm *vm, char *cmdline)
 
 	pr_info("xnu bootarg revision - %d\n", arg->revision);
 	pr_info("xnu bootarg version  - %d\n", arg->version);
-	pr_info("xnu bootarg virtbase - 0x%lx\n", arg->virt_base);
-	pr_info("xnu bootarg physbase - 0x%lx\n", arg->phys_base);
-	pr_info("xnu bootarg mem_size - 0x%lx\n", arg->mem_size);
-	pr_info("xnu bootarg tok      - 0x%lx\n", arg->top_of_kdata);
-	pr_info("xnu bootarg dtb      - 0x%lx\n", arg->dtb);
+	pr_info("xnu bootarg virtbase - 0x%"PRIx64"\n", arg->virt_base);
+	pr_info("xnu bootarg physbase - 0x%"PRIx64"\n", arg->phys_base);
+	pr_info("xnu bootarg mem_size - 0x%"PRIx64"\n", arg->mem_size);
+	pr_info("xnu bootarg tok      - 0x%"PRIx64"\n", arg->top_of_kdata);
+	pr_info("xnu bootarg dtb      - 0x%"PRIx64"\n", arg->dtb);
 	pr_info("xnu bootarg dtb_size - 0x%x\n", arg->dtb_length);
 	pr_info("xnu bootarg cmdline  - %s\n", arg->cmdline);
 
@@ -141,7 +141,9 @@ static int inline xnu_load_raw_data(int fd, void *base,
 {
 	int ret;
 
-	pr_info("load image: 0x%p 0x%lx 0x%lx 0x%lx\n", base, offset, file_off, file_size);
+	pr_info("load image: 0x%p 0x%"PRIx64" 0x%"PRIx64" 0x%"PRIx64"\n",
+			base, offset, file_off, file_size);
+
 	if (file_size == 0)
 		return 0;
 
@@ -179,7 +181,8 @@ static int xnu_load_kernel_image(struct vm *vm)
 			return ret;
 
 		if (cmd->vm_size > cmd->file_size) {
-			pr_info("memset for 0x%lx ---> 0x%lx\n", cmd->vm_addr + cmd->file_size,
+			pr_info("memset for 0x%"PRIx64" ---> 0x%"PRIx64"\n",
+					cmd->vm_addr + cmd->file_size,
 					cmd->vm_size - cmd->file_size);
 			memset(vm_base + cmd->file_size + offset, 0,
 					cmd->vm_size - cmd->file_size);
@@ -232,10 +235,10 @@ static void inline xnu_dump_cmd64(struct segment_cmd64 *cmd64)
 {
 	pr_info("\n");
 	pr_debug("segname %s\n", cmd64->seg_name);
-	pr_debug("vm_addr 0x%lx\n", cmd64->vm_addr);
-	pr_debug("vm_size %ld\n", cmd64->vm_size);
-	pr_debug("file_off %ld\n", cmd64->file_off);
-	pr_debug("file_size %ld\n", cmd64->file_size);
+	pr_debug("vm_addr 0x%"PRIx64"\n", cmd64->vm_addr);
+	pr_debug("vm_size %"PRId64"\n", cmd64->vm_size);
+	pr_debug("file_off %"PRId64"\n", cmd64->file_off);
+	pr_debug("file_size %"PRId64"\n", cmd64->file_size);
 	pr_debug("max_port %d\n", cmd64->max_port);
 	pr_debug("init_port %d\n", cmd64->init_port);
 	pr_debug("nsects %d\n", cmd64->nsects);
@@ -302,7 +305,7 @@ static int xnu_parse_kernel_image(int fd, struct xnu_os_data *od)
 			break;
 		case LC_UNIXTHREAD:
 			od->entry_point = *(uint64_t *)((char*)cmd + 0x110);
-			pr_info("xnu entry address is 0x%lx\n", od->entry_point);
+			pr_info("xnu entry address is 0x%"PRIx64"\n", od->entry_point);
 			break;
 		default:
 			break;
@@ -378,10 +381,10 @@ out:
 	vm->entry = VA2PA(od->entry_point);
 	vm->setup_data = VA2PA(od->bootarg_load_base);
 
-	pr_info("xnu kernel_load_base 0x%lx\n", od->kernel_load_base);
-	pr_info("xnu ramdisk_load_base 0x%lx\n", od->ramdisk_load_base);
-	pr_info("xnu dtb_load_base 0x%lx\n", od->dtb_load_base);
-	pr_info("xnu bootarg_load_base 0x%lx\n", od->bootarg_load_base);
+	pr_info("xnu kernel_load_base 0x%"PRIx64"\n", od->kernel_load_base);
+	pr_info("xnu ramdisk_load_base 0x%"PRIx64"\n", od->ramdisk_load_base);
+	pr_info("xnu dtb_load_base 0x%"PRIx64"\n", od->dtb_load_base);
+	pr_info("xnu bootarg_load_base 0x%"PRIx64"\n", od->bootarg_load_base);
 }
 
 static int xnu_early_init(struct vm *vm)

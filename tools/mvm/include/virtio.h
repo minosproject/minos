@@ -187,7 +187,7 @@ int virtq_enable_notify(struct virt_queue *vq);
 void virtq_disable_notify(struct virt_queue *vq);
 
 int virtio_handle_mmio(struct virtio_device *dev, int write,
-		unsigned long addr, unsigned long *value);
+		uint64_t addr, uint64_t *value);
 
 int virtq_get_descs(struct virt_queue *vq,
 		struct iovec *iov, unsigned int iov_size,

@@ -130,17 +130,10 @@ static int create_new_vm(struct vm *vm)
 	pr_notice("        -nr_vcpu    : %d\n", info.nr_vcpu);
 	pr_notice("        -bit64      : %d\n",
 			!!vm->flags & VM_FLAGS_64BIT);
-#ifdef CONFIG_AARCH32
-	pr_notice("        -mem_size   : 0x%llx\n", info.mem_size);
-	pr_notice("        -mem_base  : 0x%llx\n", info.mem_base);
-	pr_notice("        -entry      : 0x%llx\n", info.entry);
-	pr_notice("        -setup_data : 0x%llx\n", info.setup_data);
-#else
-	pr_notice("        -mem_size   : 0x%lx\n", info.mem_size);
-	pr_notice("        -mem_base  : 0x%lx\n", info.mem_base);
-	pr_notice("        -entry      : 0x%lx\n", info.entry);
-	pr_notice("        -setup_data : 0x%lx\n", info.setup_data);
-#endif
+	pr_notice("        -mem_size   : 0x%"PRIx64"\n", info.mem_size);
+	pr_notice("        -mem_base  : 0x%"PRIx64"\n", info.mem_base);
+	pr_notice("        -entry      : 0x%"PRIx64"\n", info.entry);
+	pr_notice("        -setup_data : 0x%"PRIx64"\n", info.setup_data);
 
 	vmid = ioctl(fd, IOCTL_CREATE_VM, &info);
 	if (vmid <= 0) {
@@ -917,11 +910,7 @@ static int parse_vm_membase(char *buf, uint64_t *value)
 		return -EINVAL;
 
 	if ((buf[0] == '0') && (buf[1] == 'x')) {
-#ifdef CONFIG_AARCH32
-		sscanf(buf, "0x%llx", value);
-#else
-		sscanf(buf, "0x%lx", value);
-#endif
+		sscanf(buf, "0x%"PRIx64, value);
 		return 0;
 	}
 
