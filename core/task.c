@@ -371,32 +371,32 @@ int create_idle_task(void)
  * for preempt_disable and preempt_enable need
  * to set the current task at boot stage
  */
-static int tasks_early_init(void)
+static int task_early_init(void)
 {
-	int i;
 	struct task *task;
 	struct task_info *ti;
+	int i = smp_processor_id();
 	extern struct task *__current_tasks[NR_CPUS];
 	extern struct task *__next_tasks[NR_CPUS];
-	unsigned long stack_base = CONFIG_MINOS_ENTRY_ADDRESS;
+	unsigned long stack_base;
 
-	for (i = 0; i < NR_CPUS; i++) {
-		task = &idle_tasks[i];
-		memset(task, 0, sizeof(*task));
-		get_per_cpu(idle_task, i) = task;
-		__current_tasks[i] = task;
-		__next_tasks[i] = task;
+	task = &idle_tasks[i];
+	memset(task, 0, sizeof(struct task));
+	get_per_cpu(idle_task, i) = task;
+	stack_base = CONFIG_MINOS_ENTRY_ADDRESS - i * TASK_STACK_SIZE;
 
-		/* init the task info for the thread */
-		ti = (struct task_info *)(stack_base -
-				sizeof(struct task_info));
-		TASK_INFO_INIT(ti, task, i);
-		stack_base -= TASK_STACK_SIZE;
-	}
+	__current_tasks[i] = task;
+	__next_tasks[i] = task;
+
+	/* init the task info for the thread */
+	ti = (struct task_info *)(stack_base -
+			sizeof(struct task_info));
+
+	TASK_INFO_INIT(ti, task, i);
 
 	return 0;
 }
-early_initcall(tasks_early_init);
+early_initcall_percpu(task_early_init);
 
 int create_percpu_task(char *name, task_func_t func,
 		void *arg, size_t ss, unsigned long flags)
