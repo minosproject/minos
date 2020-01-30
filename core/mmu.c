@@ -681,12 +681,11 @@ int destroy_host_mapping(vir_addr_t vir, size_t size)
 	unsigned long end;
 
 	if (!IS_PMD_ALIGN(vir) || !IS_PMD_ALIGN(size)) {
-		pr_warn("WARN: destroy host mapping 0x%x---->0x%x\n",
+		pr_warn("destroy host mapping 0x%x---->0x%x\n",
 				vir, vir + size);
 	}
 
-	end = vir + size;
-	end = BALIGN(end, MEM_BLOCK_SIZE);
+	end = BALIGN(vir + size, MEM_BLOCK_SIZE);
 	vir = ALIGN(vir, MEM_BLOCK_SIZE);
 	size = end - vir;
 
