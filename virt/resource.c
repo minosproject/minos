@@ -102,6 +102,9 @@ int parse_vm_info_of(struct device_node *node, struct vmtag *vmtag)
 	if (of_get_bool(node, "native_wfi"))
 		vmtag->flags |= VM_FLAGS_NATIVE_WFI;
 
+	if (of_get_bool(node, "no_of_resource"))
+		vmtag->flags |= VM_FLAGS_NO_OF_RESOURCE;
+
 	return 0;
 }
 
@@ -302,7 +305,7 @@ int create_vm_resource_of(struct vm *vm, void *data)
 {
 	struct device_node *node;
 
-	if (!vm)
+	if (!vm || (vm->flags & VM_FLAGS_NO_OF_RES))
 		return -EINVAL;
 
 	node = of_parse_device_tree(data);
@@ -367,22 +370,24 @@ static int create_vm_iomem_common(struct vm *vm, struct device_node *node)
 {
 	fdt32_t *data;
 	int len, i;
-	unsigned long base, size;
+	unsigned long vaddr, paddr, size;
 
+	/* vaddr paddr size */
 	data = (fdt32_t *)of_getprop(node, "iomem", &len);
-	if (!data || (len == 0) || (len % 8))
+	if (!data || (len == 0) || (len % 12))
 		return -EINVAL;
 
-	len = len / 8;
+	len = len / 12;
 
 	for (i = 0; i < len; i++) {
-		base = fdt32_to_cpu(data[0]);
-		size = fdt32_to_cpu(data[1]);
+		vaddr = fdt32_to_cpu(data[0]);
+		paddr = fdt32_to_cpu(data[1]);
+		size = fdt32_to_cpu(data[2]);
 
-		split_vmm_area(&vm->mm, base, base, size, VM_IO | VM_MAP_PT);
-		create_guest_mapping(&vm->mm, base, base, size, VM_IO);
+		split_vmm_area(&vm->mm, vaddr, paddr, size, VM_IO | VM_MAP_PT);
+		create_guest_mapping(&vm->mm, vaddr, paddr, size, VM_IO);
 
-		data += 2;
+		data += 3;
 	}
 
 	return 0;
@@ -398,7 +403,7 @@ static int create_vm_virqs_common(struct vm *vm, struct device_node *node)
 	if (!data || (len == 0) || (len % 8))
 		return -EINVAL;
 
-	len = len / 8;
+	len = len / (2 * sizeof(uint32_t));
 
 	for (i = 0; i < len; i++) {
 		phy = fdt32_to_cpu(data[0]);

@@ -18,6 +18,7 @@
 #define VM_FLAGS_NO_BOOTIMAGE		(1 << 4)
 #define VM_FLAGS_HAS_EARLYPRINTK	(1 << 5)
 #define VM_FLAGS_NATIVE_WFI		(1 << 6)
+#define VM_FLAGS_NO_OF_RESOURCE		(1 << 7)
 
 #define VM_FLAGS_SETUP_OF		(1 << 8)
 #define VM_FLAGS_SETUP_ACPI		(1 << 9)
