@@ -29,6 +29,87 @@
 		};
 	};
 
+	vms {
+		vm0 {
+			device_type = "virtual_machine";
+			vmid = <0>;
+			vm_name = "android";
+			type = "linux";
+			vm_32bit;
+			native_wfi;
+			no_of_resource;
+			vcpus = <4>;
+			entry = <0x0 0x01080000>;
+			setup_data = <0x0 0x10000000>;
+			vcpu_affinity = <0 1 2 3>;
+			memory = <0x0 0x00000000 0x0 0x80000000>;
+			cmdline = "";
+
+			vm0_bdi {
+				#address-cells = <0x1>;
+				#size-cells = <0x1>;
+
+				vtimer_irq = <27>;
+
+				iomem = <0xffe40000 0xffe40000 0x40000>,
+					<0xff500000 0xff500000 0x100000>,
+					<0xff3f0000 0xff3f0000 0x50000>,
+					<0xffe09000 0xffe09000 0x1000>,
+					<0xffe07000 0xffe07000 0x1000>,
+					<0xffe05000 0xffe05000 0x1000>,
+					<0xffe03000 0xffe03000 0x1000>,
+					<0xffd00000 0xffd00000 0x100000>,
+					<0xff600000 0xff600000 0x400000>;
+
+				virqs = <0xc2 0xc2>, /* 194 gpu@ffe40000 */
+					<0xc1 0xc1>, /* 193 gpu@ffe40000 */
+					<0xc0 0xc0>, /* 192 gpu@ffe40000 */
+					<0x3e 0x3e>, /* 62 usb@ff500000 */
+					<0x3f 0x3f>, /* 63 usb@ff400000 */
+					<0x30 0x30>, /* 48 usb@ffe09000 */
+					<0xdf 0xdf>, /* 223 mmc@ffe07000 */
+					<0xde 0xde>, /* 222 sd@ffe05000 */
+					<0xdd 0xdd>, /* 221 sd@ffe03000 */
+					<0x3a 0x3a>, /* 58 serial@24000 */
+					<0x6b 0x6b>, /* 107 serial@23000 */
+					<0x7d 0x7d>, /* 125 serial@22000 */
+					<0x35 0x35>, /* 53 i2c@1f000 */
+					<0xf6 0xf6>, /* 246 i2c@1e000 */
+					<0xf7 0xf7>, /* 247 i2c@1d000 */
+					<0x47 0x47>, /* 71 i2c@1c000 */
+					<0x23 0x23>, /* 35 vpu@ff900000 */
+					<0xe8 0xe8>, /* 232 adc@9000 */
+					<0xe4 0xe4>, /* 228 ir@8000 */
+					<0xe3 0xe3>, /* 227 i2c@5000 */
+					<0xe5 0xe5>, /* 229 serial@4000 */
+					<0xe1 0xe1>, /* 225 serial@3000 */
+					<0xeb 0xeb>, /* 235 cec@280 */
+					<0xe7 0xe7>, /* 231 cec@100 */
+					<0x29 0x29>, /* 41 ethernet_phy@8 */
+					<0xb7 0xb7>, /* 183 audio-controller@400 */
+					<0xba 0xba>, /* 186 audio-controller@240 */
+					<0xb9 0xb9>, /* 185 audio-controller@200 */
+					<0xb8 0xb8>, /* 184 audio-controller@1c0 */
+					<0xb6 0xb6>, /* 182 audio-controller@180 */
+					<0xb5 0xb5>, /* 181 audio-controller@140 */
+					<0xb4 0xb4>, /* 180 audio-controller@100 */
+					<0x59 0x59>, /* 89 hdmi-tx@0 */
+					<0x28 0x28>; /* 40 ethernet@ff3f0000 */
+
+				virq_chip@2 {
+					compatible = "arm,gicv2";
+					#address-cells = <0x1>;
+					#size-cells = <0x1>;
+					reg = <0xffc01000 0x1000>,
+						<0xffc02000 0x2000>,
+						<0xffc04000 0x2000>,
+						<0xffc06000 0x2000>;
+				};
+			};
+		};
+	};
+
+
 	timer {
 		compatible = "arm,armv8-timer";
 		interrupts = < 0x01 0x0d 0xff08 0x01 0x0e 0xff08 0x01 0x0b 0xff08 0x01 0x0a 0xff08 >;
