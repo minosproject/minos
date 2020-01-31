@@ -31,6 +31,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <assert.h>
 #include <pthread.h>
 #include <mvm.h>
@@ -369,7 +370,7 @@ virtio_blk_init(struct vdev *vdev, char *opts)
 	blk->cfg->geometry.sectors = 0;
 	blk->cfg->blk_size = sectsz;
 	blk->cfg->topology.physical_block_exp =
-	    (sts > sectsz) ? (ffsll(sts / sectsz) - 1) : 0;
+	    (sts > sectsz) ? (ffs(sts / sectsz) - 1) : 0;
 	blk->cfg->topology.alignment_offset =
 	    (sto != 0) ? ((sts - sto) / sectsz) : 0;
 	blk->cfg->topology.min_io_size = 0;

@@ -60,6 +60,39 @@ void vdev_send_irq(struct vdev *vdev)
 	send_virq_to_vm(vdev->gvm_irq);
 }
 
+#ifdef __CLANG__
+extern struct vdev_ops virtio_console_ops;
+extern struct vdev_ops virtio_net_ops;
+extern struct vdev_ops virtio_blk_ops;
+extern struct vdev_ops s3c_uart_ops;
+
+static struct vdev_ops *vdev_opses[] = {
+	&virtio_console_ops,
+	&virtio_net_ops,
+	&virtio_blk_ops,
+	&s3c_uart_ops,
+	NULL,
+};
+
+static struct vdev_ops *get_vdev_ops(char *class)
+{
+	int i;
+	struct vdev_ops *ops;
+
+	for (i = 0; ; i++) {
+		ops = vdev_opses[i];
+
+		if (ops == NULL)
+			break;
+
+		if (strcmp(ops->name, class) == 0)
+			return ops;
+	}
+
+	return NULL;
+}
+
+#else
 static struct vdev_ops *get_vdev_ops(char *class)
 {
 	struct vdev_ops *ops;
@@ -74,6 +107,7 @@ static struct vdev_ops *get_vdev_ops(char *class)
 
 	return NULL;
 }
+#endif
 
 static struct vdev *
 alloc_and_init_vdev(struct vm *vm, char *class, char *args)

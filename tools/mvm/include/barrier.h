@@ -1,9 +1,16 @@
 #ifndef __MVM_BARRIER_H__
 #define __MVM_BARRIER_H__
 
+#ifdef __CLANG__
+#include <arm_acle.h>
+#define isb()		__isb(0xf)
+#define dmb(opt)	__dmb(0xf)
+#define dsb(opt)	__dsb(0xf)
+#else
 #define isb()           asm volatile("isb" : : : "memory")
 #define dmb(opt)        asm volatile("dmb " #opt : : : "memory")
 #define dsb(opt)        asm volatile("dsb " #opt : : : "memory")
+#endif
 
 #define mb()            dsb(sy)
 #define rmb()           dsb(ld)

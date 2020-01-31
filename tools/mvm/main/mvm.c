@@ -74,6 +74,14 @@ int vm_shutdown(struct vm *vm);
 
 extern int virtio_mmio_init(struct vm *vm);
 
+#ifdef __ANDROID__
+#define DEV_MVM0	"/dev/mvm0"
+#define DEV_MVM_PATH	"/dev/mvm"
+#else
+#define DEV_MVM0	"/dev/mvm/mvm0"
+#define DEV_MVM_PATH	"/dev/mvm/mvm"
+#endif
+
 void *map_vm_memory(struct vm *vm)
 {
 	unsigned long args[2];
@@ -83,7 +91,7 @@ void *map_vm_memory(struct vm *vm)
 	args[1] = vm->mem_size;
 
 	if (ioctl(vm->vm_fd, IOCTL_VM_MMAP, args)) {
-		pr_err("mmap memory failed 0x%lx 0x%lx\n",
+		pr_err("mmap memory failed 0x%"PRIx64" 0x%"PRIx64"\n",
 				vm->mem_start, vm->mem_size);
 		return NULL;
 	}
@@ -97,7 +105,7 @@ void *map_vm_memory(struct vm *vm)
 		return NULL;
 	}
 
-	pr_notice("vm-%d mmap address in vm0: 0x%lx mmap:0x%lx\n",
+	pr_notice("vm-%d mmap address in vm0: 0x%"PRIx64" mmap:0x%lx\n",
 			vm->vmid, vm->hvm_paddr, (unsigned long)addr);
 
 	return addr;
@@ -118,9 +126,9 @@ static int create_new_vm(struct vm *vm)
 	info.flags = vm->flags;
 	info.vmid = vm->vmid;
 
-	fd = open("/dev/mvm/mvm0", O_RDWR | O_NONBLOCK);
+	fd = open(DEV_MVM0, O_RDWR | O_NONBLOCK);
 	if (fd < 0) {
-		perror("/dev/mvm/mvm0");
+		perror("DEV_MVM0");
 		return -EIO;
 	}
 
@@ -150,7 +158,7 @@ static int release_vm(int vmid)
 {
 	int fd, ret;
 
-	fd = open("/dev/mvm/mvm0", O_RDWR);
+	fd = open(DEV_MVM0, O_RDWR);
 	if (fd < 0)
 		return -ENODEV;
 
@@ -271,7 +279,7 @@ void print_usage(void)
 	fprintf(stderr, "    -c <vcpu_count>            (set the vcpu numbers of the vm)\n");
 	fprintf(stderr, "    -m <mem_size_in_MB>        (set the memsize of the vm - 2M align)\n");
 	fprintf(stderr, "    -i <boot or kernel image>  (the kernel or bootimage to use)\n");
-	fprintf(stderr, "    -s <mem_base>             (set the membase of the vm if not a boot.img)\n");
+	fprintf(stderr, "    -s <mem_base>              (set the membase of the vm if not a boot.img)\n");
 	fprintf(stderr, "    -n <vm name>               (the name of the vm)\n");
 	fprintf(stderr, "    -t <vm type>               (the os type of the vm )\n");
 	fprintf(stderr, "    -b <32 or 64>              (32bit or 64 bit )\n");
@@ -294,14 +302,22 @@ void print_usage(void)
 void *hvm_map_iomem(unsigned long base, size_t size)
 {
 	void *iomem;
-	int fd = open("/dev/mvm/mvm0", O_RDWR);
+	int fd = open(DEV_MVM0, O_RDWR);
 
 	if (fd < 0) {
-		pr_err("open /dev/mvm/mvm0 failed\n");
+		pr_err("open mvm0 failed\n");
 		return (void *)-1;
 	}
 
-	iomem = mmap(NULL, size, PROT_READ | PROT_WRITE,
+	/*
+	 * On 32-bit Android, off_t is a signed 32-bit integer. This
+	 * limits functions that use off_t to working on files no
+	 * larger than 2GiB. need to use mmap64
+	 *
+	 * also see:
+	 * https://android.googlesource.com/platform/bionic/+/master/docs/32-bit-abi.md
+	 */
+	iomem = mmap64(NULL, size, PROT_READ | PROT_WRITE,
 			MAP_SHARED, fd, base);
 	close(fd);
 
@@ -337,7 +353,7 @@ static int create_and_init_vm(struct vm *vm)
 		return (vm->vmid);
 
 	memset(path, 0, 32);
-	sprintf(path, "/dev/mvm/mvm%d", vm->vmid);
+	sprintf(path, DEV_MVM_PATH"%d", vm->vmid);
 	vm->vm_fd = open(path, O_RDWR | O_NONBLOCK);
 	if (vm->vm_fd < 0) {
 		perror(path);
@@ -365,6 +381,36 @@ static int create_and_init_vm(struct vm *vm)
 	return 0;
 }
 
+#ifdef __CLANG__
+
+extern struct vm_os os_linux;
+extern struct vm_os os_xnu;
+extern struct vm_os os_other;
+
+static struct vm_os *vm_oses[] = {
+	&os_linux,
+	&os_xnu,
+	&os_other,
+	NULL,
+};
+
+static struct vm_os *get_vm_os(char *os_type)
+{
+	int i;
+	struct vm_os *os;
+
+	for (i = 0; ; i++) {
+		os = vm_oses[i];
+		if (os == NULL)
+			break;
+
+		if (strcmp(os_type, os->name) == 0)
+			return os;
+	}
+
+	return &os_other;
+}
+#else
 static struct vm_os *get_vm_os(char *os_type)
 {
 	struct vm_os **os_start = (struct vm_os **)&__start_mvm_os;
@@ -383,6 +429,7 @@ static struct vm_os *get_vm_os(char *os_type)
 
 	return default_os;
 }
+#endif
 
 static int vm_create_resource(struct vm *vm)
 {
@@ -490,7 +537,7 @@ static int vcpu_handle_common_trap(struct vm *vm, int trap_reason,
 
 static void handle_vcpu_event(struct vmcs *vmcs)
 {
-	int ret;
+	int ret = 0;
 	uint32_t trap_type = vmcs->trap_type;
 	uint32_t trap_reason = vmcs->trap_reason;
 	uint64_t trap_data = vmcs->trap_data;
@@ -506,7 +553,6 @@ static void handle_vcpu_event(struct vmcs *vmcs)
 		ret = vcpu_handle_mmio(mvm_vm, trap_reason,
 				trap_data, &trap_result);
 		break;
-
 	default:
 		break;
 	}

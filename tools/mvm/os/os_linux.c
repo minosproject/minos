@@ -252,8 +252,8 @@ static int fdt_setup_cpu(void *dtb, int vcpus)
 	return 0;
 }
 
-static int fdt_setup_memory(void *dtb, unsigned long mstart,
-		unsigned long msize, int bit64)
+static int fdt_setup_memory(void *dtb, uint64_t mstart,
+		uint64_t msize, int bit64)
 {
 	int offset, i;
 	int size_cell;
@@ -265,12 +265,11 @@ static int fdt_setup_memory(void *dtb, unsigned long mstart,
 	for (i = 0; i < offset; i++)
 		fdt_del_mem_rsv(dtb, 0);
 
-	pr_debug("add rsv memory region : 0x%lx 0x%x\n",
+	pr_debug("add rsv memory region : 0x%"PRIx64" 0x%x\n",
 			mstart, 0x10000);
 	fdt_add_mem_rsv(dtb, mstart, 0x10000);
 
-	memset(buf, 0, 64);
-	sprintf(buf, "memory@%lx", mstart);
+	sprintf(buf, "memory@%lx", (unsigned long)mstart);
 	offset = fdt_path_offset(dtb, "/memory");
 	if (offset < 0) {
 		offset = fdt_add_subnode(dtb, 0, buf);
@@ -284,24 +283,17 @@ static int fdt_setup_memory(void *dtb, unsigned long mstart,
 
 	size_cell = fdt_size_cells(dtb, offset);
 	if (size_cell == 2) {
-#ifdef CONFIG_AARCH32
-		args[0] = cpu_to_fdt32(0);
-#else
 		args[0] = cpu_to_fdt32(mstart >> 32);
-#endif
 		args[1] = cpu_to_fdt32(mstart);
-#ifdef CONFIG_AARCH32
-		args[2] = cpu_to_fdt32(0);
-#else
+
 		args[2] = cpu_to_fdt32(msize >> 32);
-#endif
 		args[3] = cpu_to_fdt32(msize);
 		size_cell = sizeof(uint32_t) * 4;
 		pr_notice("setup memory 0x%x 0x%x 0x%x 0x%x\n",
 				args[0], args[1], args[2], args[3]);
 	} else {
-		args[0] = cpu_to_fdt32(mstart);
-		args[1] = cpu_to_fdt32(msize);
+		args[0] = cpu_to_fdt32((uint32_t)(mstart & 0xffffffff));
+		args[1] = cpu_to_fdt32((uint32_t)(msize & 0xffffffff));
 		size_cell = sizeof(uint32_t) * 2;
 		pr_notice("setup memory 0x%x 0x%x\n", args[0], args[1]);
 	}
@@ -331,7 +323,7 @@ static int fdt_setup_ramdisk(void *dtb, uint32_t start, uint32_t size)
 
 static int linux_setup_env(struct vm *vm, char *cmdline)
 {
-	char *arg;
+	char *arg = NULL;
 	boot_img_hdr *hdr = (boot_img_hdr *)vm->os_data;
 	void *vbase = vm->mmap + (vm->setup_data - vm->mem_start);
 

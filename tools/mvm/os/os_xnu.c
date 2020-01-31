@@ -80,7 +80,7 @@ static int xnu_setup_env(struct vm *vm, char *cmdline)
 {
 	size_t i;
 	uint64_t *value;
-	struct xnu_dt_node_prop *dt_prop;
+	struct xnu_dt_node_prop *dt_prop = NULL;
 	struct xnu_os_data *od = (struct xnu_os_data *)vm->os_data;
 	struct xnu_arm64_boot_args *arg = (struct xnu_arm64_boot_args *)
 		(vm->mmap + VA_OFFSET(od->bootarg_load_base));

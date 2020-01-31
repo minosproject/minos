@@ -130,7 +130,7 @@ static int s3c_uart_event(struct vdev *vdev, int read,
 	return 0;
 }
 
-static struct vdev_ops s3c_uart_ops = {
+struct vdev_ops s3c_uart_ops = {
 	.name = "s3c_uart",
 	.init = s3c_uart_init,
 	.deinit = s3c_uart_deinit,
