@@ -357,9 +357,9 @@ static int gicv3_gicr_init(void)
 static void inline gicv3_icc_sre_init(void)
 {
 #ifdef CONFIG_VIRT
-	write_sysreg(ICC_SRE_EL2, 0xf);
+	write_sysreg(0xf, ICC_SRE_EL2);
 #endif
-	write_sysreg(ICC_SRE_EL1, 0xf);
+	write_sysreg(0xf, ICC_SRE_EL1);
 }
 
 int gicv3_init(struct device_node *node)
