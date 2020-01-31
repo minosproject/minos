@@ -97,7 +97,7 @@ endif
 
 %.dtb: %.dts $(obj)/Makefile $(srctree)/Makefile
 	$(Q) echo "  DTC     $@"
-	$(Q) $(DTC) -q -W no-unit_address_vs_reg -W no-alias_paths -I dts -O dtb -o $@ $<
+	$(Q) $(DTC) -q -I dts -O dtb -o $@ $<
 
 PHONY += $(subdir-y)
 $(subdir-y):
