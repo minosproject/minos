@@ -106,6 +106,9 @@ typedef __pte_t pte_t;
 #define set_pud_at(pudp, val)	(*(pud_t *)pudp = val)
 #define set_pgd_at(pgdp, val)	(*(pgd_t *)pgdp = val)
 
+#define IS_PUD_ALIGN(x)		(!((unsigned long)(x) & (PUD_MAP_SIZE - 1)))
+#define IS_PMD_ALIGN(x)		(!((unsigned long)(x) & (PMD_MAP_SIZE - 1)))
+
 struct mapping_struct {
 	unsigned long table_base;
 	vir_addr_t vir_base;

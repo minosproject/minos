@@ -687,8 +687,13 @@ static int __vm_mmap(struct mm_struct *mm, unsigned long hvm_mmap_base,
 	struct vm *vm0 = get_vm_by_id(0);
 	struct mm_struct *mm0 = &vm0->mm;
 
-	offset = ALIGN(offset, PMD_MAP_SIZE);
-	size = BALIGN(size, PMD_MAP_SIZE);
+	if (!IS_PMD_ALIGN(offset) || !IS_PMD_ALIGN(hvm_mmap_base) ||
+			!IS_PMD_ALIGN(size)) {
+		pr_err("__vm_mmap fail not PMD align 0x%p 0x%p 0x%x\n",
+				hvm_mmap_base, offset, size);
+		return -EINVAL;
+	}
+
 	vir = offset;
 	phy = hvm_mmap_base;
 
@@ -757,6 +762,8 @@ struct vmm_area *vm_mmap(struct vm *vm, unsigned long offset, size_t size)
 			VM_NORMAL | VM_MAP_PT);
 	if (!va)
 		return 0;
+
+	pr_info("%s start:0x%x size:0x%x\n", __func__, va->start, size);
 
 	if (__vm_mmap(&vm->mm, va->start, offset, size)) {
 		pr_err("map guest vm memory to vm0 failed\n");

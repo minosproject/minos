@@ -38,9 +38,6 @@ extern unsigned char __el2_ttb0_pmd_io;
 #define pmd_table_addr(pud)	((pud & PHYSIC_ADDRESS_MASK) & PUD_DES_MASK)
 #define pte_table_addr(pmd)	((pmd & PHYSIC_ADDRESS_MASK) & PMD_DES_MASK)
 
-#define IS_PUD_ALIGN(x)		(!((unsigned long)(x) & (PUD_MAP_SIZE - 1)))
-#define IS_PMD_ALIGN(x)		(!((unsigned long)(x) & (PMD_MAP_SIZE - 1)))
-
 #define ENTRY_MAP_SIZE(s, vaddr, ems)		\
 	({					\
 	size_t __ms;				\
@@ -205,8 +202,9 @@ static int build_pmd_entry(struct mm_struct *mm,
 				*(pmdp + offset) = t_attr | (pmd & PMD_DES_MASK);
 			}
 		} else if (pmd && map_as_block){
-			pr_err("0x%x ---> 0x%x @0x%x already mapped\n",
+			pr_warn("PMD block remap 0x%x ---> 0x%x @0x%x\n",
 					vaddr, paddr, map_size);
+			*(pmdp + offset) = b_attr | (paddr & PMD_DES_MASK);
 			goto repeat;
 		} else {
 			pmd = pmd_table_addr(pmd);
@@ -245,18 +243,24 @@ static int build_pud_entry(struct mm_struct *mm,
 	 * only need check whether the previous mapping type
 	 */
 	while (size > 0) {
-		/*
-		 * check whether this region can be mapped as block, if
-		 * map as block, need check currently mapping type
-		 */
 		map_size = ENTRY_MAP_SIZE(size, vaddr, PUD_MAP_SIZE);
 		if (flags & VM_HOST)
 			offset = pud_idx(vaddr);
 		else
 			offset = guest_pud_idx(vaddr);
 
+		/*
+		 * check whether this region can be mapped as block, if
+		 * map as block, need check currently mapping type
+		 *
+		 * for hypervisor itself, only support pmd block, since
+		 * at boot stage will allocate 4pages for PUD, so each
+		 * PUD will mapped to pmd block
+		 *
+		 */
 		if (IS_PUD_ALIGN(vaddr) && IS_PUD_ALIGN(paddr) &&
-				(map_size == PUD_MAP_SIZE)) {
+				(map_size == PUD_MAP_SIZE) &&
+				!(flags & VM_HOST)) {
 			pr_debug("0x%x--->0x%x @0x%x mapping as PUD block\n",
 					vaddr, paddr, map_size);
 			map_as_block = 1;
@@ -285,8 +289,9 @@ static int build_pud_entry(struct mm_struct *mm,
 				*(pudp + offset) = t_attr | (pud & PUD_DES_MASK);
 			}
 		} else if (pud && map_as_block){
-			pr_err("0x%x ---> 0x%x @0x%x already mapped\n",
+			pr_warn("PUD block remap 0x%x ---> 0x%x @0x%x\n",
 					vaddr, paddr, map_size);
+			*(pudp + offset) = b_attr | (paddr & PUD_DES_MASK);
 			goto repeat;
 		} else {
 			pud = pmd_table_addr(pud);
