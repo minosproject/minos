@@ -117,3 +117,4 @@ tmp.minos.symbols
 tools/Kconfiglib/build/
 *.egg-info/
 tools/Kconfiglib/dist/
+tools/fdt_parse/parse_dtb
