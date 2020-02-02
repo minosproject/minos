@@ -32,14 +32,6 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/types.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <termios.h>
-#include <inttypes.h>
-#include <string.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <netinet/ether.h>
@@ -48,31 +40,24 @@
 #include <net/if.h>
 #include <sys/epoll.h>
 #include <linux/netlink.h>
-#include <errno.h>
 #include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <getopt.h>
 #include <pthread.h>
 #include <sys/eventfd.h>
 #include <sys/prctl.h>
 #include <time.h>
 
-#include <mvm.h>
-#include <vdev.h>
-#include <mevent.h>
-#include <barrier.h>
-#include <list.h>
+#include <minos/vm.h>
+#include <minos/vdev.h>
+#include <minos/mevent.h>
+#include <minos/option.h>
 
+int debug_enable;
 struct vm *mvm_vm = NULL;
-static struct vm_config *global_config = NULL;
 
-int verbose;
-
-static void free_vm_config(struct vm_config *config);
 int vm_shutdown(struct vm *vm);
-
-extern int virtio_mmio_init(struct vm *vm);
+void *vm_vcpu_thread(void *data);
 
 #ifdef __ANDROID__
 #define DEV_MVM0	"/dev/mvm0"
@@ -98,10 +83,10 @@ void *map_vm_memory(struct vm *vm)
 
 	vm->hvm_paddr = args[0];
 
-	addr = mmap(NULL, vm->mem_size, PROT_READ | PROT_WRITE,
+	addr = mmap(NULL, (size_t)vm->mem_size, PROT_READ | PROT_WRITE,
 			MAP_SHARED, vm->vm_fd, 0);
 	if (addr == (void *)-1) {
-		pr_err("mmap vm memory failed\n");
+		pr_err("mmap vm memory failed 0x%lx\n", args[0]);
 		return NULL;
 	}
 
@@ -113,44 +98,36 @@ void *map_vm_memory(struct vm *vm)
 
 static int create_new_vm(struct vm *vm)
 {
-	int fd, vmid = -1;
+	int vmid = -1;
 	struct vmtag info;
 
 	strcpy(info.name, vm->name);
-	strcpy(info.os_type, vm->os_type);
+	strcpy(info.os_type, vm->os->name);
 	info.nr_vcpu = vm->nr_vcpus;
 	info.mem_size = vm->mem_size;
 	info.mem_base = vm->mem_start;
 	info.entry = vm->entry;
 	info.setup_data = vm->setup_data;
 	info.flags = vm->flags;
-	info.vmid = vm->vmid;
-
-	fd = open(DEV_MVM0, O_RDWR | O_NONBLOCK);
-	if (fd < 0) {
-		perror("DEV_MVM0");
-		return -EIO;
-	}
+	info.vmid = -1;
 
 	pr_notice("create new vm *\n");
 	pr_notice("        -name       : %s\n", info.name);
 	pr_notice("        -os_type    : %s\n", info.os_type);
 	pr_notice("        -nr_vcpu    : %d\n", info.nr_vcpu);
-	pr_notice("        -bit64      : %d\n",
-			!!vm->flags & VM_FLAGS_64BIT);
+	pr_notice("        -bit64      : %d\n", !!(vm->flags & VM_FLAGS_64BIT));
 	pr_notice("        -mem_size   : 0x%"PRIx64"\n", info.mem_size);
 	pr_notice("        -mem_base  : 0x%"PRIx64"\n", info.mem_base);
 	pr_notice("        -entry      : 0x%"PRIx64"\n", info.entry);
 	pr_notice("        -setup_data : 0x%"PRIx64"\n", info.setup_data);
 
-	vmid = ioctl(fd, IOCTL_CREATE_VM, &info);
+	vmid = ioctl(vm->vm0_fd, IOCTL_CREATE_VM, &info);
 	if (vmid <= 0) {
 		pr_err("create new vm failed %d\n", vmid);
-		return vmid;
+		goto out;
 	}
 
-	close(fd);
-
+out:
 	return vmid;
 }
 
@@ -168,45 +145,49 @@ static int release_vm(int vmid)
 	return ret;
 }
 
-int destroy_vm(struct vm *vm)
+static void vm_release_vcpu(struct vcpu *vcpu)
+{
+	struct epoll_event ee;
+
+	memset(&ee, 0, sizeof(struct epoll_event));
+
+	if ((vcpu->epoll_fd > 0) && (vcpu->event_fd > 0)) {
+		ee.events = EPOLLIN;
+		epoll_ctl(vcpu->epoll_fd, EPOLL_CTL_DEL, vcpu->event_fd, &ee);
+	}
+
+	if (vcpu->event_fd > 0) {
+		close(vcpu->event_fd);
+		vcpu->event_fd = -1;
+	}
+
+	if (vcpu->epoll_fd > 0) {
+		close(vcpu->epoll_fd);
+		vcpu->epoll_fd = -1;
+	}
+
+	if (vcpu->vcpu_irq)
+		ioctl(vcpu->vm->vm_fd, IOCTL_UNREGISTER_VCPU, vcpu->vcpu_irq);
+
+	free(vcpu);
+}
+
+static int destroy_vm(struct vm *vm)
 {
 	int i;
 	struct vdev *vdev;
-	struct epoll_event ee;
+
+	mvm_free_options();
 
 	if (!vm)
 		return -EINVAL;
 
-	memset(&ee, 0, sizeof(struct epoll_event));
-
-	if (vm->epfds && vm->eventfds) {
+	if (vm->vcpus) {
 		for (i = 0; i < vm->nr_vcpus; i++) {
-			if ((vm->epfds[i] > 0) && (vm->eventfds[i] > 0)) {
-				ee.events = EPOLLIN;
-				epoll_ctl(vm->epfds[i], EPOLL_CTL_DEL,
-						vm->eventfds[i], &ee);
-			}
-
-			if (vm->eventfds[i] > 0) {
-				close(vm->eventfds[i]);
-				vm->eventfds[i] = -1;
-			}
-
-			if (vm->epfds[i] > 0) {
-				close(vm->epfds[i]);
-				vm->epfds[i] = -1;
-			}
+			if (vm->vcpus[i])
+				vm_release_vcpu(vm->vcpus[i]);
 		}
-	}
-
-	if (vm->irqs) {
-		for (i = 0; i < vm->nr_vcpus; i++) {
-			if (vm->irqs[i] <= 0)
-				continue;
-
-			ioctl(vm->vm_fd, IOCTL_UNREGISTER_VCPU,
-					(unsigned long)vm->irqs[i]);
-		}
+		free(vm->vcpus);
 	}
 
 	list_for_each_entry(vdev, &vm->vdev_list, list)
@@ -235,14 +216,14 @@ int destroy_vm(struct vm *vm)
 	if (vm->dfd > 0)
 		close(vm->rfd);
 
-	if (vm->os_data > 0)
-		free(vm->os_data);
+	if (vm->vm0_fd)
+		close(vm->vm0_fd);
+
+	if (vm->os && vm->os->vm_exit)
+		vm->os->vm_exit(vm);
 
 	free(vm);
 	mvm_vm = NULL;
-
-	free_vm_config(global_config);
-	global_config = NULL;
 
 	return 0;
 }
@@ -273,42 +254,8 @@ static void signal_handler(int signum)
 	exit(0);
 }
 
-void print_usage(void)
-{
-	fprintf(stderr, "\nUsage: mvm [options] \n\n");
-	fprintf(stderr, "    -c <vcpu_count>            (set the vcpu numbers of the vm)\n");
-	fprintf(stderr, "    -m <mem_size_in_MB>        (set the memsize of the vm - 2M align)\n");
-	fprintf(stderr, "    -i <boot or kernel image>  (the kernel or bootimage to use)\n");
-	fprintf(stderr, "    -s <mem_base>              (set the membase of the vm if not a boot.img)\n");
-	fprintf(stderr, "    -n <vm name>               (the name of the vm)\n");
-	fprintf(stderr, "    -t <vm type>               (the os type of the vm )\n");
-	fprintf(stderr, "    -b <32 or 64>              (32bit or 64 bit )\n");
-	fprintf(stderr, "    -r                         (do not load ramdisk image)\n");
-	fprintf(stderr, "    -v                         (verbose print debug information)\n");
-	fprintf(stderr, "    -d                         (run as a daemon process)\n");
-	fprintf(stderr, "    -D                         (create a platform bus device)\n");
-	fprintf(stderr, "    -V                         (create a virtio device)\n");
-	fprintf(stderr, "    -K                         (kernel image path)\n");
-	fprintf(stderr, "    -S                         (second image path - like dtb image)\n");
-	fprintf(stderr, "    -R                         (Ramdisk image path)\n");
-	fprintf(stderr, "    --gicv2                    (using the gicv2 interrupt controller)\n");
-	fprintf(stderr, "    --gicv3                    (using the gicv3 interrupt controller)\n");
-	fprintf(stderr, "    --gicv4                    (using the gicv4 interrupt controller)\n");
-	fprintf(stderr, "    --earlyprintk              (enable the earlyprintk based on virtio-console)\n");
-	fprintf(stderr, "\n");
-	exit(EXIT_FAILURE);
-}
-
 void *hvm_map_iomem(unsigned long base, size_t size)
 {
-	void *iomem;
-	int fd = open(DEV_MVM0, O_RDWR);
-
-	if (fd < 0) {
-		pr_err("open mvm0 failed\n");
-		return (void *)-1;
-	}
-
 	/*
 	 * On 32-bit Android, off_t is a signed 32-bit integer. This
 	 * limits functions that use off_t to working on files no
@@ -317,160 +264,119 @@ void *hvm_map_iomem(unsigned long base, size_t size)
 	 * also see:
 	 * https://android.googlesource.com/platform/bionic/+/master/docs/32-bit-abi.md
 	 */
-	iomem = mmap64(NULL, size, PROT_READ | PROT_WRITE,
-			MAP_SHARED, fd, base);
-	close(fd);
-
-	return iomem;
+	return mmap64(NULL, size, PROT_READ | PROT_WRITE,
+			MAP_SHARED, mvm_vm->vm0_fd, base);
 }
 
-static int vm_create_vmcs(struct vm *vm)
+static void *vm_create_vmcs(struct vm *vm)
 {
 	int ret;
 	unsigned long vmcs;
 
 	ret = ioctl(vm->vm_fd, IOCTL_CREATE_VMCS, &vmcs);
 	if (ret)
-		return ret;
+		return (void *)-1;
 
 	if (!vmcs)
+		return (void *)-1;
+
+	return hvm_map_iomem(vmcs, VMCS_SIZE(vm->nr_vcpus));
+}
+
+static int vm_create_vcpus(struct vm *vm)
+{
+	int i, ret;
+	void *vmcs;
+	struct vcpu *vcpu;
+	unsigned long arg[2];
+
+	vmcs = vm_create_vmcs(vm);
+	if (vmcs == (void *)-1) {
+		pr_err("create VMCS failed\n");
+		return -ENOMEM;
+	}
+
+	vm->vcpus = calloc(vm->nr_vcpus, sizeof(struct vcpu *));
+	if (!vm->vcpus)
 		return -ENOMEM;
 
-	vm->vmcs = hvm_map_iomem(vmcs, VMCS_SIZE(vm->nr_vcpus));
-	if (vm->vmcs == (void *)-1)
-		return -ENOMEM;
+	for (i = 0; i < vm->nr_vcpus; i++) {
+		vcpu = calloc(1, sizeof(struct vcpu));
+		if (!vcpu)
+			return -ENOMEM;
+
+		vcpu->cpuid = i;
+		vcpu->vm = vm;
+		vcpu->vmcs = vmcs + i * VMCS_ENTRY_SIZE;
+
+		vcpu->vcpu_irq = ioctl(vm->vm_fd, IOCTL_CREATE_VMCS_IRQ, i);
+		if (vcpu->vcpu_irq < 0) {
+			pr_err("allocate virq for vmcs failed\n");
+			return -ENOENT;
+		}
+
+		vcpu->event_fd = eventfd(0, 0);
+		if (vcpu->event_fd < 0) {
+			pr_err("get event fd fail\n");
+			return -ENOENT;
+		}
+
+		vcpu->epoll_fd = epoll_create(1);
+		if (vcpu->epoll_fd < 0) {
+			pr_err("create epoll fd fail\n");
+			return -ENOENT;
+		}
+
+		arg[0] = vcpu->event_fd;
+		arg[1] = vcpu->vcpu_irq;
+		ret = ioctl(vm->vm_fd, IOCTL_REGISTER_VCPU, arg);
+		if (ret) {
+			pr_err("register vcpu fail\n");
+			return ret;
+		}
+
+		ret = pthread_create(&vcpu->vcpu_thread, NULL,
+				vm_vcpu_thread, (void *)(unsigned long)i);
+		if (ret) {
+			pr_err("create vcpu thread fail\n");
+			return ret;
+		}
+
+		vm->vcpus[i] = vcpu;
+	}
 
 	return 0;
 }
-
-static int create_and_init_vm(struct vm *vm)
-{
-	int ret = 0;
-	char path[32];
-
-	vm->vmid = create_new_vm(vm);
-	if (vm->vmid <= 0)
-		return (vm->vmid);
-
-	memset(path, 0, 32);
-	sprintf(path, DEV_MVM_PATH"%d", vm->vmid);
-	vm->vm_fd = open(path, O_RDWR | O_NONBLOCK);
-	if (vm->vm_fd < 0) {
-		perror(path);
-		return -EIO;
-	}
-
-	ret = vm_create_vmcs(vm);
-	if (ret)
-		return -ENOMEM;
-
-	/*
-	 * map a fix region for this vm, need to call ioctl
-	 * to informe hypervisor to map the really physical
-	 * memory
-	 */
-	vm->mmap = map_vm_memory(vm);
-	if (!vm->mmap)
-		return -EAGAIN;
-
-	/* load the image into the vm memory */
-	ret = vm->os->load_image(vm);
-	if (ret)
-		return ret;
-
-	return 0;
-}
-
-#ifdef __CLANG__
-
-extern struct vm_os os_linux;
-extern struct vm_os os_xnu;
-extern struct vm_os os_other;
-
-static struct vm_os *vm_oses[] = {
-	&os_linux,
-	&os_xnu,
-	&os_other,
-	NULL,
-};
-
-static struct vm_os *get_vm_os(char *os_type)
-{
-	int i;
-	struct vm_os *os;
-
-	for (i = 0; ; i++) {
-		os = vm_oses[i];
-		if (os == NULL)
-			break;
-
-		if (strcmp(os_type, os->name) == 0)
-			return os;
-	}
-
-	return &os_other;
-}
-#else
-static struct vm_os *get_vm_os(char *os_type)
-{
-	struct vm_os **os_start = (struct vm_os **)&__start_mvm_os;
-	struct vm_os **os_end = (struct vm_os **)&__stop_mvm_os;
-	struct vm_os *default_os = NULL;
-	struct vm_os *os;
-
-	for (; os_start < os_end; os_start++) {
-		os = *os_start;
-		if (strcmp(os_type, os->name) == 0)
-			return os;
-
-		if (strcmp("default", os->name) == 0)
-			default_os = os;
-	}
-
-	return default_os;
-}
-#endif
 
 static int vm_create_resource(struct vm *vm)
 {
 	return ioctl(vm->vm_fd, IOCTL_CREATE_VM_RESOURCE, NULL);
 }
 
-static int vm_vdev_init(struct vm *vm, struct vm_config *config)
+static int vm_load_images(struct vm *vm)
 {
-	int i, ret;
-	char *tmp, *pos;
-	char *type = NULL, *arg = NULL;
-	struct device_info *info = &config->device_info;
+	return os_load_images(vm);
+}
 
-	vdev_subsystem_init();
+static int create_and_init_vm(struct vm *vm)
+{
+	char path[32];
 
-	/* init the virtio framework */
-	ret = virtio_mmio_init(vm);
-	if (ret) {
-		pr_err("unable to init the virtio framework\n");
-		return ret;
+	vm->vm0_fd = open(DEV_MVM0, O_RDWR | O_NONBLOCK);
+	if (vm->vm0_fd <= 0) {
+		pr_err("open VM0 file fail %d\n", vm->vm0_fd);
+		return -EIO;
 	}
 
-	for (i = 0; i < info->nr_device; i++) {
-		tmp = info->device_args[i];
-		if (!tmp || (strlen(tmp) == 0)) {
-			pr_warn("invaild device argument index%d\n", i);
-			continue;
-		}
+	vm->vmid = create_new_vm(vm);
+	if (vm->vmid <= 0)
+		return -EFAULT;
 
-		pos = strchr(tmp, ',');
-		if (pos == NULL) {
-			pr_err("invaild device argumet %s", tmp);
-			continue;
-		}
-
-		type = tmp;
-		arg = pos + 1;
-		*pos = '\0';
-
-		if (create_vdev(vm, type, arg))
-			pr_err("create %s-%s failed\n", type, arg);
+	sprintf(path, DEV_MVM_PATH"%d", vm->vmid);
+	vm->vm_fd = open(path, O_RDWR | O_NONBLOCK);
+	if (vm->vm_fd < 0) {
+		perror(path);
+		return -EIO;
 	}
 
 	return 0;
@@ -572,9 +478,10 @@ void *vm_vcpu_thread(void *data)
 	struct epoll_event event;
 	struct epoll_event ep_events;
 	struct vmcs *vmcs;
-	unsigned long i = (unsigned long)data;
 	eventfd_t value;
 	char buf[32];
+	struct vcpu *vcpu;
+	unsigned long i = (unsigned long)data;
 
 	memset(buf, 0, 32);
 	sprintf(buf, "vm%d-vcpu-event", vm->vmid);
@@ -583,9 +490,10 @@ void *vm_vcpu_thread(void *data)
 	if (i >= vm->nr_vcpus)
 		return NULL;
 
-	eventfd = vm->eventfds[i];
-	epfd = vm->epfds[i];
-	vmcs = (struct vmcs *)(vm->vmcs + i * sizeof(struct vmcs));
+	vcpu = vm->vcpus[i];
+	eventfd = vcpu->event_fd;
+	epfd = vcpu->epoll_fd;
+	vmcs = vcpu->vmcs;
 
 	if (eventfd <= 0 || epfd <= 0)
 		return NULL;
@@ -658,7 +566,7 @@ int __vm_reboot(struct vm *vm)
 	if (ret)
 		return ret;
 
-	ret = mvm_vm->os->setup_vm_env(vm, global_config->cmdline);
+	ret = os_setup_vm(vm);
 	if (ret)
 		return ret;
 
@@ -709,56 +617,10 @@ static void handle_vm_event(struct vm *vm, struct mvm_node *node)
 
 static int mvm_main_loop(void)
 {
-	int ret, i, irq;
-	struct vm *vm = mvm_vm;
+	int ret;
 	pthread_t vcpu_thread;
-	int *base;
-	unsigned long arg[2];
+	struct vm *vm = mvm_vm;
 	struct mvm_node *node;
-
-	/*
-	 * create the eventfd and the epoll_fds for
-	 * this vm
-	 */
-	base = malloc(sizeof(*base) * vm->nr_vcpus * 3);
-	if (!base)
-		return -ENOMEM;
-
-	memset(base, -1, sizeof(int) * vm->nr_vcpus * 3);
-	vm->eventfds = base;
-	vm->epfds = base + vm->nr_vcpus;
-	vm->irqs = base + vm->nr_vcpus * 2;
-
-	for (i = 0; i < vm->nr_vcpus; i++) {
-		irq = ioctl(vm->vm_fd, IOCTL_CREATE_VMCS_IRQ, (unsigned long)i);
-		if (irq < 0)
-			return -ENOENT;
-
-		vm->eventfds[i] = eventfd(0, 0);
-		if (vm->eventfds[i] < 0)
-			return -ENOENT;
-
-		vm->epfds[i] = epoll_create(1);
-		if (vm->epfds[i] < 0)
-			return -ENOENT;
-
-		/*
-		 * register the irq and eventfd to kernel
-		 */
-		vm->irqs[i] = irq;
-		arg[0] = (unsigned long)vm->eventfds[i];
-		arg[1] = irq;
-		ret = ioctl(vm->vm_fd, IOCTL_REGISTER_VCPU, arg);
-		if (ret)
-			return ret;
-
-		ret = pthread_create(&vcpu_thread, NULL,
-				vm_vcpu_thread, (void *)(unsigned long)i);
-		if (ret) {
-			pr_err("create vcpu thread failed\n");
-			return ret;
-		}
-	}
 
 	ret = pthread_create(&vcpu_thread, NULL,
 			mevent_dispatch, (void *)vm);
@@ -767,7 +629,7 @@ static int mvm_main_loop(void)
 		return ret;
 	}
 
-	/* now start the vm */
+	/* start the vm */
 	ret = ioctl(vm->vm_fd, IOCTL_POWER_UP_VM, NULL);
 	if (ret)
 		return ret;
@@ -777,64 +639,43 @@ static int mvm_main_loop(void)
 		node = mvm_queue_pop(&vm->queue);
 		if (node == NULL) {
 			pr_err("mvm queue is abnormal shutdown vm\n");
-			vm_shutdown(vm);
 			break;
-		} else
+		} else {
 			handle_vm_event(vm, node);
+		}
 	}
 
 	return -EAGAIN;
 }
 
-static int mvm_open_images(struct vm *vm, struct vm_config *config)
+static int mvm_check_vm_config(struct vm *vm)
 {
 	if (vm->flags & VM_FLAGS_NO_BOOTIMAGE) {
-		vm->kfd = open(config->kernel_image, O_RDONLY | O_NONBLOCK);
-		if (vm->kfd < 0) {
-			pr_err("can not open the kernel image file %s\n",
-					config->bootimage_path);
-			return -ENOENT;
-		}
-
-		vm->dfd = open(config->dtb_image, O_RDONLY | O_NONBLOCK);
-		if (vm->dfd < 0) {
-			pr_err("can not open the dtb image file %s\n",
-					config->dtb_image);
-			return -ENOENT;
-		}
-
-		if (config->tc_image[0]) {
-			vm->tc_fd = open(config->tc_image, O_RDONLY | O_NONBLOCK);
-			if (vm->tc_fd)
-				pr_err("open tc static image failed\n");
-		}
-
-		if (!(vm->flags & VM_FLAGS_NO_RAMDISK)) {
-			vm->rfd = open(config->ramdisk_image,
-					O_RDONLY | O_NONBLOCK);
-			if (vm->rfd < 0)
-				vm->flags |= VM_FLAGS_NO_RAMDISK;
+		if ((vm->kfd <= 0) || (vm->dfd <= 0)) {
+			pr_err("no kernel and dtb image found\n");
+			return -EINVAL;
 		}
 	} else {
-		/* read the image to get the entry and other args */
-		vm->image_fd = open(config->bootimage_path,
-					O_RDONLY | O_NONBLOCK);
-		if (vm->image_fd < 0) {
-			pr_err("can not open the bootimage %s\n",
-					config->bootimage_path);
-			return -ENOENT;
+		if (vm->image_fd <= 0) {
+			pr_err("no bootimage\n");
+			return -EINVAL;
 		}
+	}
+
+	if (vm->name[0] == 0)
+		strncpy(vm->name, "unknown", 8);
+
+	if (!vm->os) {
+		pr_err("no operation system found for this vm\n");
+		return -EINVAL;
 	}
 
 	return 0;
 }
 
-static int mvm_main(struct vm_config *config)
+static int mvm_main(void)
 {
 	int ret;
-	struct vm *vm;
-	struct vm_os *os;
-	struct vmtag *vmtag = &config->vmtag;
 
 	signal(SIGTERM, signal_handler);
 	signal(SIGBUS, signal_handler);
@@ -843,348 +684,131 @@ static int mvm_main(struct vm_config *config)
 	signal(SIGSTOP, signal_handler);
 	signal(SIGTSTP, signal_handler);
 
-	mvm_vm = vm = (struct vm *)calloc(1, sizeof(struct vm));
-	if (!vm)
+	mvm_vm = (struct vm *)calloc(1, sizeof(struct vm));
+	if (!mvm_vm)
 		return -ENOMEM;
 
-	os = get_vm_os(vmtag->os_type);
-	if (!os)
-		return -EINVAL;
+	/*
+	 * init some member to default value
+	 */
+	init_list(&mvm_vm->vdev_list);
+	mvm_vm->mem_start = VM_MEM_START;
+	mvm_vm->mem_size = VM_MIN_MEM_SIZE;
+	mvm_vm->flags |= VM_FLAGS_NO_BOOTIMAGE | VM_FLAGS_DYNAMIC_AFF;
 
-	/* udpate the vm from vmtag */
-	vm->os = os;
-	vm->flags = vmtag->flags;
-	vm->vmid = -1;
-	vm->vm_fd = -1;
-	vm->entry = (unsigned long)vmtag->entry;
-	vm->mem_start = vmtag->mem_base;
-	vm->mem_size = vmtag->mem_size;
-	vm->nr_vcpus = vmtag->nr_vcpu;
-	strcpy(vm->name, vmtag->name);
-	strcpy(vm->os_type, vmtag->os_type);
-	init_list(&vm->vdev_list);
-	vm->vm_config = config;
+	/*
+	 * get all the necessary vm options for this VM, then
+	 * check the whether this VM has been config correctly
+	 */
+	ret = mvm_parse_option_group(OPTION_GRP_VM, mvm_vm);
+	if (ret)
+		goto error_option;
 
-	ret = mvm_open_images(vm, config);
+	ret = mvm_check_vm_config(mvm_vm);
 	if (ret) {
-		free(vm);
+		pr_err("option checking fail\n");
+		goto error_option;
+	}
+
+	ret = os_early_init(mvm_vm);
+	if (ret) {
+		pr_err("os early init failed %d\n", ret);
+		goto error_option;
+	}
+
+	mvm_queue_init(&mvm_vm->queue);
+
+	if (mevent_init()) {
+		pr_err("mevent init fail\n");
+		return -EFAULT;
+	}
+
+	ret = create_and_init_vm(mvm_vm);
+	if (ret) {
+		pr_err("failed to create vm %d\n", ret);
+		goto error_out;
+	}
+
+	/*
+	 * create the device which is passed by the
+	 * argument
+	 */
+	os_create_resource(mvm_vm);
+	mvm_parse_option_group(OPTION_GRP_VDEV, mvm_vm);
+
+	ret = vm_create_vcpus(mvm_vm);
+	if (ret) {
+		pr_err("create vcpus for vm failed %d\n", ret);
 		return ret;
 	}
 
-	ret = os->early_init(vm);
-	if (ret) {
-		pr_err("os early init faild %d\n", ret);
-		goto release_vm;
+	/*
+	 * map a fix region for this vm, need to call ioctl
+	 * to informe hypervisor to map the really physical
+	 * memory
+	 */
+	mvm_vm->mmap = map_vm_memory(mvm_vm);
+	if (!mvm_vm->mmap) {
+		pr_err("map vm memory space to process failed\n");
+		return -EAGAIN;
 	}
 
-	if (vm->entry == 0)
-		vm->entry = VM_MEM_START;
-	if (vm->mem_start == 0)
-		vm->mem_start = VM_MEM_START;
-	if (vm->mem_size == 0)
-		vm->mem_size = VM_MIN_MEM_SIZE;
-
-	ret = create_and_init_vm(vm);
-	if (ret)
-		goto release_vm;
-
-	mvm_queue_init(&vm->queue);
-
-	/* io events init before vdev init */
-	ret = mevent_init();
-	if (ret)
-		goto release_vm;
-
-	ret = vm_vdev_init(vm, config);
-	if (ret)
-		goto release_vm;
-
-	ret = mvm_vm->os->setup_vm_env(vm, config->cmdline);
-	if (ret)
+	/* load the image into the vm memory */
+	ret = vm_load_images(mvm_vm);
+	if (ret) {
+		pr_err("load image for VM failed\n");
 		return ret;
+	}
 
-	ret = vm_create_resource(vm);
-	if (ret)
-		pr_warn("failed to create some host virtual devices\n");
+	ret = os_setup_vm(mvm_vm);
+	if (ret) {
+		pr_err("setup vm fail\n");
+		return ret;
+	}
 
-	mvm_main_loop();
+	ret = vm_create_resource(mvm_vm);
+	if (ret) {
+		pr_err("create resource for vm failed\n");
+		return ret;
+	}
 
-release_vm:
+	ret = mvm_main_loop();
+	if (mvm_vm == NULL)
+		return 0;
+
+error_out:
 	destroy_vm(mvm_vm);
 	return ret;
-}
 
-static struct option options[] = {
-	{"vcpu_number", required_argument, NULL, 'c'},
-	{"mem_size",	required_argument, NULL, 'm'},
-	{"image",	required_argument, NULL, 'i'},
-	{"mem_base",	required_argument, NULL, 's'},
-	{"name",	required_argument, NULL, 'n'},
-	{"os_type",	required_argument, NULL, 't'},
-	{"bit",		required_argument, NULL, 'b'},
-	{"no_ramdisk",	no_argument,	   NULL, 'r'},
-	{"gicv3",	no_argument,	   NULL, '0'},
-	{"gicv2",	no_argument,	   NULL, '1'},
-	{"gicv4",	no_argument,	   NULL, '2'},
-	{"earlyprintk",	no_argument,	   NULL, '3'},
-	{"tc_file",	required_argument, NULL, 'T'},
-	{"help",	no_argument,	   NULL, 'h'},
-	{NULL,		0,		   NULL,  0}
-};
-
-static int parse_vm_memsize(char *buf, uint64_t *size)
-{
-	int len = 0;
-
-	if (!buf)
-		return -EINVAL;
-
-	len = strlen(buf) - 1;
-
-	if ((buf[len] != 'm') && (buf[len] != 'M'))
-		return -EINVAL;
-
-	buf[len] = '\0';
-	*size = atol(buf) * 1024 * 1024;
-
-	return 0;
-}
-
-static int parse_vm_membase(char *buf, uint64_t *value)
-{
-	if (strlen(buf) < 3)
-		return -EINVAL;
-
-	if ((buf[0] == '0') && (buf[1] == 'x')) {
-		sscanf(buf, "0x%"PRIx64, value);
-		return 0;
-	}
-
+error_option:
+	free(mvm_vm);
 	return -EINVAL;
-}
-
-static int add_device_info(struct device_info *dinfo, char *name, int type)
-{
-	char *arg = NULL;
-
-	if (dinfo->nr_device == VM_MAX_DEVICES) {
-		pr_err("support max %d vdev\n", VM_MAX_DEVICES);
-		return -EINVAL;
-	}
-
-	arg = calloc(1, strlen(name) + 1);
-	if (!arg)
-		return -ENOMEM;
-
-	strcpy(arg, name);
-	dinfo->device_args[dinfo->nr_device] = arg;
-	dinfo->nr_device++;
-	if (type == VDEV_TYPE_VIRTIO)
-		dinfo->nr_virtio_dev++;
-
-	return 0;
-}
-
-static int check_vm_config(struct vm_config *config)
-{
-	/* default will use bootimage as the vm image */
-	if (config->bootimage_path[0] == 0) {
-		config->vmtag.flags |= VM_FLAGS_NO_BOOTIMAGE;
-		if ((config->kernel_image[0] == 0) ||
-				config->dtb_image[0] == 0) {
-			pr_err("no bootimage and kernel image\n");
-			return -EINVAL;
-		}
-
-		if (config->ramdisk_image[0] == 0)
-			config->vmtag.flags |= VM_FLAGS_NO_RAMDISK;
-	}
-
-	if (config->vmtag.nr_vcpu > VM_MAX_VCPUS) {
-		pr_warn("support max %d vcpus\n", VM_MAX_VCPUS);
-		config->vmtag.nr_vcpu = VM_MAX_VCPUS;
-	}
-
-	if (config->vmtag.name[0] == 0)
-		strcpy(config->vmtag.name, "unknown");
-	if (config->vmtag.os_type[0] == 0)
-		strcpy(config->vmtag.os_type, "unknown");
-
-	return 0;
-}
-
-static void free_vm_config(struct vm_config *config)
-{
-	int i;
-
-	if (!config)
-		return;
-
-	for (i = 0; i < config->device_info.nr_device; i++) {
-		if (!config->device_info.device_args[i])
-			continue;
-		free(config->device_info.device_args[i]);
-	}
-
-	free(config);
 }
 
 int main(int argc, char **argv)
 {
-	int ret, opt, idx;
-	int run_as_daemon = 0;
-	struct vmtag *vmtag;
-	struct device_info *device_info;
-	static char *optstr = "K:R:S:c:C:m:i:s:n:D:V:t:T:b:rv?hd0123";
+	int ret;
+	int run_as_daemon;
 
-	global_config = calloc(1, sizeof(struct vm_config));
-	if (!global_config)
-		return -ENOMEM;
-
-	vmtag = &global_config->vmtag;
-	device_info = &global_config->device_info;
-	vmtag->flags = VM_FLAGS_64BIT | VM_FLAGS_DYNAMIC_AFF;
-
-	while ((opt = getopt_long(argc, argv, optstr, options, &idx)) != -1) {
-		switch(opt) {
-		case 'c':
-			vmtag->nr_vcpu = atoi(optarg);
-			break;
-		case 'm':
-			ret = parse_vm_memsize(optarg, &vmtag->mem_size);
-			if (ret)
-				print_usage();
-			break;
-		case 'i':
-			if (strlen(optarg) > 255) {
-				pr_err("invaild boot_image path %s\n", optarg);
-				ret = -EINVAL;
-				goto exit;
-			}
-
-			strcpy(global_config->bootimage_path, optarg);
-			break;
-		case 's':
-			ret = parse_vm_membase(optarg, &vmtag->mem_base);
-			if (ret) {
-				print_usage();
-				ret = -EINVAL;
-				goto exit;
-			}
-			break;
-		case 'n':
-			strncpy((char *)vmtag->name, optarg, VM_NAME_SIZE - 1);
-			break;
-		case 't':
-			strncpy((char *)vmtag->os_type, optarg, VM_TYPE_SIZE - 1);
-			break;
-		case 'b':
-			ret = atoi(optarg);
-			if ((ret != 32) && (ret != 64)) {
-				free(global_config);
-				print_usage();
-			}
-			if (ret == 32)
-				vmtag->flags &= ~VM_FLAGS_64BIT;
-			break;
-		case 'r':
-			vmtag->flags |= VM_FLAGS_NO_RAMDISK;
-			break;
-		case 'v':
-			verbose = 1;
-			break;
-		case 'd':
-			run_as_daemon = 1;
-			break;
-		case 'D':
-			add_device_info(device_info,
-					optarg, VDEV_TYPE_PLATFORM);
-			break;
-		case 'V':
-			add_device_info(device_info,
-					optarg, VDEV_TYPE_VIRTIO);
-			break;
-		case 'C':
-			if (strlen(optarg) > 255) {
-				pr_err("cmdline is too long\n");
-				ret = -EINVAL;
-				goto exit;
-			}
-			strcpy(global_config->cmdline, optarg);
-			break;
-		case 'h':
-			free(global_config);
-			print_usage();
-			return 0;
-		case '3':
-			vmtag->flags |= VM_FLAGS_HAS_EARLYPRINTK;
-			break;
-		case '2':
-			global_config->gic_type = 2;
-			break;
-		case '0':
-			global_config->gic_type = 0;
-			break;
-		case '1':
-			global_config->gic_type = 1;
-			break;
-		/* the below argument is deicated for linux vm
-		 * and will use the fixed loading address which
-		 * kernel will loaded at 0x80080000 and dtb will
-		 * loaded at (endadress - 2M) */
-		case 'K':
-			if (strlen(optarg) > 255) {
-				pr_err("kernel image is too long\n");
-				ret = -EINVAL;
-				goto exit;
-			}
-			strcpy(global_config->kernel_image, optarg);
-			break;
-		case 'S':
-			if (strlen(optarg) > 255) {
-				pr_err("kernel image is too long\n");
-				ret = -EINVAL;
-				goto exit;
-			}
-			strcpy(global_config->dtb_image, optarg);
-			break;
-		case 'R':
-			if (strlen(optarg) > 255) {
-				pr_err("kernel image is too long\n");
-				ret = -EINVAL;
-				goto exit;
-			}
-			strcpy(global_config->ramdisk_image, optarg);
-			break;
-		case 'T':		// for xnu tc_static file
-			if (strlen(optarg) > 255) {
-				pr_err("tc file image name is too long\n");
-				ret = -EINVAL;
-				goto exit;
-			}
-			strcpy(global_config->tc_image, optarg);
-			break;
-		default:
-			break;
-		}
+	ret = mvm_option_init(argc, argv);
+	if (ret) {
+		pr_err("invaild options %d\n", ret);
+		goto out;
 	}
 
-	ret = check_vm_config(global_config);
-	if (ret)
-		goto exit;
-
+	mvm_parse_option_bool("run_as_daemon", &run_as_daemon);
 	if (run_as_daemon) {
 		if (daemon(1, 1)) {
 			pr_err("failed to run as daemon\n");
-			ret = -EFAULT;
-			goto exit;
+			goto out;
 		}
 	}
 
-	ret = mvm_main(global_config);
+	mvm_parse_option_bool("debug_enable", &debug_enable);
+	debug_enable = 1;
 
-exit:
-	free_vm_config(global_config);
-	global_config = NULL;
-	exit(ret);
+	ret = mvm_main();
+out:
+	mvm_free_options();
+	return ret;
 }

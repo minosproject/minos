@@ -40,11 +40,11 @@
 #include <pthread.h>
 #include <linux/if_tun.h>
 
-#include <mvm.h>
-#include <mevent.h>
-#include <virtio.h>
-#include <netmap_user.h>
-#include <barrier.h>
+#include <minos/vm.h>
+#include <minos/mevent.h>
+#include <minos/virtio.h>
+#include <minos/netmap_user.h>
+#include <minos/barrier.h>
 
 #define VIRTIO_NET_RINGSZ	1024
 #define VIRTIO_NET_MAXSEGS	256

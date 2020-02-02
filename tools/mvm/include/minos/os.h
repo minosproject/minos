@@ -1,6 +1,8 @@
 #ifndef __OS_H__
 #define __OS_H__
 
+#include <minos/mvm.h>
+
 #define DEFINE_OS(os) \
 	static void *os_##os __section("mvm_os") __used = &os;
 
@@ -21,9 +23,14 @@ struct vm_os {
 	int (*early_init)(struct vm *vm);
 	int (*load_image)(struct vm *vm);
 	int (*setup_vm_env)(struct vm *vm, char *cmdline);
+	int (*create_resource)(struct vm *vm);
 	void (*vm_exit)(struct vm *vm);
 };
 
-#define OS_TYPE_LINUX		(1 << 0)
+struct vm_os *get_vm_os(char *os_type);
+int os_load_images(struct vm *vm);
+int os_early_init(struct vm *vm);
+int os_create_resource(struct vm *vm);
+int os_setup_vm(struct vm *vm);
 
 #endif

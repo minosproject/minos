@@ -602,7 +602,7 @@ int create_vm_mmap(int vmid,  unsigned long offset,
 
 int create_guest_vm(struct vmtag *tag)
 {
-	int ret;
+	int ret = VMID_INVALID;
 	struct vm *vm;
 	struct vmtag *vmtag;
 

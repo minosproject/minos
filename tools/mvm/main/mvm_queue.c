@@ -33,8 +33,8 @@
  */
 
 #include <pthread.h>
-#include <mvm.h>
-#include <mvm_queue.h>
+#include <minos/mvm.h>
+#include <minos/mvm_queue.h>
 
 int mvm_queue_init(struct mvm_queue *queue)
 {

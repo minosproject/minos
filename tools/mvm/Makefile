@@ -26,7 +26,7 @@ TARGET := mvm
 CCFLAG := -Wall -D_XOPEN_SOURCE -D_GNU_SOURCE -march=armv8-a \
 	-Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing \
 	-fno-common -Werror-implicit-function-declaration \
-	-Wno-format-security -I$(PWD)/include -I$(PWD)/../../include
+	-Wno-format-security -I$(PWD)/include
 
 src	:= main/mvm.c main/bootimage.c
 src	+= libfdt/fdt_addresses.c libfdt/fdt.c libfdt/fdt_empty_tree.c
@@ -40,12 +40,15 @@ src	+= devices/virtio/virtio_console.c
 src	+= devices/block_if.c
 src	+= devices/virtio/virtio_block.c
 src	+= devices/virtio/virtio_net.c
+src	+= os/os.c
 src	+= os/os_linux.c
 src	+= os/os_xnu.c
 src	+= os/os_other.c
 src	+= devices/s3c_uart.c
+src	+= main/option.c
+src	+= main/option_vm.c
 
-INCLUDE_DIR = ../../include include/libfdt include
+INCLUDE_DIR = include
 
 objs	:= $(src:%.c=%.o)
 

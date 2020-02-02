@@ -31,14 +31,14 @@
  */
 
 
-#include <mvm.h>
-#include <virtio.h>
-#include <io.h>
-#include <barrier.h>
+#include <minos/vm.h>
+#include <minos/virtio.h>
+#include <minos/io.h>
+#include <minos/barrier.h>
 #include <common/gvm.h>
 
-static int virtio_devices_nr;
-static uint64_t virtio_iomem_base;
+static int virtio_devices_nr = VM_MAX_VIRTIO_DEVICES;
+static uint64_t virtio_iomem_base = VM_VIRTIO_IOMEM_BASE;
 static int virtio_device_index;
 
 static void *hv_virtio_mmio_init(struct vm *vm, uint64_t gbase)
@@ -84,21 +84,6 @@ static int hv_create_virtio_device(struct vm *vm, uint64_t *gbase, void **hbase)
 
 	*gbase = __gbase;
 	*hbase = __hbase;
-
-	return 0;
-}
-
-int virtio_mmio_init(struct vm *vm)
-{
-	/*
-	 * each virtio device will have 0x1000 iomem
-	 * space for communicated between guest and host
-	 *
-	 * and the total virtio mem space must PAGE_ALIGN
-	 */
-	virtio_devices_nr = VM_MAX_VIRTIO_DEVICES;
-	virtio_iomem_base = VM_VIRTIO_IOMEM_BASE;
-	virtio_device_index = 0;
 
 	return 0;
 }

@@ -52,28 +52,27 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 
-#include <mvm.h>
+#include <minos/vm.h>
 
-static int os_setup_env(struct vm *vm, char *cmdline)
+static int os_other_setup_env(struct vm *vm, char *cmdline)
 {
 	return 0;
 }
 
-static int os_load_image(struct vm *vm)
+static int os_other_load_image(struct vm *vm)
 {
 	return 0;
 }
 
-static int os_early_init(struct vm *vm)
+static int os_other_early_init(struct vm *vm)
 {
 	return 0;
 }
 
 struct vm_os os_other = {
 	.name		= "unknown",
-	.early_init	= os_early_init,
-	.load_image	= os_load_image,
-	.setup_vm_env   = os_setup_env,
+	.early_init	= os_other_early_init,
+	.load_image	= os_other_load_image,
+	.setup_vm_env   = os_other_setup_env,
 };
-
 DEFINE_OS(os_other);

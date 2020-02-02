@@ -30,7 +30,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
 #include <sys/types.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -45,15 +44,11 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
-#include <mvm.h>
-#include <bootimage.h>
+#include <minos/vm.h>
+#include <minos/bootimage.h>
 #include <libfdt/libfdt.h>
-#include <vdev.h>
+#include <minos/vdev.h>
 #include <common/gvm.h>
-
-#define GIC_TYPE_GICV3	(0)
-#define GIC_TYPE_GICV2	(1)
-#define GIC_TYPE_GICV4	(2)
 
 static int fdt_set_gicv2(void *dtb, int node)
 {
@@ -354,7 +349,7 @@ static int linux_setup_env(struct vm *vm, char *cmdline)
 	fdt_setup_cpu(vbase, vm->nr_vcpus);
 	fdt_setup_memory(vbase, vm->mem_start, vm->mem_size,
 			!!vm->flags & VM_FLAGS_64BIT);
-	fdt_set_gic(vbase, vm->vm_config->gic_type);
+	fdt_set_gic(vbase, vm->gic_type);
 
 	if (!(vm->flags & (VM_FLAGS_NO_RAMDISK))) {
 		if (vm->flags & VM_FLAGS_NO_BOOTIMAGE) {
@@ -511,6 +506,12 @@ static int linux_load_image(struct vm *vm)
 		return linux_load_bootimage(vm);
 }
 
+static void linux_vm_exit(struct vm *vm)
+{
+	if (vm->os_data)
+		free(vm->os_data);
+}
+
 static int linux_parse_bootimage(struct vm *vm)
 {
 	int ret;
@@ -535,29 +536,32 @@ static int linux_parse_bootimage(struct vm *vm)
 	vm->os_data = (void *)hdr;
 
 	return 0;
-
-}
-
-static int linux_parse_image(struct vm *vm)
-{
-	/* the images will loaded at fixed address */
-	vm->entry = 0x80080000;
-	vm->setup_data = 0x83e00000;
-	vm->mem_start = 0x80000000;
-
-	return 0;
 }
 
 static int linux_early_init(struct vm *vm)
 {
-	int ret = 0;
+	if (!(vm->flags & VM_FLAGS_NO_BOOTIMAGE))
+		return linux_parse_bootimage(vm);
 
-	if (vm->flags & VM_FLAGS_NO_BOOTIMAGE)
-		ret = linux_parse_image(vm);
-	else
-		ret = linux_parse_bootimage(vm);
+	/*
+	 * memory must 2M align
+	 */
+	vm->mem_start += 0x1fffff;
+	vm->mem_start &= ~0x1ffff;
 
-	return ret;
+	if (vm->entry == 0) {
+		if (vm->flags & VM_FLAGS_64BIT)
+			vm->entry = vm->mem_start + 0x80000;
+		else
+			vm->entry = vm->mem_start + 0x8000;
+	}
+
+	if (vm->setup_data == 0) {
+		vm->setup_data = vm->mem_start +
+			vm->mem_size - MEM_BLOCK_SIZE;
+	}
+
+	return 0;
 }
 
 struct vm_os os_linux = {
@@ -566,6 +570,6 @@ struct vm_os os_linux = {
 	.early_init 	= linux_early_init,
 	.load_image 	= linux_load_image,
 	.setup_vm_env   = linux_setup_env,
+	.vm_exit	= linux_vm_exit,
 };
-
 DEFINE_OS(os_linux);

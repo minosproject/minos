@@ -42,8 +42,8 @@
 #include <pthread.h>
 #include <string.h>
 
-#include "mevent.h"
-#include <vm.h>
+#include <minos/mevent.h>
+#include <minos/vm.h>
 
 #define	MEVENT_MAX	64
 
@@ -270,8 +270,7 @@ static void mevent_set_name(int vmid)
 	pthread_setname_np(mevent_tid, name);
 }
 
-int
-mevent_init(void)
+int mevent_init(void)
 {
 	epoll_fd = epoll_create1(0);
 	assert(epoll_fd >= 0);
@@ -282,11 +281,12 @@ mevent_init(void)
 		return -1;
 }
 
-void
-mevent_deinit(void)
+void mevent_deinit(void)
 {
-	mevent_destroy();
-	close(epoll_fd);
+	if (epoll_fd > 0) {
+		mevent_destroy();
+		close(epoll_fd);
+	}
 }
 
 void *mevent_dispatch(void *data)

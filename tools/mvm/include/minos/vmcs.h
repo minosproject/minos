@@ -16,6 +16,7 @@ struct vmcs {
 	volatile uint64_t data[0];
 } __align(1024);
 
+#define VMCS_ENTRY_SIZE	1024
 #define VMCS_DATA_SIZE	(1024 - sizeof(struct vmcs))
 
 enum vm_trap_type {

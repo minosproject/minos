@@ -1,11 +1,11 @@
 #ifndef __DEBUG_H__
 #define __DEBUG_H__
 
-extern int verbose;
+extern int debug_enable;
 
 #define pr_debug(...)	\
-	do {			\
-		if (verbose)	\
+	do {				\
+		if (debug_enable)	\
 			printf("[DEBUG] " __VA_ARGS__); \
 	} while (0)
 

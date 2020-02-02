@@ -42,8 +42,9 @@
 #include <signal.h>
 #include <unistd.h>
 #include <inttypes.h>
-#include <block_if.h>
-#include <ahci.h>
+
+#include <minos/block_if.h>
+#include <minos/ahci.h>
 
 #define MAXCOMLEN	19
 

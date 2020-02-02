@@ -30,10 +30,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <mvm.h>
+#include <minos/vm.h>
 #include <sys/ioctl.h>
-#include <vdev.h>
-#include <list.h>
+#include <minos/vdev.h>
+#include <minos/list.h>
 #include <sys/mman.h>
 #include <libfdt/libfdt.h>
 #include <common/gvm.h>

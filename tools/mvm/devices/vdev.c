@@ -30,16 +30,18 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <mvm.h>
+#include <minos/vm.h>
 #include <sys/ioctl.h>
-#include <vdev.h>
-#include <list.h>
+#include <minos/vdev.h>
+#include <minos/list.h>
 #include <sys/mman.h>
 #include <libfdt/libfdt.h>
 #include <common/gvm.h>
+#include <minos/option.h>
 
-static int vdev_irq_base;
-static int vdev_irq_count;
+static int vdev_irq_base = GVM_IRQ_BASE;
+static int vdev_irq_count = GVM_IRQ_COUNT;
+static int vdev_id;
 
 void *vdev_map_iomem(unsigned long base, size_t size)
 {
@@ -76,7 +78,7 @@ static struct vdev_ops *vdev_opses[] = {
 
 static struct vdev_ops *get_vdev_ops(char *class)
 {
-	int i;
+	int i, j;
 	struct vdev_ops *ops;
 
 	for (i = 0; ; i++) {
@@ -91,7 +93,6 @@ static struct vdev_ops *get_vdev_ops(char *class)
 
 	return NULL;
 }
-
 #else
 static struct vdev_ops *get_vdev_ops(char *class)
 {
@@ -101,6 +102,7 @@ static struct vdev_ops *get_vdev_ops(char *class)
 
 	for (; start < end; start++) {
 		ops = *start;
+
 		if (strcmp(ops->name, class) == 0)
 			return ops;
 	}
@@ -108,50 +110,6 @@ static struct vdev_ops *get_vdev_ops(char *class)
 	return NULL;
 }
 #endif
-
-static struct vdev *
-alloc_and_init_vdev(struct vm *vm, char *class, char *args)
-{
-	int len, ret;
-	static int vdev_id = 0;
-	struct vdev *pdev;
-	struct vdev_ops *plat_ops = NULL;
-	char buf[32];
-
-	plat_ops = get_vdev_ops(class);
-	if (!plat_ops) {
-		pr_err("can not find such vdev class %s\n", class);
-		return NULL;
-	}
-
-	pdev = malloc(sizeof(struct vdev));
-	if (!pdev)
-		return NULL;
-
-	memset(pdev, 0, sizeof(struct vdev));
-	pdev->ops = plat_ops;
-	pdev->vm = vm;
-	pdev->dev_type = VDEV_TYPE_PLATFORM;
-	pthread_mutex_init(&pdev->lock, NULL);
-
-	memset(buf, 0, 32);
-	len = strlen(class);
-	if (len > PDEV_NAME_SIZE - 2)
-		strncpy(buf, class, PDEV_NAME_SIZE - 2);
-	else
-		strcpy(buf, class);
-	sprintf(pdev->name, "%s%d", buf, vdev_id);
-	pdev->id = vdev_id;
-	vdev_id++;
-
-	ret = plat_ops->init(pdev, args);
-	if (ret) {
-		free(pdev);
-		pdev = NULL;
-	}
-
-	return pdev;
-}
 
 void release_vdev(struct vdev *vdev)
 {
@@ -200,19 +158,6 @@ int vdev_alloc_irq(struct vm *vm, int nr)
 int vdev_alloc_and_request_irq(struct vm *vm, int nr)
 {
 	return __vdev_alloc_and_request_irq(vm, nr, 1);
-}
-
-int create_vdev(struct vm *vm, char *class, char *args)
-{
-	struct vdev *vdev;
-
-	vdev = alloc_and_init_vdev(vm, class, args);
-	if (!vdev)
-		return -ENOMEM;
-
-	list_add_tail(&vm->vdev_list, &vdev->list);
-
-	return 0;
 }
 
 static int dtb_add_virtio(struct vdev *vdev, void *dtb)
@@ -291,10 +236,43 @@ void vdev_setup_env(struct vm *vm, void *data, int os_type)
 	}
 }
 
-int vdev_subsystem_init(void)
+int create_vdev(struct vm *vm, char *name, char *args)
 {
-	vdev_irq_base = GVM_IRQ_BASE;
-	vdev_irq_count = GVM_IRQ_COUNT;
+	int ret;
+	struct vdev *vdev = NULL;
+	struct vdev_ops *vdev_ops;
+
+	vdev_ops = get_vdev_ops(name);
+	if (!vdev_ops)
+		return -ENOENT;
+
+	vdev = calloc(1, sizeof(struct vdev));
+	if (!vdev)
+		return -ENOMEM;
+
+	vdev->ops = vdev_ops;
+	vdev->vm = vm;
+	vdev->id = vdev_id++;
+	vdev->dev_type = VDEV_TYPE_PLATFORM;
+	pthread_mutex_init(&vdev->lock, NULL);
+
+	strncpy(vdev->name, name, sizeof(vdev->name) - 1);
+
+	if (vdev_ops->init)
+		ret = vdev_ops->init(vdev, args);
+	if (ret)
+		goto out;
+
+	list_add_tail(&vm->vdev_list, &vdev->list);
 
 	return 0;
+out:
+	free(vdev);
+	return ret;
 }
+
+static int setup_vm_vdev(char *arg, char *sub_arg, void *data)
+{
+	return create_vdev((struct vm *)data, arg, sub_arg);
+}
+DEFINE_OPTION_VDEV(vm_vdev, "device", 0, setup_vm_vdev);

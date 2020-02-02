@@ -3,10 +3,10 @@
 
 #include <sys/types.h>
 #include <inttypes.h>
-#include <vdev.h>
-#include <io.h>
+#include <minos/vdev.h>
+#include <minos/io.h>
 #include <common/virtio_mmio.h>
-#include <barrier.h>
+#include <minos/barrier.h>
 
 #define VRING_DESC_F_NEXT		(1)
 #define VRING_DESC_F_WRITE		(2)

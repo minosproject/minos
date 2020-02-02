@@ -44,8 +44,8 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
-#include <mvm.h>
-#include <os_xnu.h>
+#include <minos/vm.h>
+#include <minos/os_xnu.h>
 
 #define XNU_KERNEL_BASE		0x40000000
 #define VA_OFFSET(addr)		((addr) & 0x3fffffff)
@@ -75,6 +75,12 @@ static void xnu_vm_exit(struct vm *vm)
 }
 
 extern int create_s3c_uart(struct vm *vm);
+static int xnu_create_resource(struct vm *vm)
+{
+	create_s3c_uart(vm);
+
+	return 0;
+}
 
 static int xnu_setup_env(struct vm *vm, char *cmdline)
 {
@@ -422,5 +428,6 @@ struct vm_os os_xnu = {
 	.load_image	= xnu_load_image,
 	.setup_vm_env	= xnu_setup_env,
 	.vm_exit	= xnu_vm_exit,
+	.create_resource = xnu_create_resource,
 };
 DEFINE_OS(os_xnu);

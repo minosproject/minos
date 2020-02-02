@@ -34,10 +34,11 @@
 #include <strings.h>
 #include <assert.h>
 #include <pthread.h>
-#include <mvm.h>
-#include <virtio.h>
-#include <block_if.h>
-#include <compiler.h>
+
+#include <minos/vm.h>
+#include <minos/virtio.h>
+#include <minos/block_if.h>
+#include <minos/compiler.h>
 
 #define VIRTIO_BLK_RINGSZ	64
 #define VIRTIO_BLK_IOVSZ	64
@@ -452,5 +453,4 @@ struct vdev_ops virtio_blk_ops = {
 	.reset		= virtio_blk_reset,
 	.event		= virtio_blk_event,
 };
-
 DEFINE_VDEV_TYPE(virtio_blk_ops);

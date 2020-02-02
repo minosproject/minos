@@ -1,7 +1,7 @@
 #ifndef _MINOS_LIST_H_
 #define _MINOS_LIST_H_
 
-#include <compiler.h>
+#include <minos/compiler.h>
 
 struct list_head;
 

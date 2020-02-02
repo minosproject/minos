@@ -45,8 +45,8 @@
 #include <sys/mman.h>
 #include <sys/stat.h>
 
-#include <bootimage.h>
-#include <mvm.h>
+#include <minos/bootimage.h>
+#include <minos/mvm.h>
 
 static void dump_bootimg_hdr(boot_img_hdr *hdr)
 {

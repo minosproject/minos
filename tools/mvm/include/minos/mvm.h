@@ -1,5 +1,5 @@
-#ifndef __MINOS_USER_H__
-#define __MINOS_USER_H__
+#ifndef __MINOS_MVM_H__
+#define __MINOS_MVM_H__
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -11,16 +11,19 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/uio.h>
-#include <linux/netlink.h>
 
-#include <compiler.h>
-#include <vmcs.h>
-#include <barrier.h>
-#include <mvm_queue.h>
-#include <debug.h>
-#include <list.h>
-#include <os.h>
-#include <vm.h>
+#include <minos/debug.h>
+#include <minos/compiler.h>
+#include <minos/barrier.h>
+
+#define GIC_TYPE_GICV2	(0)
+#define GIC_TYPE_GICV3	(1)
+#define GIC_TYPE_GICV4	(2)
+
+#define VM_STAT_RUNNING		0x0
+#define VM_STAT_SUSPEND		0x1
+
+#define VM_NAME_SIZE		32
 
 #define INVALID_MMAP_ADDR		((void *)-1)
 

@@ -1,7 +1,7 @@
 #ifndef __MVM_MVM_DEVICE_H__
 #define __MVM_MVM_DEVICE_H__
 
-#include <mvm.h>
+#include <minos/mvm.h>
 #include <pthread.h>
 
 #define PDEV_NAME_SIZE		(31)
@@ -22,15 +22,16 @@ struct vdev_ops {
 #define VDEV_TYPE_VIRTIO	(0x1)
 
 struct vdev {
+	int id;
 	struct vm *vm;
 	int gvm_irq;
-	void *iomem;
 	uint64_t guest_iomem;
 	size_t iomem_size;
+	void *iomem;
 	struct vdev_ops *ops;
 	void *pdata;
 	int dev_type;
-	int id;
+	unsigned long flags;
 	char name[PDEV_NAME_SIZE + 1];
 	struct list_head list;
 	pthread_mutex_t lock;
@@ -48,7 +49,6 @@ void vdev_unmap_iomem(void *iomem, size_t size);
 void vdev_setup_env(struct vm *vm, void *data, int os_type);
 void vdev_send_irq(struct vdev *vdev);
 void release_vdev(struct vdev *vdev);
-int vdev_subsystem_init(void);
 int vdev_alloc_irq(struct vm *vm, int nr);
 int vdev_alloc_and_request_irq(struct vm *vm, int nr);
 
