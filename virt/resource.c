@@ -35,7 +35,7 @@ static int create_vm_vdev_of(struct vm *vm, struct device_node *node)
 {
 	vdev_init_t func;
 
-	if (!node->compatible || node->class != DT_CLASS_VDEV)
+	if (!node->compatible)
 		return -EINVAL;
 
 	func = (vdev_init_t)of_device_node_match(node,
@@ -255,26 +255,6 @@ static int create_vm_res_of(struct vm *vm, struct device_node *node)
 	return 0;
 }
 
-static int create_vm_vtimer_of(struct vm *vm, struct device_node *node)
-{
-	int ret;
-	uint32_t irq;
-	unsigned long flags;
-
-	/*
-	 * for armv8 need to use the virtual timer as the system
-	 * ticks, here we get the virtual timer's irq number, the
-	 * virtual timer's irq num will with the index 2
-	 */
-	ret = get_device_irq_index(node, &irq, &flags, 2);
-	if (ret || (irq < 16) || (irq > 32))
-		return -ENOENT;
-
-	vm->vtimer_virq = irq;
-
-	return 0;
-}
-
 static void *__create_vm_resource_of(struct device_node *node, void *arg)
 {
 	struct vm *vm = (struct vm *)arg;
@@ -285,14 +265,12 @@ static void *__create_vm_resource_of(struct device_node *node, void *arg)
 	case DT_CLASS_PDEV:
 		create_vm_pdev_of(vm, node);
 		break;
+	case DT_CLASS_TIMER:
 	case DT_CLASS_VDEV:
 		create_vm_vdev_of(vm, node);
 		break;
 	case DT_CLASS_VM:
 		create_vm_res_of(vm, node);
-		break;
-	case DT_CLASS_TIMER:
-		create_vm_vtimer_of(vm, node);
 		break;
 	default:
 		break;

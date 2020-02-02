@@ -87,5 +87,6 @@ extern char *pl031_match_table[];
 extern char *sp805_match_table[];
 extern char *virtio_match_table[];
 extern char *aic_match_table[];
+extern char *arm_arch_timer_match_table[];
 
 #endif

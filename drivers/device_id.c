@@ -58,3 +58,9 @@ char *aic_match_table[] = {
 	"aic",
 	NULL
 };
+
+char *arm_arch_timer_match_table[] = {
+	"arm,armv8-timer",
+	"arm,armv7-timer",
+	NULL,
+};

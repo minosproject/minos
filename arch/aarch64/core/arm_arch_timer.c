@@ -36,10 +36,10 @@ enum timer_type {
 };
 
 static char *timer_name[TIMER_MAX] = {
-	"sec_phy_timer",
-	"nonsec_phy_timer",
-	"virt_timer",
-	"hypervisor_timer"
+	"   sec_phy_timer ",
+	"nonsec_phy_timer ",
+	"      virt_timer ",
+	"hypervisor_timer "
 };
 
 struct armv8_timer_info {
@@ -104,14 +104,10 @@ static int timers_arch_init(void)
 	int i, ret;
 	struct armv8_timer_info *info;
 	struct device_node *node = NULL;
-	char *comp[3] = {
-		"arm,armv8-timer",
-		"arm,armv7-timer",
-		NULL,
-	};
 
 #ifdef CONFIG_DEVICE_TREE
-	node = of_find_node_by_compatible(hv_node, comp);
+	node = of_find_node_by_compatible(hv_node,
+			arm_arch_timer_match_table);
 #endif
 	if (!node) {
 		pr_err("can not find arm-arch-timer\n");
@@ -126,8 +122,7 @@ static int timers_arch_init(void)
 			return -ENOENT;
 		}
 
-		pr_notice("%s : irq-%d flags-0x%x\n", timer_name[i],
-				info->irq, info->flags);
+		pr_notice("%s : %d\n", timer_name[i], info->irq);
 	}
 
 	ret = of_get_u32_array(node, "clock-frequency", &cpu_khz, 1);
