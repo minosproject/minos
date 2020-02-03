@@ -47,6 +47,8 @@ src	+= os/os_other.c
 src	+= devices/s3c_uart.c
 src	+= main/option.c
 src	+= main/option_vm.c
+src	+= devices/option_vdev.c
+src	+= os/option_os.c
 
 INCLUDE_DIR = include
 

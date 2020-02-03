@@ -90,8 +90,3 @@ int os_setup_vm(struct vm *vm)
 
 	return 0;
 }
-
-/*
- * do nothing to fix compile issue for option_os section
- */
-DEFINE_OPTION_OS(setup_os_null, "os-res", 0, NULL);
