@@ -758,6 +758,13 @@ struct vmm_area *vm_mmap(struct vm *vm, unsigned long offset, size_t size)
 	struct vmm_area *va;
 	struct vm *vm0 = get_vm_by_id(0);
 
+	/*
+	 * allocate all the memory the GVM request but will not
+	 * map all the memory, only map the memory which mvm request
+	 * for linux, if it need use virtio then need to map all
+	 * the memory, but for other os, may not require to map
+	 * all the memory
+	 */
 	va = alloc_free_vmm_area(&vm0->mm, size, BLOCK_MASK,
 			VM_NORMAL | VM_MAP_PT);
 	if (!va)

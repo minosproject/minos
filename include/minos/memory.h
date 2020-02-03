@@ -83,6 +83,8 @@ struct mm_struct {
 	unsigned long pgd_base;
 	spinlock_t mm_lock;
 
+	struct vmm_area *mem_va;
+
 	/*
 	 * head - all page allocated to this VM, the mmu
 	 * mapping table pages

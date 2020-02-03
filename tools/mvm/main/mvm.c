@@ -696,13 +696,13 @@ static int mvm_main(void)
 
 	if (mevent_init()) {
 		pr_err("mevent init fail\n");
-		return -EFAULT;
+		goto error_option;
 	}
 
 	ret = create_and_init_vm(mvm_vm);
 	if (ret) {
 		pr_err("failed to create vm %d\n", ret);
-		goto error_out;
+		goto error_option;
 	}
 
 	/*
@@ -715,7 +715,7 @@ static int mvm_main(void)
 	ret = vm_create_vcpus(mvm_vm);
 	if (ret) {
 		pr_err("create vcpus for vm failed %d\n", ret);
-		return ret;
+		goto error_out;
 	}
 
 	/*
@@ -726,26 +726,26 @@ static int mvm_main(void)
 	mvm_vm->mmap = map_vm_memory(mvm_vm);
 	if (!mvm_vm->mmap) {
 		pr_err("map vm memory space to process failed\n");
-		return -EAGAIN;
+		goto error_out;
 	}
 
 	/* load the image into the vm memory */
 	ret = vm_load_images(mvm_vm);
 	if (ret) {
 		pr_err("load image for VM failed\n");
-		return ret;
+		goto error_out;
 	}
 
 	ret = os_setup_vm(mvm_vm);
 	if (ret) {
 		pr_err("setup vm fail\n");
-		return ret;
+		goto error_out;
 	}
 
 	ret = vm_create_resource(mvm_vm);
 	if (ret) {
 		pr_err("create resource for vm failed\n");
-		return ret;
+		goto error_out;
 	}
 
 	ret = mvm_main_loop();
