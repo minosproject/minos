@@ -45,7 +45,7 @@ static void *hv_virtio_mmio_init(struct vm *vm, uint64_t gbase)
 {
 	int ret = 0;
 	void *map_base;
-	unsigned long args[2] = {(unsigned long)gbase, VIRTIO_DEVICE_IOMEM_SIZE};
+	uint64_t args[2] = {gbase, VIRTIO_DEVICE_IOMEM_SIZE};
 
 	/*
 	 * first let the hypervisor allocate 4K physic memory for

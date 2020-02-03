@@ -69,8 +69,8 @@ void *vm_vcpu_thread(void *data);
 
 void *map_vm_memory(struct vm *vm)
 {
-	unsigned long args[2];
-	void *addr = NULL;
+	void *addr;
+	uint64_t args[2];
 
 	args[0] = vm->mem_start;
 	args[1] = vm->mem_size;
@@ -81,17 +81,14 @@ void *map_vm_memory(struct vm *vm)
 		return NULL;
 	}
 
-	vm->hvm_paddr = args[0];
-
 	addr = mmap(NULL, (size_t)vm->mem_size, PROT_READ | PROT_WRITE,
 			MAP_SHARED, vm->vm_fd, 0);
 	if (addr == (void *)-1) {
-		pr_err("mmap vm memory failed 0x%lx\n", args[0]);
+		pr_err("mmap vm memory failed 0x%lx\n", (unsigned long)addr);
 		return NULL;
 	}
 
-	pr_notice("vm-%d mmap address in vm0: 0x%"PRIx64" mmap:0x%lx\n",
-			vm->vmid, vm->hvm_paddr, (unsigned long)addr);
+	pr_notice("vm-%d mmap address 0x%lx\n", vm->vmid, (unsigned long)addr);
 
 	return addr;
 }
@@ -121,7 +118,7 @@ static int create_new_vm(struct vm *vm)
 	pr_notice("        -entry      : 0x%"PRIx64"\n", info.entry);
 	pr_notice("        -setup_data : 0x%"PRIx64"\n", info.setup_data);
 
-	vmid = ioctl(vm->vm0_fd, IOCTL_CREATE_VM, &info);
+	vmid = ioctl(vm->vm0_fd, IOCTL_CREATE_VM, (unsigned long)&info);
 	if (vmid <= 0) {
 		pr_err("create new vm failed %d\n", vmid);
 		goto out;
@@ -129,20 +126,6 @@ static int create_new_vm(struct vm *vm)
 
 out:
 	return vmid;
-}
-
-static int release_vm(int vmid)
-{
-	int fd, ret;
-
-	fd = open(DEV_MVM0, O_RDWR);
-	if (fd < 0)
-		return -ENODEV;
-
-	ret = ioctl(fd, IOCTL_DESTROY_VM, vmid);
-	close(fd);
-
-	return ret;
 }
 
 static void vm_release_vcpu(struct vcpu *vcpu)
@@ -195,14 +178,13 @@ static int destroy_vm(struct vm *vm)
 
 	mevent_deinit();
 
-	if (vm->mmap)
-		munmap(vm->mmap, vm->mem_size);
+	if (vm->vm0_fd)
+		close(vm->vm0_fd);
 
-	if (vm->vm_fd > 0)
+	if (vm->vm_fd > 0) {
+		pr_info("close vm fd\n");
 		close(vm->vm_fd);
-
-	if (vm->vmid > 0)
-		release_vm(vm->vmid);
+	}
 
 	if (vm->image_fd > 0)
 		close(vm->image_fd);
@@ -215,9 +197,6 @@ static int destroy_vm(struct vm *vm)
 
 	if (vm->dfd > 0)
 		close(vm->rfd);
-
-	if (vm->vm0_fd)
-		close(vm->vm0_fd);
 
 	if (vm->os && vm->os->vm_exit)
 		vm->os->vm_exit(vm);
@@ -271,16 +250,13 @@ void *hvm_map_iomem(unsigned long base, size_t size)
 static void *vm_create_vmcs(struct vm *vm)
 {
 	int ret;
-	unsigned long vmcs;
+	uint64_t vmcs;
 
 	ret = ioctl(vm->vm_fd, IOCTL_CREATE_VMCS, &vmcs);
 	if (ret)
 		return (void *)-1;
 
-	if (!vmcs)
-		return (void *)-1;
-
-	return hvm_map_iomem(vmcs, VMCS_SIZE(vm->nr_vcpus));
+	return hvm_map_iomem((unsigned long)vmcs, VMCS_SIZE(vm->nr_vcpus));
 }
 
 static int vm_create_vcpus(struct vm *vm)
@@ -288,7 +264,7 @@ static int vm_create_vcpus(struct vm *vm)
 	int i, ret;
 	void *vmcs;
 	struct vcpu *vcpu;
-	unsigned long arg[2];
+	uint32_t arg[2];
 
 	vmcs = vm_create_vmcs(vm);
 	if (vmcs == (void *)-1) {

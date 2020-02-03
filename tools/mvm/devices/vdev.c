@@ -122,11 +122,12 @@ void release_vdev(struct vdev *vdev)
 
 static int __vdev_request_virq(struct vm *vm, int base, int nr)
 {
-	unsigned long arg[2];
+	int arg[2];
 
 	/* request the virq from the hypervisor */
 	arg[0] = base;
 	arg[1] = nr;
+
 	return ioctl(vm->vm_fd, IOCTL_REQUEST_VIRQ, arg);
 }
 
