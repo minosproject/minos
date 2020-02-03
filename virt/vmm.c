@@ -707,8 +707,10 @@ static int __vm_mmap(struct mm_struct *mm, unsigned long hvm_mmap_base,
 
 	while (left > 0) {
 		vm_pmd = (unsigned long *)get_mapping_pmd(mm->pgd_base, vir, 0);
-		if (mapping_error(vm_pmd))
-			return -EIO;
+		if (mapping_error(vm_pmd)) {
+			pr_err("addr 0x%x has not mapped in vm-%d\n", vir);
+			return -EPERM;
+		}
 
 		vir_off = pmd_idx(vir);
 		count = (PAGE_MAPPING_COUNT - vir_off);
@@ -729,8 +731,10 @@ static int __vm_mmap(struct mm_struct *mm, unsigned long hvm_mmap_base,
 			if ((phy_off & (PAGE_MAPPING_COUNT - 1)) == 0) {
 				phy_off = 0;
 				vm0_pmd = (unsigned long *)alloc_guest_pmd(mm0, phy);
-				if (!vm0_pmd)
+				if (!vm0_pmd) {
+					pr_err("no more pmd can be allocated\n");
 					return -ENOMEM;
+				}
 			}
 		}
 
