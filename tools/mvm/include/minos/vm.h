@@ -80,6 +80,8 @@ struct vm {
 
 	uint64_t mem_size;
 	uint64_t mem_start;
+	uint64_t map_start;
+	uint64_t map_size;
 	uint64_t entry;
 	uint64_t setup_data;
 

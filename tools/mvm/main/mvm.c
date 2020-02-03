@@ -72,8 +72,18 @@ void *map_vm_memory(struct vm *vm)
 	void *addr;
 	uint64_t args[2];
 
-	args[0] = vm->mem_start;
-	args[1] = vm->mem_size;
+	/*
+	 * use vm->map_xxx as the default map config, if
+	 * these two member has not been set, the config
+	 * is as same as vm->map_xxx
+	 */
+	if (vm->map_size == 0) {
+		vm->map_start = vm->mem_start;
+		vm->map_size = vm->mem_size;
+	}
+
+	args[0] = vm->map_start;
+	args[1] = vm->map_size;
 
 	if (ioctl(vm->vm_fd, IOCTL_VM_MMAP, args)) {
 		pr_err("mmap memory failed 0x%"PRIx64" 0x%"PRIx64"\n",
@@ -81,14 +91,16 @@ void *map_vm_memory(struct vm *vm)
 		return NULL;
 	}
 
-	addr = mmap(NULL, (size_t)vm->mem_size, PROT_READ | PROT_WRITE,
-			MAP_SHARED, vm->vm_fd, 0);
+	addr = mmap64(NULL, (size_t)vm->map_size, PROT_READ | PROT_WRITE,
+			MAP_SHARED, vm->vm_fd, vm->map_start);
 	if (addr == (void *)-1) {
 		pr_err("mmap vm memory failed 0x%lx\n", (unsigned long)addr);
 		return NULL;
 	}
 
-	pr_notice("vm-%d mmap address 0x%lx\n", vm->vmid, (unsigned long)addr);
+	pr_notice("vm-%d 0x%"PRIx64"@0x%"PRIx64" mmap to 0x%lx\n",
+			vm->vmid, vm->map_start, vm->map_size,
+			(unsigned long)addr);
 
 	return addr;
 }
