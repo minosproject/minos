@@ -51,6 +51,8 @@
 #define VA_OFFSET(addr)		((addr) & 0x3fffffff)
 #define VA2PA(addr)		(XNU_KERNEL_BASE + ((addr) & 0x3fffffff))
 
+#define LOAD_OFFSET(addr, base)	(VA2PA(addr) - base)
+
 struct xnu_segment_cmd64 {
 	struct segment_cmd64 *cmd;
 	struct xnu_segment_cmd64 *next;
@@ -71,15 +73,8 @@ struct xnu_os_data {
 
 static void xnu_vm_exit(struct vm *vm)
 {
-
-}
-
-extern int create_s3c_uart(struct vm *vm);
-static int xnu_create_resource(struct vm *vm)
-{
-	create_s3c_uart(vm);
-
-	return 0;
+	if (vm->os_data)
+		free(vm->os_data);
 }
 
 static int xnu_setup_env(struct vm *vm, char *cmdline)
@@ -89,10 +84,8 @@ static int xnu_setup_env(struct vm *vm, char *cmdline)
 	struct xnu_dt_node_prop *dt_prop = NULL;
 	struct xnu_os_data *od = (struct xnu_os_data *)vm->os_data;
 	struct xnu_arm64_boot_args *arg = (struct xnu_arm64_boot_args *)
-		(vm->mmap + VA_OFFSET(od->bootarg_load_base));
-	char *dtb = (char *)(vm->mmap + VA_OFFSET(od->dtb_load_base));
-
-	create_s3c_uart(vm);
+		(vm->mmap + LOAD_OFFSET(od->bootarg_load_base, vm->map_start));
+	char *dtb = (char *)(vm->mmap + LOAD_OFFSET(od->dtb_load_base, vm->map_start));
 
 	memset(arg, 0, sizeof(struct xnu_arm64_boot_args));
 	arg->revision = XNU_ARM64_KBOOT_ARGS_REVISION2;
@@ -179,7 +172,7 @@ static int xnu_load_kernel_image(struct vm *vm)
 
 	while (root) {
 		cmd = root->cmd;
-		offset = VA_OFFSET(cmd->vm_addr);
+		offset = LOAD_OFFSET(cmd->vm_addr, vm->map_start);
 
 		ret = xnu_load_raw_data(vm->kfd, vm_base, offset,
 				cmd->file_off, cmd->file_size);
@@ -208,7 +201,8 @@ static int xnu_load_ramdisk(struct vm *vm)
 		return -ENOENT;
 
 	return xnu_load_raw_data(vm->rfd, vm->mmap,
-			VA_OFFSET(od->ramdisk_load_base), 0, od->ramdisk_size);
+			LOAD_OFFSET(od->ramdisk_load_base, vm->map_start),
+			0, od->ramdisk_size);
 }
 
 static int xnu_load_dtb(struct vm *vm)
@@ -219,7 +213,8 @@ static int xnu_load_dtb(struct vm *vm)
 		return -ENOENT;
 
 	return xnu_load_raw_data(vm->dfd, vm->mmap,
-			VA_OFFSET(od->dtb_load_base), 0, od->dtb_size);
+			LOAD_OFFSET(od->dtb_load_base, vm->map_start),
+			0, od->dtb_size);
 }
 
 static int xnu_load_image(struct vm *vm)
@@ -387,10 +382,15 @@ out:
 	vm->entry = VA2PA(od->entry_point);
 	vm->setup_data = VA2PA(od->bootarg_load_base);
 
+	vm->map_start = MEM_BLOCK_ALIGN(VA2PA(od->kernel_load_base));
+	vm->map_size = VA2PA(MEM_BLOCK_BALIGN(od->load_end)) - vm->map_start;
+
 	pr_info("xnu kernel_load_base 0x%"PRIx64"\n", od->kernel_load_base);
 	pr_info("xnu ramdisk_load_base 0x%"PRIx64"\n", od->ramdisk_load_base);
 	pr_info("xnu dtb_load_base 0x%"PRIx64"\n", od->dtb_load_base);
 	pr_info("xnu bootarg_load_base 0x%"PRIx64"\n", od->bootarg_load_base);
+	pr_info("xnu memory map start 0x%"PRIx64"\n", vm->map_start);
+	pr_info("xnu memory map size 0x%"PRIx64"\n", vm->map_size);
 }
 
 static int xnu_early_init(struct vm *vm)
@@ -428,6 +428,5 @@ struct vm_os os_xnu = {
 	.load_image	= xnu_load_image,
 	.setup_vm_env	= xnu_setup_env,
 	.vm_exit	= xnu_vm_exit,
-	.create_resource = xnu_create_resource,
 };
 DEFINE_OS(os_xnu);

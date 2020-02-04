@@ -87,11 +87,6 @@ static int s3c_uart_reset(struct vdev *vdev)
 	return 0;
 }
 
-int create_s3c_uart(struct vm *vm)
-{
-	return create_vdev(vm, "s3c_uart", NULL);
-}
-
 static void s3c_uart_read_event(unsigned long reg, uint64_t *value)
 {
 	switch (reg) {
