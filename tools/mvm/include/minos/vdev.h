@@ -48,7 +48,7 @@ void *vdev_map_iomem(unsigned long iomem, size_t size);
 void vdev_unmap_iomem(void *iomem, size_t size);
 void vdev_setup_env(struct vm *vm, void *data, int os_type);
 void vdev_send_irq(struct vdev *vdev);
-void release_vdev(struct vdev *vdev);
+void release_vdevs(struct vm *vm);
 int vdev_alloc_irq(struct vm *vm, int nr);
 int vdev_alloc_and_request_irq(struct vm *vm, int nr);
 

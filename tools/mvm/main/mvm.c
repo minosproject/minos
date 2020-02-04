@@ -170,8 +170,8 @@ static void vm_release_vcpu(struct vcpu *vcpu)
 static int destroy_vm(struct vm *vm)
 {
 	int i;
-	struct vdev *vdev;
 
+	mvm_vm = NULL;
 	mvm_free_options();
 
 	if (!vm)
@@ -179,49 +179,62 @@ static int destroy_vm(struct vm *vm)
 
 	if (vm->vcpus) {
 		for (i = 0; i < vm->nr_vcpus; i++) {
-			if (vm->vcpus[i])
+			if (vm->vcpus[i]) {
+				pr_info("release vcpu-%d\n", i);
 				vm_release_vcpu(vm->vcpus[i]);
+			}
 		}
 		free(vm->vcpus);
 	}
 
-	list_for_each_entry(vdev, &vm->vdev_list, list)
-		release_vdev(vdev);
+	release_vdevs(vm);
 
+	pr_info("mevent deinit\n");
 	mevent_deinit();
 
-	if (vm->vm0_fd)
+	if (vm->vm0_fd) {
+		pr_info("close vm0 fd\n");
 		close(vm->vm0_fd);
+	}
 
 	if (vm->vm_fd > 0) {
 		pr_info("close vm fd\n");
 		close(vm->vm_fd);
 	}
 
-	if (vm->image_fd > 0)
+	if (vm->image_fd > 0) {
+		pr_info("close bootimage fd\n");
 		close(vm->image_fd);
+	}
 
-	if (vm->kfd > 0)
+	if (vm->kfd > 0) {
+		pr_info("close kernel fd\n");
 		close(vm->kfd);
+	}
 
-	if (vm->rfd > 0)
+	if (vm->rfd > 0) {
+		pr_info("close ramdisk fd\n");
 		close(vm->rfd);
+	}
 
-	if (vm->dfd > 0)
+	if (vm->dfd > 0) {
+		pr_info("close dtb fd\n");
 		close(vm->rfd);
+	}
 
-	if (vm->os && vm->os->vm_exit)
+	if (vm->os && vm->os->vm_exit) {
+		pr_info("do os exiting\n");
 		vm->os->vm_exit(vm);
+	}
 
 	free(vm);
-	mvm_vm = NULL;
 
 	return 0;
 }
 
 static void signal_handler(int signum)
 {
-	int vmid = 0xfff;
+	struct vm *vm;
 
 	pr_notice("recevied signal %i\n", signum);
 
@@ -232,11 +245,12 @@ static void signal_handler(int signum)
 	case SIGSEGV:
 	case SIGSTOP:
 	case SIGTSTP:
-		if (mvm_vm)
-			vmid = mvm_vm->vmid;
-
-		pr_notice("shutdown vm-%d\n", vmid);
-		vm_shutdown(mvm_vm);
+		if (mvm_vm) {
+			vm = mvm_vm;
+			mvm_vm = NULL;
+			pr_notice("shutdown vm-%d\n", vm->vmid);
+			vm_shutdown(vm);
+		}
 		break;
 	default:
 		break;
@@ -349,6 +363,7 @@ static int vm_load_images(struct vm *vm)
 static int create_and_init_vm(struct vm *vm)
 {
 	char path[32];
+	int retry;
 
 	vm->vm0_fd = open(DEV_MVM0, O_RDWR | O_NONBLOCK);
 	if (vm->vm0_fd <= 0) {
@@ -360,12 +375,19 @@ static int create_and_init_vm(struct vm *vm)
 	if (vm->vmid <= 0)
 		return -EFAULT;
 
+	memset(path, 0, sizeof(path));
 	sprintf(path, DEV_MVM_PATH"%d", vm->vmid);
-	vm->vm_fd = open(path, O_RDWR | O_NONBLOCK);
-	if (vm->vm_fd < 0) {
-		perror(path);
-		return -EIO;
+
+	for (retry = 0; retry < 5; retry++) {
+		vm->vm_fd = open(path, O_RDWR | O_NONBLOCK);
+		if (vm->vm_fd < 0)
+			pr_err("fail to open %s %d\n", path, vm->vm_fd);
+		else
+			break;
 	}
+
+	if (vm->vm_fd < 0)
+		return -ENOENT;
 
 	return 0;
 }
@@ -524,11 +546,13 @@ int vm_shutdown(struct vm *vm)
 {
 	int ret;
 
-	ret = ioctl(vm->vm_fd, IOCTL_POWER_DOWN_VM, 0);
-	if (ret) {
-		pr_err("can not power-off vm-%d now, try again\n",
-				vm->vmid);
-		return -EAGAIN;
+	if (vm && vm->vm_fd) {
+		ret = ioctl(vm->vm_fd, IOCTL_POWER_DOWN_VM, 0);
+		if (ret) {
+			pr_err("can not power-off vm-%d now, try again\n",
+					vm->vmid);
+			return -EAGAIN;
+		}
 	}
 
 	return __vm_shutdown(vm);
@@ -603,11 +627,10 @@ static void handle_vm_event(struct vm *vm, struct mvm_node *node)
 	mvm_queue_free(node);
 }
 
-static int mvm_main_loop(void)
+static int mvm_main_loop(struct vm *vm)
 {
 	int ret;
 	pthread_t vcpu_thread;
-	struct vm *vm = mvm_vm;
 	struct mvm_node *node;
 
 	ret = pthread_create(&vcpu_thread, NULL,
@@ -664,6 +687,7 @@ static int mvm_check_vm_config(struct vm *vm)
 static int mvm_main(void)
 {
 	int ret;
+	struct vm *vm;
 
 	signal(SIGTERM, signal_handler);
 	signal(SIGBUS, signal_handler);
@@ -672,46 +696,46 @@ static int mvm_main(void)
 	signal(SIGSTOP, signal_handler);
 	signal(SIGTSTP, signal_handler);
 
-	mvm_vm = (struct vm *)calloc(1, sizeof(struct vm));
-	if (!mvm_vm)
+	vm = mvm_vm = (struct vm *)calloc(1, sizeof(struct vm));
+	if (!vm)
 		return -ENOMEM;
 
 	/*
 	 * init some member to default value
 	 */
-	init_list(&mvm_vm->vdev_list);
-	mvm_vm->mem_start = VM_MEM_START;
-	mvm_vm->mem_size = VM_MIN_MEM_SIZE;
-	mvm_vm->flags |= VM_FLAGS_NO_BOOTIMAGE | VM_FLAGS_DYNAMIC_AFF;
+	init_list(&vm->vdev_list);
+	vm->mem_start = VM_MEM_START;
+	vm->mem_size = VM_MIN_MEM_SIZE;
+	vm->flags |= VM_FLAGS_NO_BOOTIMAGE | VM_FLAGS_DYNAMIC_AFF;
 
 	/*
 	 * get all the necessary vm options for this VM, then
 	 * check the whether this VM has been config correctly
 	 */
-	ret = mvm_parse_option_group(OPTION_GRP_VM, mvm_vm);
+	ret = mvm_parse_option_group(OPTION_GRP_VM, vm);
 	if (ret)
 		goto error_option;
 
-	ret = mvm_check_vm_config(mvm_vm);
+	ret = mvm_check_vm_config(vm);
 	if (ret) {
 		pr_err("option checking fail\n");
 		goto error_option;
 	}
 
-	ret = os_early_init(mvm_vm);
+	ret = os_early_init(vm);
 	if (ret) {
 		pr_err("os early init failed %d\n", ret);
 		goto error_option;
 	}
 
-	mvm_queue_init(&mvm_vm->queue);
+	mvm_queue_init(&vm->queue);
 
 	if (mevent_init()) {
 		pr_err("mevent init fail\n");
 		goto error_option;
 	}
 
-	ret = create_and_init_vm(mvm_vm);
+	ret = create_and_init_vm(vm);
 	if (ret) {
 		pr_err("failed to create vm %d\n", ret);
 		goto error_option;
@@ -721,10 +745,10 @@ static int mvm_main(void)
 	 * create the device which is passed by the
 	 * argument
 	 */
-	os_create_resource(mvm_vm);
-	mvm_parse_option_group(OPTION_GRP_VDEV, mvm_vm);
+	os_create_resource(vm);
+	mvm_parse_option_group(OPTION_GRP_VDEV, vm);
 
-	ret = vm_create_vcpus(mvm_vm);
+	ret = vm_create_vcpus(vm);
 	if (ret) {
 		pr_err("create vcpus for vm failed %d\n", ret);
 		goto error_out;
@@ -735,41 +759,43 @@ static int mvm_main(void)
 	 * to informe hypervisor to map the really physical
 	 * memory
 	 */
-	mvm_vm->mmap = map_vm_memory(mvm_vm);
-	if (!mvm_vm->mmap) {
+	vm->mmap = map_vm_memory(vm);
+	if (!vm->mmap) {
 		pr_err("map vm memory space to process failed\n");
 		goto error_out;
 	}
 
 	/* load the image into the vm memory */
-	ret = vm_load_images(mvm_vm);
+	ret = vm_load_images(vm);
 	if (ret) {
 		pr_err("load image for VM failed\n");
 		goto error_out;
 	}
 
-	ret = os_setup_vm(mvm_vm);
+	ret = os_setup_vm(vm);
 	if (ret) {
 		pr_err("setup vm fail\n");
 		goto error_out;
 	}
 
-	ret = vm_create_resource(mvm_vm);
+	ret = vm_create_resource(vm);
 	if (ret) {
 		pr_err("create resource for vm failed\n");
 		goto error_out;
 	}
 
-	ret = mvm_main_loop();
+	ret = mvm_main_loop(vm);
 	if (mvm_vm == NULL)
 		return 0;
 
 error_out:
-	destroy_vm(mvm_vm);
+	mvm_vm = NULL;
+	destroy_vm(vm);
 	return ret;
 
 error_option:
-	free(mvm_vm);
+	mvm_vm = NULL;
+	free(vm);
 	return -EINVAL;
 }
 

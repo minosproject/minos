@@ -14,4 +14,4 @@ static int setup_vm_vdev(char *arg, char *sub_arg, void *data)
 {
 	return create_vdev((struct vm *)data, arg, sub_arg);
 }
-DEFINE_OPTION_VDEV(vm_vdev, "device", 0, setup_vm_vdev);
+DEFINE_OPTION_VDEV(device, "device", 0, setup_vm_vdev);

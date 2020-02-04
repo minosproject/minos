@@ -203,19 +203,19 @@ static int setup_vm_gic(char *arg, char *sub_arg, void *data)
 	return 0;
 }
 
-DEFINE_OPTION_VM(vm_mem_size, "memory", 1, setup_vm_mem_size);
-DEFINE_OPTION_VM(vm_name, "vm_name", 0, setup_vm_name);
-DEFINE_OPTION_VM(vm_os_type, "vm_os", 1, setup_vm_os_type);
-DEFINE_OPTION_VM(vm_vcpus, "vcpus", 1, setup_vm_vcpus);
-DEFINE_OPTION_VM(vm_bootimage, "bootimage", 0, setup_vm_bootimage);
-DEFINE_OPTION_VM(vm_kfd, "kernel_image", 0, setup_vm_kernel_image);
-DEFINE_OPTION_VM(vm_dfd, "dtb_image", 0, setup_vm_dtb_image);
-DEFINE_OPTION_VM(vm_rfd, "ramdisk_image", 0, setup_vm_ramdisk_image);
-DEFINE_OPTION_VM(vm_rf, "no-ramdisk", 0, setup_vm_ramdisk_flag);
-DEFINE_OPTION_VM(vm_entry, "entry", 0, setup_vm_entry);
-DEFINE_OPTION_VM(vm_setup_data, "setup", 0, setup_vm_setup_addr);
-DEFINE_OPTION_VM(vm_setup_mem_base,
+DEFINE_OPTION_VM(mem_size, "memory", 1, setup_vm_mem_size);
+DEFINE_OPTION_VM(name, "vm_name", 0, setup_vm_name);
+DEFINE_OPTION_VM(os_type, "vm_os", 1, setup_vm_os_type);
+DEFINE_OPTION_VM(vcpus, "vcpus", 1, setup_vm_vcpus);
+DEFINE_OPTION_VM(bootimage, "bootimage", 0, setup_vm_bootimage);
+DEFINE_OPTION_VM(kfd, "kernel_image", 0, setup_vm_kernel_image);
+DEFINE_OPTION_VM(dfd, "dtb_image", 0, setup_vm_dtb_image);
+DEFINE_OPTION_VM(rfd, "ramdisk_image", 0, setup_vm_ramdisk_image);
+DEFINE_OPTION_VM(rf, "no-ramdisk", 0, setup_vm_ramdisk_flag);
+DEFINE_OPTION_VM(entry, "entry", 0, setup_vm_entry);
+DEFINE_OPTION_VM(setup_data, "setup", 0, setup_vm_setup_addr);
+DEFINE_OPTION_VM(setup_mem_base,
 		"iomem_base", 0, setup_vm_mem_base);
-DEFINE_OPTION_VM(vm_type, "os-64bit", 0, setup_vm_type);
-DEFINE_OPTION_VM(vm_cmdline, "cmdline", 0, setup_vm_cmdline);
-DEFINE_OPTION_VM(vm_gic, "gic", 0, setup_vm_gic);
+DEFINE_OPTION_VM(type, "os-64bit", 0, setup_vm_type);
+DEFINE_OPTION_VM(cmdline, "cmdline", 0, setup_vm_cmdline);
+DEFINE_OPTION_VM(gic, "gic", 0, setup_vm_gic);

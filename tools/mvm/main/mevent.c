@@ -286,6 +286,7 @@ void mevent_deinit(void)
 	if (epoll_fd > 0) {
 		mevent_destroy();
 		close(epoll_fd);
+		epoll_fd = 0;
 	}
 }
 

@@ -140,7 +140,7 @@ struct virtio_console_console_resize {
 	uint16_t rows;
 } __attribute__((packed));
 
-static int stdio_in_use;
+int stdio_in_use;
 
 static void virtio_console_notify_rx(struct virt_queue *);
 static void virtio_console_notify_tx(struct virt_queue *);
@@ -537,8 +537,8 @@ virtio_console_open_backend(const char *path,
 			pr_warn("vtcon: stdio is used by other device\n");
 			break;
 		}
-		fd = STDIN_FILENO;
 		stdio_in_use = true;
+		fd = STDIN_FILENO;
 		break;
 	case VIRTIO_CONSOLE_BE_TTY:
 		fd = open(path, O_RDWR | O_NONBLOCK);

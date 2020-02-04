@@ -78,7 +78,7 @@ static struct vdev_ops *vdev_opses[] = {
 
 static struct vdev_ops *get_vdev_ops(char *class)
 {
-	int i, j;
+	int i;
 	struct vdev_ops *ops;
 
 	for (i = 0; ; i++) {
@@ -111,13 +111,16 @@ static struct vdev_ops *get_vdev_ops(char *class)
 }
 #endif
 
-void release_vdev(struct vdev *vdev)
+void release_vdevs(struct vm *vm)
 {
-	if (!vdev)
-		return;
+	struct vdev *vdev, *tmp;
 
-	vdev->ops->deinit(vdev);
-	free(vdev);
+	list_for_each_entry_safe(vdev, tmp, &vm->vdev_list, list) {
+		pr_info("release vdev-%s\n", vdev->name);
+		vdev->ops->deinit(vdev);
+		list_del(&vdev->list);
+		free(vdev);
+	}
 }
 
 static int __vdev_request_virq(struct vm *vm, int base, int nr)
@@ -239,7 +242,7 @@ void vdev_setup_env(struct vm *vm, void *data, int os_type)
 
 int create_vdev(struct vm *vm, char *name, char *args)
 {
-	int ret;
+	int ret = 0;
 	struct vdev *vdev = NULL;
 	struct vdev_ops *vdev_ops;
 

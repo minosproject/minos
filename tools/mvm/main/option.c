@@ -43,6 +43,50 @@
 
 static struct list_head option_head;
 
+DECLARE_VM_OPTION(mem_size);
+DECLARE_VM_OPTION(name);
+DECLARE_VM_OPTION(os_type);
+DECLARE_VM_OPTION(vcpus);
+DECLARE_VM_OPTION(bootimage);
+DECLARE_VM_OPTION(kfd);
+DECLARE_VM_OPTION(dfd);
+DECLARE_VM_OPTION(rfd);
+DECLARE_VM_OPTION(rf);
+DECLARE_VM_OPTION(entry);
+DECLARE_VM_OPTION(setup_data);
+DECLARE_VM_OPTION(setup_mem_base);
+DECLARE_VM_OPTION(type);
+DECLARE_VM_OPTION(cmdline);
+DECLARE_VM_OPTION(gic);
+
+DECLARE_VDEV_OPTION(device);
+
+static struct mvm_option_parser *vm_parser_table[] = {
+	VM_OP(mem_size),
+	VM_OP(name),
+	VM_OP(os_type),
+	VM_OP(vcpus),
+	VM_OP(bootimage),
+	VM_OP(kfd),
+	VM_OP(dfd),
+	VM_OP(rfd),
+	VM_OP(rf),
+	VM_OP(entry),
+	VM_OP(setup_data),
+	VM_OP(setup_mem_base),
+	VM_OP(type),
+	VM_OP(cmdline),
+	VM_OP(gic),
+};
+
+static struct mvm_option_parser *os_parser_table[] = {
+
+};
+
+static struct mvm_option_parser *vdev_parser_table[] = {
+	VDEV_OP(device),
+};
+
 static void mvm_get_one_option(char *arg)
 {
 	char *ret = NULL;
@@ -84,32 +128,25 @@ static void mvm_get_one_option(char *arg)
 }
 
 static int inline get_option_parser(int group,
-		struct mvm_option_parser ***start,
-		struct mvm_option_parser ***end)
+		struct mvm_option_parser ***start, int *cnt)
 {
-	struct mvm_option_parser **p_start;
-	struct mvm_option_parser **p_end;
-
 	switch (group) {
 	case OPTION_GRP_VM:
-		p_start = (struct mvm_option_parser **)&__start_option_vm;
-		p_end = (struct mvm_option_parser **)&__stop_option_vm;
+		*start = vm_parser_table;
+		*cnt = sizeof(vm_parser_table) / sizeof(vm_parser_table[0]);
 		break;
 	case OPTION_GRP_OS:
-		p_start = (struct mvm_option_parser **)&__start_option_os;
-		p_end = (struct mvm_option_parser **)&__stop_option_os;
+		*start = os_parser_table;
+		*cnt = sizeof(os_parser_table) / sizeof(os_parser_table[0]);
 		break;
 	case OPTION_GRP_VDEV:
-		p_start = (struct mvm_option_parser **)&__start_option_vdev;
-		p_end = (struct mvm_option_parser **)&__stop_option_vdev;
+		*start = vdev_parser_table;
+		*cnt = sizeof(vdev_parser_table) / sizeof(vdev_parser_table[0]);
 		break;
 	default:
 		pr_err("unsupport option group %d\n", group);
 		return -EINVAL;
 	}
-
-	*start = p_start;
-	*end = p_end;
 
 	return 0;
 }
@@ -369,12 +406,12 @@ int mvm_parse_option_bool(char *name, int *value)
 int mvm_parse_option_group(int group, void *data)
 {
 	int found = 0, ret;
+	int i= 0, cnt;
 	struct mvm_option *option, *tmp;
 	struct mvm_option_parser *p;
 	struct mvm_option_parser **p_start;
-	struct mvm_option_parser **p_end;
 
-	if (get_option_parser(group, &p_start, &p_end))
+	if (get_option_parser(group, &p_start, &cnt) || (cnt == 0))
 		return -EINVAL;
 
 	/*
@@ -383,8 +420,8 @@ int mvm_parse_option_group(int group, void *data)
 	 * option need to check it's state, if fail then return
 	 * error
 	 */
-	for (; p_start < p_end; p_start++) {
-		p = *p_start;
+	for (i = 0; i < cnt; i++) {
+		p = p_start[i];
 		list_for_each_entry_safe(option,
 				tmp, &option_head, list) {
 			if (strcmp(option->name, p->name) != 0)

@@ -24,7 +24,12 @@ cc_binary {
 	"os/os_linux.c",
 	"os/os_xnu.c",
 	"os/os_other.c",
+	"os/os.c",
 	"devices/s3c_uart.c",
+	"main/option.c",
+	"main/option_vm.c",
+	"devices/option_vdev.c",
+	"os/option_os.c",
     ],
     cflags: [
         "-Wall",

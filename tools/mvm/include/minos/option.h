@@ -11,10 +11,10 @@ enum {
 	OPTION_GRP_UNKNOWN,
 };
 
-#define OPTION_TAG_GLOBAL	"option_global"
-#define OPTION_TAG_VM		"option_vm"
-#define OPTION_TAG_OS		"option_os"
-#define OPTION_TAG_VDEV		"option_vdev"
+#define OPTION_TAG_GLOBAL	global
+#define OPTION_TAG_VM		vm
+#define OPTION_TAG_OS		os
+#define OPTION_TAG_VDEV		vdev
 
 struct mvm_option_parser {
 	int force;
@@ -29,14 +29,17 @@ struct mvm_option {
 	struct list_head list;
 };
 
+#define OPTION_NAME(tag, n)	__option_##tag##_##n
+#define VM_OPTION(n)		OPTION_NAME(vm, n)
+#define OS_OPTION(n)		OPTION_NAME(os, n)
+#define VDEV_OPTION(n)		OPTION_NAME(vdev, n)
+
 #define DEFINE_OPTION_PARSER(n, arg_name, tag_name, f, hdl)	\
-	static struct mvm_option_parser __option_##n __used = {	\
+	struct mvm_option_parser OPTION_NAME(tag_name, n) __used = {	\
 		.name = arg_name,				\
 		.handler = hdl,					\
 		.force	= f,					\
-	};							\
-	static struct mvm_option_parser *__option_##n##_ptr	\
-	__used __section(tag_name) = &__option_##n
+	};
 
 #define DEFINE_OPTION_GLOBAL(n, arg_name, f, handler)	\
 	DEFINE_OPTION_PARSER(n, arg_name, OPTION_TAG_GLOBAL, f, handler)
@@ -50,12 +53,16 @@ struct mvm_option {
 #define DEFINE_OPTION_VDEV(n, arg_name, f, handler)	\
 	DEFINE_OPTION_PARSER(n, arg_name, OPTION_TAG_VDEV, f, handler)
 
-extern unsigned char __start_option_vm;
-extern unsigned char __stop_option_vm;
-extern unsigned char __start_option_os;
-extern unsigned char __stop_option_os;
-extern unsigned char __start_option_vdev;
-extern unsigned char __stop_option_vdev;
+#define DECLARE_VM_OPTION(n)	\
+	extern struct mvm_option_parser VM_OPTION(n)
+#define DECLARE_OS_OPTION(n)	\
+	extern struct mvm_option_parser OS_OPTION(n)
+#define DECLARE_VDEV_OPTION(n)	\
+	extern struct mvm_option_parser VDEV_OPTION(n)
+
+#define VM_OP(n)	&VM_OPTION(n)
+#define OS_OP(n)	&OS_OPTION(n)
+#define VDEV_OP(n)	&VDEV_OPTION(n)
 
 int mvm_option_init(int argc, char **argv);
 int mvm_parse_option_group(int group, void *data);
