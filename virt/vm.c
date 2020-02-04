@@ -415,6 +415,8 @@ static int vcpu_affinity_init(void)
 	}
 
 	aff_current = find_first_zero_bit(vcpu_aff_bitmap, NR_CPUS);
+	if (aff_current >= NR_CPUS)
+		aff_current = (NR_CPUS - 1);
 
 	for (i = 0; i < NR_CPUS; i++) {
 		if (test_bit(i, vcpu_aff_bitmap))
