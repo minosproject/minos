@@ -80,6 +80,7 @@ static void xnu_vm_exit(struct vm *vm)
 static int xnu_setup_env(struct vm *vm, char *cmdline)
 {
 	size_t i;
+	uint64_t timer_freq = 100000000;
 	uint64_t *value;
 	struct xnu_dt_node_prop *dt_prop = NULL;
 	struct xnu_os_data *od = (struct xnu_os_data *)vm->os_data;
@@ -131,6 +132,32 @@ static int xnu_setup_env(struct vm *vm, char *cmdline)
 	value = (uint64_t *)&dt_prop->value;
 	value[0] = od->ramdisk_load_base;
 	value[1] = od->ramdisk_size;
+
+	/*
+	 * need change the armv8 timer freq to the host freq
+	 * get the freq from CNTFRQ_EL0
+	 */
+#ifdef __AARCH32__
+	/* TBD */
+#else
+	asm volatile("mrs %0, CNTFRQ_EL0" : "=r" (timer_freq));
+	mb();
+#endif
+
+	dt_prop = NULL;
+	for (i = 0; i < od->dtb_size; i++) {
+		if (strncmp(dtb + i, "timebase-frequency",
+				XNU_DT_PROP_NAME_LENGTH) == 0) {
+			dt_prop = (struct xnu_dt_node_prop *)(dtb + i);
+			break;
+		}
+	}
+
+	if (dt_prop) {
+		pr_info("set timer freq to 0x%"PRIx64"\n", timer_freq);
+		value = (uint64_t *)&dt_prop->value;
+		value[0] = timer_freq;
+	}
 
 	return 0;
 }

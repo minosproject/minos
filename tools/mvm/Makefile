@@ -28,6 +28,10 @@ CCFLAG := -Wall -D_XOPEN_SOURCE -D_GNU_SOURCE -march=armv8-a \
 	-fno-common -Werror-implicit-function-declaration \
 	-Wno-format-security -I$(PWD)/include
 
+ifeq ($(ARCH), aarch32)
+CCFLAG += -D__AARCH32__
+endif
+
 src	:= main/mvm.c main/bootimage.c
 src	+= libfdt/fdt_addresses.c libfdt/fdt.c libfdt/fdt_empty_tree.c
 src	+= libfdt/fdt_ro.c libfdt/fdt_rw.c libfdt/fdt_strerror.c
