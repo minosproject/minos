@@ -23,9 +23,10 @@
 #include <minos/irq.h>
 #include <minos/sched.h>
 #include <virt/virq.h>
+#include <virt/os.h>
 
-static uint32_t __hw_virtual_irq;
-static uint32_t	__hw_phy_irq;
+static int arm_phy_timer_trap(struct vcpu *vcpu,
+		int reg, int read, unsigned long *value);
 
 int vtimer_vmodule_id = INVALID_MODULE_ID;
 
@@ -92,12 +93,14 @@ static void vtimer_state_init(struct task *task, void *context)
 {
 	struct vtimer *vtimer;
 	struct vcpu *vcpu = task_to_vcpu(task);
+	struct arm_virt_data *arm_data = vcpu->vm->arch_data;
 	struct vtimer_context *c = (struct vtimer_context *)context;
 
-	if (get_vcpu_id(vcpu) == 0)
+	if (get_vcpu_id(vcpu) == 0) {
 		vcpu->vm->time_offset = get_sys_ticks();
+		arm_data->phy_timer_trap = arm_phy_timer_trap;
+	}
 
-	memset(c, 0, sizeof(struct vtimer_context));
 	c->offset = vcpu->vm->time_offset;
 
 	vtimer = &c->virt_timer;
@@ -105,10 +108,7 @@ static void vtimer_state_init(struct task *task, void *context)
 	init_timer_on_cpu(&vtimer->timer, vcpu->task->affinity);
 	vtimer->timer.function = virt_timer_expire_function;
 	vtimer->timer.data = (unsigned long)vtimer;
-	if(vm_is_native(vcpu->vm))
-		vtimer->virq = __hw_virtual_irq;
-	else
-		vtimer->virq = 27;
+	vtimer->virq = vcpu->vm->vtimer_virq;
 	vtimer->cnt_ctl = 0;
 	vtimer->cnt_cval = 0;
 
@@ -117,10 +117,7 @@ static void vtimer_state_init(struct task *task, void *context)
 	init_timer_on_cpu(&vtimer->timer, vcpu->task->affinity);
 	vtimer->timer.function = phys_timer_expire_function;
 	vtimer->timer.data = (unsigned long)vtimer;
-	if (vm_is_native(vcpu->vm))
-		vtimer->virq = __hw_phy_irq;
-	else
-		vtimer->virq = vcpu->vm->vtimer_virq;
+	vtimer->virq = 26;
 	vtimer->cnt_ctl = 0;
 	vtimer->cnt_cval = 0;
 }
@@ -133,19 +130,37 @@ static void vtimer_state_deinit(struct task *task, void *context)
 	del_timer(&c->phy_timer.timer);
 }
 
-static void vtimer_handle_cntp_ctl(gp_regs *regs,
-		int access, int read, unsigned long *value)
+static inline void
+asoc_handle_cntp_ctl(struct vcpu *vcpu, struct vtimer *vtimer)
+{
+	/*
+	 * apple xnu use physical timer's interrupt as a fiq
+	 * and read the ctl register to check wheter the timer
+	 * is triggered, if the read access is happened in the
+	 * fiq handler, need to clear the interrupt
+	 */
+	if ((vtimer->cnt_ctl & CNT_CTL_ISTATUS) &&
+			(read_sysreg(HCR_EL2) & HCR_EL2_VF)) {
+		vtimer->cnt_ctl &= ~CNT_CTL_ISTATUS;
+		clear_pending_virq(vcpu, vtimer->virq);
+	}
+}
+
+static void vtimer_handle_cntp_ctl(struct vcpu *vcpu, int access,
+		int read, unsigned long *value)
 {
 	uint32_t v;
 	struct vtimer *vtimer;
-	struct vtimer_context *c = (struct vtimer_context *)
-		get_vmodule_data_by_id(get_current_task(), vtimer_vmodule_id);
+	struct vtimer_context *c;
 	unsigned long ns;
 
+	c = get_vmodule_data_by_id(vcpu->task, vtimer_vmodule_id);
 	get_access_vtimer(vtimer, c, access);
 
 	if (read) {
 		*value = vtimer->cnt_ctl;
+		if (vcpu->vm->os->type == OS_TYPE_XNU)
+			asoc_handle_cntp_ctl(vcpu, vtimer);
 	} else {
 		v = (uint32_t)(*value);
 		v &= ~CNT_CTL_ISTATUS;
@@ -163,15 +178,15 @@ static void vtimer_handle_cntp_ctl(gp_regs *regs,
 	}
 }
 
-static void vtimer_handle_cntp_tval(gp_regs *regs,
+static void vtimer_handle_cntp_tval(struct vcpu *vcpu,
 		int access, int read, unsigned long *value)
 {
 	struct vtimer *vtimer;
 	unsigned long now;
 	unsigned long ticks;
-	struct vtimer_context *c = (struct vtimer_context *)
-		get_vmodule_data_by_id(get_current_task(), vtimer_vmodule_id);
+	struct vtimer_context *c;
 
+	c = get_vmodule_data_by_id(vcpu->task, vtimer_vmodule_id);
 	get_access_vtimer(vtimer, c, access);
 	now = get_sys_ticks() - c->offset;
 
@@ -190,20 +205,20 @@ static void vtimer_handle_cntp_tval(gp_regs *regs,
 	}
 }
 
-static void vtimer_handle_cntp_cval(gp_regs *regs,
+static void vtimer_handle_cntp_cval(struct vcpu *vcpu,
 		int access, int read, unsigned long *value)
 {
-	struct vtimer *vtimer;
-	struct vtimer_context *c = (struct vtimer_context *)
-		get_vmodule_data_by_id(get_current_task(), vtimer_vmodule_id);
 	unsigned long ns;
+	struct vtimer *vtimer;
+	struct vtimer_context *c;
 
+	c = get_vmodule_data_by_id(vcpu->task, vtimer_vmodule_id);
 	get_access_vtimer(vtimer, c, access);
 
 	if (read) {
 		*value = vtimer->cnt_cval;
 	} else {
-		vtimer->cnt_cval = ticks_to_ns(*value);
+		vtimer->cnt_cval = *value;
 		if (vtimer->cnt_ctl & CNT_CTL_ENABLE) {
 			vtimer->cnt_ctl &= ~CNT_CTL_ISTATUS;
 			ns = ticks_to_ns(vtimer->cnt_cval + c->offset);
@@ -212,50 +227,18 @@ static void vtimer_handle_cntp_cval(gp_regs *regs,
 	}
 }
 
-int vtimer_sysreg_simulation(gp_regs *regs, uint32_t esr_value)
+static int arm_phy_timer_trap(struct vcpu *vcpu,
+		int reg, int read, unsigned long *value)
 {
-	struct esr_sysreg *sysreg = (struct esr_sysreg *)&esr_value;
-	uint32_t reg = esr_value & ESR_SYSREG_REGS_MASK;
-	unsigned long value = 0;
-	int read = sysreg->read;
-
-	if (!read)
-		value = get_reg_value(regs, sysreg->reg);
-
 	switch (reg) {
 	case ESR_SYSREG_CNTP_CTL_EL0:
-		vtimer_handle_cntp_ctl(regs, ACCESS_REG, read, &value);
+		vtimer_handle_cntp_ctl(vcpu, ACCESS_REG, read, value);
 		break;
 	case ESR_SYSREG_CNTP_CVAL_EL0:
-		vtimer_handle_cntp_cval(regs, ACCESS_REG, read, &value);
+		vtimer_handle_cntp_cval(vcpu, ACCESS_REG, read, value);
 		break;
 	case ESR_SYSREG_CNTP_TVAL_EL0:
-		vtimer_handle_cntp_tval(regs, ACCESS_REG, read, &value);
-		break;
-	default:
-		break;
-	}
-
-	if (read)
-		set_reg_value(regs, sysreg->reg, value);
-
-	return 0;
-}
-
-static inline int vtimer_phy_mem_handler(gp_regs *regs, int read,
-		unsigned long address, unsigned long *value)
-{
-	unsigned long offset = address - 0x2a830000;
-
-	switch (offset) {
-	case REG_CNTP_CTL:
-		vtimer_handle_cntp_ctl(regs, ACCESS_MEM, read, value);
-		break;
-	case REG_CNTP_CVAL:
-		vtimer_handle_cntp_cval(regs, ACCESS_MEM, read, value);
-		break;
-	case REG_CNTP_TVAL:
-		vtimer_handle_cntp_tval(regs, ACCESS_MEM, read, value);
+		vtimer_handle_cntp_tval(vcpu, ACCESS_REG, read, value);
 		break;
 	default:
 		break;
@@ -285,8 +268,6 @@ static int vtimer_vmodule_init(struct vmodule *vmodule)
 
 int arch_vtimer_init(uint32_t virtual_irq, uint32_t phy_irq)
 {
-	__hw_virtual_irq = virtual_irq;
-	__hw_phy_irq = phy_irq;
 	register_task_vmodule("vtimer_module", vtimer_vmodule_init);
 
 	return 0;

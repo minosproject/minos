@@ -79,6 +79,8 @@ static int mcrr_mrrc_cp15_handler(gp_regs *reg, uint32_t esr_value)
 	struct esr_cp64 *sysreg = (struct esr_cp64 *)&esr_value;
 	unsigned long reg_value0, reg_value1;
 	unsigned long reg_value;
+	struct vcpu *vcpu = get_current_vcpu();
+	struct arm_virt_data *arm_data = vcpu->vm->arch_data;
 
 	switch (esr_value & HSR_CP64_REGS_MASK) {
 	case HSR_CPREG64(CNTP_CVAL):
@@ -88,11 +90,11 @@ static int mcrr_mrrc_cp15_handler(gp_regs *reg, uint32_t esr_value)
 	case HSR_CPREG64(ICC_SGI1R):
 	case HSR_CPREG64(ICC_ASGI1R):
 	case HSR_CPREG64(ICC_SGI0R):
-		if (!sysreg->read) {
+		if (!sysreg->read && arm_data->sgi1r_el1_trap) {
 			reg_value0 = get_reg_value(reg, sysreg->reg1);
 			reg_value1 = get_reg_value(reg, sysreg->reg2);
 			reg_value = (reg_value1 << 32) | reg_value0;
-			vgicv3_send_sgi(get_current_vcpu(), reg_value);
+			arm_data->sgi1r_el1_trap(vcpu, reg_value);
 		}
 		break;
 	}
@@ -188,47 +190,48 @@ static int smc_aarch64_handler(gp_regs *reg, uint32_t esr_value)
 	return arm_svc_handler(reg, esr_value, 1);
 }
 
-static int dczva_for_apple_soc(gp_regs *reg, unsigned long va)
-{
-	unsigned long pa = guest_va_to_pa(va, 0);
-
-	memset((void *)pa, 0, 0x40);
-	wmb();
-
-	return 0;
-}
-
 static int access_system_reg_handler(gp_regs *reg, uint32_t esr_value)
 {
-	unsigned long ret = 0;
+	int ret = 0, reg_name;
 	struct esr_sysreg *sysreg = (struct esr_sysreg *)&esr_value;
 	uint32_t regindex = sysreg->reg;
-	unsigned long reg_value;
+	unsigned long reg_value = 0;
+	struct vcpu *vcpu = get_current_vcpu();
+	struct arm_virt_data *arm_data = vcpu->vm->arch_data;
 
-	switch (esr_value & ESR_SYSREG_REGS_MASK) {
+	reg_name = esr_value & ESR_SYSREG_REGS_MASK;
+	if (!sysreg->read)
+		reg_value = get_reg_value(reg, regindex);
+
+	switch (reg_name) {
 	case ESR_SYSREG_ICC_SGI1R_EL1:
 	case ESR_SYSREG_ICC_ASGI1R_EL1:
-		pr_debug("access system reg SGI1R_EL1\n");
-		if (!sysreg->read) {
-			reg_value = get_reg_value(reg, regindex);
-			vgicv3_send_sgi(get_current_vcpu(), reg_value);
-		}
-		break;
-
 	case ESR_SYSREG_ICC_SGI0R_EL1:
-		pr_debug("access system reg SGI0R_EL1\n");
+		pr_debug("access system reg SGI1R_EL1\n");
+		if (!sysreg->read && (arm_data->sgi1r_el1_trap))
+			arm_data->sgi1r_el1_trap(vcpu, reg_value);
 		break;
-
 	case ESR_SYSREG_CNTPCT_EL0:
 	case ESR_SYSREG_CNTP_TVAL_EL0:
 	case ESR_SYSREG_CNTP_CTL_EL0:
 	case ESR_SYSREG_CNTP_CVAL_EL0:
-		return vtimer_sysreg_simulation(reg, esr_value);
+		if (arm_data->phy_timer_trap) {
+			ret = arm_data->phy_timer_trap(vcpu, reg_name,
+					sysreg->read, &reg_value);
+		}
+		break;
 
 	case ESR_SYSREG_DCZVA:
-		/* temp workround for apple */
-		return dczva_for_apple_soc(reg, get_reg_value(reg, regindex));
+		if ((arm_data->dczva_trap) && !sysreg->read)
+			ret = arm_data->dczva_trap(vcpu, reg_value);
+		break;
+	default:
+		pr_warn("unsupport register access 0x%x\n", reg_name);
+		break;
 	}
+
+	if (sysreg->read)
+		set_reg_value(reg, regindex, reg_value);
 
 	return ret;
 }

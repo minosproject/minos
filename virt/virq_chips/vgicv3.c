@@ -55,7 +55,7 @@ extern int gic_xlate_irq(struct device_node *node,
 		uint32_t *intspec, unsigned int initsize,
 		uint32_t *hwirq, unsigned long *type);
 
-void vgicv3_send_sgi(struct vcpu *vcpu, unsigned long sgi_value)
+static int vgicv3_send_sgi(struct vcpu *vcpu, unsigned long sgi_value)
 {
 	sgi_mode_t mode;
 	uint32_t sgi;
@@ -68,7 +68,7 @@ void vgicv3_send_sgi(struct vcpu *vcpu, unsigned long sgi_value)
 	sgi = (sgi_value & (0xf << 24)) >> 24;
 	if (sgi >= 16) {
 		pr_err("vgic : sgi number is incorrect %d\n", sgi);
-		return;
+		return -EINVAL;
 	}
 
 	mode = sgi_value & (1UL << 40) ? SGI_TO_OTHERS : SGI_TO_LIST;
@@ -101,6 +101,8 @@ void vgicv3_send_sgi(struct vcpu *vcpu, unsigned long sgi_value)
 		target = get_vcpu_in_vm(vm, bit);
 		send_virq_to_vcpu(target, sgi);
 	}
+
+	return 0;
 }
 
 static int address_to_gicr(struct vgic_gicr *gicr,
@@ -737,6 +739,7 @@ struct virq_chip *vgicv3_virqchip_init(struct vm *vm,
 	uint64_t gicd_base, gicd_size, gicr_base, gicr_size;
 	unsigned long size, flags = 0;
 	struct virq_chip *vc;
+	struct arm_virt_data *arm_data = vm->arch_data;
 
 	pr_notice("create vgicv3 for vm-%d\n", vm->vmid);
 
@@ -784,6 +787,7 @@ struct virq_chip *vgicv3_virqchip_init(struct vm *vm,
 		flags |= VIRQCHIP_F_HW_VIRT;
 
 	vgicv3_init_virqchip(vc, vgicv3_dev, flags);
+	arm_data->sgi1r_el1_trap = vgicv3_send_sgi;
 
 	return vc;
 

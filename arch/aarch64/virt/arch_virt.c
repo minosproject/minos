@@ -289,3 +289,24 @@ static int mpidr_el1_init(void)
 	return 0;
 }
 arch_initcall_percpu(mpidr_el1_init);
+
+static int arm_create_vm(void *item, void *context)
+{
+	struct vm *vm = item;
+	struct arm_virt_data *arch_data;
+
+	arch_data = zalloc(sizeof(struct arm_virt_data));
+	if (!arch_data)
+		panic("No more memory for arm arch data\n");
+	vm->arch_data = arch_data;
+
+	return 0;
+}
+
+static int arm_virt_init(void)
+{
+	register_hook(arm_create_vm, OS_HOOK_CREATE_VM);
+
+	return 0;
+}
+module_initcall(arm_virt_init);

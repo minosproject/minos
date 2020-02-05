@@ -48,6 +48,4 @@ struct vgicv3_dev {
 
 #define GVM_VGICR_IOMEM_BASE	(0x2f100000)
 
-void vgicv3_send_sgi(struct vcpu *vcpu, unsigned long sgi_value);
-
 #endif

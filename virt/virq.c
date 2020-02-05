@@ -456,6 +456,9 @@ static void update_virq_cap(struct virq_desc *desc, unsigned long flags)
 		if (virq_is_hw(desc))
 			irq_unmask(desc->hno);
 	}
+
+	if (flags & VIRQF_FIQ)
+		__virq_set_fiq(desc);
 }
 
 void vcpu_virq_struct_init(struct vcpu *vcpu)

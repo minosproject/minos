@@ -33,7 +33,8 @@ struct vtimer {
 	struct timer_list timer;
 	int virq;
 	uint32_t cnt_ctl;
-	uint32_t cnt_cval;
+	uint64_t cnt_cval;
+	uint64_t freq;
 };
 
 struct vtimer_context {

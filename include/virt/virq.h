@@ -55,6 +55,7 @@ struct irqtag;
 
 #define VIRQF_CAN_WAKEUP	(1 << 4)
 #define VIRQF_ENABLE		(1 << 5)
+#define VIRQF_FIQ		(1 << 7)
 
 struct virq_desc {
 	uint8_t id;

@@ -6,6 +6,10 @@
 #include <config/config.h>
 #include <minos/task_def.h>
 
+#ifdef CONFIG_VIRT
+#include <asm/virt.h>
+#endif
+
 #define SP_SIZE	 CONFIG_TASK_STACK_SIZE
 
 /*

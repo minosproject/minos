@@ -93,6 +93,8 @@ struct vm {
 	void *resource;
 
 	void *os_data;
+
+	void *arch_data;
 } __align(sizeof(unsigned long));
 
 #define vm_name(vm)	devnode_name(vm->dev_node)

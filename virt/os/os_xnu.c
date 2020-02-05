@@ -21,7 +21,6 @@
 #include <virt/vm.h>
 #include <minos/platform.h>
 #include <minos/of.h>
-#include <config/config.h>
 #include <virt/virq_chip.h>
 #include <virt/virq.h>
 #include <virt/vmbox.h>
@@ -29,19 +28,40 @@
 #include <minos/arch.h>
 #include <virt/os.h>
 #include <virt/resource.h>
+#include <asm/vtimer.h>
+#include <asm/virt.h>
+
+#define ASOC_VTIMER_VIRQ	26
+#define ASOC_DCZVA_SIZE		0x40
 
 struct virq_chip *create_aic_virqchip(struct vm *vm,
 		unsigned long base, unsigned long size);
 
+static int apple_soc_dczva_trap(struct vcpu *vcpu, unsigned long va)
+{
+	unsigned long pa = guest_va_to_pa(va, 0);
+
+	memset((void *)pa, 0, ASOC_DCZVA_SIZE);
+
+	return 0;
+}
+
 static int xnu_create_gvm_res_apple(struct vm *vm)
 {
+	struct arm_virt_data *arm_data = vm->arch_data;
+
+	request_virq_pervcpu(vm, ASOC_VTIMER_VIRQ, VIRQF_FIQ);
+
 	vm->virq_chip = create_aic_virqchip(vm, 0x20e100000, 0x100000);
 	if (!vm->virq_chip) {
 		pr_err("create virq chiq for apple soc failed\n");
 		return -EINVAL;
 	}
 
-	vm->vtimer_virq = 27;
+	/*
+	 * install trap callback for apple soc
+	 */
+	arm_data->dczva_trap = apple_soc_dczva_trap;
 
 	return 0;
 }
