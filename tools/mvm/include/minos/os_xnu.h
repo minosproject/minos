@@ -49,13 +49,21 @@ struct load_cmd {
 	uint32_t cmd_size;		/* total size of command in bytes */
 };
 
+/*
+ * the original xnu_arm64_boot_video are all unsigned long
+ * but for 64bit ios, this need to change to uint64_t if
+ * the mvm is compiled as 32bit elf
+ *
+ * mvm32_bit changed from unsigned long to uint64_t
+ *
+ */
 struct xnu_arm64_boot_video {
-	unsigned long v_base_addr;	/* base address of video memory */
-	unsigned long v_display;	/* display code */
-	unsigned long v_row_bytes;	/* number of bytes per pixel row */
-	unsigned long v_width;		/* width */
-	unsigned long v_height;		/* height */
-	unsigned long v_depth;		/* pixel depth and other parameters */
+	uint64_t v_base_addr;	/* base address of video memory */
+	uint64_t v_display;	/* display code */
+	uint64_t v_row_bytes;	/* number of bytes per pixel row */
+	uint64_t v_width;	/* width */
+	uint64_t v_height;	/* height */
+	uint64_t v_depth;	/* pixel depth and other parameters */
 };
 
 struct xnu_arm64_monitor_boot_args {

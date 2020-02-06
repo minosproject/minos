@@ -406,10 +406,11 @@ static int vcpu_handle_mmio(struct vm *vm, int trap_reason,
 {
 	int ret = -EIO;
 	struct vdev *vdev;
-	unsigned long base, size;
+	size_t size;
+	uint64_t base;
 
 	list_for_each_entry(vdev, &vm->vdev_list, list) {
-		base = (unsigned long)vdev->guest_iomem;
+		base = vdev->guest_iomem;
 		size = vdev->iomem_size;
 		if ((trap_data >= base) && (trap_data < base + size)) {
 			pthread_mutex_lock(&vdev->lock);
