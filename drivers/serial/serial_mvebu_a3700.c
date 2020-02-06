@@ -77,8 +77,7 @@ static int mvebu_serial_setbrg(int baudrate)
 
 static int mvebu_serial_probe(char *addr)
 {
-	base = addr;
-
+#if 0
 	/* reset FIFOs */
 	iowrite32(UART_CTRL_RXFIFO_RESET | UART_CTRL_TXFIFO_RESET,
 			base + UART_CTRL_REG);
@@ -88,7 +87,7 @@ static int mvebu_serial_probe(char *addr)
 
 	/* set brg to 115200 */
 	mvebu_serial_setbrg(115200);
-
+#endif
 	return 0;
 }
 DEFINE_CONSOLE(mvebu, "mvebu", mvebu_serial_probe,

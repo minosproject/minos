@@ -83,7 +83,7 @@ config OS_REALTIME_CORE0
 
 choice
 	prompt "Printf log level"
-	default PRINT_NOTICE
+	default PRINT_INFO
 	config PRINT_DEBUG
 		bool "Log Level DEBUG"
 	config PRINT_INFO
@@ -103,6 +103,6 @@ config LOG_LEVEL
 	default 3 if PRINT_NOTICE
 	default 2 if PRINT_WARN
 	default 1 if PRINT_ERROR
-	default 3
+	default 4
 
 endmenu

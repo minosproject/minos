@@ -26,7 +26,7 @@ config NR_CPUS
 
 config UART_BASE
 	hex "uart controller iomem base address"
-	default 0xfe215040
+	default 0xd0012000
 
 config UART_IO_SIZE
 	hex "uart controller iomem size"
