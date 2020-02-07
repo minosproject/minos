@@ -46,6 +46,7 @@
 
 #include <minos/vm.h>
 #include <minos/os_xnu.h>
+#include <minos/option.h>
 
 #define XNU_KERNEL_BASE		0x40000000
 #define VA_OFFSET(addr)		((addr) & 0x3fffffff)
@@ -59,7 +60,10 @@ struct xnu_segment_cmd64 {
 };
 
 struct xnu_os_data {
+	int tc_fd;
 	uint64_t entry_point;
+	uint64_t tc_load_base;
+	uint64_t tc_load_size;
 	uint64_t kernel_load_base;
 	uint64_t load_end;
 	uint64_t ramdisk_load_base;
@@ -80,7 +84,6 @@ static void xnu_vm_exit(struct vm *vm)
 static int xnu_setup_env(struct vm *vm, char *cmdline)
 {
 	size_t i;
-	uint64_t timer_freq = 100000000;
 	uint64_t *value;
 	struct xnu_dt_node_prop *dt_prop = NULL;
 	struct xnu_os_data *od = (struct xnu_os_data *)vm->os_data;
@@ -130,34 +133,31 @@ static int xnu_setup_env(struct vm *vm, char *cmdline)
 
 	strncpy(dt_prop->name, "RAMDisk", XNU_DT_PROP_NAME_LENGTH);
 	value = (uint64_t *)&dt_prop->value;
-	value[0] = od->ramdisk_load_base;
+	value[0] = VA2PA(od->ramdisk_load_base);
 	value[1] = od->ramdisk_size;
 
 	/*
-	 * need change the armv8 timer freq to the host freq
-	 * get the freq from CNTFRQ_EL0
+	 * add the trust cache information to the dtb, just search
+	 * the string "MemoryMapReserved-1"
 	 */
-#ifdef __AARCH32__
-	/* TBD */
-#else
-	asm volatile("mrs %0, CNTFRQ_EL0" : "=r" (timer_freq));
-	mb();
-#endif
-
 	dt_prop = NULL;
 	for (i = 0; i < od->dtb_size; i++) {
-		if (strncmp(dtb + i, "timebase-frequency",
+		if (strncmp(dtb + i, "MemoryMapReserved-1",
 				XNU_DT_PROP_NAME_LENGTH) == 0) {
 			dt_prop = (struct xnu_dt_node_prop *)(dtb + i);
 			break;
 		}
 	}
 
-	if (dt_prop) {
-		pr_info("set timer freq to 0x%"PRIx64"\n", timer_freq);
-		value = (uint64_t *)&dt_prop->value;
-		value[0] = timer_freq;
+	if (!dt_prop) {
+		pr_err("Can't find the tc node\n");
+		return -ENOENT;
 	}
+
+	strncpy(dt_prop->name, "TrustCache", XNU_DT_PROP_NAME_LENGTH);
+	value = (uint64_t *)&dt_prop->value;
+	value[0] = VA2PA(od->tc_load_base);
+	value[1] = od->tc_load_size;
 
 	return 0;
 }
@@ -167,8 +167,8 @@ static int inline xnu_load_raw_data(int fd, void *base,
 {
 	int ret;
 
-	pr_info("load image: 0x%p 0x%"PRIx64" 0x%"PRIx64" 0x%"PRIx64"\n",
-			base, offset, file_off, file_size);
+	pr_info("load image: %p 0x%"PRIx64" 0x%"PRIx64" 0x%"PRIx64"\n",
+			(base + offset), offset, file_off, file_size);
 
 	if (file_size == 0)
 		return 0;
@@ -244,6 +244,15 @@ static int xnu_load_dtb(struct vm *vm)
 			0, od->dtb_size);
 }
 
+static int xnu_load_tc(struct vm *vm)
+{
+	struct xnu_os_data *od = (struct xnu_os_data *)vm->os_data;
+
+	return xnu_load_raw_data(od->tc_fd, vm->mmap,
+			LOAD_OFFSET(od->tc_load_base, vm->map_start),
+			0, od->tc_load_size);
+}
+
 static int xnu_load_image(struct vm *vm)
 {
 	int ret = 0;
@@ -255,6 +264,7 @@ static int xnu_load_image(struct vm *vm)
 	ret += xnu_load_kernel_image(vm);
 	ret += xnu_load_ramdisk(vm);
 	ret += xnu_load_dtb(vm);
+	ret += xnu_load_tc(vm);
 
 	return ret;
 }
@@ -368,6 +378,18 @@ static void inline xnu_get_macho_highlow(struct xnu_os_data *od,
 	*h = high;
 }
 
+static size_t get_file_size(int fd)
+{
+	int ret;
+	struct stat stbuf;
+
+	ret = fstat(fd, &stbuf);
+	if ((ret != 0) || !S_ISREG(stbuf.st_mode))
+		return 0;
+
+	return stbuf.st_size;
+}
+
 static void xnu_parse_address_space(struct vm *vm, struct xnu_os_data *od)
 {
 	struct stat stbuf;
@@ -409,13 +431,18 @@ out:
 	vm->entry = VA2PA(od->entry_point);
 	vm->setup_data = VA2PA(od->bootarg_load_base);
 
-	vm->map_start = MEM_BLOCK_ALIGN(VA2PA(od->kernel_load_base));
+	vm->map_start = MEM_BLOCK_ALIGN(VA2PA(od->kernel_load_base)) - MEM_BLOCK_SIZE;
 	vm->map_size = VA2PA(MEM_BLOCK_BALIGN(od->load_end)) - vm->map_start;
+
+	od->tc_load_base = vm->map_start;
+	od->tc_load_size = get_file_size(od->tc_fd);
 
 	pr_info("xnu kernel_load_base 0x%"PRIx64"\n", od->kernel_load_base);
 	pr_info("xnu ramdisk_load_base 0x%"PRIx64"\n", od->ramdisk_load_base);
 	pr_info("xnu dtb_load_base 0x%"PRIx64"\n", od->dtb_load_base);
 	pr_info("xnu bootarg_load_base 0x%"PRIx64"\n", od->bootarg_load_base);
+	pr_info("xnu tc cache load base 0x%"PRIx64"\n", od->tc_load_base);
+	pr_info("xnu tc cache load size 0x%"PRIx64"\n", od->tc_load_size);
 	pr_info("xnu memory map start 0x%"PRIx64"\n", vm->map_start);
 	pr_info("xnu memory map size 0x%"PRIx64"\n", vm->map_size);
 }
@@ -423,6 +450,7 @@ out:
 static int xnu_early_init(struct vm *vm)
 {
 	int ret;
+	char *tc_name;
 	struct xnu_os_data *os_data;
 
 	if (vm->kfd <= 0) {
@@ -430,11 +458,22 @@ static int xnu_early_init(struct vm *vm)
 		return -EINVAL;
 	}
 
-	os_data = malloc(sizeof(struct xnu_os_data));
+	ret = mvm_parse_option_string("tc_file", &tc_name);
+	if (ret) {
+		pr_err("no tc file found\n");
+		return -ENOENT;
+	}
+
+	os_data = calloc(1, sizeof(struct xnu_os_data));
 	if (!os_data)
 		return -ENOMEM;
 
-	memset(os_data, 0, sizeof(struct xnu_os_data));
+	os_data->tc_fd = open(tc_name, O_RDONLY);
+	if (os_data->tc_fd <= 0) {
+		pr_err("can not open tc file\n");
+		free(os_data);
+		return -ENOENT;
+	}
 
 	ret = xnu_parse_kernel_image(vm->kfd, os_data);
 	if (ret) {
