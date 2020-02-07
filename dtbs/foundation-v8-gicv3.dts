@@ -23,8 +23,9 @@
 			vm_name = "fvp_linux_host";
 			type = "linux";
 			native_wfi;
+			vm_32bit;
 			vcpus = <1>;
-			entry = <0x0 0x80080000>;
+			entry = <0x0 0x80008000>;
 			setup_data = <0x0 0x83e00000>;
 			vcpu_affinity = <0 1 2 3>;
 			memory = <0x0 0x80000000 0x0 0x10000000>;

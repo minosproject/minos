@@ -30,6 +30,7 @@
 #include <virt/resource.h>
 #include <asm/vtimer.h>
 #include <asm/virt.h>
+#include <asm/processer.h>
 
 #define ASOC_VTIMER_VIRQ	26
 #define ASOC_DCZVA_SIZE		0x40
@@ -41,7 +42,59 @@ static int apple_soc_dczva_trap(struct vcpu *vcpu, unsigned long va)
 {
 	unsigned long pa = guest_va_to_pa(va, 0);
 
-	memset((void *)pa, 0, ASOC_DCZVA_SIZE);
+	if (pa > 0x80000000)
+		memset((void *)pa, 0, ASOC_DCZVA_SIZE);
+	else {
+		pa = guest_va_to_pa(va, 1);
+		if (pa > 0x80000000)
+			memset((void *)pa, 0, ASOC_DCZVA_SIZE);
+		else
+			pr_err("wrong address va:0x%p pa:0x%p\n", va, pa);
+	}
+
+	return 0;
+}
+
+static int apple_soc_unknow_sysreg(struct vcpu *vcpu,
+		int reg, int read, unsigned long *value)
+{
+	*value = 0;
+
+	switch (reg) {
+	case ESR_SYSREG_ASOC_HID11:
+		pr_debug("apple soc reg: %s\n", "ESR_SYSREG_ASOC_HID11\n");
+		break;
+	case ESR_SYSREG_ASOC_HID5:
+		pr_debug("apple soc reg: %s\n", "ESR_SYSREG_ASOC_HID5\n");
+		break;
+	case ESR_SYSREG_ASOC_HID4:
+		pr_debug("apple soc reg: %s\n", "ESR_SYSREG_ASOC_HID4\n");
+		break;
+	case ESR_SYSREG_ASOC_HID8:
+		pr_debug("apple soc reg: %s\n", "ESR_SYSREG_ASOC_HID8\n");
+		break;
+	case ESR_SYSREG_ASOC_HID7:
+		pr_debug("apple soc reg: %s\n", "ESR_SYSREG_ASOC_HID7\n");
+		break;
+	case ESR_SYSREG_ASOC_LSU_ERR_STS:
+		pr_debug("apple soc reg: %s\n", "ESR_SYSREG_ASOC_LSU_ERR_STS\n");
+		break;
+	case ESR_SYSREG_ASOC_PMC0:
+		pr_debug("apple soc reg: %s\n", "ESR_SYSREG_ASOC_PMC0\n");
+		break;
+	case ESR_SYSREG_ASOC_PMC1:
+		pr_debug("apple soc reg: %s\n", "ESR_SYSREG_ASOC_PMC1\n");
+		break;
+	case ESR_SYSREG_ASOC_PMCR1:
+		pr_debug("apple soc reg: %s\n", "ESR_SYSREG_ASOC_PMCR1\n");
+		break;
+	case ESR_SYSREG_ASOC_PMSR:
+		pr_debug("apple soc reg: %s\n", "ESR_SYSREG_ASOC_PMSR\n");
+		break;
+	default:
+		pr_debug("apple soc reg: %s\n", "UNKNOWN\n");
+		break;
+	}
 
 	return 0;
 }
@@ -62,6 +115,7 @@ static int xnu_create_gvm_res_apple(struct vm *vm)
 	 * install trap callback for apple soc
 	 */
 	arm_data->dczva_trap = apple_soc_dczva_trap;
+	arm_data->sysreg_emulation = apple_soc_unknow_sysreg;
 
 	return 0;
 }

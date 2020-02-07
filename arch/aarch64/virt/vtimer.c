@@ -191,7 +191,7 @@ static void vtimer_handle_cntp_tval(struct vcpu *vcpu,
 	now = get_sys_ticks() - c->offset;
 
 	if (read) {
-		ticks = (vtimer->cnt_cval - now) & 0xffffffff;
+		ticks = (vtimer->cnt_cval - now - c->offset) & 0xffffffff;
 		*value = ticks;
 	} else {
 		unsigned long v = *value;
@@ -199,7 +199,7 @@ static void vtimer_handle_cntp_tval(struct vcpu *vcpu,
 		vtimer->cnt_cval = get_sys_ticks() + v;
 		if (vtimer->cnt_ctl & CNT_CTL_ENABLE) {
 			vtimer->cnt_ctl &= ~CNT_CTL_ISTATUS;
-			ticks = ticks_to_ns(vtimer->cnt_cval + c->offset);
+			ticks = ticks_to_ns(vtimer->cnt_cval);
 			mod_timer(&vtimer->timer, ticks);
 		}
 	}
@@ -216,12 +216,12 @@ static void vtimer_handle_cntp_cval(struct vcpu *vcpu,
 	get_access_vtimer(vtimer, c, access);
 
 	if (read) {
-		*value = vtimer->cnt_cval;
+		*value = vtimer->cnt_cval - c->offset;
 	} else {
-		vtimer->cnt_cval = *value;
+		vtimer->cnt_cval = *value + c->offset;
 		if (vtimer->cnt_ctl & CNT_CTL_ENABLE) {
 			vtimer->cnt_ctl &= ~CNT_CTL_ISTATUS;
-			ns = ticks_to_ns(vtimer->cnt_cval + c->offset);
+			ns = ticks_to_ns(vtimer->cnt_cval);
 			mod_timer(&vtimer->timer, ns);
 		}
 	}

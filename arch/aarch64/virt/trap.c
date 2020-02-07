@@ -133,7 +133,7 @@ static int illegal_exe_state_handler(gp_regs *reg, uint32_t esr_value)
 }
 
 static inline int
-arm_svc_handler(gp_regs *reg, uint32_t esr_value, int smc)
+__arm_svc_handler(gp_regs *reg, uint32_t esr_value, int smc)
 {
 	int fast;
 	uint32_t id;
@@ -158,6 +158,27 @@ arm_svc_handler(gp_regs *reg, uint32_t esr_value, int smc)
 		local_irq_enable();
 
 	return do_svc_handler(reg, id, args, smc);
+}
+
+static inline int
+arm_svc_handler(gp_regs *regs, uint32_t esr_value, int smc)
+{
+	struct vcpu *vcpu = get_current_vcpu();
+	struct arm_virt_data *arm_data = vcpu->vm->arch_data;
+
+	if (smc) {
+		if (arm_data->smc_handler)
+			return arm_data->smc_handler(vcpu, regs, esr_value);
+		else
+			__arm_svc_handler(regs, esr_value, 1);
+	} else {
+		if (arm_data->hvc_handler)
+			return arm_data->hvc_handler(vcpu, regs, esr_value);
+		else
+			__arm_svc_handler(regs, esr_value, 0);
+	}
+
+	return 0;
 }
 
 static int svc_aarch32_handler(gp_regs *reg, uint32_t esr_value)
@@ -226,7 +247,12 @@ static int access_system_reg_handler(gp_regs *reg, uint32_t esr_value)
 			ret = arm_data->dczva_trap(vcpu, reg_value);
 		break;
 	default:
-		pr_warn("unsupport register access 0x%x\n", reg_name);
+		pr_debug("unsupport register access 0x%x %s\n",
+				reg_name, sysreg->read ? "read" : "write");
+		if (arm_data->sysreg_emulation) {
+			ret = arm_data->sysreg_emulation(vcpu,
+					reg_name, sysreg->read, &reg_value);
+		}
 		break;
 	}
 
