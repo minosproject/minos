@@ -22,7 +22,7 @@
 #include <minos/percpu.h>
 #include <minos/spinlock.h>
 #include <minos/print.h>
-#include <asm/gicv2.h>
+#include <device/gicv2.h>
 #include <minos/errno.h>
 #include <minos/vmodule.h>
 #include <asm/arch.h>

@@ -53,7 +53,6 @@ void bcm283x_mu_putc(char c)
 		__bcm283x_mu_putc('\r');
 
 	__bcm283x_mu_putc(c);
-	return 0;
 }
 
 char bcm283x_mu_getc(void)

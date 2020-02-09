@@ -15,10 +15,10 @@
  */
 
 #include <asm/aarch64_helper.h>
-#include <asm/exception.h>
+#include <asm/trap.h>
 #include <minos/minos.h>
 #include <minos/smp.h>
-#include <asm/processer.h>
+#include <asm/reg.h>
 #include <minos/sched.h>
 #include <minos/irq.h>
 #include <asm/svccc.h>

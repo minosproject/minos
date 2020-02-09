@@ -5,10 +5,6 @@
 
 #define HPFAR_MASK	GENMASK(39, 4)
 
-/*
- * copied from xen defination
- */
-
 /* ESR.EC == ESR_CP{15,14,10}_32 */
 #define HSR_CP32_OP2_MASK (0x000e0000)
 #define HSR_CP32_OP2_SHIFT (17)

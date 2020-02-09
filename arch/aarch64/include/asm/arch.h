@@ -1,7 +1,7 @@
 #ifndef _MINOS_ARCH_AARCH64_H_
 #define _MINOS_ARCH_AARCH64_H_
 
-#include <minos/types.h>
+#include <asm/gp_reg.h>
 #include <asm/aarch64_helper.h>
 #include <config/config.h>
 #include <minos/task_def.h>

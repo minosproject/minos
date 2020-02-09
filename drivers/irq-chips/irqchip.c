@@ -15,7 +15,7 @@
  */
 
 #include <minos/minos.h>
-#include <asm/bcm_irq.h>
+#include <device/bcm_irq.h>
 #include <minos/device_id.h>
 #include <minos/of.h>
 

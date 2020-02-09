@@ -15,20 +15,58 @@
  */
 #include <minos/minos.h>
 #include <minos/vmodule.h>
-#include <asm/vtimer.h>
+#include <minos/timer.h>
 #include <asm/io.h>
-#include <asm/processer.h>
-#include <asm/exception.h>
+#include <asm/reg.h>
+#include <asm/trap.h>
 #include <minos/timer.h>
 #include <minos/irq.h>
 #include <minos/sched.h>
 #include <virt/virq.h>
 #include <virt/os.h>
 
+#define REG_CNTCR		0x000
+#define REG_CNTSR		0x004
+#define REG_CNTCV_L		0x008
+#define REG_CNTCV_H		0x00c
+#define REG_CNTFID0		0x020
+
+#define REG_CNTVCT_LO		0x08
+#define REG_CNTVCT_HI		0x0c
+#define REG_CNTFRQ		0x10
+#define REG_CNTP_CVAL		0x24
+#define REG_CNTP_TVAL		0x28
+#define REG_CNTP_CTL		0x2c
+#define REG_CNTV_CVAL		0x30
+#define REG_CNTV_TVAL		0x38
+#define REG_CNTV_CTL		0x3c
+
+#define CNT_CTL_ISTATUS		(1 << 2)
+#define CNT_CTL_IMASK		(1 << 1)
+#define CNT_CTL_ENABLE		(1 << 0)
+
+#define ACCESS_REG		0x0
+#define ACCESS_MEM		0x1
+
+struct vtimer {
+	struct vcpu *vcpu;
+	struct timer_list timer;
+	int virq;
+	uint32_t cnt_ctl;
+	uint64_t cnt_cval;
+	uint64_t freq;
+};
+
+struct vtimer_context {
+	struct vtimer phy_timer;
+	struct vtimer virt_timer;
+	unsigned long offset;
+};
+
 static int arm_phy_timer_trap(struct vcpu *vcpu,
 		int reg, int read, unsigned long *value);
 
-int vtimer_vmodule_id = INVALID_MODULE_ID;
+static int vtimer_vmodule_id = INVALID_MODULE_ID;
 
 #define get_access_vtimer(vtimer, c, access)		\
 	do {						\
@@ -271,4 +309,34 @@ int arch_vtimer_init(uint32_t virtual_irq, uint32_t phy_irq)
 	register_task_vmodule("vtimer_module", vtimer_vmodule_init);
 
 	return 0;
+}
+
+int virtual_timer_irq_handler(uint32_t irq, void *data)
+{
+	uint32_t value;
+	struct vcpu *vcpu = get_current_vcpu();
+
+	/*
+	 * if the current vcpu is idle, disable the vtimer
+	 * since the pending request vtimer irq is set to
+	 * the timer
+	 */
+	if (!vcpu || (!task_is_vcpu(vcpu->task))) {
+		write_sysreg32(0, CNTV_CTL_EL0);
+		return 0;
+	}
+
+	value = read_sysreg32(CNTV_CTL_EL0);
+	dsb();
+
+	if (!(value & CNT_CTL_ISTATUS)) {
+		pr_debug("vtimer is not trigger\n");
+		return 0;
+	}
+
+	value = value | CNT_CTL_IMASK;
+	write_sysreg32(value, CNTV_CTL_EL0);
+	dsb();
+
+	return send_virq_to_vcpu(vcpu, vcpu->vm->vtimer_virq);
 }

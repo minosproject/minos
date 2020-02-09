@@ -28,9 +28,8 @@
 #include <minos/arch.h>
 #include <virt/os.h>
 #include <virt/resource.h>
-#include <asm/vtimer.h>
 #include <asm/virt.h>
-#include <asm/processer.h>
+#include <asm/reg.h>
 
 #define ASOC_VTIMER_VIRQ	26
 #define ASOC_DCZVA_SIZE		0x40

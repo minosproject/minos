@@ -16,15 +16,13 @@
 
 #include <asm/aarch64_helper.h>
 #include <virt/vm.h>
-#include <asm/exception.h>
+#include <asm/trap.h>
 #include <minos/minos.h>
 #include <minos/smp.h>
-#include <asm/processer.h>
+#include <asm/reg.h>
 #include <minos/sched.h>
-#include <asm/vgicv3.h>
 #include <minos/irq.h>
 #include <asm/svccc.h>
-#include <asm/vtimer.h>
 #include <virt/vdev.h>
 
 extern unsigned char __sync_desc_start;

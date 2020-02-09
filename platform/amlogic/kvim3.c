@@ -18,11 +18,10 @@
 #include <asm/arch.h>
 #include <asm/io.h>
 #include <minos/mmu.h>
-#include <asm/bcm_irq.h>
 #include <libfdt/libfdt.h>
 #include <minos/of.h>
-#include <asm/cpu.h>
 #include <minos/platform.h>
+#include <asm/power.h>
 
 #ifdef CONFIG_VIRT
 #include <virt/vm.h>

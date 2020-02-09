@@ -26,7 +26,7 @@
 #include <virt/vdev.h>
 #include <minos/of.h>
 #include <virt/virq_chip.h>
-#include <asm/bcm_irq.h>
+#include <device/bcm_irq.h>
 
 struct bcm2836_virq {
 	struct vdev vdev;
@@ -520,7 +520,6 @@ static int bcm2836_update_virq(struct vcpu *vcpu,
 
 static int bcm2836_enter_to_guest(struct vcpu *vcpu, void *data)
 {
-	int fiq = 0;
 	struct virq_desc *virq, *n;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
 

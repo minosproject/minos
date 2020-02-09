@@ -28,7 +28,6 @@
 #include <minos/platform.h>
 #include <minos/task.h>
 #include <virt/vm.h>
-#include <asm/vtimer.h>
 #include <virt/virq.h>
 #include <virt/os.h>
 
@@ -251,36 +250,6 @@ static int aarch64_system_init(struct vmodule *vmodule)
 
 MINOS_MODULE_DECLARE(aarch64_system,
 	AARCH64_SYSTEM_VMODULE, (void *)aarch64_system_init);
-
-int virtual_timer_irq_handler(uint32_t irq, void *data)
-{
-	uint32_t value;
-	struct vcpu *vcpu = get_current_vcpu();
-
-	/*
-	 * if the current vcpu is idle, disable the vtimer
-	 * since the pending request vtimer irq is set to
-	 * the timer
-	 */
-	if (!vcpu || (!task_is_vcpu(vcpu->task))) {
-		write_sysreg32(0, CNTV_CTL_EL0);
-		return 0;
-	}
-
-	value = read_sysreg32(CNTV_CTL_EL0);
-	dsb();
-
-	if (!(value & CNT_CTL_ISTATUS)) {
-		pr_debug("vtimer is not trigger\n");
-		return 0;
-	}
-
-	value = value | CNT_CTL_IMASK;
-	write_sysreg32(value, CNTV_CTL_EL0);
-	dsb();
-
-	return send_virq_to_vcpu(vcpu, vcpu->vm->vtimer_virq);
-}
 
 static int mpidr_el1_init(void)
 {

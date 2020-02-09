@@ -24,7 +24,7 @@
 #include <minos/vmodule.h>
 #include <minos/irq.h>
 #include <minos/of.h>
-#include <asm/processer.h>
+#include <asm/reg.h>
 #include <minos/platform.h>
 
 enum timer_type {

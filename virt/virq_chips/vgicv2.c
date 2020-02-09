@@ -15,9 +15,7 @@
  */
 #include <minos/minos.h>
 #include <asm/arch.h>
-#include <minos/vmodule.h>
-#include <minos/irq.h>
-#include <asm/gicv2.h>
+#include <device/gicv2.h>
 #include <asm/io.h>
 #include <minos/vmodule.h>
 #include <minos/cpumask.h>

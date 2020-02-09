@@ -15,8 +15,7 @@
  */
 
 #include <minos/minos.h>
-#include <asm/cpu.h>
-#include <asm/vtimer.h>
+#include <asm/power.h>
 #include <asm/io.h>
 #include <minos/platform.h>
 #include <libfdt/libfdt.h>
@@ -25,6 +24,8 @@
 #ifdef CONFIG_VIRT
 #include <virt/vm.h>
 #endif
+
+#define REG_CNTCR	0x0
 
 static int fvp_time_init(void)
 {

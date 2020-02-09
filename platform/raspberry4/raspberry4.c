@@ -18,10 +18,10 @@
 #include <asm/arch.h>
 #include <asm/io.h>
 #include <minos/mmu.h>
-#include <asm/bcm_irq.h>
 #include <libfdt/libfdt.h>
 #include <minos/of.h>
-#include <asm/cpu.h>
+#include <device/bcm_irq.h>
+#include <asm/power.h>
 #include <minos/platform.h>
 
 #ifdef CONFIG_VIRT

@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <asm/cpu.h>
+#include <asm/power.h>
 #include <minos/mm.h>
 #include <virt/vmm.h>
 #include <virt/vm.h>

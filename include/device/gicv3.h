@@ -1,7 +1,7 @@
 #ifndef _MINOS_GICV3_H_
 #define _MINOS_GICV3_H_
 
-#include <asm/gic_reg.h>
+//#include <asm/gic_reg.h>
 
 #if 0
 #define GICD_CTLR_ENABLE_GRP0		(1 << 0)

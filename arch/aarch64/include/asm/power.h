@@ -1,13 +1,13 @@
-#ifndef _MINOS_POWER_H_
-#define _MINOS_POWER_H_
+#ifndef __MINOS_CPU_H__
+#define __MINOS_CPU_H__
 
-#define PPOFFR	(0x00)
-#define PPONR	(0x04)
-#define PCOFFR	(0x08)
-#define PWKUPR	(0x0c)
-#define PSYSR	(0x10)
+#include <asm/psci.h>
 
-void power_on_cpu_core(uint8_t aff0, uint8_t aff1, uint8_t aff2);
-void power_off_cpu_core(uint8_t aff0, uint8_t aff1, uint8_t aff2);
+int psci_cpu_on(unsigned long cpu, unsigned long entry);
+int psci_cpu_off(unsigned long cpu);
+void psci_system_reboot(int mode, const char *cmd);
+void psci_system_shutdown(void);
+
+int spin_table_cpu_on(unsigned long affinity, unsigned long entry);
 
 #endif
