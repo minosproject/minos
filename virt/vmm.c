@@ -17,6 +17,7 @@
 #include <minos/minos.h>
 #include <virt/vm.h>
 #include <minos/mmu.h>
+#include <minos/tlb.h>
 
 extern unsigned char __el2_ttb0_pgd;
 extern unsigned char __el2_ttb0_pud;
@@ -571,7 +572,6 @@ static void release_vmm_area_in_vm0(struct vm *vm)
 
 void release_vm_memory(struct vm *vm)
 {
-	unsigned long type;
 	struct mm_struct *mm;
 	struct page *page, *tmp;
 	struct vmm_area *va, *n;
@@ -590,11 +590,7 @@ void release_vm_memory(struct vm *vm)
 	 * running, do not to require the lock
 	 */
 	list_for_each_entry_safe(va, n, &mm->vmm_area_used, list) {
-		type = va->flags & VM_MAP_TYPE_MASK;
-		if ((type == VM_MAP_PT) || (type == 0))
-			continue;
-
-		switch (type) {
+		switch (va->flags & VM_MAP_TYPE_MASK) {
 		case VM_MAP_P2P:
 			free((void *)va->pstart);
 			break;
@@ -627,7 +623,6 @@ void release_vm_memory(struct vm *vm)
 	}
 
 	free_pages((void *)mm->pgd_base);
-	memset(mm, 0, sizeof(struct mm_struct));
 }
 
 unsigned long create_hvm_iomem_map(struct vm *vm,
@@ -741,9 +736,8 @@ static int __vm_mmap(struct mm_struct *mm, unsigned long hvm_mmap_base,
 		left -= count;
 	}
 
-	/* this function always run in vm0 */
 	flush_local_tlb_guest();
-	flush_icache_all();
+	inv_icache_all();
 
 	return 0;
 }

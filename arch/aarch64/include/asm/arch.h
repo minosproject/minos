@@ -10,7 +10,7 @@
 #include <asm/virt.h>
 #endif
 
-#define SP_SIZE	 CONFIG_TASK_STACK_SIZE
+#define SP_SIZE		CONFIG_TASK_STACK_SIZE
 
 #define NR_LOCAL_IRQS	(32)
 #define NR_SGI_IRQS	(16)
@@ -51,7 +51,6 @@ static inline int arch_irq_disabled(void)
 		arch_restore_irqflags(flag); \
 	} while (0)
 
-
 #define stack_to_gp_regs(base) \
 	(gp_regs *)(base - sizeof(gp_regs))
 
@@ -61,25 +60,27 @@ static inline int arch_irq_disabled(void)
 #define set_reg_value(regs, index, value)	\
 	*((unsigned long *)(regs) + index + 3) = (unsigned long)value
 
-#define read_sysreg32(name) ({                          \
-    uint32_t _r;                                        \
-    asm volatile("mrs  %0, "stringify(name) : "=r" (_r));         \
-    _r; })
+#define read_sysreg32(name) ({						\
+	uint32_t _r;							\
+	asm volatile("mrs  %0, "stringify(name) : "=r" (_r));		\
+	_r; })
 
-#define write_sysreg32(v, name) do {                    \
-    uint32_t _r = v;                                    \
-    asm volatile("msr "stringify(name)", %0" : : "r" (_r));       \
-} while (0)
+#define write_sysreg32(v, name)						\
+	do {								\
+		uint32_t _r = v;					\
+		asm volatile("msr "stringify(name)", %0" : : "r" (_r));	\
+	} while (0)
 
-#define write_sysreg64(v, name) do {                    \
-    uint64_t _r = v;                                    \
-    asm volatile("msr "stringify(name)", %0" : : "r" (_r));       \
-} while (0)
+#define write_sysreg64(v, name)						\
+	do {								\
+		uint64_t _r = v;					\
+		asm volatile("msr "stringify(name)", %0" : : "r" (_r));	\
+	} while (0)
 
-#define read_sysreg64(name) ({                          \
-    uint64_t _r;                                        \
-    asm volatile("mrs  %0, "stringify(name) : "=r" (_r));         \
-    _r; })
+#define read_sysreg64(name) ({						\
+	uint64_t _r;							\
+	asm volatile("mrs  %0, "stringify(name) : "=r" (_r));		\
+	_r; })
 
 #define read_sysreg(name)     read_sysreg64(name)
 #define write_sysreg(v, name) write_sysreg64(v, name)
@@ -160,83 +161,6 @@ static inline struct task_info *current_task_info(void)
 }
 #endif
 
-
-static inline void flush_all_tlb_host(void)
-{
-	asm volatile (
-		"dsb sy;"
-		"tlbi alle2;"
-		"dsb sy;"
-		"isb;"
-		: : : "memory"
-	);
-}
-
-static inline void flush_local_tlb_guest(void)
-{
-	/* current VMID only */
-	asm volatile (
-		"dsb sy;"
-		"tlbi vmalls12e1;"
-		"dsb sy;"
-		"isb;"
-		: : : "memory"
-	);
-}
-
-static inline void flush_local_tlbis_guest(void)
-{
-	/* current vmid only and innershareable TLBS */
-	asm volatile(
-		"dsb sy;"
-		"tlbi vmalls12e1is;"
-		"dsb sy;"
-		"isb;"
-		: : : "memory"
-	);
-}
-
-static inline void flush_all_tlb_guest(void)
-{
-	/* flush all vmids local TLBS, non-hypervisor mode */
-	asm volatile(
-		"dsb sy;"
-		"tlbi alle1;"
-		"dsb sy;"
-		"isb;"
-		: : : "memory"
-	);
-}
-
-static inline void flush_all_tlbis_guest(void)
-{
-	/* flush innershareable TLBS, all VMIDs, non-hypervisor mode */
-	asm volatile(
-		"dsb sy;"
-		"tlbi alle1is;"
-		"dsb sy;"
-		"isb;"
-		: : : "memory"
-	);
-}
-
-static inline void flush_tlb_va_host(unsigned long va,
-		unsigned long size)
-{
-	unsigned long end = va + size;
-
-	dsb();
-
-	while (va < end) {
-		asm volatile("tlbi vae2is, %0;" : : "r"
-				(va >> PAGE_SHIFT) : "memory");
-		va += PAGE_SIZE;
-	}
-
-	dsb();
-	isb();
-}
-
 static inline unsigned long va_to_pa(unsigned long va)
 {
 	uint64_t pa, tmp = read_sysreg64(PAR_EL1);
@@ -287,7 +211,14 @@ static inline void cpu_relax(void)
 	asm volatile("yield" ::: "memory");
 }
 
-static inline void flush_icache_all(void)
+static inline void inv_icache_local(void)
+{
+	asm volatile("ic iallu");
+	dsbsy();
+	isb();
+}
+
+static inline void inv_icache_all(void)
 {
 	asm volatile("ic ialluis");
 	dsbsy();

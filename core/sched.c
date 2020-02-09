@@ -472,6 +472,7 @@ void switch_to_task(struct task *cur, struct task *next)
 
 	do_hooks((void *)next, NULL, OS_HOOK_TASK_SWITCH_TO);
 	pcpu->switch_to(pcpu, cur, next);
+	next->ctx_sw_cnt++;
 
 	task_sched_return(next);
 }

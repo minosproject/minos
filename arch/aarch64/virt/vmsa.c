@@ -22,6 +22,7 @@
 #include <asm/arch.h>
 #include <virt/vmm.h>
 #include <virt/vm.h>
+#include <minos/tlb.h>
 
 /*
  * a - Non-shareable
@@ -173,7 +174,9 @@ static void vmsa_state_restore(struct task *task, void *context)
 	write_sysreg(c->tcr_el1, TCR_EL1);
 	write_sysreg(c->par_el1, PAR_EL1);
 	dsb();
-	flush_local_tlb_guest();
+
+	if (task->ctx_sw_cnt == 0)
+		flush_local_tlb_guest();
 }
 
 static void vmsa_state_resume(struct task *task, void *context)
