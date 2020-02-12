@@ -340,7 +340,7 @@ static int bcm2836_irq_init(struct device_node *node)
 	pr_notice("boardcom bcm2836 l1 interrupt init\n");
 
 	bcm2836_base = (void *)0x40000000;
-	io_remap(0x40000000, 0x40000000, 0x100);
+	io_remap(0x40000000, 0x100);
 
 	/*
 	 * set the timer to source for the 19.2Mhz crstal clock
@@ -364,7 +364,7 @@ static int bcm2836_irq_init(struct device_node *node)
 
 	/* init the bcm2835 interrupt controller for spi */
 	base = intc.base = (void *)0x3f00b200;
-	io_remap(0x3f00b200, 0x3f00b200, 0x100);
+	io_remap(0x3f00b200, 0x100);
 
 	for (b = 0; b < NR_BANKS; b++) {
 		intc.pending[b] = base + reg_pending[b];

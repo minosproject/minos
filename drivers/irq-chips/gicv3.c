@@ -384,10 +384,8 @@ int gicv3_init(struct device_node *node)
 	spin_lock_init(&gicv3_lock);
 
 	/* only map gicd and gicr now */
-	io_remap((vir_addr_t)array[0], (phy_addr_t)array[0],
-			(size_t)array[1]);
-	io_remap((vir_addr_t)array[2], (phy_addr_t)array[2],
-			(size_t)array[3]);
+	io_remap((vir_addr_t)array[0], (size_t)array[1]);
+	io_remap((vir_addr_t)array[2], (size_t)array[3]);
 
 	gicd_base = (void *)(unsigned long)array[0];
 	__gicr_rd_base = (void *)(unsigned long)array[2];

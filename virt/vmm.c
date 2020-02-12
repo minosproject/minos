@@ -81,6 +81,7 @@ int create_guest_mapping(struct mm_struct *mm, vir_addr_t vir,
 static int __used destroy_guest_mapping(struct mm_struct *mm,
 		unsigned long vir, size_t size)
 {
+	int ret;
 	unsigned long end;
 
 	if (!IS_PAGE_ALIGN(vir) || !IS_PAGE_ALIGN(size)) {
@@ -93,7 +94,9 @@ static int __used destroy_guest_mapping(struct mm_struct *mm,
 	vir = ALIGN(vir, PAGE_SIZE);
 	size = end - vir;
 
-	return destroy_mem_mapping(mm, vir, size, 0);
+	ret = destroy_mem_mapping(mm, vir, size, 0);
+
+	return ret;
 }
 
 static struct vmm_area *__alloc_vmm_area_entry(unsigned long base,
@@ -535,7 +538,7 @@ static int __vm_unmap(struct mm_struct *mm0, struct vmm_area *va)
 
 	spin_unlock(&mm0->mm_lock);
 
-	flush_local_tlb_guest();
+	flush_tlb_guest();
 
 	return 0;
 }
@@ -623,6 +626,8 @@ void release_vm_memory(struct vm *vm)
 	}
 
 	free_pages((void *)mm->pgd_base);
+
+	flush_tlb_guest();
 }
 
 unsigned long create_hvm_iomem_map(struct vm *vm,
@@ -639,6 +644,8 @@ unsigned long create_hvm_iomem_map(struct vm *vm,
 	va->flags |= (VM_MAP_P2P | VM_IO);
 	va->pstart = phy;
 	map_vmm_area(&vm0->mm, va, 0);
+
+	flush_tlb_guest();
 
 	return va->start;
 }
@@ -669,6 +676,7 @@ void unmap_vm_mem(unsigned long gva, size_t size)
 	 * in otherwhere
 	 */
 	pa = guest_va_to_pa(gva, 1);
+	flush_dcache_range(pa, size);
 	destroy_host_mapping(pa, size);
 }
 
@@ -736,8 +744,7 @@ static int __vm_mmap(struct mm_struct *mm, unsigned long hvm_mmap_base,
 		left -= count;
 	}
 
-	flush_local_tlb_guest();
-	inv_icache_all();
+	flush_tlb_guest();
 
 	return 0;
 }

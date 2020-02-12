@@ -17,6 +17,7 @@
 #include <minos/minos.h>
 #include <minos/mm.h>
 #include <minos/mmu.h>
+#include <minos/tlb.h>
 
 LIST_HEAD(mem_list);
 
@@ -184,6 +185,8 @@ static void map_os_memory(void)
 		create_host_mapping(region->vir_base, region->phy_base,
 				region->size, flags);
 	}
+
+	flush_tlb_host();
 }
 
 #ifdef CONFIG_SIMPLE_MM_ALLOCATER

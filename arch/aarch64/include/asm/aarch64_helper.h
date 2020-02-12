@@ -192,7 +192,6 @@ DEFINE_SYSOP_TYPE_FUNC(dsb, ish)
 DEFINE_SYSOP_TYPE_FUNC(dsb, ishst)
 DEFINE_SYSOP_TYPE_FUNC(dmb, ish)
 DEFINE_SYSOP_TYPE_FUNC(dmb, ishst)
-DEFINE_SYSOP_FUNC(isb)
 
 uint32_t get_afflvl_shift(uint32_t);
 uint32_t mpidr_mask_lower_afflvls(uint64_t, uint32_t);

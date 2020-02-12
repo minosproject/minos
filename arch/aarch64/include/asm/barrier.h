@@ -5,6 +5,8 @@
 #define __dmb(opt)	asm volatile("dmb " #opt : : : "memory")
 #define __dsb(opt)	asm volatile("dsb " #opt : : : "memory")
 
+#define isb()		__isb();
+
 #define mb()		__dsb(sy)
 #define rmb()		__dsb(ld)
 #define wmb()		__dsb(st)

@@ -75,6 +75,7 @@ static void inline set_next_task(struct task *task, int cpuid)
 
 void pcpu_resched(int pcpu_id)
 {
+	mb();
 	send_sgi(CONFIG_MINOS_RESCHED_IRQ, pcpu_id);
 }
 

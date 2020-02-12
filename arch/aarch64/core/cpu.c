@@ -60,8 +60,7 @@ int spin_table_cpu_on(unsigned long affinity, unsigned long entry)
 	int cpu = affinity_to_cpuid(affinity);
 
 	if (smp_holding_address[cpu] != 0) {
-		io_remap(smp_holding_address[cpu], smp_holding_address[cpu],
-				sizeof(uint64_t));
+		io_remap(smp_holding_address[cpu], sizeof(uint64_t));
 		*(unsigned long *)smp_holding_address[cpu] = entry;
 
 		/* flush the cache and send signal to other cpu */

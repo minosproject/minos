@@ -394,11 +394,6 @@ int create_mem_mapping(struct mm_struct *mm, vir_addr_t addr,
 	if (ret)
 		pr_err("map fail 0x%x->0x%x size:%x\n", addr, phy, size);
 
-	if (flags & VM_HOST)
-		flush_tlb_va_host(addr, size);
-	else
-		flush_local_tlb_guest();
-
 	return ret;
 }
 
@@ -523,11 +518,6 @@ int destroy_mem_mapping(struct mm_struct *mm, unsigned long vir,
 	spin_lock(&mm->mm_lock);
 	__destroy_mem_mapping(&map_info);
 	spin_unlock(&mm->mm_lock);
-
-	if (flags & VM_HOST)
-		flush_tlb_va_host(vir, size);
-	else
-		flush_local_tlb_guest();
 
 	return 0;
 }
@@ -656,7 +646,7 @@ int create_early_pmd_mapping(vir_addr_t vir, phy_addr_t phy)
 
 	set_pmd_at(pmd_offset(pmdp, phy), (phy & PMD_MASK) |
 			VM_DESC_HOST_BLOCK);
-	flush_tlb_va_host(vir, SIZE_2M);
+	flush_tlb_host();
 
 	return 0;
 }
@@ -684,6 +674,7 @@ int create_host_mapping(vir_addr_t vir, phy_addr_t phy,
 
 int destroy_host_mapping(vir_addr_t vir, size_t size)
 {
+	int ret;
 	unsigned long end;
 
 	if (!IS_PMD_ALIGN(vir) || !IS_PMD_ALIGN(size)) {
@@ -695,7 +686,23 @@ int destroy_host_mapping(vir_addr_t vir, size_t size)
 	vir = ALIGN(vir, MEM_BLOCK_SIZE);
 	size = end - vir;
 
-	return destroy_mem_mapping(&host_mm, vir, size, VM_HOST);
+	ret = destroy_mem_mapping(&host_mm, vir, size, VM_HOST);
+	flush_tlb_va_host(vir, size);
+
+	return ret;
+}
+
+unsigned long io_remap(vir_addr_t vir, size_t size)
+{
+	if (!create_host_mapping(vir, vir, size, VM_IO))
+		return vir;
+	else
+		return 0;
+}
+
+void io_unmap(unsigned long vir, size_t size)
+{
+	destroy_host_mapping(vir, size);
 }
 
 static int vmm_early_init(void)

@@ -206,10 +206,10 @@ static void gicv2_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *mask)
 		for_each_cpu(cpu, mask)
 			value |= gic_cpu_mask[cpu];
 
-		mb();
 		writel_gicd(GICD_SGI_TARGET_LIST |
 			(value << GICD_SGI_TARGET_SHIFT) | sgi,
 			GICD_SGIR);
+		isb();
 		break;
 	default:
 		break;;
@@ -373,12 +373,9 @@ static int gicv2_init(struct device_node *node)
 	gicv2_cbase = (void *)array[2];
 	gicv2_hbase = (void *)array[4];
 
-	io_remap((vir_addr_t)array[0], (phy_addr_t)array[0],
-			(size_t)array[1]);
-	io_remap((vir_addr_t)array[2], (phy_addr_t)array[2],
-			(size_t)array[3]);
-	io_remap((vir_addr_t)array[4], (phy_addr_t)array[4],
-			(size_t)array[5]);
+	io_remap((vir_addr_t)array[0], (size_t)array[1]);
+	io_remap((vir_addr_t)array[2], (size_t)array[3]);
+	io_remap((vir_addr_t)array[4], (size_t)array[5]);
 
 	if (gicv2_is_aliased((unsigned long)array[2],
 				(unsigned long)array[3])) {

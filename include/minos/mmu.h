@@ -172,19 +172,10 @@ int create_host_mapping(unsigned long vir, unsigned long phy,
 		size_t size, unsigned long flags);
 int destroy_host_mapping(unsigned long vir, size_t size);
 
+unsigned long io_remap(vir_addr_t vir, size_t size);
+void io_unmap(unsigned long vir, size_t size);
+
 phy_addr_t mmu_translate_guest_address(void *pgd, unsigned long va);
 phy_addr_t mmu_translate_host_address(void *pgd, unsigned long va);
-
-static inline int
-io_remap(vir_addr_t vir, phy_addr_t phy, size_t size)
-{
-	return create_host_mapping(vir, phy, size, VM_IO);
-}
-
-static inline int
-io_unmap(unsigned long vir, size_t size)
-{
-	return destroy_host_mapping(vir, size);
-}
 
 #endif

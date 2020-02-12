@@ -21,6 +21,7 @@
 #include <minos/init.h>
 #include <minos/mm.h>
 #include <minos/mmu.h>
+#include <minos/tlb.h>
 
 extern unsigned char __code_start;
 extern void *bootmem_end;
@@ -570,8 +571,10 @@ struct mem_block *alloc_mem_block(unsigned long flags)
 		if (f & VM_NORMAL)
 			return block;
 
+		flush_dcache_range(block->phy_base, MEM_BLOCK_SIZE);
 		create_host_mapping(block->phy_base, block->phy_base,
 				MEM_BLOCK_SIZE, f);
+		flush_tlb_va_host(block->phy_base, MEM_BLOCK_SIZE);
 	}
 
 	return block;
