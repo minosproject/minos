@@ -323,7 +323,7 @@ clean: $(clean-dirs)
 
 distclean: clean
 	$(Q) echo "  CLEAN   .config include/config"
-	$(Q) rm -rf include/config .config
+	$(Q) rm -rf include/config .config .config.old
 	$(Q) echo "  CLEAN   tags cscope.in.out cscope.out cscope.po.out"
 	$(Q) rm -f tags cscope.in.out cscope.out cscope.po.out
 	$(Q) cd tools/mvm && make clean
