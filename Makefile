@@ -318,8 +318,8 @@ clean: $(clean-dirs)
 	$(Q) echo "  CLEAN   allsymbols.o allsymbols.S linkmap.txt minos.s .tmp.minos.elf .tmp.minos.symbols minos.bin minos.elf"
 	$(Q) rm -f allsymbols.o allsymbols.S linkmap.txt minos.s .tmp.minos.elf .tmp.minos.symbols minos.bin minos.elf
 	$(Q) cd tools/mvm && make clean
-	$(Q) rm $(offset_h)
-	$(Q) rm $(offset_s)
+	$(Q) rm -rf $(offset_h)
+	$(Q) rm -rf $(offset_s)
 
 distclean: clean
 	$(Q) echo "  CLEAN   .config include/config"
