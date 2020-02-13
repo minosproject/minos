@@ -381,14 +381,14 @@ static int vmbox_device_attach(struct vmbox_controller *_vc,
 	if (!vdev->vring_virq || !vdev->ipc_virq)
 		return -ENOSPC;
 
-	va = alloc_free_vmm_area(&vm->mm, vmbox->shmem_size,
-			PAGE_MASK, VM_MAP_P2P | VM_IO);
+	va = alloc_free_vmm_area(&vm->mm, vmbox->shmem_size, PAGE_MASK, 0);
 	if (!va)
 		return -ENOMEM;
 
 	vdev->iomem = va->start;
 	vdev->iomem_size = vmbox->shmem_size;
-	map_vmm_area(&vm->mm, va, (unsigned long)vmbox->shmem);
+	map_vmm_area(&vm->mm, va, 0, (unsigned long)vmbox->shmem,
+			VM_MAP_SHARED | VM_IO);
 
 	vdev->devid = _vc->dev_cnt++;
 	_vc->devices[vdev->devid] = vdev;
@@ -831,7 +831,7 @@ static int __vm_create_vmbox_controller_static(struct vm *vm)
 	if (ret || (irq < 32))
 		return -ENOENT;
 
-	split_vmm_area(&vm->mm, base, base, size, 0);
+	split_vmm_area(&vm->mm, base, size, VM_IO);
 	request_virq(vm, irq, 0);
 
 	vc = zalloc(sizeof(*vc));

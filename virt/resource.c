@@ -227,11 +227,12 @@ static int create_pdev_iomem_of(struct vm *vm, struct device_node *node)
 		/* map the physical memory for vm */
 		pr_info("[VM%d IOMEM] 0x%x->0x%x 0x%x %s\n", vm->vmid,
 				addr, addr, size, node->name);
-		split_vmm_area(&vm->mm, addr, addr, size, VM_IO | VM_MAP_PT);
+		split_vmm_area(&vm->mm, addr, size, VM_IO);
 
 		/* irqchip do not map the virtual address */
 		if (node->class != DT_CLASS_IRQCHIP)
-			create_guest_mapping(&vm->mm, addr, addr, size, VM_IO);
+			create_guest_mapping(&vm->mm, addr,
+					addr, size, VM_IO | VM_MAP_PT);
 	}
 
 	return 0;
@@ -367,8 +368,9 @@ static int create_vm_iomem_common(struct vm *vm, struct device_node *node)
 		paddr = fdt32_to_cpu64(data[2], data[3]);
 		size = fdt32_to_cpu64(data[4], data[5]);
 
-		split_vmm_area(&vm->mm, vaddr, paddr, size, VM_IO | VM_MAP_PT);
-		create_guest_mapping(&vm->mm, vaddr, paddr, size, VM_IO);
+		split_vmm_area(&vm->mm, vaddr, size, VM_IO);
+		create_guest_mapping(&vm->mm, vaddr,
+				paddr, size, VM_IO | VM_MAP_PT);
 
 		data += IOMEM_ENTRY_CNT;
 	}

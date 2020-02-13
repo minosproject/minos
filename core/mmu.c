@@ -511,9 +511,15 @@ int destroy_mem_mapping(struct mm_struct *mm, unsigned long vir,
 
 	map_info.table_base = mm->pgd_base;
 	map_info.vir_base = vir;
-	map_info.lvl = PGD;
 	map_info.size = size;
-	map_info.config = attrs[PGD];
+
+	if (flags & VM_HOST) {
+		map_info.lvl = PGD;
+		map_info.config = attrs[PGD];
+	} else {
+		map_info.lvl = PUD;
+		map_info.config = attrs[PUD];
+	}
 
 	spin_lock(&mm->mm_lock);
 	__destroy_mem_mapping(&map_info);

@@ -37,10 +37,10 @@ void *map_vm_mem(unsigned long gva, size_t size);
 void unmap_vm_mem(unsigned long gva, size_t size);
 
 int split_vmm_area(struct mm_struct *mm, unsigned long base,
-		unsigned long pbase, unsigned long size, unsigned long flags);
+		unsigned long size, unsigned long flags);
 
 int map_vmm_area(struct mm_struct *mm, struct vmm_area *va,
-		unsigned long pbase);
+		uint32_t vmid, unsigned long pbase, unsigned long flags);
 
 struct vmm_area *alloc_free_vmm_area(struct mm_struct *mm,
 		size_t size, unsigned long mask, unsigned long flags);

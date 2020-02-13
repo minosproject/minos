@@ -575,7 +575,7 @@ int vm_power_off(int vmid, void *arg)
 
 static int guest_mm_init(struct vm *vm, uint64_t base, uint64_t size)
 {
-	if (split_vmm_area(&vm->mm, base, 0, size, VM_NORMAL | VM_MAP_BK)) {
+	if (split_vmm_area(&vm->mm, base, size, VM_NORMAL)) {
 		pr_err("invalid memory config for guest VM\n");
 		return -EINVAL;
 	}
@@ -827,6 +827,7 @@ static void vm_setup(struct vm *vm)
 void destroy_vm(struct vm *vm)
 {
 	int i;
+	unsigned long flags;
 	struct vdev *vdev, *n;
 	struct vcpu *vcpu;
 
@@ -860,22 +861,17 @@ void destroy_vm(struct vm *vm)
 		free(vm->vcpus);
 	}
 
-	if (vm->vmcs)
-		free(vm->vmcs);
-
-	vm->hvm_vmcs = NULL;
-	vm->vmcs = NULL;
 	release_vm_memory(vm);
 
 	i = vm->vmid;
-	spin_lock(&vms_lock);
+	spin_lock_irqsave(&vms_lock, flags);
 	clear_bit(i, vmid_bitmap);
 	list_del(&vm->vm_list);
-	spin_unlock(&vms_lock);
-
-	free(vm);
 	vms[i] = NULL;
 	total_vms--;
+	spin_unlock_irqrestore(&vms_lock, flags);
+
+	free(vm);
 }
 
 int vm_vcpus_init(struct vm *vm)
@@ -1071,8 +1067,8 @@ static void *create_native_vm_of(struct device_node *node, void *arg)
 	ret = ret / 2;
 
 	for (i = 0; i < ret; i ++) {
-		split_vmm_area(&vm->mm, meminfo[i * 2], meminfo[i * 2],
-				meminfo[i * 2 + 1], VM_NORMAL | VM_MAP_PT);
+		split_vmm_area(&vm->mm, meminfo[i * 2],
+				meminfo[i * 2 + 1], VM_NORMAL);
 	}
 
 	return vm;

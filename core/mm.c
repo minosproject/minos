@@ -181,6 +181,8 @@ static void map_os_memory(void)
 
 		if (type == MEMORY_REGION_TYPE_DMA)
 			flags |= VM_IO;
+		else
+			flags |= VM_NORMAL;
 
 		create_host_mapping(region->vir_base, region->phy_base,
 				region->size, flags);

@@ -141,34 +141,34 @@ unsigned long vm_create_vmcs(struct vm *vm)
 	int i;
 	uint32_t size;
 	struct vcpu *vcpu;
-	unsigned long base;
+	void *base;
+	unsigned long hvm_vmcs;
 
 	if (vm->vmcs || vm->hvm_vmcs)
 		return 0;
 
 	size = VMCS_SIZE(vm->vcpu_nr);
-	base = (unsigned long)get_io_pages(PAGE_NR(size));
+	base = get_io_pages(PAGE_NR(size));
 	if (!base)
 		return 0;
 
-	vm->vmcs = (void *)base;
-	memset(vm->vmcs, 0, size);
+	memset(base, 0, size);
 
-	vm->hvm_vmcs = (void *)create_hvm_iomem_map(vm, base, size);
-	if (!vm->hvm_vmcs) {
+	hvm_vmcs = create_hvm_iomem_map(vm, (unsigned long)base, size);
+	if (hvm_vmcs == INVALID_ADDRESS) {
 		pr_err("mapping vmcs to hvm failed\n");
-		free(vm->vmcs);
+		free(base);
 		return 0;
 	}
 
 	for (i = 0; i < vm->vcpu_nr; i++) {
 		vcpu = vm->vcpus[i];
-		vcpu->vmcs = (struct vmcs *)(vm->vmcs +
+		vcpu->vmcs = (struct vmcs *)(base +
 				i * sizeof(struct vmcs));
 		vcpu_vmcs_init(vcpu);
 	}
 
-	return (unsigned long)vm->hvm_vmcs;
+	return hvm_vmcs;
 }
 
 int vm_create_vmcs_irq(struct vm *vm, int vcpu_id)
