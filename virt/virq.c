@@ -22,6 +22,19 @@
 
 static DEFINE_SPIN_LOCK(hvm_irq_lock);
 
+#define HVM_IRQ_LOCK(vm) 				\
+	do {						\
+		if (vm_is_hvm(vm))			\
+			spin_lock(&hvm_irq_lock); 	\
+	} while (0)
+
+#define HVM_IRQ_UNLOCK(vm) 				\
+	do {						\
+		if (vm_is_hvm(vm))			\
+			spin_unlock(&hvm_irq_lock); 	\
+	} while (0)
+
+
 static inline struct virq_desc *
 get_virq_desc(struct vcpu *vcpu, uint32_t virq)
 {
@@ -615,8 +628,7 @@ int alloc_vm_virq(struct vm *vm)
 	int virq;
 	int count = vm->vspi_nr;
 
-	if (vm_is_hvm(vm))
-		spin_lock(&hvm_irq_lock);
+	HVM_IRQ_LOCK(vm);
 
 	virq = find_next_zero_bit_loop(vm->vspi_map, count, 0);
 	if (virq >= count)
@@ -625,8 +637,7 @@ int alloc_vm_virq(struct vm *vm)
 	if (virq >= 0)
 		request_virq(vm, virq + VM_LOCAL_VIRQ_NR, VIRQF_ENABLE);
 
-	if (vm_is_hvm(vm))
-		spin_unlock(&hvm_irq_lock);
+	HVM_IRQ_UNLOCK(vm);
 
 	return (virq >= 0 ? virq + VM_LOCAL_VIRQ_NR : -1);
 }
@@ -639,15 +650,13 @@ void release_vm_virq(struct vm *vm, int virq)
 	if (virq >= vm->vspi_nr)
 		return;
 
-	if (vm_is_hvm(vm))
-		spin_lock(&hvm_irq_lock);
+	HVM_IRQ_LOCK(vm);
 
 	desc = &vm->vspi_desc[virq];
 	memset(desc, 0, sizeof(struct virq_desc));
 	clear_bit(virq, vm->vspi_map);
 
-	if (vm_is_hvm(vm))
-		spin_unlock(&hvm_irq_lock);
+	HVM_IRQ_UNLOCK(vm);
 }
 
 static int virq_create_vm(void *item, void *args)
