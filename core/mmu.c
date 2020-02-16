@@ -608,55 +608,6 @@ unsigned long alloc_guest_pmd(struct mm_struct *mm, unsigned long phy)
 	return pmd;
 }
 
-/*
- * create pmd mapping mapping 2m mem each time
- * used to early mapping
- */
-int create_early_pmd_mapping(vir_addr_t vir, phy_addr_t phy)
-{
-	pud_t *pudp;
-	pmd_t *pmdp;
-	extern unsigned char __el2_ttb0_pgd;
-	pgd_t *pgdp = (pgd_t *)&__el2_ttb0_pgd;
-
-	vir = vir & PMD_MASK;
-	phy = phy & PMD_MASK;
-
-	/*
-	 * create the early mapping for hypervisor
-	 * will map phy to phy mapping, the pages needed
-	 * for this function will used bootmem
-	 */
-	pudp = (pud_t *)(*pgd_offset(pgdp, vir) & ~PAGE_MASK);
-	if (!pudp) {
-		pudp = (pud_t *)alloc_boot_pages(1);
-		if (unlikely(!pudp))
-			return -ENOMEM;
-
-		memset(pudp, 0, PAGE_SIZE);
-		set_pgd_at(pgd_offset(pgdp, vir), (unsigned long)pudp |
-				VM_DESC_HOST_TABLE);
-	}
-
-	pmdp = (pmd_t *)(*pud_offset(pudp, vir) & ~PAGE_MASK);
-	if (!pmdp) {
-		pmdp = (pmd_t *)alloc_boot_pages(1);
-		if (unlikely(!pmdp))
-			return -ENOMEM;
-
-		memset(pmdp, 0, PAGE_SIZE);
-		set_pud_at(pud_offset(pudp, vir), (unsigned long)pmdp |
-				VM_DESC_HOST_TABLE);
-
-	}
-
-	set_pmd_at(pmd_offset(pmdp, phy), (phy & PMD_MASK) |
-			VM_DESC_HOST_BLOCK);
-	flush_tlb_host();
-
-	return 0;
-}
-
 int create_host_mapping(vir_addr_t vir, phy_addr_t phy,
 		size_t size, unsigned long flags)
 {

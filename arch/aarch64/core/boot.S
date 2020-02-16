@@ -99,6 +99,19 @@ do_start:
 	dsb	sy
 	isb
 
+	/*
+	 * 0xff440c0400
+	 * MT_DEVICE_NGNRNE	0
+	 * MT_DEVICE_NGNRE	1
+	 * MT_DEVICE_GRE	2
+	 * MT_NORMAL_NC		3
+	 * MT_NORMAL		4
+	 * 0x00 - MT_DEVICE_NGNRNE
+	 * 0x04 - MT_DEVICE_NGNRE
+	 * 0x0c - MT_DEVICE_GRE
+	 * 0x44 - MT_NORMAL_NC
+	 * 0x0ff - MT_NORMAL
+	 */
 	ldr	x1, =0xff440c0400
 	msr	MAIR_EL2, x1
 	isb
@@ -115,10 +128,10 @@ do_start:
 	and	x1, x1, x3
 	orr	x1, x1, x2
 	orr	x1, x1, #0x10		// VA 48 bit address range and translation start at lvl0
-	orr	x1, x1, #(1 << 8)	// IRGN0 : Normal memory, Inner Write-Back Read-Allocate Write-Allocate Cacheable
-	orr	x1, x1, #(1 << 10)	// ORGN0
+	orr	x1, x1, #(1 << 8)	// IRGN0 : Normal memory, Inner Write-Back Write-Allocate Cacheable
+	orr	x1, x1, #(1 << 10)	// ORGN0 : Normal memory, Outer Write-Back Write-Allocate Cacheable
 	orr	x1, x1, #(3 << 12)	// Inner shareable
-	orr	x1, x1, #(1 << 23)
+	orr	x1, x1, #(1 << 23)	// Reserved, res1.
 	msr	TCR_EL2, x1
 	isb
 

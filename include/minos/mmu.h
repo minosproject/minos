@@ -55,10 +55,6 @@ typedef __pte_t pte_t;
 #define PTE_NOT_MAPPED		(PTE + 1)
 #define INVALID_MAPPING		(6)
 
-/* for early mapping use */
-#define VM_DESC_HOST_TABLE	__VM_DESC_HOST_TABLE
-#define VM_DESC_HOST_BLOCK	__VM_DESC_HOST_BLOCK
-
 #define mapping_error(r)	(((unsigned long)(r) > 0) && ((unsigned long)(r) <= 6))
 
 #define pgd_idx(vir)		((vir >> PGD_SHIFT) & (PAGE_MAPPING_COUNT - 1))

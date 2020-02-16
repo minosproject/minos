@@ -77,25 +77,16 @@ map_boot_mem:
 	ldr	vaddr, =CONFIG_MINOS_START_ADDRESS
 	ldr	paddr, =CONFIG_MINOS_START_ADDRESS
 	ldr	size, =CONFIG_MINOS_RAM_SIZE
-	mov	pte_attr, #(TT_S1_ATTR_BLOCK | \
-		(4 << TT_S1_ATTR_MATTR_LSB) | \
-		TT_S1_ATTR_AP_RW_PL1 | \
-		TT_S1_ATTR_NS | \
-		TT_S1_ATTR_SH_INNER | \
-		TT_S1_ATTR_AF)
+	ldr	pte_attr, =(S1_ATTR_IDX(MT_NORMAL) | S1_DES_BLOCK | S1_NS | \
+			S1_AP_RW | S1_SH_INNER | S1_AF)
 	bl	build_pmd_table
 	dsb	sy
 
 	ldr	vaddr, =CONFIG_UART_BASE
 	ldr	paddr, =CONFIG_UART_BASE
 	ldr	size, =CONFIG_UART_IO_SIZE
-	ldr	pte_attr, =(TT_S1_ATTR_BLOCK | \
-		(0 << TT_S1_ATTR_MATTR_LSB) | \
-		TT_S1_ATTR_AP_RW_PL1 | \
-		TT_S1_ATTR_NS | \
-		TT_S1_ATTR_UXN | \
-		TT_S1_ATTR_PXN | \
-		TT_S1_ATTR_AF)
+	ldr	pte_attr, =(S1_ATTR_IDX(MT_DEVICE_nGnRnE) | S1_DES_BLOCK | S1_NS | \
+			S1_AP_RW | S1_AF | S1_XN)
 	bl	build_pmd_table
 	dsb	sy
 	ret	x26
@@ -142,7 +133,7 @@ build_pud_table:
 	mov	pte_index, 0
 
 loop_pud:
-	orr	pte_value, tmp, #TT_S1_ATTR_TABLE
+	orr	pte_value, tmp, #S1_DES_TABLE
 	str	pte_value, [ttb0_pud, pte_index, lsl #3]
 	add	pte_index, pte_index, #1
 	add	tmp, tmp, #0x1000
@@ -152,6 +143,6 @@ loop_pud:
 
 build_pgd_table:
 	/* map first 512GB for booting memory */
-	orr	pte_value, ttb0_pud, #TT_S1_ATTR_TABLE
+	orr	pte_value, ttb0_pud, #S1_DES_TABLE
 	str	pte_value, [ttb0_pgd]
 	ret

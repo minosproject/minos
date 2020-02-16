@@ -13,7 +13,7 @@
 #define VM_NONE			(0x00000000)
 #define VM_IO			(0x00000001)
 #define VM_NORMAL		(0x00000002)
-#define VM_SHMEM		(0x00000004)
+#define VM_NORMAL_NC		(0x00000004)
 #define VM_TYPE_MASK		(0x000000ff)
 
 #define VM_DES_FAULT		(0x00000000)
@@ -31,7 +31,8 @@
 /* the default acess type is 0 means RW */
 #define VM_RO			(0x00100000)
 #define VM_WO			(0x00200000)
-#define VM_RW_MASK		(0x00300000)
+#define VM_RW_NON		(0x00400000)
+#define VM_RW_MASK		(0x00f00000)
 
 #define VM_MAP_PT		(0x01000000)	/* mapped as passthough only for IO memory*/
 #define VM_MAP_BK		(0X02000000)	/* mapped as block */
