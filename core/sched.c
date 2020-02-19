@@ -54,7 +54,11 @@ extern void sched_tick_enable(unsigned long exp);
 static inline void percpu_task_ready(struct pcpu *pcpu,
 		struct task *task, int preempt)
 {
-	list_del(&task->stat_list);
+	if (task->stat_list.next != NULL) {
+		pr_err("%s: wrong task state %d\n", __func__, task->stat);
+		list_del(&task->stat_list);
+	}
+
 	if (preempt)
 		list_add(&pcpu->ready_list, &task->stat_list);
 	else
@@ -63,8 +67,34 @@ static inline void percpu_task_ready(struct pcpu *pcpu,
 
 static inline void precpu_task_sleep(struct pcpu *pcpu, struct task *task)
 {
-	list_del(&task->stat_list);
-	list_add_tail(&pcpu->sleep_list, &task->stat_list);
+	if (task->stat_list.next == NULL) {
+		pr_err("%s: wrong task state %d\n", __func__, task->stat);
+	} else {
+		list_del(&task->stat_list);
+		task->stat_list.next = NULL;
+	}
+}
+
+static inline void smp_percpu_task_ready(struct pcpu *pcpu,
+		struct task *task, int preempt)
+{
+	unsigned long flags;
+
+	if (preempt)
+		task_set_resched(task);
+
+	/*
+	 * add this task to the pcpu's new_list and send
+	 * a resched call to the pcpu
+	 */
+	spin_lock_irqsave(&pcpu->lock, flags);
+	if (task->stat_list.next != NULL) {
+		pr_err("%s: wrong task state %d\n", __func__, task->stat);
+		list_del(&task->stat_list);
+	}
+
+	list_add_tail(&pcpu->new_list, &task->stat_list);
+	spin_unlock_irqrestore(&pcpu->lock, flags);
 }
 
 static void inline set_next_task(struct task *task, int cpuid)
@@ -82,12 +112,16 @@ void pcpu_resched(int pcpu_id)
 int set_task_ready(struct task *task, int preempt)
 {
 	struct pcpu *pcpu, *tpcpu;
-	unsigned long flags;
 
 	/*
 	 * when call this function need to ensure :
 	 * 1 - kernel sched lock is locked (rt task)
 	 * 2 - the interrupt is disabled
+	 *
+	 * if the task is a precpu task and the cpu is not
+	 * the cpu which this task affinity to then put this
+	 * cpu to the new_list of the pcpu and send a resched
+	 * interrupt to the pcpu
 	 */
 	if (task_is_realtime(task)) {
 		os_rdy_grp |= task->bity;
@@ -95,19 +129,8 @@ int set_task_ready(struct task *task, int preempt)
 	} else {
 		pcpu = get_cpu_var(pcpu);
 		if (pcpu->pcpu_id != task->affinity) {
-			if (preempt)
-				task_set_resched(task);
-
-			/*
-			 * add this task to the pcpu's new_list and send
-			 * a resched call to the pcpu
-			 */
 			tpcpu = get_per_cpu(pcpu, task->affinity);
-			spin_lock_irqsave(&tpcpu->lock, flags);
-			list_del(&task->stat_list);
-			list_add_tail(&tpcpu->new_list, &task->stat_list);
-			spin_unlock_irqrestore(&tpcpu->lock, flags);
-
+			smp_percpu_task_ready(tpcpu, task, preempt);
 			pcpu_resched(task->affinity);
 
 			return 0;
@@ -122,6 +145,7 @@ int set_task_ready(struct task *task, int preempt)
 	}
 
 	set_need_resched();
+
 	return 0;
 }
 
@@ -811,7 +835,6 @@ void pcpus_init(void)
 		pcpu->state = PCPU_STATE_OFFLINE;
 		init_list(&pcpu->task_list);
 		init_list(&pcpu->ready_list);
-		init_list(&pcpu->sleep_list);
 		init_list(&pcpu->new_list);
 		init_list(&pcpu->stop_list);
 		pcpu->pcpu_id = i;

@@ -278,13 +278,11 @@ int create_task(char *name, task_func_t func,
 		raw_spin_lock(&pcpu->lock);
 		list_add_tail(&pcpu->task_list, &task->list);
 
-		if (aff == smp_processor_id()) {
-			if (task->stat == TASK_STAT_RDY)
+		if (task->stat == TASK_STAT_RDY) {
+			if (aff == smp_processor_id())
 				list_add_tail(&pcpu->ready_list, &task->stat_list);
 			else
-				list_add_tail(&pcpu->sleep_list, &task->stat_list);
-		} else {
-			list_add_tail(&pcpu->new_list, &task->stat_list);
+				list_add_tail(&pcpu->new_list, &task->stat_list);
 		}
 
 		pcpu->nr_pcpu_task++;

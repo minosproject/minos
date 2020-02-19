@@ -39,7 +39,6 @@ struct pcpu {
 	 * which the task is affinitied.
 	 */
 	struct list_head ready_list;
-	struct list_head sleep_list;
 	struct list_head stop_list;
 	struct task *idle_task;
 

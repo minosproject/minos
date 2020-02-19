@@ -60,8 +60,9 @@ struct task {
 	void *stack_base;
 	void *stack_origin;
 	uint32_t stack_size;
+
+	uint32_t pid;
 	void *udata;
-	int pid;
 
 	unsigned long flags;
 
@@ -72,16 +73,21 @@ struct task {
 	 */
 	struct list_head list;
 	struct list_head stat_list;
-	struct list_head event_list;
-
-	void *msg;
-	uint32_t flags_rdy;
 
 	uint32_t delay;
 	struct timer_list delay_timer;	
 
+	/*
+	 * the spinlock will use to protect the below member
+	 * which may modified by different cpu at the same
+	 * time:
+	 * 1 - stat
+	 * 2 - pend_stat
+	 */
+	spinlock_t lock;
 	volatile uint32_t stat;
 	volatile uint32_t pend_stat;
+
 	uint8_t del_req;
 	uint8_t prio;
 	uint8_t bx;
@@ -89,33 +95,31 @@ struct task {
 	prio_t bitx;
 	prio_t bity;
 
-	/* the event that this task hold currently */
 	atomic_t event_timeout;
 	struct event *lock_event;
 	struct event *wait_event;
 
-	/* used to the flag type */
 	int flag_rdy;
 	struct flag_node *flag_node;
 
 	/*
-	 * affinity - the cpu node which the task affinity to
-	 * cpu - the cpu node which the task runing at currently
+	 * list to the event which the task waitting for
 	 */
-	uint16_t affinity;
-	uint16_t padding0;
+	struct list_head event_list;
+
+	void *msg;
+	uint32_t flags_rdy;
+
+	/*
+	 * affinity - the cpu node which the task affinity to
+	 */
+	uint32_t affinity;
 
 	unsigned long run_time;
-	unsigned long start_ns;
-
-	spinlock_t lock;
 
 	/* stat information */
 	unsigned long ctx_sw_cnt;
-	unsigned long cycle_total;
-	unsigned long cycle_start;
-	void *stack_current;
-	uint32_t stack_used;
+	unsigned long start_ns;
 
 	char name[TASK_NAME_SIZE + 1];
 
