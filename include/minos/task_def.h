@@ -37,10 +37,10 @@
 #define TASK_STAT_SEM           0x01  /* Pending on semaphore */
 #define TASK_STAT_MBOX          0x02  /* Pending on mailbox */
 #define TASK_STAT_Q             0x04  /* Pending on queue */
-#define TASK_STAT_SUSPEND       0x08  /* Task is suspended */
-#define TASK_STAT_MUTEX         0x10  /* Pending on mutual exclusion semaphore */
-#define TASK_STAT_FLAG          0x20  /* Pending on event flag group */
-#define TASK_STAT_MULTI         0x80  /* Pending on multiple events */
+#define TASK_STAT_MUTEX         0x08  /* Pending on mutual exclusion semaphore */
+#define TASK_STAT_FLAG          0x10  /* Pending on event flag group */
+#define TASK_STAT_MULTI         0x20  /* Pending on multiple events */
+#define TASK_STAT_SUSPEND       0x40  /* Task is suspended */
 #define TASK_STAT_RUNNING	0x100 /* Task is running */
 #define TASK_STAT_STOPPED	0x200
 

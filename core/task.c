@@ -264,7 +264,6 @@ int create_task(char *name, task_func_t func,
 	arch_init_task(task, (void *)func, task->udata);
 
 	aff = task->affinity;
-	pcpu = get_per_cpu(pcpu, aff);
 
 	/* 
 	 * after create the task, if the task is affinity to
@@ -273,9 +272,12 @@ int create_task(char *name, task_func_t func,
 	 * the task has been finish all the related init things
 	 */
 	if ((aff < NR_CPUS) && (prio == OS_PRIO_PCPU)) {
-		spin_lock_irqsave(&pcpu->lock, flags);
+		local_irq_save(flags);
 		pcpu = get_per_cpu(pcpu, aff);
+
+		raw_spin_lock(&pcpu->lock);
 		list_add_tail(&pcpu->task_list, &task->list);
+
 		if (aff == smp_processor_id()) {
 			if (task->stat == TASK_STAT_RDY)
 				list_add_tail(&pcpu->ready_list, &task->stat_list);
@@ -284,8 +286,10 @@ int create_task(char *name, task_func_t func,
 		} else {
 			list_add_tail(&pcpu->new_list, &task->stat_list);
 		}
+
 		pcpu->nr_pcpu_task++;
-		spin_unlock_irqrestore(&pcpu->lock, flags);
+		raw_spin_unlock(&pcpu->lock);
+		local_irq_restore(flags);
 	}
 
 	/*

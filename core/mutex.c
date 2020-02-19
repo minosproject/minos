@@ -59,7 +59,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 		m->data = (void *)task;
 		m->cnt = task->pid;
 
-		/* to be done  need furture design */
+		/* to be done need furture design */
 		task->lock_event = to_event(m);
 		spin_unlock(&m->lock);
 		return 0;

@@ -21,6 +21,7 @@
 #include <minos/irq.h>
 #include <minos/mm.h>
 #include <minos/of.h>
+#include <minos/task.h>
 
 extern void apps_cpu0_init(void);
 extern void apps_cpu1_init(void);
@@ -30,9 +31,10 @@ extern void apps_cpu4_init(void);
 extern void apps_cpu5_init(void);
 extern void apps_cpu6_init(void);
 extern void apps_cpu7_init(void);
-extern void os_init(void);
 
-static void create_static_tasks(void)
+static atomic_t kernel_ref;
+
+static void create_static_tasks(int cpu)
 {
 	int ret = 0;
 	struct task_desc *tdesc;
@@ -41,11 +43,17 @@ static void create_static_tasks(void)
 
 	section_for_each_item(__task_desc_start, __task_desc_end, tdesc) {
 		if (tdesc->aff == PCPU_AFF_PERCPU) {
-			create_percpu_task(tdesc->name, tdesc->func,
-					tdesc->arg, tdesc->size, tdesc->flags);
-		} else {
-			ret = create_realtime_task(tdesc->name, tdesc->func, tdesc->arg,
-					tdesc->prio, tdesc->size, tdesc->flags);
+			ret = create_task(tdesc->name, tdesc->func,
+					tdesc->arg, OS_PRIO_PCPU,
+					cpu, tdesc->size, tdesc->flags);
+			if (ret < 0) {
+				pr_err("create [%s] fail on cpu%d\n",
+						tdesc->name, cpu);
+			}
+		} else if ((tdesc->aff != PCPU_AFF_PERCPU) && (cpu == 0)) {
+			ret = create_realtime_task(tdesc->name, tdesc->func,
+					tdesc->arg, tdesc->prio,
+					tdesc->size, tdesc->flags);
 			if (ret) {
 				pr_err("create [%s] fail on cpu-%d@%d\n",
 					tdesc->name, tdesc->aff, tdesc->prio);
@@ -109,12 +117,11 @@ void cpu_idle(void)
 {
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
+	create_static_tasks(pcpu->pcpu_id);
+
 	switch (pcpu->pcpu_id) {
 	case 0:
-		os_init();
-		create_static_tasks();
 		apps_cpu0_init();
-		os_clean();
 		break;
 	case 1:
 		apps_cpu1_init();
@@ -143,10 +150,21 @@ void cpu_idle(void)
 	}
 
 	set_os_running();
+	atomic_dec(&kernel_ref);
 	local_irq_enable();
 
-	/* send a irq to itself for the precpu task */
+	/*
+	 * send a resched interrupt for the currently cpu
+	 * for the percpu task
+	 */
 	pcpu_resched(pcpu->pcpu_id);
+
+	if (pcpu->pcpu_id == 0) {
+		while (atomic_read(&kernel_ref) != 0)
+			rmb();
+
+		os_clean();
+	}
 
 	while (1) {
 		/*

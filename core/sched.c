@@ -79,35 +79,10 @@ void pcpu_resched(int pcpu_id)
 	send_sgi(CONFIG_MINOS_RESCHED_IRQ, pcpu_id);
 }
 
-static void __used smp_set_task_ready(void *data)
-{
-	struct task *task = data;
-	struct pcpu *pcpu = get_cpu_var(pcpu);
-	
-	/*
-	 * current is the task, means the task has already
-	 * set to ready stat, there may some mistake that
-	 * make this case happend, need to check
-	 */
-	if ((current == task) || !task_is_ready(task)) {
-		pr_warn("%s wrong stat %d\n", __func__, task->stat);
-		return;
-	}
-
-	percpu_task_ready(pcpu, task, task_need_resched(task));
-	task_clear_resched(task);
-
-	if (task->delay) {
-		del_timer(&task->delay_timer);
-		task->delay = 0;
-	}
-
-	set_need_resched();
-}
-
 int set_task_ready(struct task *task, int preempt)
 {
-	struct pcpu *pcpu;
+	struct pcpu *pcpu, *tpcpu;
+	unsigned long flags;
 
 	/*
 	 * when call this function need to ensure :
@@ -123,7 +98,18 @@ int set_task_ready(struct task *task, int preempt)
 			if (preempt)
 				task_set_resched(task);
 
+			/*
+			 * add this task to the pcpu's new_list and send
+			 * a resched call to the pcpu
+			 */
+			tpcpu = get_per_cpu(pcpu, task->affinity);
+			spin_lock_irqsave(&tpcpu->lock, flags);
+			list_del(&task->stat_list);
+			list_add_tail(&tpcpu->new_list, &task->stat_list);
+			spin_unlock_irqrestore(&tpcpu->lock, flags);
+
 			pcpu_resched(task->affinity);
+
 			return 0;
 		}
 
@@ -448,6 +434,7 @@ void switch_to_task(struct task *cur, struct task *next)
 			mod_timer(&cur->delay_timer,
 				NOW() + MILLISECS(cur->delay));
 		}
+		cur->stat &= ~TASK_STAT_RUNNING;
 	} else {
 		recal_task_run_time(cur, pcpu, 0);
 		cur->stat = TASK_STAT_RDY;
@@ -489,7 +476,7 @@ unsigned long sched_tick_handler(unsigned long data)
 	delta = now - task->start_ns;
 
 	if (task->prio != OS_PRIO_PCPU) {
-		pr_warn("wrong task type on tick handler %d\n", task->pid);
+		pr_debug("wrong task type on tick handler %d\n", task->pid);
 		return 0;
 	}
 
@@ -638,6 +625,13 @@ void sched_task(struct task *task)
 		smp_resched = 1;
 
 	local_irq_restore(flags);
+
+	/*
+	 * 1 - if need to send a resched interrupt to other cpu
+	 * 2 - if percpu task but not on the current cpu
+	 */
+	if (task_is_percpu(task) && (t_cpu != s_cpu))
+		return;
 
 	if (smp_resched)
 		pcpu_resched(t_cpu);
@@ -872,31 +866,22 @@ int resched_handler(uint32_t irq, void *data)
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
 	/*
-	 * check whether there new task need to add to
-	 * this pcpu
+	 * check whether there are new taskes need to
+	 * set to ready state again
 	 */
 	raw_spin_lock(&pcpu->lock);
 	list_for_each_entry_safe(task, n, &pcpu->new_list, stat_list) {
+		if (!task_is_ready(task))
+			continue;
+
 		list_del(&task->stat_list);
-		if (task->stat == TASK_STAT_RDY)
+		if (task_need_resched(task))
 			list_add(&pcpu->ready_list, &task->stat_list);
 		else
-			list_add_tail(&pcpu->sleep_list, &task->stat_list);
+			list_add_tail(&pcpu->ready_list, &task->stat_list);
+		task_clear_resched(task);
 	}
 	raw_spin_unlock(&pcpu->lock);
-
-	/*
-	 * list all the task in the sleep list to see whether need
-	 * to wakeup it, here do not need to aquire the spinlock of
-	 * the task stat, since only this task can be only run at
-	 * current cpu
-	 */
-	list_for_each_entry_safe(task, n, &pcpu->sleep_list, stat_list) {
-		if (task_is_ready(task)) {
-			percpu_task_ready(pcpu, task, task_need_resched(task));
-			task_clear_resched(task);
-		}
-	}
 
 	set_need_resched();
 

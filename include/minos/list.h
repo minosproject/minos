@@ -50,8 +50,8 @@ static void inline list_del(struct list_head *list)
 {
 	list->next->pre = list->pre;
 	list->pre->next = list->next;
-	list->next = (void *)0 + 0x10;
-	list->pre = (void *)0 + 0x20;
+	list->next = (void *)0x10;
+	list->pre = (void *)0x20;
 }
 
 static void inline list_del_tail(struct list_head *head)
