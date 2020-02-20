@@ -37,15 +37,14 @@
 	 */
 
 func __atomic_set
-	stlr	w0, [x1]
-	nop
+	str	w0, [x1]
+	dsb	sy
 	ret
 endfunc __atomic_set
 
 func __atomic_get
 	ldr	w1, [x0]
 	mov	w0, w1
-	nop
 	ret
 endfunc __atomic_get
 
