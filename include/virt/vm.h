@@ -81,6 +81,8 @@ struct vm {
 
 	struct list_head vdev_list;
 
+	atomic_t vcpu_online_cnt;
+
 	uint32_t vspi_nr;
 	int virq_same_page;
 	struct virq_desc *vspi_desc;
@@ -180,8 +182,8 @@ struct vm *create_vm(struct vmtag *vme);
 int create_guest_vm(struct vmtag *tag);
 void destroy_vm(struct vm *vm);
 int vm_power_up(int vmid);
-int vm_reset(int vmid, void *args);
-int vm_power_off(int vmid, void *arg);
+int vm_reset(int vmid, void *args, int byself);
+int vm_power_off(int vmid, void *arg, int byself);
 int vm_suspend(int vmid);
 
 static inline struct vm *get_vm_by_id(uint32_t vmid)
@@ -218,5 +220,10 @@ int vm_create_host_vdev(struct vm *vm);
 int request_vm_virqs(struct vm *vm, int base, int nr);
 
 void arch_init_vcpu(struct vcpu *vcpu, void *entry, void *arg);
+
+static inline int get_vm_vcpu_online_cnt(struct vm *vm)
+{
+	return atomic_read(&vm->vcpu_online_cnt);
+}
 
 #endif

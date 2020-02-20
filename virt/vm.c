@@ -70,6 +70,16 @@ static inline void set_vcpu_stop(struct vcpu *vcpu)
 	task_unlock_irqrestore(vcpu->task, flags);
 }
 
+static inline void set_vcpu_suspend(struct vcpu *vcpu)
+{
+	unsigned long flags;
+
+	task_lock_irqsave(vcpu->task, flags);
+	vcpu->task->stat = TASK_STAT_SUSPEND;
+	set_task_sleep(vcpu->task, 0);
+	task_unlock_irqrestore(vcpu->task, flags);
+}
+
 void vcpu_online(struct vcpu *vcpu)
 {
 	set_vcpu_ready(vcpu);
@@ -117,7 +127,7 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 		return -ENOENT;
 	}
 
-	if (vcpu->task->stat == TASK_STAT_STOPPED) {
+	if (!task_is_ready(vcpu->task)) {
 		pr_notice("vcpu-%d of vm-%d power on from vm suspend 0x%p\n",
 				vcpu->vcpu_id, vcpu->vm->vmid, entry);
 		os_vcpu_power_on(vcpu, entry);
@@ -329,22 +339,22 @@ int vcpu_reset(struct vcpu *vcpu)
 	return 0;
 }
 
-void vcpu_power_off_call(void *data)
+static void inline __vcpu_power_off_call(struct vcpu *vcpu, int stop)
 {
-	struct vcpu *vcpu = (struct vcpu *)data;
-
-	if (!vcpu)
-		return;
-
 	if (vcpu_affinity(vcpu) != smp_processor_id()) {
 		pr_err("vcpu-%s do not belong to this pcpu\n",
 				vcpu->task->name);
 		return;
 	}
 
-	set_vcpu_stop(vcpu);
-	pr_notice("power off vcpu-%d-%d done\n", get_vmid(vcpu),
-			get_vcpu_id(vcpu));
+	if (stop)
+		set_vcpu_stop(vcpu);
+	else
+		set_vcpu_suspend(vcpu);
+
+	pr_notice("%s vcpu-%d-%d done\n",
+			stop ? "stop" : "suspend",
+			get_vmid(vcpu), get_vcpu_id(vcpu));
 
 	/*
 	 * *********** Note ****************
@@ -361,7 +371,17 @@ void vcpu_power_off_call(void *data)
 	}
 }
 
-int vcpu_power_off(struct vcpu *vcpu, int timeout)
+static void vcpu_power_off_call(void *data)
+{
+	__vcpu_power_off_call(data, 1);
+}
+
+static void vcpu_suspend_call(void *data)
+{
+	__vcpu_power_off_call(data, 0);
+}
+
+int vcpu_enter_poweroff(struct vcpu *vcpu, int timeout)
 {
 	/*
 	 * since the vcpu will not sched on other
@@ -385,6 +405,24 @@ int vcpu_power_off(struct vcpu *vcpu, int timeout)
 	return 0;
 }
 
+int vcpu_enter_suspend(struct vcpu *vcpu, int timeout)
+{
+	int cpuid = smp_processor_id();
+
+	if (vcpu_affinity(vcpu) != cpuid) {
+		pr_debug("call vcpu_suspend_call for vcpu-%s\n",
+				vcpu->task->name);
+		return smp_function_call(vcpu->task->affinity,
+				vcpu_suspend_call, (void *)vcpu, 1);
+	} else {
+		/* just set it stat then force sched to another task */
+		set_vcpu_suspend(vcpu);
+		pr_notice("suspend vcpu-%d-%d done\n", get_vmid(vcpu),
+				get_vcpu_id(vcpu));
+	}
+
+	return 0;
+}
 
 static int alloc_new_vmid(void)
 {
@@ -520,16 +558,34 @@ int vm_power_up(int vmid)
 	return 0;
 }
 
-static int __vm_power_off(struct vm *vm, void *args)
+static void inline wait_other_vcpu_offline(struct vm *vm)
+{
+	while (atomic_read(&vm->vcpu_online_cnt) > 1) {
+		cpu_relax();
+		mb();
+	}
+}
+
+static void inline wait_all_vcpu_offline(struct vm *vm)
+{
+	while (atomic_read(&vm->vcpu_online_cnt) != 0) {
+		cpu_relax();
+		mb();
+	}
+}
+
+static int __vm_power_off(struct vm *vm, void *args, int byself)
 {
 	int ret = 0;
 	struct vcpu *vcpu;
 
-	if (vm_is_hvm(vm))
-		panic("hvm can not call power_off_vm\n");
+	if (vm_is_native(vm))
+		panic("native can not call power_off_vm\n");
 
 	/* set the vm to offline state */
-	pr_notice("power off vm-%d\n", vm->vmid);
+	pr_notice("power off vm-%d by %s\n", vm->vmid,
+			byself ? "itself" : "mvm");
+
 	preempt_disable();
 	vm->state = VM_STAT_OFFLINE;
 
@@ -539,15 +595,19 @@ static int __vm_power_off(struct vm *vm, void *args)
 	 * host that this vm need to be reset
 	 */
 	vm_for_each_vcpu(vm, vcpu) {
-		ret = vcpu_power_off(vcpu, 1000);
+		ret = vcpu_enter_poweroff(vcpu, 1000);
 		if (ret)
 			pr_warn("power off vcpu-%d failed\n", vcpu->vcpu_id);
 	}
 
-	if (args == NULL) {
-		pr_notice("vm shutdown request by itself\n");
+	if (byself)
+		wait_other_vcpu_offline(vm);
+	else
+		wait_all_vcpu_offline(vm);
+
+	if (byself) {
 		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
-			VMTRAP_REASON_SHUTDOWN, 0, NULL);
+				VMTRAP_REASON_SHUTDOWN, 0, NULL);
 		set_need_resched();
 		preempt_enable();
 
@@ -559,7 +619,7 @@ static int __vm_power_off(struct vm *vm, void *args)
 	return 0;
 }
 
-int vm_power_off(int vmid, void *arg)
+int vm_power_off(int vmid, void *arg, int byself)
 {
 	struct vm *vm = NULL;
 
@@ -570,7 +630,7 @@ int vm_power_off(int vmid, void *arg)
 	if (!vm)
 		return -EINVAL;
 
-	return __vm_power_off(vm, arg);
+	return __vm_power_off(vm, arg, byself);
 }
 
 static int guest_mm_init(struct vm *vm, uint64_t base, uint64_t size)
@@ -635,17 +695,19 @@ unmap_vmtag:
 	return ret;
 }
 
-static int __vm_reset(struct vm *vm, void *args)
+static int __vm_reset(struct vm *vm, void *args, int byself)
 {
 	int ret;
 	struct vdev *vdev;
 	struct vcpu *vcpu;
 
-	if (vm_is_hvm(vm))
-		panic("hvm can not call reset vm\n");
+	if (vm_is_native(vm))
+		panic("native vm can not call reset vm\n");
 
 	/* set the vm to offline state */
-	pr_notice("reset vm-%d\n", vm->vmid);
+	pr_notice("reset vm-%d by %s\n",
+			vm->vmid, byself ? "itself" : "mvm");
+
 	preempt_disable();
 	vm->state = VM_STAT_REBOOT;
 
@@ -654,17 +716,31 @@ static int __vm_reset(struct vm *vm, void *args)
 	 * iteself, otherwise the reset is called by vm0
 	 */
 	vm_for_each_vcpu(vm, vcpu) {
-		ret = vcpu_power_off(vcpu, 1000);
+		ret = vcpu_enter_suspend(vcpu, 1000);
 		if (ret) {
 			pr_err("vm-%d vcpu-%d power off failed\n",
 					vm->vmid, vcpu->vcpu_id);
-			return ret;
+			goto out;
 		}
+	}
 
-		/* the vcpu is powered off, then reset it */
+	/*
+	 * call vcpu_enter_suspend can not ensure that all the
+	 * vcpu is sched out or not, here need wait again, if
+	 * the reset is triggeried by itself, then wait other
+	 * vcpu sched out, otherwise wait for all vcpu
+	 */
+	if (byself)
+		wait_other_vcpu_offline(vm);
+	else
+		wait_all_vcpu_offline(vm);
+
+	vm_for_each_vcpu(vm, vcpu) {
 		ret = vcpu_reset(vcpu);
-		if (ret)
-			return ret;
+		if (ret) {
+			pr_err("vcpu reset failed\n");
+			goto out;
+		}
 	}
 
 	/* reset the vdev for this vm */
@@ -675,26 +751,23 @@ static int __vm_reset(struct vm *vm, void *args)
 
 	vm_virq_reset(vm);
 
-	if (args == NULL) {
-		pr_notice("vm reset trigger by itself\n");
+	if (byself) {
 		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
-			VMTRAP_REASON_REBOOT, 0, NULL);
+				VMTRAP_REASON_REBOOT, 0, NULL);
 		set_need_resched();
 		preempt_enable();
-
-		/*
-		 * no need to reset the vmodules for the vm, since
-		* the state will be reset when power up, then sched
-		* out if the reset is called by itself
-		*/
 		sched();
 	} else
 		preempt_enable();
 
 	return 0;
+
+out:
+	preempt_enable();
+	return ret;
 }
 
-int vm_reset(int vmid, void *args)
+int vm_reset(int vmid, void *args, int byself)
 {
 	struct vm *vm;
 
@@ -709,7 +782,7 @@ int vm_reset(int vmid, void *args)
 	if (!vm)
 		return -ENOENT;
 
-	return __vm_reset(vm, args);
+	return __vm_reset(vm, args, byself);
 }
 
 static int vm_resume(struct vm *vm)
@@ -833,6 +906,9 @@ void destroy_vm(struct vm *vm)
 
 	if (!vm)
 		return;
+
+	if (vm_is_native(vm))
+		panic("can not destory native VM\n");
 
 	/*
 	 * 1 : release the vdev

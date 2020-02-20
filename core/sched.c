@@ -438,6 +438,36 @@ static void local_switch_to(struct pcpu *pcpu,
 
 }
 
+static void inline task_switch_out(struct pcpu *pcpu,
+		struct task *cur, struct task *next)
+{
+#ifdef CONFIG_VIRT
+	struct vm *vm;
+
+	if (task_is_vcpu(cur)) {
+		vm = task_to_vm(cur);
+		atomic_dec(&vm->vcpu_online_cnt);
+	}
+#endif
+
+	pcpu->switch_out(pcpu, cur, next);
+}
+
+static void inline task_switch_to(struct pcpu *pcpu,
+		struct task *cur, struct task *next)
+{
+#ifdef CONFIG_VIRT
+	struct vm *vm;
+
+	if (task_is_vcpu(next)) {
+		vm = task_to_vm(next);
+		atomic_inc(&vm->vcpu_online_cnt);
+	}
+#endif
+	pcpu->switch_to(pcpu, cur, next);
+	next->ctx_sw_cnt++;
+}
+
 void switch_to_task(struct task *cur, struct task *next)
 {
 	struct pcpu *pcpu = get_cpu_var(pcpu);
@@ -466,7 +496,7 @@ void switch_to_task(struct task *cur, struct task *next)
 	}
 
 	do_hooks((void *)cur, NULL, OS_HOOK_TASK_SWITCH_OUT);
-	pcpu->switch_out(pcpu, cur, next);
+	task_switch_out(pcpu, cur, next);
 
 	/*
 	 * if the next running task prio is OS_PRIO_PCPU, it
@@ -483,8 +513,7 @@ void switch_to_task(struct task *cur, struct task *next)
 	task_info(next)->cpu = pcpu->pcpu_id;
 
 	do_hooks((void *)next, NULL, OS_HOOK_TASK_SWITCH_TO);
-	pcpu->switch_to(pcpu, cur, next);
-	next->ctx_sw_cnt++;
+	task_switch_to(pcpu, cur, next);
 
 	task_sched_return(next);
 }

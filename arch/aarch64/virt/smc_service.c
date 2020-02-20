@@ -70,11 +70,11 @@ static int std_smc_handler(gp_regs *c,
 
 	case PSCI_0_2_FN_SYSTEM_OFF:
 		/* request reset by it self */
-		vm_power_off(get_vmid(get_current_vcpu()), NULL);
+		vm_power_off(get_vmid(get_current_vcpu()), NULL, 1);
 		break;
 
 	case PSCI_0_2_FN_SYSTEM_RESET:
-		vm_reset(get_vmid(get_current_vcpu()), NULL);
+		vm_reset(get_vmid(get_current_vcpu()), NULL, 1);
 		break;
 
 	case PSCI_1_0_FN_SYSTEM_SUSPEND:

@@ -343,7 +343,6 @@ static struct vmm_area *__alloc_free_vmm_area(struct mm_struct *mm,
 		old->end = old->start + old->size - 1;
 	} else if (fva->size == size) {
 		new = fva;
-		new->flags = flags;
 	}
 
 out:
@@ -352,8 +351,11 @@ out:
 		add_free_vmm_area(mm, old1);
 	if (old)
 		add_free_vmm_area(mm, old);
-	if (new)
+
+	if (new) {
+		new->flags = flags;
 		add_used_vmm_area(mm, new);
+	}
 
 	return new;
 }
