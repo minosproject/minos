@@ -160,12 +160,12 @@ static void vtimer_state_init(struct task *task, void *context)
 	vtimer->cnt_cval = 0;
 }
 
-static void vtimer_state_deinit(struct task *task, void *context)
+static void vtimer_state_stop(struct task *task, void *context)
 {
 	struct vtimer_context *c = (struct vtimer_context *)context;
 
-	del_timer(&c->virt_timer.timer);
-	del_timer(&c->phy_timer.timer);
+	del_timer_sync(&c->virt_timer.timer);
+	del_timer_sync(&c->phy_timer.timer);
 }
 
 static inline void
@@ -296,8 +296,8 @@ static int vtimer_vmodule_init(struct vmodule *vmodule)
 	vmodule->state_init = vtimer_state_init;
 	vmodule->state_save = vtimer_state_save;
 	vmodule->state_restore = vtimer_state_restore;
-	vmodule->state_deinit = vtimer_state_deinit;
-	vmodule->state_reset = vtimer_state_deinit;
+	vmodule->state_stop = vtimer_state_stop;
+	vmodule->state_reset = vtimer_state_stop;
 	vmodule->valid_for_task = vtimer_valid_for_task;
 	vtimer_vmodule_id = vmodule->id;
 

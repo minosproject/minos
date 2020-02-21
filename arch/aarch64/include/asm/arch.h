@@ -245,5 +245,6 @@ void arch_smp_init(phy_addr_t *smp_h_addr);
 int __arch_init(void);
 int arch_early_init(void);
 void arch_init_task(struct task *task, void *entry, void *data);
+void arch_release_task(struct task *task);
 
 #endif

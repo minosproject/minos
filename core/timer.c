@@ -234,7 +234,7 @@ int del_timer_sync(struct timer_list *timer)
 	 * if this timer is running now, waitting for
 	 * this timer finish
 	 */
-	while (timers->running_timer != timer)
+	while (timers->running_timer == timer)
 		cpu_relax();
 
 	return del_timer(timer);

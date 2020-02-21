@@ -115,6 +115,8 @@ static void os_clean(void)
 
 void cpu_idle(void)
 {
+	unsigned long flags;
+	struct task *task;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
 	create_static_tasks(pcpu->pcpu_id);
@@ -167,6 +169,24 @@ void cpu_idle(void)
 	}
 
 	while (1) {
+		/*
+		 * check whether there are some task need to free
+		 * if yes, do release the task
+		 */
+		spin_lock_irqsave(&pcpu->lock, flags);
+		while (!is_list_empty(&pcpu->stop_list)) {
+			task = list_first_entry(&pcpu->stop_list,
+					struct task, list);
+			list_del(&task->list);
+
+			spin_unlock_irqrestore(&pcpu->lock, flags);
+
+			do_release_task(task);
+
+			spin_lock_irqsave(&pcpu->lock, flags);
+		}
+		spin_unlock_irqrestore(&pcpu->lock, flags);
+
 		/*
 		 * need to check whether the pcpu can go to idle
 		 * state to avoid the interrupt happend before wfi

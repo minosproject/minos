@@ -170,7 +170,8 @@ int create_task(char *name, task_func_t func,
 		void *arg, prio_t prio, uint16_t aff,
 		size_t stk_size, unsigned long opt);
 
-int release_task(struct task *task);
+void release_task(struct task *task);
+void do_release_task(struct task *task);
 struct task *pid_to_task(int pid);
 
 #define task_lock(task)					\

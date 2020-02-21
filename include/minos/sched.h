@@ -25,10 +25,13 @@ struct pcpu {
 	 * the below two list member can be accessed
 	 * by all cpus in the system, when access this
 	 * it need to using lock to avoid race condition
+	 * when process the below three list, need to get
+	 * the lock
 	 */
 	spinlock_t lock;
 	struct list_head task_list;
 	struct list_head new_list;
+	struct list_head stop_list;
 
 	struct task *running_task;
 
@@ -39,7 +42,6 @@ struct pcpu {
 	 * which the task is affinitied.
 	 */
 	struct list_head ready_list;
-	struct list_head stop_list;
 	struct task *idle_task;
 
 	/* sched class callback for each pcpu */

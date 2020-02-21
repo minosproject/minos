@@ -232,8 +232,34 @@ static void task_create_hook(struct task *task)
 	do_hooks((void *)task, NULL, OS_HOOK_CREATE_TASK);
 }
 
-int release_task(struct task *task)
+void do_release_task(struct task *task)
 {
+	pr_notice("release task pid: %d name: %s\n",
+			task->pid, task->name);
+	/*
+	 * this function can not be called at interrupt
+	 * context, use release_task is more safe
+	 */
+	release_pid(task->pid);
+	atomic_dec(&os_task_nr);
+
+	arch_release_task(task);
+
+	task_vmodules_deinit(task);
+	free(task->context);
+
+	free((task->stack_origin - task->stack_size + TASK_INFO_SIZE));
+	free(task);
+}
+
+void release_task(struct task *task)
+{
+	unsigned long flags;
+	struct pcpu *pcpu = get_cpu_var(pcpu);
+
+	if (!task_is_vcpu(task))
+		panic("only support release vcpu tas now\n");
+
 	/*
 	 * need to make sure that when free the memory resource
 	 * can not be done in the interrupt context, so the
@@ -244,7 +270,15 @@ int release_task(struct task *task)
 	 */
 	stop_task_vmodule_state(task);
 
-	return 0;
+	/*
+	 * real time task and percpu time all link to
+	 * the stop list, and delete from the pcpu global
+	 * list
+	 */
+	spin_lock_irqsave(&pcpu->lock, flags);
+	list_del(&task->list);
+	list_add_tail(&pcpu->stop_list, &task->list);
+	spin_unlock_irqrestore(&pcpu->lock, flags);
 }
 
 int create_task(char *name, task_func_t func,

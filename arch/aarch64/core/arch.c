@@ -187,6 +187,11 @@ void arch_init_task(struct task *task, void *entry, void *arg)
 	regs->x28 = (uint64_t)task->stack_origin;
 }
 
+void arch_release_task(struct task *task)
+{
+
+}
+
 static int aarch64_init_percpu(void)
 {
 	uint64_t reg;
