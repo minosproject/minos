@@ -12,7 +12,6 @@ typedef void (*timer_func_t)(unsigned long);
 
 struct timer_list {
 	int cpu;
-	atomic_t del_request;
 	struct list_head entry;
 	unsigned long expires;
 	timer_func_t function;
@@ -31,6 +30,7 @@ void init_timer(struct timer_list *timer);
 void init_timer_on_cpu(struct timer_list *timer, int cpu);
 void add_timer(struct timer_list *timer);
 int del_timer(struct timer_list *timer);
+int del_timer_sync(struct timer_list *timer);
 int mod_timer(struct timer_list *timer, unsigned long expires);
 
 #endif

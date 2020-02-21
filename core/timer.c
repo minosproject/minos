@@ -13,6 +13,7 @@
  *  2002-05-31	Move sys_sysinfo here and make its locking sane, Robert Love
  *  2000-10-05  Implemented scalable SMP per-CPU timer handling.
  *                              Copyright (C) 2000, 2001, 2002  Ingo Molnar
+ *  2018-05-02  Changed for Minos hypervisor
  */
 
 #include <minos/minos.h>
@@ -29,42 +30,18 @@ static void run_timer_softirq(struct softirq_action *h)
 	struct timer_list *timer;
 	unsigned long expires = ~0, now;
 	struct timers *timers = &get_cpu_var(timers);
-	struct list_head *entry;
-	struct list_head *next;
+	struct list_head tmp_head;
 	timer_func_t fn;
 	unsigned long data;
 
 	now = NOW();
+	init_list(&tmp_head);
 
-	/* 
-	 * need to aquire the spinlock in case of other
-	 * cpu process the list, first thing is to check
-	 * whether the timer has been canceled
-	 */
 	raw_spin_lock(&timers->lock);
-	entry = &timers->active;
-	next = timers->active.next;
 
-	while ((next != entry) && (next != NULL)) {
-		timer = list_entry(next, struct timer_list, entry);
-		next = next->next;
-
-		/* 
-		 * there may be a issue that when the next entry
-		 * has been delete from the timers list, this will cause
-		 * that not all the timer can be handled, need to be
-		 * fix later, currently only panic here for debug purpose
-		 *
-		 * here use a member to indicate whether this timer is
-		 * requested to be deleted
-		 */
-		if (atomic_read(&timer->del_request)) {
-			pr_debug("timer has been deleted\n");
-			list_del(&timer->entry);
-			timer->entry.next = NULL;
-			timer->expires = (unsigned long)~0;
-			continue;
-		}
+	while (!is_list_empty(&timers->active)) {
+		timer = list_first_entry(&timers->active,
+				struct timer_list, entry);
 
 		if (timer->expires <= (now + DEFAULT_TIMER_MARGIN)) {	
 			/* 
@@ -83,15 +60,43 @@ static void run_timer_softirq(struct softirq_action *h)
 			fn(data);
 
 			raw_spin_lock(&timers->lock);
-		}
 
-		/* 
-		 * need to check whether the timer has been
-		 * add to timers list again
-		 */
-		if ((timer->entry.next != NULL) &&
-				(expires > timer->expires))
-			expires = timer->expires;
+			/*
+			 * inform other cpu that this timer has been
+			 * finish processing
+			 */
+			timers->running_timer = NULL;
+			wmb();
+		} else {
+			/*
+			 * need to be careful one case, when do the expires
+			 * handler, the spin lock will be released, then other
+			 * cpu may get this lock to delete the timer from the
+			 * active list, if use the .next member to get the next
+			 * timer then there will be issues, so if this timer not
+			 * expires, then add it to the tmp timer list head, at
+			 * the end of this function, switch the actvie to the head
+			 */
+			if ((expires > timer->expires))
+				expires = timer->expires;
+
+			list_del(&timer->entry);
+			list_add_tail(&tmp_head, &timer->entry);
+		}
+	}
+
+	if (!is_list_empty(&timers->active))
+		panic("error in timers->active list\n");
+
+	/*
+	 * swap the tmp head to the active head
+	 */
+	if (!is_list_empty(&tmp_head)) {
+		tmp_head.next->pre = &timers->active;
+		timers->active.next = tmp_head.next;
+		tmp_head.pre->next = &timers->active;
+		timers->active.pre = tmp_head.pre;
+		wmb();
 	}
 
 	raw_spin_unlock(&timers->lock);
@@ -117,7 +122,6 @@ static int detach_timer(struct timers *timers, struct timer_list *timer)
 	if (timer_pending(timer)) {
 		list_del(entry);
 		entry->next = NULL;
-		atomic_set(&timer->del_request, 0);
 	}
 
 	return 0;
@@ -139,7 +143,6 @@ static int __mod_timer(struct timer_list *timer)
 
 	detach_timer(timers, timer);
 	list_add_tail(&timers->active, &timer->entry);
-	atomic_set(&timer->del_request, 0);
 
 	/*
 	 * reprogram the timer for next event do not
@@ -216,29 +219,25 @@ int del_timer(struct timer_list *timer)
 	unsigned long flags;
 	struct timers *timers = timer->timers;
 
-
-	if (!timer_pending(timer))
-		return 0;
-
-	preempt_disable();
-
-	/* 
-	 * if the timer is running on the same cpu
-	 * delete it directly otherwise set the del_request
-	 * bit
-	 */
-	if (timer->cpu == smp_processor_id()) {
-		spin_lock_irqsave(&timers->lock, flags);
-		detach_timer(timers, timer);
-		spin_unlock_irqrestore(&timers->lock, flags);
-	} else {
-		atomic_set(&timer->del_request, 1);
-		wmb();
-	}
-
-	preempt_enable();
+	spin_lock_irqsave(&timers->lock, flags);
+	detach_timer(timers, timer);
+	spin_unlock_irqrestore(&timers->lock, flags);
 
 	return 0;
+}
+
+int del_timer_sync(struct timer_list *timer)
+{
+	struct timers *timers = timer->timers;
+
+	/*
+	 * if this timer is running now, waitting for
+	 * this timer finish
+	 */
+	while (timers->running_timer != timer)
+		cpu_relax();
+
+	return del_timer(timer);
 }
 
 void add_timer(struct timer_list *timer)
