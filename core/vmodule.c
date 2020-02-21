@@ -213,6 +213,18 @@ void resume_task_vmodule_state(struct task *task)
 	}
 }
 
+void stop_task_vmodule_state(struct task *task)
+{
+	struct vmodule *vmodule;
+	void *context;
+
+	list_for_each_entry(vmodule, &vmodule_list, list) {
+		context = task->context[vmodule->id];
+		if (vmodule->state_stop && context)
+			vmodule->state_stop(task, context);
+	}
+}
+
 int vmodules_init(void)
 {
 	struct module_id *mid;

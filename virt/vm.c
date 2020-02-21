@@ -127,7 +127,7 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 		return -ENOENT;
 	}
 
-	if (!task_is_ready(vcpu->task)) {
+	if (vcpu->task->stat == TASK_STAT_SUSPEND) {
 		pr_notice("vcpu-%d of vm-%d power on from vm suspend 0x%p\n",
 				vcpu->vcpu_id, vcpu->vm->vmid, entry);
 		os_vcpu_power_on(vcpu, entry);
@@ -236,7 +236,7 @@ void kick_vcpu(struct vcpu *vcpu, int preempt)
 {
 	unsigned long flags;
 
-	task_lock_irqsave(vcpu->task, flags);
+	spin_lock_irqsave(&vcpu->task->lock, flags);
 
 	/*
 	 * if vcpu need preempt, ususally it will caused
@@ -248,10 +248,10 @@ void kick_vcpu(struct vcpu *vcpu, int preempt)
 	} else if (preempt && (current->affinity != vcpu_affinity(vcpu)))
 		pcpu_resched(vcpu_affinity(vcpu));
 
-	task_unlock_irqrestore(vcpu->task, flags);
+	spin_unlock_irqrestore(&vcpu->task->lock, flags);
 }
 
-static void release_vcpu(struct vcpu *vcpu)
+static void inline release_vcpu(struct vcpu *vcpu)
 {
 	if (vcpu->task)
 		release_task(vcpu->task);
@@ -1034,10 +1034,10 @@ static struct vm *__create_vm(struct vmtag *vme)
 	vm->flags |= vme->flags;
 
 	vms[vme->vmid] = vm;
-	total_vms++;
 
 	spin_lock(&vms_lock);
 	list_add_tail(&vm_list, &vm->vm_list);
+	total_vms++;
 	spin_unlock(&vms_lock);
 
 	vm->os = get_vm_os((char *)vme->os_type);

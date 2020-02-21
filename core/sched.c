@@ -113,6 +113,9 @@ int set_task_ready(struct task *task, int preempt)
 {
 	struct pcpu *pcpu, *tpcpu;
 
+	if (task->stat == TASK_STAT_STOPPED)
+		panic("task is stopped can not be wakeup\n");
+
 	/*
 	 * when call this function need to ensure :
 	 * 1 - kernel sched lock is locked (rt task)

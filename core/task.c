@@ -152,7 +152,7 @@ static void task_init(struct task *task, char *name,
 
 	task->pend_stat = 0;
 	if (task->flags & TASK_FLAGS_VCPU)
-		task->stat = TASK_STAT_STOPPED;
+		task->stat = TASK_STAT_SUSPEND;
 	else
 		task->stat = TASK_STAT_RDY;
 	
@@ -234,6 +234,16 @@ static void task_create_hook(struct task *task)
 
 int release_task(struct task *task)
 {
+	/*
+	 * need to make sure that when free the memory resource
+	 * can not be done in the interrupt context, so the
+	 * destroy a task will done in the idle task, here
+	 * just call vmodule_stop call back, then set the
+	 * task to the stop list of the pcpu, when the idle
+	 * task is run, the idle task will release this task
+	 */
+	stop_task_vmodule_state(task);
+
 	return 0;
 }
 
