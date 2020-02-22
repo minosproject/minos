@@ -106,7 +106,7 @@ static uint64_t generate_vttbr_el2(uint32_t vmid, unsigned long base)
 	return value;
 }
 
-int el2_stage2_init(void)
+static int __init_text el2_stage2_init(void)
 {
 	/*
 	 * now just support arm fvp, TBD to support more

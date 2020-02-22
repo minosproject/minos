@@ -99,7 +99,7 @@ unsigned long get_sys_time(void)
 	return ticks_to_ns(ticks);
 }
 
-static int timers_arch_init(void)
+static int __init_text timers_arch_init(void)
 {
 	int i, ret;
 	struct armv8_timer_info *info;
@@ -190,7 +190,7 @@ static int sched_timer_handler(uint32_t irq, void *data)
 	return 0;
 }
 
-static int timers_init(void)
+static int __init_text timers_init(void)
 {
 	struct armv8_timer_info *info;
 

@@ -141,7 +141,7 @@ SECTIONS
 	}
 	__task_desc_end = .;
 
-	. = ALIGN(8);
+	. = ALIGN(64);
 
 	__init_func_start = .;
 	__init_func_0_start = .;
@@ -202,7 +202,7 @@ SECTIONS
 	}
 	__init_text_end = .;
 
-	. = ALIGN(8);
+	. = ALIGN(64);
 
 	__init_end = .;
 

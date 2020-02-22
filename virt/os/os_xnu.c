@@ -179,7 +179,7 @@ static struct os_ops os_xnu_ops = {
 	.create_nvm_res = xnu_create_nvm_res,
 };
 
-static int os_xnu_init(void)
+static int __init_text os_xnu_init(void)
 {
 	return register_os("xnu", OS_TYPE_XNU, &os_xnu_ops);
 }

@@ -246,7 +246,7 @@ static void gicv2_unmask_irq_cpu(uint32_t irq, int cpu)
 	pr_warn("not support unmask irq_percpu\n");
 }
 
-static int gicv2_is_aliased(unsigned long base, unsigned long size)
+static int __init_text gicv2_is_aliased(unsigned long base, unsigned long size)
 {
 	uint32_t val_low, val_high;
 
@@ -260,7 +260,7 @@ static int gicv2_is_aliased(unsigned long base, unsigned long size)
 			val_low == val_high);
 }
 
-static void gicv2_cpu_init(void)
+static void __init_text gicv2_cpu_init(void)
 {
 	int i;
 	int cpuid = smp_processor_id();
@@ -296,12 +296,12 @@ static void gicv2_cpu_init(void)
 	dsb();
 }
 
-static void gicv2_hyp_init(void)
+static void __init_text gicv2_hyp_init(void)
 {
 
 }
 
-static void gicv2_dist_init(void)
+static void __init_text gicv2_dist_init(void)
 {
 	uint32_t type;
 	uint32_t cpumask;
@@ -351,7 +351,7 @@ static void gicv2_dist_init(void)
 	dsb();
 }
 
-static int gicv2_init(struct device_node *node)
+static int __init_text gicv2_init(struct device_node *node)
 {
 	uint64_t array[10];
 
@@ -399,7 +399,7 @@ static int gicv2_init(struct device_node *node)
 	return 0;
 }
 
-static int gicv2_secondary_init(void)
+static int __init_text gicv2_secondary_init(void)
 {
 	spin_lock(&gicv2_lock);
 

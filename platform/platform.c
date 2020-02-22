@@ -51,7 +51,7 @@ void platform_init(void)
 		platform->platform_init();
 }
 
-static int platform_early_init(void)
+static int __init_text platform_early_init(void)
 {
 	/* check whether the platform has been set
 	 * by the arch code in the early boot stage

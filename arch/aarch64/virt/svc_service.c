@@ -74,7 +74,7 @@ static void parse_svc_desc(unsigned long start, unsigned long end,
 	}
 }
 
-static int svc_service_init(void)
+static int __init_text svc_service_init(void)
 {
 	pr_notice("parsing SMC/HVC handler\n");
 
@@ -85,5 +85,4 @@ static int svc_service_init(void)
 
 	return 0;
 }
-
 arch_initcall(svc_service_init);

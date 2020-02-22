@@ -367,7 +367,7 @@ struct os_ops linux_os_ops = {
 	.create_gvm_res = linux_create_guest_vm_resource,
 };
 
-static int os_linux_init(void)
+static int __init_text os_linux_init(void)
 {
 	return register_os("linux", OS_TYPE_LINUX, &linux_os_ops);
 }

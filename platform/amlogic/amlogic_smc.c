@@ -243,7 +243,7 @@ static int audio_query_license_cmd(gp_regs *c, uint32_t id, unsigned long *args)
 	return 0;
 }
 
-static int amlogic_smc_init(void)
+static int __init_text amlogic_smc_init(void)
 {
 	amlogic_install_smc(secmon_in_base, SECMON_IN_BASE_FUNC);
 	amlogic_install_smc(secmon_out_base, SECMON_OUT_BASE_FUNC);

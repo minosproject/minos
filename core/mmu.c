@@ -662,7 +662,7 @@ void io_unmap(unsigned long vir, size_t size)
 	destroy_host_mapping(vir, size);
 }
 
-static int vmm_early_init(void)
+static int __init_text vmm_early_init(void)
 {
 	spin_lock_init(&host_mm.mm_lock);
 	host_mm.pgd_base = (unsigned long)&__el2_ttb0_pgd;

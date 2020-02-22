@@ -38,7 +38,7 @@ void percpus_init(void)
 	}
 }
 
-static int percpu_module_init(void)
+static int __init_text percpu_module_init(void)
 {
 	int i;
 

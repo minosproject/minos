@@ -79,7 +79,7 @@ static struct vmbox_hook_ops hvc_ops = {
 	.vmbox_init = hvc_vmbox_init,
 };
 
-static int vmbox_hvc_init(void)
+static int __init_text vmbox_hvc_init(void)
 {
 	return register_vmbox_hook("hvc", &hvc_ops);
 }

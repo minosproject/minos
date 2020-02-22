@@ -159,7 +159,7 @@ static int virq_chip_vcpu_init(void *item, void *contex)
 	return 0;
 }
 
-int vcpu_vgic_hook_init(void)
+static int __init_text vcpu_vgic_hook_init(void)
 {
 	return register_hook(virq_chip_vcpu_init, OS_HOOK_VCPU_INIT);
 }

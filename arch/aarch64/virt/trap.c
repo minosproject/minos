@@ -545,7 +545,7 @@ out:
 	enter_to_guest(get_current_vcpu(), NULL);
 }
 
-static int aarch64_sync_init(void)
+static int __init_text aarch64_sync_init(void)
 {
 	struct sync_desc *desc;
 

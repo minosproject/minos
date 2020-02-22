@@ -432,7 +432,7 @@ int create_native_vm_resource_common(struct vm *vm)
 	return ret;
 }
 
-static int resource_init(void)
+static int __init_text resource_init(void)
 {
 	extern unsigned char __virqchip_start;
 	extern unsigned char __virqchip_end;

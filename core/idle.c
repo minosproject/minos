@@ -113,12 +113,12 @@ void cpu_idle(void)
 	create_static_tasks(pcpu->pcpu_id);
 
 	set_os_running();
-	atomic_dec(&kernel_ref);
+	atomic_inc(&kernel_ref);
 
 	local_irq_enable();
 
 	if (pcpu->pcpu_id == 0) {
-		while (atomic_read(&kernel_ref) != 0)
+		while (atomic_read(&kernel_ref) != NR_CPUS)
 			cpu_relax();
 
 		os_clean();

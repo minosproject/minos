@@ -247,11 +247,10 @@ static int aarch64_system_init(struct vmodule *vmodule)
 
 	return 0;
 }
-
 MINOS_MODULE_DECLARE(aarch64_system,
 	AARCH64_SYSTEM_VMODULE, (void *)aarch64_system_init);
 
-static int mpidr_el1_init(void)
+static int __init_text mpidr_el1_init(void)
 {
 	mpidr_el1[smp_processor_id()] = read_sysreg32(MIDR_EL1);
 

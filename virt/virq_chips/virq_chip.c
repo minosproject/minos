@@ -118,7 +118,7 @@ int virqchip_get_virq_state(struct vcpu *vcpu, struct virq_desc *virq)
 	return 0;
 }
 
-static int virqchip_init(void)
+static int __init_text virqchip_init(void)
 {
 	register_hook(virqchip_enter_to_guest,
 			OS_HOOK_ENTER_TO_GUEST);

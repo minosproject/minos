@@ -305,7 +305,7 @@ static void bcm2836_eoi_irq(uint32_t irq)
 		bcm2835_mask_irq(irq);
 }
 
-int bcm2835_irq_handler(uint32_t irq, void *data)
+static int bcm2835_irq_handler(uint32_t irq, void *data)
 {
 	uint32_t no;
 	struct irq_desc *irq_desc;
@@ -332,7 +332,7 @@ int bcm2835_irq_handler(uint32_t irq, void *data)
 	return 0;
 }
 
-static int bcm2836_irq_init(struct device_node *node)
+static int __init_text bcm2836_irq_init(struct device_node *node)
 {
 	void *base;
 	int b;
@@ -381,7 +381,7 @@ static int bcm2836_irq_init(struct device_node *node)
 	return 0;
 }
 
-static int bcm2836_secondary_init(void)
+static int __init_text bcm2836_secondary_init(void)
 {
 	return 0;
 }
@@ -402,6 +402,5 @@ static struct irq_chip bcm2836_irq_chip = {
 	.init			= bcm2836_irq_init,
 	.secondary_init		= bcm2836_secondary_init,
 };
-
 IRQCHIP_DECLARE(bcm2836_chip, bcmirq_match_table,
 		(void *)&bcm2836_irq_chip);

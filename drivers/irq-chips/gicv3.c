@@ -298,7 +298,7 @@ static void gicv3_wakeup_gicr(void)
 			& GICR_WAKER_CHILDREN_ASLEEP) != 0);
 }
 
-static int gicv3_gicc_init(void)
+static int __init_text gicv3_gicc_init(void)
 {
 	unsigned long reg_value;
 
@@ -316,7 +316,7 @@ static int gicv3_gicc_init(void)
 	return 0;
 }
 
-static int gicv3_hyp_init(void)
+static int __init_text gicv3_hyp_init(void)
 {
 	write_sysreg32(GICH_VMCR_VENG1 | (0xff << 24), ICH_VMCR_EL2);
 	write_sysreg32(GICH_HCR_EN, ICH_HCR_EL2);
@@ -325,7 +325,7 @@ static int gicv3_hyp_init(void)
 	return 0;
 }
 
-static int gicv3_gicr_init(void)
+static int __init_text gicv3_gicr_init(void)
 {
 	int i;
 	uint64_t pr;
@@ -354,7 +354,7 @@ static int gicv3_gicr_init(void)
 	return 0;
 }
 
-static void inline gicv3_icc_sre_init(void)
+static void __init_text gicv3_icc_sre_init(void)
 {
 #ifdef CONFIG_VIRT
 	write_sysreg(0xf, ICC_SRE_EL2);
@@ -362,7 +362,7 @@ static void inline gicv3_icc_sre_init(void)
 	write_sysreg(0xf, ICC_SRE_EL1);
 }
 
-int gicv3_init(struct device_node *node)
+static int __init_text gicv3_init(struct device_node *node)
 {
 	int i;
 	uint32_t type;
@@ -455,7 +455,7 @@ int gicv3_init(struct device_node *node)
 	return 0;
 }
 
-int gicv3_secondary_init(void)
+static int __init_text gicv3_secondary_init(void)
 {
 	spin_lock(&gicv3_lock);
 
@@ -486,5 +486,4 @@ static struct irq_chip gicv3_chip = {
 	.init			= gicv3_init,
 	.secondary_init		= gicv3_secondary_init,
 };
-
 IRQCHIP_DECLARE(gicv3_chip, gicv3_match_table, (void *)&gicv3_chip);

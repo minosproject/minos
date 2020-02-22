@@ -19,7 +19,7 @@
 
 static struct list_head hook_lists[OS_HOOK_TYPE_UNKNOWN];
 
-static int hooks_init(void)
+static int __init_text hooks_init(void)
 {
 	int i;
 

@@ -417,7 +417,7 @@ int create_idle_task(void)
  * for preempt_disable and preempt_enable need
  * to set the current task at boot stage
  */
-static int task_early_init(void)
+static int __init_text task_early_init(void)
 {
 	struct task *task;
 	struct task_info *ti;

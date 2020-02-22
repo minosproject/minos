@@ -192,7 +192,7 @@ void arch_release_task(struct task *task)
 
 }
 
-static int aarch64_init_percpu(void)
+static int __init_text aarch64_init_percpu(void)
 {
 	uint64_t reg;
 

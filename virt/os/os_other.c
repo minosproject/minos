@@ -58,7 +58,7 @@ struct os_ops default_os_ops = {
 	.create_nvm_res = default_create_native_vm_resource,
 };
 
-static int os_default_init(void)
+static int __init_text os_default_init(void)
 {
 	return register_os("default-os", OS_TYPE_OTHERS, &default_os_ops);
 }
