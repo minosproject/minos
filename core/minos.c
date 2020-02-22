@@ -37,7 +37,6 @@ extern int allsymbols_init(void);
 extern void platform_init(void);
 extern int create_idle_task(void);
 extern int vmodules_init(void);
-extern void os_init(void);
 
 #ifdef CONFIG_VIRT
 extern int virt_init(void);
@@ -93,12 +92,6 @@ void boot_main(void)
 	device_init_percpu();
 
 	create_idle_task();
-
-	/*
-	 * call os_init here to init some kernel data
-	 * or other things before all cpu is up
-	 */
-	os_init();
 
 #ifdef CONFIG_SMP
 	smp_cpus_up();

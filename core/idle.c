@@ -23,15 +23,6 @@
 #include <minos/of.h>
 #include <minos/task.h>
 
-extern void apps_cpu0_init(void);
-extern void apps_cpu1_init(void);
-extern void apps_cpu2_init(void);
-extern void apps_cpu3_init(void);
-extern void apps_cpu4_init(void);
-extern void apps_cpu5_init(void);
-extern void apps_cpu6_init(void);
-extern void apps_cpu7_init(void);
-
 static atomic_t kernel_ref;
 
 static void create_static_tasks(int cpu)
@@ -121,52 +112,23 @@ void cpu_idle(void)
 
 	create_static_tasks(pcpu->pcpu_id);
 
-	switch (pcpu->pcpu_id) {
-	case 0:
-		apps_cpu0_init();
-		break;
-	case 1:
-		apps_cpu1_init();
-		break;
-	case 2:
-		apps_cpu2_init();
-		break;
-	case 3:
-		apps_cpu3_init();
-		break;
-	case 4:
-		apps_cpu4_init();
-		break;
-	case 5:
-		apps_cpu5_init();
-		break;
-	case 6:
-		apps_cpu6_init();
-		break;
-	case 7:
-		apps_cpu7_init();
-		break;
-	default:
-		pr_warn("cpu local init function not defined\n");
-		break;
-	}
-
 	set_os_running();
 	atomic_dec(&kernel_ref);
+
 	local_irq_enable();
+
+	if (pcpu->pcpu_id == 0) {
+		while (atomic_read(&kernel_ref) != 0)
+			cpu_relax();
+
+		os_clean();
+	}
 
 	/*
 	 * send a resched interrupt for the currently cpu
 	 * for the percpu task
 	 */
 	pcpu_resched(pcpu->pcpu_id);
-
-	if (pcpu->pcpu_id == 0) {
-		while (atomic_read(&kernel_ref) != 0)
-			rmb();
-
-		os_clean();
-	}
 
 	while (1) {
 		/*

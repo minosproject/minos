@@ -21,12 +21,7 @@
 
 DEFINE_MUTEX(rt_mutex);
 
-void os_init(void)
-{
-	mutex_init(&rt_mutex);
-}
-
-#if 0
+#if 1
 static void rt_task(void *data)
 {
 	int ret = 0;
@@ -45,11 +40,20 @@ static void rt_task(void *data)
 		msleep(100 * (task_id % 4 + 1));
 	}
 }
+
+static int __init_text app_main_init(void)
+{
+	mutex_init(&rt_mutex);
+
+	return 0;
+}
+device_initcall(app_main_init);
+
 #endif
 
 void apps_cpu0_init(void)
 {
-#if 0
+#if 1
 	create_realtime_task("rt-task-45", rt_task, (void *)45, 45, 4096, 0);
 	create_realtime_task("rt-task-44", rt_task, (void *)44, 44, 4096, 0);
 	create_realtime_task("rt-task-43", rt_task, (void *)43, 43, 4096, 0);
@@ -164,7 +168,7 @@ void test_task3(void *data)
 	}
 }
 
-#if 0
+#if 1
 DEFINE_TASK_PERCPU("test task3", test_task3, NULL, 4096, 0);
 DEFINE_TASK_PERCPU("test task", test_task, NULL, 4096, 0);
 DEFINE_TASK_PERCPU("test task2", test_task2, NULL, 4096, 0);
