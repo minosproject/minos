@@ -22,6 +22,7 @@
 #include <minos/mm.h>
 #include <minos/of.h>
 #include <minos/task.h>
+#include <minos/app.h>
 
 static atomic_t kernel_ref;
 
@@ -45,7 +46,7 @@ static void create_static_tasks(int cpu)
 			ret = create_realtime_task(tdesc->name, tdesc->func,
 					tdesc->arg, tdesc->prio,
 					tdesc->size, tdesc->flags);
-			if (ret) {
+			if (ret < 0) {
 				pr_err("create [%s] fail on cpu-%d@%d\n",
 					tdesc->name, tdesc->aff, tdesc->prio);
 			}

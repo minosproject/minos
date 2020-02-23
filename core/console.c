@@ -69,3 +69,8 @@ void console_putc(char ch)
 {
 	console->putc(ch);
 }
+
+char console_getc(void)
+{
+	return console->getc();
+}

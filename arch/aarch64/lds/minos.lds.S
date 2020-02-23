@@ -133,6 +133,14 @@ SECTIONS
 
 	. = ALIGN(8);
 
+	__shell_command_start = .;
+	.__shell_command : {
+		*(.__shell_command)
+	}
+	__shell_command_end = .;
+
+	. = ALIGN(8);
+
 	__init_start = .;
 
 	__task_desc_start = .;

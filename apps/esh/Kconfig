@@ -1,0 +1,11 @@
+if SHELL
+
+menu "Shell config"
+
+config SHELL_TASK_PRIO
+	int "The priority of shell task"
+	default 63
+
+endmenu
+
+endif

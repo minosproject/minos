@@ -18,5 +18,6 @@ struct console {
 
 void console_init(char *name);
 void console_putc(char ch);
+char console_getc(void);
 
 #endif

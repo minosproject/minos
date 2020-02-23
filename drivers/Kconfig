@@ -6,6 +6,6 @@ source "drivers/device-tree/Kconfig"
 
 config DEVICE_TREE
 	bool "device tree libfdt support"
-	default n
+	default y
 
 endmenu

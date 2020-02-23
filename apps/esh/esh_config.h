@@ -1,0 +1,9 @@
+#define ESH_PROMPT "minos # "
+#define ESH_BUFFER_LEN 200
+#define ESH_ARGC_MAX 10
+
+#define ESH_HIST_ALLOC STATIC
+#define ESH_HIST_LEN 4096
+
+#define ESH_ALLOC STATIC
+#define ESH_INSTANCES 1

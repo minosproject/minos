@@ -91,7 +91,7 @@ int level_print(int level, char *fmt, ...)
 	if (level > print_level)
 		return 0;
 
-	spin_lock_irqsave(&print_lock, flags);
+	preempt_disable();
 
 	cpuid = smp_processor_id();
 	task = __current_tasks[cpuid];
@@ -128,11 +128,33 @@ int level_print(int level, char *fmt, ...)
 	 * which wanna to show
 	 */
 	printed = buffer - buf;
+
+	spin_lock_irqsave(&print_lock, flags);
+
 	for(i = 0; i < printed; i++)
 		console_putc(buf[i]);
 
 	va_start(arg, fmt);
 	printed += vsprintf(NULL, fmt, arg);
+	va_end(arg);
+
+	spin_unlock_irqrestore(&print_lock, flags);
+
+	preempt_enable();
+
+	return printed;
+}
+
+int printf(char *fmt, ...)
+{
+	va_list arg;
+	int printed;
+	unsigned long flags;
+
+	spin_lock_irqsave(&print_lock, flags);
+
+	va_start(arg, fmt);
+	printed = vsprintf(NULL, fmt, arg);
 	va_end(arg);
 
 	spin_unlock_irqrestore(&print_lock, flags);

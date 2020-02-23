@@ -6,75 +6,7 @@
 #include <config/config.h>
 #include <minos/task_def.h>
 
-extern struct task *os_task_table[OS_NR_TASKS];
-
-struct task_desc {
-	char *name;
-	task_func_t func;
-	void *arg;
-	prio_t prio;
-	uint16_t aff;
-	size_t size;
-	unsigned long flags;
-};
-
-struct task_event {
-	int id;
-	struct task *task;
-#define TASK_EVENT_EVENT_READY		0x0
-#define TASK_EVENT_FLAG_READY		0x1
-	int action;
-	void *msg;
-	uint32_t msk;
-	uint32_t delay;
-	flag_t flags;
-};
-
 #define task_info(task)	((struct task_info *)task->stack_origin)
-
-#define TASK_INFO_INIT(__ti, task, c) \
-	do {		\
-		__ti->cpu = c; \
-		__ti->task = task; \
-		__ti->preempt_count = 0; \
-		__ti->flags = 0; \
-	} while (0)
-
-#define DEFINE_TASK(nn, f, a, p, af, ss, fl) \
-	static const struct task_desc __used \
-	task_desc_##f __section(.__task_desc) = { \
-		.name = nn,		\
-		.func = f,		\
-		.arg = a,		\
-		.prio = p,		\
-		.aff = af,		\
-		.size = ss,		\
-		.flags = fl		\
-	}
-
-#define DEFINE_TASK_PERCPU(nn, f, a, ss, fl) \
-	static const struct task_desc __used \
-	task_desc_##f __section(.__task_desc) = { \
-		.name = nn,		\
-		.func = f,		\
-		.arg = a,		\
-		.prio = OS_PRIO_PCPU,	\
-		.aff = PCPU_AFF_PERCPU,	\
-		.size = ss,		\
-		.flags = fl		\
-	}
-
-#define DEFINE_REALTIME(nn, f, a, p, ss, fl) \
-	static const struct task_desc __used \
-	task_desc_##f __section(.__task_desc) = { \
-		.name = nn,		\
-		.func = f,		\
-		.arg = a,		\
-		.prio = p,		\
-		.aff = PCPU_AFF_NONE,	\
-		.size = ss,		\
-		.flags = fl		\
-	}
 
 static int inline task_is_idle(struct task *task)
 {
@@ -154,9 +86,6 @@ static inline int task_need_resched(struct task *task)
 	return (tf->flags & TIF_NEED_RESCHED);
 }
 
-int alloc_pid(prio_t prio, int cpuid);
-void release_pid(int pid);
-
 int create_percpu_task(char *name, task_func_t func,
 		void *arg, size_t stk_size, unsigned long flags);
 
@@ -173,6 +102,7 @@ int create_task(char *name, task_func_t func,
 void release_task(struct task *task);
 void do_release_task(struct task *task);
 struct task *pid_to_task(int pid);
+void os_for_all_task(void (*hdl)(struct task *task));
 
 #define task_lock(task)					\
 	do {						\

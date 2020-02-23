@@ -1,0 +1,14 @@
+if SHELL
+
+menu "Shell Command Support"
+
+config SHELL_COMMAND_TASK
+	bool "Command for task management"
+	default y
+	help
+	  "command for task management"
+
+endmenu
+
+endif
+

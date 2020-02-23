@@ -31,7 +31,15 @@ static atomic_t os_task_nr;
 static struct task idle_tasks[NR_CPUS];
 static DEFINE_PER_CPU(struct task *, idle_task);
 
-int alloc_pid(prio_t prio, int cpuid)
+#define TASK_INFO_INIT(__ti, task, c) \
+	do {		\
+		__ti->cpu = c; \
+		__ti->task = task; \
+		__ti->preempt_count = 0; \
+		__ti->flags = 0; \
+	} while (0)
+
+static int alloc_pid(prio_t prio, int cpuid)
 {
 	int pid = -1;
 	struct pcpu *pcpu = get_per_cpu(pcpu, cpuid);
@@ -70,7 +78,7 @@ out:
 	return pid;
 }
 
-void release_pid(int pid)
+static void release_pid(int pid)
 {
 	if (pid > OS_NR_TASKS)
 		return;
@@ -371,6 +379,7 @@ int create_idle_task(void)
 {
 	int pid;
 	struct task *task;
+	char task_name[32];
 	int aff = smp_processor_id();
 	struct pcpu *pcpu = get_per_cpu(pcpu, aff);
 
@@ -384,7 +393,8 @@ int create_idle_task(void)
 
 	os_task_table[pid] = task;
 	atomic_inc(&os_task_nr);
-	task_init(task, "idle-task", NULL, NULL,
+	sprintf(task_name, "cpu_idle_cpu%d", aff);
+	task_init(task, task_name, NULL, NULL,
 			OS_PRIO_IDLE, pid, aff, 0, 0);
 	task_vmodules_init(task);
 
@@ -411,6 +421,23 @@ int create_idle_task(void)
 	set_next_prio(OS_PRIO_PCPU);
 
 	return 0;
+}
+
+void os_for_all_task(void (*hdl)(struct task *task))
+{
+	int i;
+	struct task *task;
+
+	if (hdl == NULL)
+		return;
+
+	for (i = 0; i < OS_NR_TASKS; i++) {
+		task = os_task_table[i];
+		if (!task)
+			continue;
+
+		hdl(task);
+	}
 }
 
 /*

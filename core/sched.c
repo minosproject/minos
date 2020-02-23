@@ -34,8 +34,6 @@ static uint8_t *os_rdy_table;
 prio_t os_highest_rdy[NR_CPUS];
 prio_t os_prio_cur[NR_CPUS]; 
 
-extern struct task *os_task_table[OS_NR_TASKS];
-
 static struct pcpu pcpus[NR_CPUS];
 
 DEFINE_PER_CPU(struct pcpu *, pcpu);
@@ -48,6 +46,7 @@ struct task *__next_tasks[NR_CPUS];
 #define SCHED_CLASS_GLOBAL	1
 static int pcpu_sched_class[NR_CPUS];
 
+extern struct task *os_task_table[OS_NR_TASKS];
 extern void sched_tick_disable(void);
 extern void sched_tick_enable(unsigned long exp);
 

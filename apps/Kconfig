@@ -1,0 +1,11 @@
+menu "Application Config"
+
+config SHELL
+	bool "Shell support"
+	default n
+	help
+	  "hell support using ESH from Chris Pavlina"
+
+source "apps/esh/Kconfig"
+
+endmenu

@@ -33,4 +33,10 @@ static inline int is_digit(char ch)
 	return ((ch <= '9') && (ch >= '0'));
 }
 
+static inline int isalpha(char ch)
+{
+	return (((ch >= 'a') && (ch <= 'z')) ||
+			((ch >= 'A') && (ch <= 'Z')));
+}
+
 #endif

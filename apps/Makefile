@@ -1,1 +1,1 @@
-obj-y += app_main.o
+obj-$(CONFIG_SHELL)	+= esh/
