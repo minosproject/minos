@@ -1,10 +1,14 @@
+/*
+ * Created by Le Min 2017/12/12
+ */
+
 #include <core/string.h>
+#include <asm/cpu.h>
 
-int main(void)
+int boot_main(void)
 {
-	int size = 0x1000;
+	if (get_cpu_id() != 0)
+		panic("cpu is not cpu0");
 
-	memset(0x82000000, 0, size);
-
-	return 0;
+	init_mem_block();
 }

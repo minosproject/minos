@@ -1,0 +1,19 @@
+#ifndef _MVISOR_ASM_MARCO_H_
+#define _MVISOR_ASM_MARCO_H_
+
+	.macro func _name, align=2
+	.cfi_sections .debug_frame
+	.section .text.\_name, "ax"
+	.type \_name, %function
+	.func \_name
+	.cfi_startproc
+	.align \align
+	\_name:
+	.endm
+
+	.macro endfunc _name
+	.endfunc
+	.cfi_endproc
+	.size \_name, . - \_name
+	.endm
+#endif

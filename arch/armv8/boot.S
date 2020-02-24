@@ -50,7 +50,7 @@ _start:
 	mrs x0, MIDR_EL1
 	msr VPIDR_EL2, x0
 
-	bl GetCPUID
+	bl get_cpu_id
 	mov x19, x0
 
 	//
@@ -111,4 +111,12 @@ loop:
 	sub x0, x0, x19, lsl #14
 	mov sp, x0
 
-	b main
+	b boot_main
+
+	.data
+
+	.global code_start
+code_start	: .long __code_start
+
+	.global code_end
+code_end	: .long __code_end

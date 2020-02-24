@@ -14,7 +14,7 @@
     .global InvalidateUDCaches
     .global GetMIDR
     .global GetMPIDR
-    .global GetCPUID
+    .global get_cpu_id
 
 // ------------------------------------------------------------
 
@@ -135,9 +135,9 @@ GetMPIDR:
     .cfi_endproc
 
 
-    .type GetCPUID, "function"
+    .type get_cpu_id, "function"
     .cfi_startproc
-GetCPUID:
+get_cpu_id:
 
     mrs x0, MIDR_EL1
     ubfx    x0, x0, #4, #12 // extract PartNum
