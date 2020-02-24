@@ -1,12 +1,11 @@
 os/out/
-mvm/mvm
+tools/mvm/mvm
 tags
 cscope.in.out
 cscope.out
 cscope.po.out
 linkmap.txt
-os/include/asm
-os/include/config/config.h
+include/config/config.h
 .*
 *.o
 *.o.*
@@ -68,9 +67,9 @@ Module.symvers
 #
 # Generated include files
 #
-os/include/config/
-os/include/generated
-os/arch/*/include/generated
+include/config/
+include/generated
+arch/*/include/generated
 
 # stgit generated dirs
 patches-*
