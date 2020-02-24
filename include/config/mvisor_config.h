@@ -1,0 +1,14 @@
+/*
+ * created by Le MIn 2017/12/09
+ */
+
+#ifndef _MVISOR_CONFIG_H_
+#define _MVISOR_CONFIG_H_H
+
+#define RAM_START_ADDRESS	0x80000000
+#define RAM_SIZE		0x40000000
+
+#define MVISOR_START_ADDRESS	RAM_START_ADDRESS
+#define MVISOR_RAM_SIZE		(128 * 1024 *1024)
+
+#endif
