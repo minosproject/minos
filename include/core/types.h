@@ -68,6 +68,8 @@ typedef _s8			int8_t;
 
 #define BIT(nr) (1 << (nr))
 
+#define ALIGN(num, size)	((num) & ~(size - 1))
+
 #define __user
 
 #endif

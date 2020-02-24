@@ -11,4 +11,5 @@ int boot_main(void)
 		panic("cpu is not cpu0");
 
 	init_mem_block();
+	init_vms();
 }

@@ -7,6 +7,9 @@
 
 #include <core/types.h>
 #include <config/mvisor_config.h>
+#include <core/list.h>
+
+struct vmm_vm;
 
 struct vmm_vcpu_context {
 	uint64_t x0;
@@ -21,13 +24,15 @@ struct vmm_vcpu_context {
 	uint64_t x9;
 	uint64_t x10;
 	uint64_t x11;
-};
+} __attribute__ ((__aligned__ (8)));
 
 struct vmm_vcpu {
 	uint32_t vcpu_id;
-	uint32_t vm_belong_to;
+	struct vmm_vm *vm_belong_to;
 	uint32_t hcpu_affinity;
+	struct list_head hcpu_list;
 	struct vmm_vcpu_context context;
-};
+	uint32_t status;
+} __attribute__ ((__aligned__ (8)));
 
 #endif

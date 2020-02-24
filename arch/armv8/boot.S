@@ -114,9 +114,3 @@ loop:
 	b boot_main
 
 	.data
-
-	.global code_start
-code_start	: .long __code_start
-
-	.global code_end
-code_end	: .long __code_end
