@@ -11,4 +11,8 @@
 #define MVISOR_START_ADDRESS	RAM_START_ADDRESS
 #define MVISOR_RAM_SIZE		(128 * 1024 *1024)
 
+#define MAX_CPU_NR	(4)
+#define MAX_VCPU_NR	(64)
+#define VM_MAX_VCPU	(MAX_CPU_NR)
+
 #endif

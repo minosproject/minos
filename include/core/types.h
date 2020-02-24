@@ -1,24 +1,24 @@
 #ifndef _TYPES_H
 #define _TYPES_H
 
-#ifdef ARCH_64
-typedef long			_s64l;
-typedef unsigned long		_u64l;
-#else
-typedef long			_s32l;
-typedef unsigned long		_u32l;
-typedef	_u32l			u32l;
-typedef	_s32l			s32l;
-#endif
+typedef long			_s64;
+typedef unsigned long		_u64;
 
 typedef unsigned int		_u32;
 typedef unsigned short		_u16;
 typedef unsigned char		_u8;
-typedef unsigned long long	_u64;
 typedef int			_s32;
 typedef short			_s16;
 typedef char			_s8;
-typedef long long		_s64;
+
+typedef _u32 	uint32_t;
+typedef _s32 	int32_t;
+typedef _u16 	uint16_t;
+typedef _s16 	int16_t;
+typedef _u8 	uint8_t;
+typedef _s8 	int8_t;
+typedef _u64 	uint64_t;
+typedef _s64	int64_t;
 
 typedef _u32			u32;
 typedef _u16			u16;
@@ -66,7 +66,7 @@ typedef _s8			int8_t;
 #define container_of(ptr, name, member) \
 	(name *)((unsigned char *)ptr - ((unsigned char *)&(((name *)0)->member)))
 
-#define bit(nr) (1 << (nr))
+#define BIT(nr) (1 << (nr))
 
 #define __user
 

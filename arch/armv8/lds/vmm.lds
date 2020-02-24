@@ -22,6 +22,12 @@ SECTIONS
 
 	. = ALIGN(4);
 
+	__vmm_vm_start = .;
+	.__vmm_vm : {
+		*(.__vmm_vm)
+	}
+	__vmm_vm_end = .;
+
 	__init_start = .;
 
 	. = ALIGN(4);
