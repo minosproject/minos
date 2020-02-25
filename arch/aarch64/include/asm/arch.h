@@ -25,20 +25,10 @@
 #define arch_disable_local_irq()	write_daifset(2)
 #define arch_enable_local_irq() 	write_daifclr(2)
 
-static inline unsigned long arch_save_irqflags(void)
-{
-	return read_daif();
-}
+#define arch_save_irqflags()		read_daif()
+#define arch_restore_irqflags(flags)	write_daif(flags)
 
-static inline void arch_restore_irqflags(unsigned long flags)
-{
-	write_daif(flags);
-}
-
-static inline int arch_irq_disabled(void)
-{
-	return (read_daif() & (1 << DAIF_I_BIT));
-}
+#define arch_irq_disabled()		(read_daif() & (1 << DAIF_I_BIT))
 
 #define local_irq_save(flag) \
 	do { \
