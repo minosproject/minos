@@ -55,9 +55,11 @@ struct pcpu {
 
 void pcpus_init(void);
 void sched(void);
+void sched_yield(void);
 int sched_init(void);
 int local_sched_init(void);
 void pcpu_resched(int pcpu_id);
+void pcpu_irqwork(int pcpu_id);
 int sched_can_idle(struct pcpu *pcpu);
 int set_task_ready(struct task *task, int preempt);
 void set_task_suspend(uint32_t delay);

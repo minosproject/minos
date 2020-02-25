@@ -43,13 +43,17 @@ config TASK_RUN_TIME
 	int "default task run time in ms"
 	default 100
 
-config MINOS_RESCHED_IRQ
-	int "default resched IRQ number"
-	default 7
+config MINOS_IRQWORK_IRQ
+	int "default irq_work IRQ number"
+	default 5
 
 config SMP_FUNCTION_CALL_IRQ
 	int "default smp cpu function call irq number"
 	default 6
+
+config MINOS_RESCHED_IRQ
+	int "default resched IRQ number"
+	default 7
 
 config SMP
 	bool "SMP system"

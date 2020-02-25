@@ -368,7 +368,7 @@ int create_task(char *name, task_func_t func,
 				sched();
 		} else {
 			if (aff != smp_processor_id())
-				pcpu_resched(aff);
+				pcpu_irqwork(aff);
 		}
 	}
 	

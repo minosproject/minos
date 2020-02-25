@@ -608,11 +608,10 @@ static int __vm_power_off(struct vm *vm, void *args, int byself)
 	if (byself) {
 		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
 				VMTRAP_REASON_SHUTDOWN, 0, NULL);
-		set_need_resched();
 		preempt_enable();
 
 		/* called by itself need to sched out */
-		sched();
+		sched_yield();
 	} else
 		preempt_enable();
 
@@ -754,9 +753,8 @@ static int __vm_reset(struct vm *vm, void *args, int byself)
 	if (byself) {
 		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
 				VMTRAP_REASON_REBOOT, 0, NULL);
-		set_need_resched();
 		preempt_enable();
-		sched();
+		sched_yield();
 	} else
 		preempt_enable();
 

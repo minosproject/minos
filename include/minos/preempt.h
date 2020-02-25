@@ -31,11 +31,13 @@ static inline void set_next_prio(prio_t prio)
 static inline void set_need_resched(void)
 {
 	set_bit(TIF_NEED_RESCHED, &current_task_info()->flags);
+	wmb();
 }
 
 static inline void clear_need_resched(void)
 {
 	clear_bit(TIF_NEED_RESCHED, &current_task_info()->flags);
+	wmb();
 }
 
 static inline int need_resched(void)
@@ -78,13 +80,11 @@ static inline int preempt_allowed(void)
 static void inline preempt_enable(void)
 {
 	current_task_info()->preempt_count--;
-	wmb();
 }
 
 static void inline preempt_disable(void)
 {
 	current_task_info()->preempt_count++;
-	wmb();
 }
 
 #endif

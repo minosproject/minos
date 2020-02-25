@@ -106,7 +106,7 @@ static void inline event_task_ready(struct task *task, void *msg,
 	task->stat &= ~msk;
 	task->wait_event = NULL;
 
-	set_task_ready(task, 0);
+	set_task_ready(task, 1);
 }
 
 struct task *event_highest_task_ready(struct event *ev, void *msg,

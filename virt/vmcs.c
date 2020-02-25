@@ -53,7 +53,7 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 	 */
 	while (vmcs->guest_index != vmcs->host_index) {
 		if (vcpu_affinity(vcpu) < vcpu_affinity(vm0->vcpus[0]))
-			sched();
+			sched_yield();
 		else
 			cpu_relax();
 		mb();
@@ -96,7 +96,7 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 	if (!nonblock) {
 		while (vmcs->guest_index != vmcs->host_index) {
 			if (vcpu_affinity(vcpu) < vm0->vcpu_nr)
-				sched();
+				sched_yield();
 			else
 				cpu_relax();
 		}
