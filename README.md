@@ -1,15 +1,46 @@
-# Minos - Type 1 Hypervisor for ARMv8-A
+# Minos 
 
-Minos is a lightweight open source Type 1 Hypervisor for mobile and embedded systems that runs directly in bare metal environments. Minos implements a complete virtualization framework that can run multiple VMs (Linux or RTOS) on one hardware platform. Minos provides CPU virtualization; interrupt virtualization; memory virtualization; Timer virtual; and the virtualization of some common peripherals.
+http://minosproject.org
 
-Minos provides an application "mvm" running on VM0 to support the management of the Guest VM. At the same time, mvm provides a virtio-based paravirtualization solution that supports virtio-console, virtio-blk, virtio-net and other devices. Minos can support both 64bit and 32bit guest VM, but VM0 must use 64bit.
+Microkernel RTOS with Virtualization and SMP support for ARMv8-A
 
-Minos is suitable for mobile and embedded platforms and currently only supports the ARMv8-A architecture. Marvell's Esspressobin and Raspberry Pi 3 are supported, and the hardware platform of the ARMv8-A + GICV3/GICV2 combination can theoretically be supported. The software debugging platform supports ARM's official Fix Virtual Platform (FVP), and developers can use ARM DS5 tools for simulation and debugging.
+## What is Minos
 
-Below is the board that Minos has been supported:
+Minos is a real-time priority-based microkernel RTOS with virtualization support for ARMv8-A that provides the trusted reliability and performance for embedded system while also allowing multiple operating systems to safely co-exist on the same System on Chip (SoC). 
 
-- [x] Marvell's Esspressobin development board
-- [x] Raspberry Pi 3 Model B+ / Raspberry Pi 3 Model A+ / Raspberry Pi 3 Model B
-- [x] ARMv8 Fixed Virtual Platforms
+Minos defines a device hypervisor reference stack and an architecture for running multiple software subsystems, managed securely, on a consolidated system by means of a virtual machine manager. Minos can be used as a Type 1 reference hypervisor stack, running directly on the bare-metal hardware, and is suitable for a variety of IoT and embedded device solutions. Minos addresses the gap that currently exists between datacenter hypervisors, and hard partitioning hypervisors. The hypervisor architecture partitions the system into different functional domains, with carefully selected guest OS sharing optimizations for IoT and embedded devices.
 
-Here is a video shows how to run Minos on Raspberry Pi 3B+ [Run Minos Hypervisor On Raspberry 3B+](https://www.youtube.com/watch?v=82YrcGrkblo)
+Minos is also designed as a real-time priority-based microkernel RTOS that support SMP, currently support ARMv8-A, But can be easily ported to other platforms and architectures like Cortex-M MCU.
+
+#### Supported hardware
+
+- [x] Marvell espressobin
+
+- [x] Raspberry 3B
+
+- [x] Raspberry 4
+
+- [x] Khadas VIM3
+
+  Minos can be easily ported to other armv8-a based platform.
+
+#### Supported OSes
+
+- [x] Linux 
+- [x] Ubuntu
+- [x] Android
+- [x] zephyr
+- [x] XNU (ios kernel)
+
+## Documentation
+
+We will have various `README` files in the  `Documents` subdirectory. Please refer `Documents/000-INDEX` for a list of what is contained in each file or sub-directory.
+
+`Documents/001-Build_Minos.md`
+`Documents/002-Test_Minos_on_Raspberry_4.md`
+`Documents/003-Test_Minos_on_Khadas_VIM3.md`
+`Documents/004-Test_Minos_on_ARM_FVP.md`
+`Documents/005-Test_IOS_kernel_using_Minos_on_VIM3.md`
+`Documents/006-How_to_use_mvm_create_guest_VM.md`
+`Documents/007-How_to_create_Native_VM.md`
+`Documents/008-Developer_Guide.md`
