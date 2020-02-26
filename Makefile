@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: GPL-2.0
 VERSION = 0
-PATCHLEVEL = 2
-SUBLEVEL = 2
-EXTRAVERSION = -rc0
+PATCHLEVEL = 3
+SUBLEVEL = 1
+EXTRAVERSION = -rc1
 NAME = unstable
 
 PHONY := _all
