@@ -303,9 +303,6 @@ static void sched_new(struct pcpu *pcpu)
 		}
 	}
 
-	pr_notice("sched prio %d %d %d %d\n", os_highest_rdy[0],
-			os_highest_rdy[1], os_highest_rdy[2], os_highest_rdy[3]);
-
 	wmb();
 #else
 	/*
