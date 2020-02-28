@@ -1,6 +1,8 @@
 #ifndef __MINOS__TTY_H__
 #define __MINOS_TTY_H__
 
+#include <minos/types.h>
+
 struct tty;
 
 struct tty_ops {

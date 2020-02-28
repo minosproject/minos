@@ -38,7 +38,7 @@ struct tty *alloc_tty(uint32_t id, unsigned long flags)
 
 	tty->id = id;
 	tty->flags = flags;
-		
+
 	return tty;
 }
 EXPORT_SYMBOL(alloc_tty);

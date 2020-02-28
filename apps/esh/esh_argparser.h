@@ -24,6 +24,8 @@
 #ifndef ESH_ARGPARSER_H
 #define ESH_ARGPARSER_H
 
+struct esh;
+
 /**
  * Map the buffer to the argv array, and return argc. If argc exceeds the
  * maximum, the full buffer will still be processed; argument pointers will
@@ -48,6 +50,6 @@
  * argv:   ^
  *
  */
-int esh_parse_args(esh_t * esh);
+int esh_parse_args(struct esh *esh);
 
 #endif // ESH_ARGPARSER_H

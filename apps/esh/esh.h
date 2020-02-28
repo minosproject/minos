@@ -61,11 +61,11 @@
  *     #define ESH_PROMPT       "% "        // Prompt string
  *     #define ESH_BUFFER_LEN   200         // Maximum length of a command
  *     #define ESH_ARGC_MAX     10          // Maximum argument count
- *     #define ESH_ALLOC        STATIC      // How to allocate esh_t (or MALLOC)
+ *     #define ESH_ALLOC        STATIC      // How to allocate struct esh (or MALLOC)
  *
  * Then, to use esh, include `esh.h`, and initialize an esh instance with:
  *
- *     esh_t * esh = esh_init();
+ *     struct esh * esh = esh_init();
  *
  * Unless you're using static callbacks (see below), register your callbacks
  * with:
@@ -186,16 +186,12 @@ struct esh;
  *  - whichever allocation method was chosen for ESH_HIST_ALLOC, if any,
  *      failed.
  */
-esh_t * esh_init(void);
+struct esh *esh_init(void);
 
 /**
  * Pass in a character that was received.
  */
-void esh_rx(
-        esh_t * esh,
-        char    c);
-
-
+void esh_rx(struct esh * esh, char c);
 
 #ifndef ESH_STATIC_CALLBACKS
 /**
@@ -211,11 +207,8 @@ void esh_rx(
  * @param argv - arguments
  * @param arg - arbitrary argument passed to esh_set_command_arg()
  */
-typedef void (*esh_cb_command)(
-        esh_t * esh,
-        int     argc,
-        char ** argv,
-        void *  arg);
+typedef void (*esh_cb_command)(struct esh *esh,
+		int argc, char **argv, void *arg);
 
 /**
  * Callback to print a character.
@@ -223,10 +216,7 @@ typedef void (*esh_cb_command)(
  * @param c - the character to print
  * @param arg - arbitrary argument passed to esh_set_print_arg()
  */
-typedef void (*esh_cb_print)(
-        esh_t * esh,
-        char    c,
-        void *  arg);
+typedef void (*esh_cb_print)(struct esh * esh, char c, void *arg);
 
 /**
  * Callback to notify about overflow.
@@ -234,32 +224,24 @@ typedef void (*esh_cb_print)(
  * @param buffer - the internal buffer, NUL-terminated
  * @param arg - arbitrary argument passed to esh_set_overflow_arg()
  */
-typedef void (*esh_cb_overflow)(
-        esh_t *         esh,
-        char const *    buffer,
-        void *          arg);
+typedef void (*esh_cb_overflow)(struct esh *esh,
+		char const *buffer, void *rg);
 
 /**
  * Register a callback to execute a command.
  */
-void esh_register_command(
-        esh_t *         esh,
-        esh_cb_command  callback);
+void esh_register_command(struct esh *esh, esh_cb_command callback);
 
 /**
  * Register a callback to print a character.
  */
-void esh_register_print(
-        esh_t *         esh,
-        esh_cb_print    callback);
+void esh_register_print(struct esh *esh, esh_cb_print callback);
 
 /**
  * Register a callback to notify about overflow. Optional; esh has an internal
  * overflow handler. To reset to that, set the handler to NULL.
  */
-void esh_register_overflow(
-        esh_t * esh,
-        esh_cb_overflow overflow);
+void esh_register_overflow(struct esh *esh, esh_cb_overflow overflow);
 #endif
 
 /**
@@ -272,29 +254,21 @@ void esh_register_overflow(
  * set to MANUAL. If ESH_HIST_ALLOC is not defined or not set to MANUAL, this
  * is a no-op.
  */
-void esh_set_histbuf(
-        esh_t * esh,
-        char *  buffer);
+void esh_set_histbuf(struct esh *esh, char *buffer);
 
 /**
  * Set an argument to be given to the command callback. Default is NULL.
  */
-void esh_set_command_arg(
-        esh_t * esh,
-        void *  arg);
+void esh_set_command_arg(struct esh *esh, void *arg);
 
 /**
  * Set an argument to be given to the print callback. Default is NULL.
  */
-void esh_set_print_arg(
-        esh_t * esh,
-        void *  arg);
+void esh_set_print_arg(struct esh * esh, void *arg);
 
 /**
  * Set an argument to be given to the overflow callback. Default is NULL.
  */
-void esh_set_overflow_arg(
-        esh_t * esh,
-        void *  arg);
+void esh_set_overflow_arg(struct esh *esh, void *arg);
 
 #endif // ESH_H

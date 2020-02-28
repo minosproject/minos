@@ -18,14 +18,18 @@
 #include <minos/console.h>
 #include <minos/compiler.h>
 #include <minos/shell_command.h>
+#include <minos/tty.h>
 #include "esh.h"
+#include "esh_internal.h"
 
-static void esh_putc(esh_t *esh, char c, void *arg)
+static struct esh *pesh;
+
+static void __esh_putc(struct esh *esh, char c, void *arg)
 {
 	console_putc(c);
 }
 
-static void esh_excute_command(esh_t *esh,
+static void esh_excute_command(struct esh *esh,
 		int argc, char **argv, void *arg)
 {
 	int ret;
@@ -35,15 +39,46 @@ static void esh_excute_command(esh_t *esh,
 		printf("Command \'%s\' not found\n", argv[0]);
 }
 
-void shell_task(void *data)
+static void shell_detach_tty(void)
+{
+	close_tty(pesh->tty);
+	pesh->tty = NULL;
+}
+
+static int shell_cmd_tty(int argc, char **argv)
+{
+	uint32_t id;
+
+	if (argc < 3)
+		return -EINVAL;
+
+	if (strcmp(argv[1], "attach") == 0) {
+		id = atoi(argv[1]);
+
+		pesh->tty = open_tty(0xabcd0000 | id);
+		if (!pesh->tty) {
+			printf("no such tty\n");
+			return -EINVAL;
+		}
+	} else {
+		printf("unsupport action now\n");
+	}
+
+	return 0;
+}
+DEFINE_SHELL_COMMAND(tty, "tty", "tty related command", shell_cmd_tty);
+
+static void shell_task(void *data)
 {
 	char ch;
 
-	esh_t *esh = esh_init();
-	esh_register_command(esh, esh_excute_command);
-	esh_register_print(esh, esh_putc);
+	pesh = esh_init();
+	esh_register_command(pesh, esh_excute_command);
+	esh_register_print(pesh, __esh_putc);
 
-	esh_rx(esh, '\n');
+	esh_rx(pesh, '\n');
+
+	pesh->tty = open_tty(0xabcd0000);
 
 	while (1) {
 		ch = console_getc();
@@ -51,7 +86,14 @@ void shell_task(void *data)
 			if (ch == '\r')
 				ch = '\n';
 
-			esh_rx(esh, ch);
+			if (pesh->tty) {
+				if (ch == 27)	/* esc key */
+					shell_detach_tty();
+				else
+					pesh->tty->ops->put_char(pesh->tty, ch);
+			} else {
+				esh_rx(pesh, ch);
+			}
 		}
 
 		msleep(10);

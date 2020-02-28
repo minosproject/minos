@@ -16,11 +16,11 @@
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-#include <minos/app.h>
 #include "esh.h"
 #define ESH_INTERNAL_INCLUDE
 #include "esh_argparser.h"
 #include "esh_internal.h"
+#include <minos/string.h>
 
 enum esh_flags {
     IN_ESCAPE = 0x01,
@@ -28,49 +28,49 @@ enum esh_flags {
     IN_NUMERIC_ESCAPE = 0x04,
 };
 
-static esh_t * allocate_esh(void);
-static void free_last_allocated(esh_t * esh);
-static void do_print_callback(esh_t * esh, char c);
-static void do_command(esh_t * esh, int argc, char ** argv);
-static void do_overflow_callback(esh_t * esh, char const * buffer);
-static bool command_is_nop(esh_t * esh);
-static void execute_command(esh_t * esh);
-static void handle_char(esh_t * esh, char c);
-static void handle_esc(esh_t * esh, char esc);
-static void handle_ctrl(esh_t * esh, char c);
-static void ins_del(esh_t * esh, char c);
-static void term_cursor_move(esh_t * esh, int n);
-static void cursor_move(esh_t * esh, int n);
-static void word_move(esh_t * esh, int dir);
+static struct esh * allocate_esh(void);
+static void free_last_allocated(struct esh * esh);
+static void do_print_callback(struct esh * esh, char c);
+static void do_command(struct esh * esh, int argc, char ** argv);
+static void do_overflow_callback(struct esh * esh, char const * buffer);
+static bool command_is_nop(struct esh * esh);
+static void execute_command(struct esh * esh);
+static void handle_char(struct esh * esh, char c);
+static void handle_esc(struct esh * esh, char esc);
+static void handle_ctrl(struct esh * esh, char c);
+static void ins_del(struct esh * esh, char c);
+static void term_cursor_move(struct esh * esh, int n);
+static void cursor_move(struct esh * esh, int n);
+static void word_move(struct esh * esh, int dir);
 
-void esh_default_overflow(esh_t * esh, char const * buffer, void * arg);
+void esh_default_overflow(struct esh * esh, char const * buffer, void * arg);
 
 #ifdef ESH_STATIC_CALLBACKS
-extern void ESH_PRINT_CALLBACK(esh_t * esh, char c, void * arg);
+extern void ESH_PRINT_CALLBACK(struct esh * esh, char c, void * arg);
 extern void ESH_COMMAND_CALLBACK(
-    esh_t * esh, int argc, char ** argv, void * arg);
+    struct esh * esh, int argc, char ** argv, void * arg);
 __attribute__((weak))
-void ESH_OVERFLOW_CALLBACK(esh_t * esh, char const * buffer, void * arg)
+void ESH_OVERFLOW_CALLBACK(struct esh * esh, char const * buffer, void * arg)
 {
     (void) arg;
     esh_default_overflow(esh, buffer, arg);
 }
 #else
-void esh_register_command(esh_t * esh, esh_cb_command callback)
+void esh_register_command(struct esh * esh, esh_cb_command callback)
 {
     (void) esh;
     ESH_INSTANCE->cb_command = callback;
 }
 
 
-void esh_register_print(esh_t * esh, esh_cb_print callback)
+void esh_register_print(struct esh * esh, esh_cb_print callback)
 {
     (void) esh;
     ESH_INSTANCE->print = callback;
 }
 
 
-void esh_register_overflow(esh_t * esh, esh_cb_overflow overflow)
+void esh_register_overflow(struct esh * esh, esh_cb_overflow overflow)
 {
     (void) esh;
     ESH_INSTANCE->overflow = (overflow ? overflow : &esh_default_overflow);
@@ -78,27 +78,27 @@ void esh_register_overflow(esh_t * esh, esh_cb_overflow overflow)
 #endif
 
 // API WARNING: This function is separately declared in lib.rs
-void esh_set_command_arg(esh_t * esh, void * arg)
+void esh_set_command_arg(struct esh * esh, void * arg)
 {
     (void) esh;
     ESH_INSTANCE->cb_command_arg = arg;
 }
 
 // API WARNING: This function is separately declared in lib.rs
-void esh_set_print_arg(esh_t * esh, void * arg)
+void esh_set_print_arg(struct esh * esh, void * arg)
 {
     (void) esh;
     ESH_INSTANCE->cb_print_arg = arg;
 }
 
 // API WARNING: This function is separately declared in lib.rs
-void esh_set_overflow_arg(esh_t * esh, void * arg)
+void esh_set_overflow_arg(struct esh * esh, void * arg)
 {
     (void) esh;
     ESH_INSTANCE->cb_overflow_arg = arg;
 }
 
-static void do_print_callback(esh_t * esh, char c)
+static void do_print_callback(struct esh * esh, char c)
 {
     (void) esh;
 #ifdef ESH_STATIC_CALLBACKS
@@ -109,7 +109,7 @@ static void do_print_callback(esh_t * esh, char c)
 }
 
 
-static void do_command(esh_t * esh, int argc, char ** argv)
+static void do_command(struct esh * esh, int argc, char ** argv)
 {
     (void) esh;
 #ifdef ESH_STATIC_CALLBACKS
@@ -120,7 +120,7 @@ static void do_command(esh_t * esh, int argc, char ** argv)
 }
 
 
-static void do_overflow_callback(esh_t * esh, char const * buffer)
+static void do_overflow_callback(struct esh * esh, char const * buffer)
 {
     (void) esh;
 #ifdef ESH_STATIC_CALLBACKS
@@ -137,14 +137,14 @@ static void do_overflow_callback(esh_t * esh, char const * buffer)
  */
 #if ESH_ALLOC == STATIC
 static bool g_allocated = false;
-esh_t g_esh_struct;
+struct esh g_esh_struct;
 #endif
 
 /**
- * Allocate a new esh_t, or return a new statically allocated one from the pool.
+ * Allocate a new struct esh, or return a new statically allocated one from the pool.
  * This does not perform initialization.
  */
-static esh_t * allocate_esh(void)
+static struct esh * allocate_esh(void)
 {
 #if ESH_ALLOC == STATIC
     if (g_allocated) {
@@ -154,7 +154,7 @@ static esh_t * allocate_esh(void)
         return &g_esh_struct;
     }
 #elif ESH_ALLOC == MALLOC
-    return malloc(sizeof(esh_t));
+    return malloc(sizeof(struct esh));
 #else
 #   error "ESH_ALLOC must be STATIC or MALLOC"
 #endif
@@ -162,10 +162,10 @@ static esh_t * allocate_esh(void)
 
 
 /**
- * Free the last esh_t that was allocated, in case an initialization error
+ * Free the last struct esh that was allocated, in case an initialization error
  * occurs after allocation.
  */
-static void free_last_allocated(esh_t *esh)
+static void free_last_allocated(struct esh *esh)
 {
 #if ESH_ALLOC == STATIC
     (void) esh;
@@ -177,9 +177,9 @@ static void free_last_allocated(esh_t *esh)
 
 
 // API WARNING: This function is separately declared in lib.rs
-esh_t * esh_init(void)
+struct esh * esh_init(void)
 {
-    esh_t * esh = allocate_esh();
+    struct esh * esh = allocate_esh();
 
     memset(esh, 0, sizeof(*esh));
 #ifndef ESH_STATIC_CALLBACKS
@@ -196,7 +196,7 @@ esh_t * esh_init(void)
 
 
 // API WARNING: This function is separately declared in lib.rs
-void esh_rx(esh_t * esh, char c)
+void esh_rx(struct esh * esh, char c)
 {
     (void) esh;
     if (ESH_INSTANCE->flags & (IN_BRACKET_ESCAPE | IN_NUMERIC_ESCAPE)) {
@@ -224,7 +224,7 @@ void esh_rx(esh_t * esh, char c)
  * Process a normal text character. If there is room in the buffer, it is
  * inserted directly. Otherwise, the buffer is set into the overflow state.
  */
-static void handle_char(esh_t * esh, char c)
+static void handle_char(struct esh * esh, char c)
 {
     (void) esh;
     esh_hist_substitute(ESH_INSTANCE);
@@ -249,7 +249,7 @@ static void handle_char(esh_t * esh, char c)
 /**
  * Process a single-character control byte.
  */
-static void handle_ctrl(esh_t * esh, char c)
+static void handle_ctrl(struct esh * esh, char c)
 {
     (void) esh;
     switch (c) {
@@ -281,7 +281,7 @@ static void handle_ctrl(esh_t * esh, char c)
 /**
  * Process the last character in an escape sequence.
  */
-static void handle_esc(esh_t * esh, char esc)
+static void handle_esc(struct esh * esh, char esc)
 {
     (void) esh;
     int cdelta;
@@ -359,7 +359,7 @@ wmove:
  * Return whether the command in the edit buffer is a NOP and should be ignored.
  * This does not substitute the selected history item.
  */
-static bool command_is_nop(esh_t * esh)
+static bool command_is_nop(struct esh * esh)
 {
     int i;
 
@@ -377,7 +377,7 @@ static bool command_is_nop(esh_t * esh)
  * Process the command in the buffer and give it to the command callback. If
  * the buffer has overflowed, call the overflow callback instead.
  */
-static void execute_command(esh_t * esh)
+static void execute_command(struct esh * esh)
 {
     (void) esh;
 
@@ -412,7 +412,7 @@ static void execute_command(esh_t * esh)
 }
 
 
-void esh_print_prompt(esh_t * esh)
+void esh_print_prompt(struct esh * esh)
 {
     (void) esh;
     esh_puts_flash(ESH_INSTANCE, FSTR(ESH_PROMPT));
@@ -423,7 +423,7 @@ void esh_print_prompt(esh_t * esh)
  * Default overflow callback. This just prints a message.
  */
 // API WARNING: This function is separately declared in lib.rs
-void esh_default_overflow(esh_t * esh, char const * buffer, void * arg)
+void esh_default_overflow(struct esh * esh, char const * buffer, void * arg)
 {
     (void) esh;
     (void) buffer;
@@ -432,7 +432,7 @@ void esh_default_overflow(esh_t * esh, char const * buffer, void * arg)
 }
 
 
-bool esh_putc(esh_t * esh, char c)
+bool esh_putc(struct esh * esh, char c)
 {
     (void) esh;
 
@@ -441,7 +441,7 @@ bool esh_putc(esh_t * esh, char c)
 }
 
 
-bool esh_puts(esh_t * esh, char const * s)
+bool esh_puts(struct esh * esh, char const * s)
 {
     (void) esh;
     char c;
@@ -454,7 +454,7 @@ bool esh_puts(esh_t * esh, char const * s)
 
 
 #ifdef __AVR_ARCH__
-bool esh_puts_flash(esh_t * esh, char const __flash * s)
+bool esh_puts_flash(struct esh * esh, char const __flash * s)
 {
     (void) esh;
     char c;
@@ -467,7 +467,7 @@ bool esh_puts_flash(esh_t * esh, char const __flash * s)
 #endif // __AVR_ARCH__
 
 
-void esh_restore(esh_t * esh)
+void esh_restore(struct esh * esh)
 {
     (void) esh;
 
@@ -492,7 +492,7 @@ size_t esh_get_slice_size(void)
 /**
  * Move only the terminal cursor. This does not move the insertion point.
  */
-static void term_cursor_move(esh_t * esh, int n)
+static void term_cursor_move(struct esh * esh, int n)
 {
     (void) esh;
 
@@ -510,7 +510,7 @@ static void term_cursor_move(esh_t * esh, int n)
  * Move the esh cursor. This applies history substitution, moves the terminal
  * cursor, and moves the insertion point.
  */
-static void cursor_move(esh_t * esh, int n)
+static void cursor_move(struct esh * esh, int n)
 {
     (void) esh;
 
@@ -533,7 +533,7 @@ static void cursor_move(esh_t * esh, int n)
  * @param dir - move forward if +1 or negative if -1. All other numbers produce
  *              undefined behavior.
  */
-static void word_move(esh_t * esh, int dir)
+static void word_move(struct esh * esh, int dir)
 {
     (void) esh;
 
@@ -561,7 +561,7 @@ static void word_move(esh_t * esh, int dir)
  * @param esh - esh instance
  * @param c - character to insert, or 0 to delete
  */
-static void ins_del(esh_t * esh, char c)
+static void ins_del(struct esh * esh, char c)
 {
     (void) esh;
 

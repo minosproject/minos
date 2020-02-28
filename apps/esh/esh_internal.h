@@ -17,16 +17,14 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef ESH_INTERNAL_INCLUDE
-#error "esh_internal.h is an internal file and should not be included directly"
-#endif // ESH_INTERNAL_INCLUDE
-
 #ifndef ESH_INTERNAL_H
 #define ESH_INTERNAL_H
 
 #include "esh_incl_config.h"
 #include "esh_hist.h"
 #include <minos/types.h>
+
+struct tty;
 
 /**
  * If we're building for Rust, we need to know the size of a &[u8] in order
@@ -49,7 +47,7 @@ struct char_slice {
  * esh instance struct. This holds all of the state that needs to be saved
  * between calls to esh_rx().
  */
-typedef struct esh {
+struct esh {
     /**
      * The config item ESH_BUFFER_LEN is only the number of characters to be
      * stored, not characters plus termination.
@@ -81,7 +79,9 @@ typedef struct esh {
     void *cb_command_arg;
     void *cb_print_arg;
     void *cb_overflow_arg;
-} esh_t;
+
+    struct tty *tty;
+};
 
 /**
  * On AVR, a number of strings should be stored in and read from flash space.
@@ -101,13 +101,13 @@ typedef struct esh {
  * Print one character.
  * @return false (allows it to be an esh_hist_for_each_char callback)
  */
-bool esh_putc(esh_t * esh, char c);
+bool esh_putc(struct esh *esh, char c);
 
 /**
  * @internal
  * Print a string located in RAM.
  */
-bool esh_puts(esh_t * esh, char const * s);
+bool esh_puts(struct esh *esh, char const *s);
 
 /**
  * @internal
@@ -115,7 +115,7 @@ bool esh_puts(esh_t * esh, char const * s);
  * esh_puts().
  */
 #ifdef __AVR_ARCH__
-bool esh_puts_flash(esh_t * esh, char const __flash * s);
+bool esh_puts_flash(struct esh *esh, char const __flash * s);
 #else
 #define esh_puts_flash esh_puts
 #endif
@@ -123,28 +123,28 @@ bool esh_puts_flash(esh_t * esh, char const __flash * s);
 /**
  * Print the prompt string
  */
-void esh_print_prompt(esh_t * esh);
+void esh_print_prompt(struct esh *esh);
 
 /**
  * Overwrite the prompt and restore the buffer.
  */
-void esh_restore(esh_t * esh);
+void esh_restore(struct esh *esh);
 
 /**
  * Call the print callback. Wrapper to avoid ifdefs for static callback.
  */
-void esh_do_print_callback(esh_t * esh, char c);
+void esh_do_print_callback(struct esh *esh, char c);
 
 /**
  * Call the main callback. Wrapper to avoid ifdefs for static callback.
  */
-void esh_do_callback(esh_t * esh, int argc, char ** argv);
+void esh_do_callback(struct esh *esh, int argc, char **argv);
 
 /**
  * Call the overflow callback. Wrapper to avoid ifdefs for the static
  * callback.
  */
-void esh_do_overflow_callback(esh_t * esh, char const * buffer);
+void esh_do_overflow_callback(struct esh *esh, char const * buffer);
 
 #ifdef ESH_RUST
 /**
@@ -170,7 +170,7 @@ size_t esh_get_slice_size(void);
 #define ESCCHAR_CTRLRIGHT   'c'
 
 #if ESH_ALLOC == STATIC
-extern esh_t g_esh_struct;
+extern struct esh g_esh_struct;
 #define ESH_INSTANCE (&g_esh_struct)
 #else
 #define ESH_INSTANCE esh

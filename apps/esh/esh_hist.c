@@ -68,8 +68,8 @@ static int modulo(int n, int modulus)
  * Regardless of the callback's return value, iteration will always stop at NUL
  * or if the loop wraps all the way around.
  */
-static void for_each_char(esh_t * esh, int offset,
-        bool (*callback)(esh_t * esh, char c))
+static void for_each_char(struct esh * esh, int offset,
+        bool (*callback)(struct esh * esh, char c))
 {
     int i;
     (void) esh;
@@ -91,7 +91,7 @@ static void for_each_char(esh_t * esh, int offset,
 /**
  * Internal callback passed to for_each_char by clobber_buffer
  */
-static bool clobber_cb(esh_t * esh, char c)
+static bool clobber_cb(struct esh * esh, char c)
 {
     (void) esh;
     ESH_INSTANCE->buffer[ESH_INSTANCE->cnt] = c;
@@ -107,7 +107,7 @@ static bool clobber_cb(esh_t * esh, char c)
  * @param esh - esh instance
  * @param offset - offset into the ring buffer
  */
-static void clobber_buffer(esh_t * esh, int offset)
+static void clobber_buffer(struct esh * esh, int offset)
 {
     (void) esh;
     if (offset < 0 || offset >= ESH_HIST_LEN) {
@@ -120,7 +120,7 @@ static void clobber_buffer(esh_t * esh, int offset)
 }
 
 
-bool esh_hist_init(esh_t * esh)
+bool esh_hist_init(struct esh * esh)
 {
     (void) esh;
 #if ESH_HIST_ALLOC == STATIC
@@ -143,7 +143,7 @@ bool esh_hist_init(esh_t * esh)
 }
 
 
-int esh_hist_nth(esh_t * esh, int n)
+int esh_hist_nth(struct esh * esh, int n)
 {
     int i;
     (void) esh;
@@ -162,7 +162,7 @@ int esh_hist_nth(esh_t * esh, int n)
 }
 
 
-bool esh_hist_add(esh_t * esh, char const * s)
+bool esh_hist_add(struct esh * esh, char const * s)
 {
     int i;
     (void) esh;
@@ -189,7 +189,7 @@ bool esh_hist_add(esh_t * esh, char const * s)
 }
 
 
-void esh_hist_print(esh_t * esh, int offset)
+void esh_hist_print(struct esh * esh, int offset)
 {
     (void) esh;
     // Clear the line
@@ -203,7 +203,7 @@ void esh_hist_print(esh_t * esh, int offset)
 }
 
 
-bool esh_hist_substitute(esh_t * esh)
+bool esh_hist_substitute(struct esh * esh)
 {
     (void) esh;
     if (ESH_INSTANCE->hist.idx) {
@@ -221,7 +221,7 @@ bool esh_hist_substitute(esh_t * esh)
 
 #if defined(ESH_HIST_ALLOC) && ESH_HIST_ALLOC == MANUAL
 
-void esh_set_histbuf(esh_t * esh, char * buffer)
+void esh_set_histbuf(struct esh * esh, char * buffer)
 {
     ESH_INSTANCE->hist.hist = buffer;
     init_buffer(ESH_INSTANCE->hist.hist);
@@ -229,7 +229,7 @@ void esh_set_histbuf(esh_t * esh, char * buffer)
 
 #else // ESH_HIST_ALLOC == MANUAL
 
-void esh_set_histbuf(esh_t * esh, char * buffer)
+void esh_set_histbuf(struct esh * esh, char * buffer)
 {
     (void) esh;
     (void) buffer;

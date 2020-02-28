@@ -17,8 +17,6 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <minos/app.h>
-
 #define ESH_INTERNAL
 #include "esh.h"
 #define ESH_INTERNAL_INCLUDE
@@ -38,7 +36,7 @@
  * This is safe to use when the destination and source buffer are the same;
  * it will only ever contract the data, not expand it.
  */
-static void consume_quoted(esh_t * esh, size_t *src_i, size_t *dest_i)
+static void consume_quoted(struct esh *esh, size_t *src_i, size_t *dest_i)
 {
     (void) esh;
     char quote = ESH_INSTANCE->buffer[*src_i];
@@ -56,7 +54,7 @@ static void consume_quoted(esh_t * esh, size_t *src_i, size_t *dest_i)
 }
 
 
-int esh_parse_args(esh_t * esh)
+int esh_parse_args(struct esh *esh)
 {
     size_t i;
     (void) esh;

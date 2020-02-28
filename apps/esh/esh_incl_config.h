@@ -17,10 +17,6 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef ESH_INTERNAL_INCLUDE
-#error "esh_incl_config.h is an internal header and should not be included by the user."
-#endif // ESH_INTERNAL_INCLUDE
-
 #ifndef ESH_INCL_CONFIG_H
 #define ESH_INCL_CONFIG_H
 
