@@ -161,3 +161,16 @@ int printf(char *fmt, ...)
 
 	return printed;
 }
+
+/*
+ * TBD
+ */
+int puts(char *buf, size_t size)
+{
+	size_t print = 0;
+
+	while (print < size)
+		console_putc(buf[print++]);
+
+	return size;
+}

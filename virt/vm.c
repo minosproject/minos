@@ -888,6 +888,7 @@ static void vm_setup(struct vm *vm)
 	create_vmbox_controller(vm);
 
 	os_setup_vm(vm);
+	do_hooks(vm, NULL, OS_HOOK_SETUP_VM);
 
 	if (vm->setup_data) {
 		destroy_host_mapping((vir_addr_t)vm->setup_data,

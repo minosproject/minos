@@ -5,12 +5,16 @@
 #define HVC_TYPE_HVC_VM0		(0x8)
 #define HVC_TYPE_HVC_MISC		(0x9)
 #define HVC_TYPE_HVC_VMBOX		(0xa)
+#define HVC_TYPE_HVC_DEBUG_CONSOLE	(0xb)
 
 #define HVC_CALL_BASE			(0xc0000000)
 
-#define HVC_VM0_FN(n)			(HVC_CALL_BASE + (HVC_TYPE_HVC_VM0 << 24) + n)
-#define HVC_MISC_FN(n)			(HVC_CALL_BASE + (HVC_TYPE_HVC_MISC << 24) + n)
-#define HVC_VMBOX_FN(n)			(HVC_CALL_BASE + (HVC_TYPE_HVC_VMBOX << 24) + n)
+#define HVC_CALL_NUM(t, n)		(HVC_CALL_BASE + (t << 24) + n)
+
+#define HVC_VM0_FN(n)			HVC_CALL_NUM(HVC_TYPE_HVC_VM0, n)
+#define HVC_MISC_FN(n)			HVC_CALL_NUM(HVC_TYPE_HVC_MISC, n)
+#define HVC_VMBOX_FN(n)			HVC_CALL_NUM(HVC_TYPE_HVC_VMBOX, n)
+#define HVC_VMBOX_DEBUG_CONSOLE(n)	HVC_CALL_NUM(HVC_TYPE_HVC_DEBUG_CONSOLE, n)
 
 /* hypercall for vm releated operation */
 #define	HVC_VM_CREATE			HVC_VM0_FN(0)
@@ -31,5 +35,10 @@
 
 #define HVC_GET_VMID			HVC_MISC_FN(0)
 #define HVC_SCHED_OUT			HVC_MISC_FN(1)
+
+#define HVC_DC_GET_STAT			HVC_VMBOX_DEBUG_CONSOLE(0)
+#define HVC_DC_GET_RING			HVC_VMBOX_DEBUG_CONSOLE(1)
+#define HVC_DC_GET_IRQ			HVC_VMBOX_DEBUG_CONSOLE(2)
+#define HVC_DC_WRITE			HVC_VMBOX_DEBUG_CONSOLE(3)
 
 #endif

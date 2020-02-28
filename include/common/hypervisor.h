@@ -58,4 +58,13 @@ struct vmtag {
 #define IOCTL_REQUEST_VIRQ		0xf00f
 #define IOCTL_CREATE_VM_RESOURCE	0xf010
 
+struct vm_ring {
+	volatile uint32_t ridx;
+	volatile uint32_t widx;
+	uint32_t size;
+	char buf[0];
+};
+
+#define VM_RING_IDX(idx, size)		(idx & (size - 1))
+
 #endif

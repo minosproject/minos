@@ -17,6 +17,7 @@
 #include <minos/preempt.h>
 #include <minos/hook.h>
 #include <minos/current.h>
+#include <minos/symbol.h>
 
 #define section_for_each_item_addr(__start_addr, __end_addr, __var)            \
 	size_t _i, _cnt;                                                       \
