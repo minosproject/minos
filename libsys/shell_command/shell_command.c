@@ -15,7 +15,7 @@
  */
 
 #include <minos/minos.h>
-#include <sys/shell_command.h>
+#include <minos/shell_command.h>
 
 int excute_shell_command(int argc, char **argv)
 {

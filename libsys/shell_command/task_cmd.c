@@ -15,7 +15,7 @@
  */
 
 #include <minos/task.h>
-#include <sys/shell_command.h>
+#include <minos/shell_command.h>
 
 static void dump_task_info(struct task *task)
 {

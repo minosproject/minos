@@ -17,7 +17,7 @@
 #include <minos/app.h>
 #include <minos/console.h>
 #include <minos/compiler.h>
-#include <sys/shell_command.h>
+#include <minos/shell_command.h>
 #include "esh.h"
 
 static void esh_putc(esh_t *esh, char c, void *arg)
