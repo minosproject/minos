@@ -180,10 +180,18 @@ static inline char *memory_vsprintf(char *dst, const char *src, int size)
 	return (dst + size);
 }
 
+#define PRINT_ALIGN_CHAR(str, index, align, len)			\
+	do {								\
+		if (align && (align > len)) {				\
+			for (index = 0; index < (align - len); index++)	\
+				str = vst(str, " ", 1);			\
+		}							\
+	} while (0)
+
 int vsprintf(char *buf, const char *fmt, va_list arg)
 {
 	char *str, *tmp;
-	int len, ch;
+	int len, ch, align, i;
 	char num_buf[96];		// 96 is enough for number
 	unsigned long unumber;
 	int flag = 0;
@@ -195,7 +203,7 @@ int vsprintf(char *buf, const char *fmt, va_list arg)
 		vst = memory_vsprintf;
 
 	for (str = buf; *fmt; fmt++) {
-
+		align = 0;
 		if (*fmt != '%') {
 			str = vst(str, fmt, 1);
 			continue;
@@ -203,11 +211,17 @@ int vsprintf(char *buf, const char *fmt, va_list arg)
 
 		fmt++;
 
+		if (is_digit(*fmt)) {
+			align = *fmt - '0';
+			fmt++;
+		}
+
 		switch (*fmt) {
 		case 'd':
 			flag |= PRINTF_DEC | PRINTF_SIGNED;
 			break;
 		case 'p':
+			len = 0;
 			flag |= PRINTF_POINTER | PRINTF_UNSIGNED;
 			break;
 		case 'x':
@@ -218,30 +232,38 @@ int vsprintf(char *buf, const char *fmt, va_list arg)
 			break;
 		case 's':
 			len = strlen(tmp = va_arg(arg, char *));
+			PRINT_ALIGN_CHAR(str, i, align, len);
 			str = vst(str, (const char *)tmp, len);
 			continue;
-			break;
 		case 'c':
+			PRINT_ALIGN_CHAR(str, i, align, 1);
 			ch = (char)(va_arg(arg, int));
 			str = vst(str, (const char *)&ch, 1);
 			continue;
-			break;
 		case 'o':
 			flag |= PRINTF_DEC | PRINTF_SIGNED;
 			break;
 		case '%':
+			if (align) {
+				str = vst(str, "%", 1);
+				align = align + '0';
+				str = vst(str, (char *)&align, 1);
+			}
 			str = vst(str, "%", 1);
 			continue;
-			break;
 		default:
 			str = vst(str, "%", 1);
+			if (align) {
+				align = align + '0';
+				str = vst(str, (char *)&align, 1);
+			}
 			str = vst(str, fmt, 1);
 			continue;
-			break;
 		}
 
 		unumber = va_arg(arg, unsigned long);
 		len = numbric(num_buf, unumber, flag);
+		PRINT_ALIGN_CHAR(str, i, align, len);
 		str = vst(str, num_buf, len);
 
 		flag = 0;
