@@ -19,12 +19,12 @@
 
 static void dump_task_info(struct task *task)
 {
-	printf("%d   %s\n", task->pid, task->name);
+	printf("%4d %3d %s\n", task->pid, task->affinity, task->name);
 }
 
 static int ps_cmd(int argc, char **argv)
 {
-	printf("PID  NAME\n");
+	printf(" PID CPU NAME\n");
 	os_for_all_task(dump_task_info);
 
 	return 0;
