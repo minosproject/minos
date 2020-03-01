@@ -28,6 +28,7 @@
 			entry = <0x0 0x80008000>;
 			setup_data = <0x0 0x83e00000>;
 			vcpu_affinity = <0 1 2 3>;
+			cmdline = "console=hvc0 earlycon=dbcon,io,0x0 loglevel=8 consolelog=9 root=/dev/vda2 rw";
 			memory = <0x0 0x80000000 0x0 0x10000000>;
 		};
 	};
