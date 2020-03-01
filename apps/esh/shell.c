@@ -49,11 +49,13 @@ static int shell_cmd_tty(int argc, char **argv)
 {
 	uint32_t id;
 
-	if (argc < 3)
+	if (argc < 3) {
+		printf("invalid argument\n");
 		return -EINVAL;
+	}
 
 	if (strcmp(argv[1], "attach") == 0) {
-		id = atoi(argv[1]);
+		id = atoi(argv[2]);
 
 		pesh->tty = open_tty(0xabcd0000 | id);
 		if (!pesh->tty) {
@@ -80,11 +82,14 @@ static void shell_task(void *data)
 
 	pesh->tty = open_tty(0xabcd0000);
 
+	/* clear the fifo */
+	while (console_getc());
+	
 	while (1) {
-		ch = console_getc();
-		if (ch > 0) {
-			if (ch == '\r')
-				ch = '\n';
+		for (; ;) {
+			ch = console_getc();
+			if (ch <= 0)
+				break;
 
 			if (pesh->tty) {
 				if (ch == 27)	/* esc key */
@@ -92,6 +97,8 @@ static void shell_task(void *data)
 				else
 					pesh->tty->ops->put_char(pesh->tty, ch);
 			} else {
+				if (ch == '\r')
+					ch = '\n';
 				esh_rx(pesh, ch);
 			}
 		}

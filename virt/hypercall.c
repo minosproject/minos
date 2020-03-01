@@ -124,8 +124,8 @@ static int misc_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 	HVC_RET1(c, -EINVAL);
 }
 
-DEFINE_HVC_HANDLER("vm_hvc_handler", HVC_TYPE_HVC_VM0,
-		HVC_TYPE_HVC_VM0, vm_hvc_handler);
+DEFINE_HVC_HANDLER("vm_hvc_handler", HVC_TYPE_VM0,
+		HVC_TYPE_VM0, vm_hvc_handler);
 
-DEFINE_HVC_HANDLER("misc_hvc_handler", HVC_TYPE_HVC_MISC,
-		HVC_TYPE_HVC_MISC, misc_hvc_handler);
+DEFINE_HVC_HANDLER("misc_hvc_handler", HVC_TYPE_MISC,
+		HVC_TYPE_MISC, misc_hvc_handler);

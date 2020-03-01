@@ -33,6 +33,8 @@
 
 struct vm_debug_console {
 	int irq;
+	int open;
+	struct vm *vm;
 	struct tty *tty;
 	unsigned long ring_addr;
 	struct vm_ring *tx;
@@ -43,6 +45,22 @@ static struct vm_debug_console *dcons[NR_DC];
 
 static int dcon_putc(struct tty *tty, char ch)
 {
+	struct vm_debug_console *dcon = tty->pdata;
+	struct vm_ring *tx = dcon->tx;
+
+	if (!dcon->open)
+		return 0;
+
+	if ((tx->widx - tx->ridx) > tx->size) {
+		pr_err("write buffer overflow\n");
+		return -EIO;
+	}
+
+	tx->buf[tx->widx++] = ch;
+	mb();
+
+	send_virq_to_vm(dcon->vm, dcon->irq);
+
 	return 0;
 }
 
@@ -74,7 +92,7 @@ static int dcon_init(struct vm *vm, struct vm_debug_console *dcon, void *ring)
 	struct vmm_area *va;
 
 	va = alloc_free_vmm_area(&vm->mm, DCON_RING_SIZE,
-			PAGE_MASK, VM_IO | VM_MAP_PRIVATE);
+			PAGE_MASK, VM_NORMAL | VM_MAP_PRIVATE);
 
 	if (!va)
 		return -ENOMEM;
@@ -125,17 +143,19 @@ static int create_dconsole(void *item, void *args)
 	if (!dcon)
 		goto release_tty;
 
-	ring = get_io_pages(PAGE_NR(DCON_RING_SIZE));
+	ring = get_free_pages(PAGE_NR(DCON_RING_SIZE));
 	if (!ring)
 		goto release_dcon;
 
 	if (dcon_init(vm, dcon, ring))
 		goto free_ring;
 
+	dcon->tty = tty;
+	dcon->vm = vm;
+	dcons[vm->vmid] = dcon;
+
 	tty->ops = &vm_tty_ops;
 	tty->pdata = dcon;
-	dcon->tty = tty;
-	dcons[vm->vmid] = dcon;
 	register_tty(tty);
 
 	return 0;
@@ -154,12 +174,19 @@ static void dcon_write(struct vm_debug_console *dcon)
 	struct vm_ring *ring = dcon->rx;
 	uint32_t ridx, widx;
 
+	if (!dcon->tty->open) {
+		ring->ridx = ring->widx;
+		wmb();
+
+		return;
+	}
+
 	ridx = ring->ridx;
 	widx = ring->widx;
 	mb();
 
 	while (ridx != widx)
-		console_putc(ring->buf[VM_RING_IDX(ridx++, DCON_TX_RING_SIZE)]);
+		console_putc(ring->buf[VM_RING_IDX(ridx++, ring->size)]);
 
 	ring->ridx = ring->widx;
 	mb();
@@ -186,14 +213,18 @@ static int dcon_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 		break;
 	case HVC_DC_WRITE:
 		dcon_write(dcon);
+	case HVC_DC_OPEN:
+		dcon->open = 1;
+		break;
+	case HVC_DC_CLOSE:
+		dcon->open = 0;
 		break;
 	}
 
 	HVC_RET1(c, 0);
 }
-
-DEFINE_HVC_HANDLER("debug_console_hvc", HVC_TYPE_HVC_DEBUG_CONSOLE,
-		HVC_TYPE_HVC_DEBUG_CONSOLE, dcon_hvc_handler);
+DEFINE_HVC_HANDLER("debug_console_hvc", HVC_TYPE_DEBUG_CONSOLE,
+		HVC_TYPE_DEBUG_CONSOLE, dcon_hvc_handler);
 
 static int __init_text dconsole_init(void)
 {

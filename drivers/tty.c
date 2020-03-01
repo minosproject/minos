@@ -89,11 +89,11 @@ struct tty *open_tty(uint32_t id)
 	if (!__tty || __tty->open)
 		return NULL;
 
-	tty->open = 1;
 	if (tty->ops->open)
 		tty->ops->open(tty);
+	tty->open = 1;
 
-	return 0;
+	return __tty;
 }
 EXPORT_SYMBOL(open_tty);
 
@@ -104,5 +104,6 @@ void close_tty(struct tty *tty)
 
 	if (tty->ops->close)
 		tty->ops->close(tty);
+	tty->open = 0;
 }
 EXPORT_SYMBOL(close_tty);
