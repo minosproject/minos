@@ -59,13 +59,14 @@ static int meson_serial_init(char *arg)
 	val |= (AML_UART_RX_EN | AML_UART_TX_EN);
 	writel(val, &uart->control);
 #endif
+
 	return 0;
 }
 
 static char meson_serial_getc(void)
 {
-	if (readl(&uart->status) & AML_UART_RX_EMPTY)
-		return -EAGAIN;
+	if ((readl(&uart->status) & 0x7f) == 0)
+		return 0;
 
 	return readl(&uart->rfifo) & 0xff;
 }

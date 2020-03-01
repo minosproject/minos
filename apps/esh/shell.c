@@ -83,7 +83,8 @@ static void shell_task(void *data)
 	pesh->tty = open_tty(0xabcd0000);
 
 	/* clear the fifo */
-	while (console_getc());
+	while (console_getc() > 0)
+		cpu_relax();
 	
 	while (1) {
 		for (; ;) {
