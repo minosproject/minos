@@ -52,7 +52,7 @@
 
 #define TASK_STACK_SIZE		CONFIG_TASK_STACK_SIZE
 
-typedef void (*task_func_t)(void *data);
+typedef int (*task_func_t)(void *data);
 struct flag_node;
 struct event;
 

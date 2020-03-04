@@ -53,7 +53,7 @@ extern void sched_tick_enable(unsigned long exp);
 
 #define sched_allow_check()	\
 	do {			\
-		if (!preempt_allowed() || irq_disabled())	\
+		if (irq_disabled())	\
 			panic("sched is disabled %s %d\n", __func__, __LINE__);	\
 	} while (0)
 
@@ -624,6 +624,9 @@ void sched_yield(void)
 
 	sched_allow_check();
 
+	if (!preempt_allowed())
+		return;
+
 	/*
 	 * if current task is percpu task, and is not in
 	 * suspend state, means it need ot drop the run time
@@ -650,6 +653,9 @@ void sched(void)
 	struct task *cur = get_current_task();
 
 	sched_allow_check();
+
+	if (!preempt_allowed())
+		return;
 
 	while (need_resched()) {
 		local_irq_disable();

@@ -32,7 +32,8 @@ extern int el2_stage1_init(void);
 extern int fdt_early_init(void);
 extern int fdt_init(void);
 extern int fdt_spin_table_init(phy_addr_t *smp_holding);
-void boot_main(void);
+extern void arm64_task_exit(void);
+extern void boot_main(void);
 
 void arch_set_virq_flag(void)
 {
@@ -178,6 +179,18 @@ void arch_init_task(struct task *task, void *entry, void *arg)
 	regs->elr_elx = (uint64_t)entry;
 	regs->spsr_elx = AARCH64_SPSR_EL2h;
 
+	/*
+	 * if the task is not a deadloop the task will exist
+	 * by itself like below
+	 *	int main(int argc, char **argv)
+	 *	{
+	 *		do_some_thing();
+	 *		return 0;
+	 *	}
+	 * then the lr register should store a function to
+	 * handle the task's exist
+	 */
+	regs->lr = (uint64_t)arm64_task_exit;
 
 	/*
 	 * if the CONFIG_VIRT is not enable the x28

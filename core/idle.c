@@ -83,6 +83,9 @@ int system_suspend(void)
 
 static inline bool pcpu_can_idle(struct pcpu *pcpu)
 {
+	if (pcpu->idle_block_flags)
+		return 0;
+
 	return true;
 }
 
@@ -148,6 +151,7 @@ void cpu_idle(void)
 
 			spin_lock_irqsave(&pcpu->lock, flags);
 		}
+		pcpu->idle_block_flags &= ~PCPU_IDLE_F_TASKS_RELEASE;
 		spin_unlock_irqrestore(&pcpu->lock, flags);
 
 		/*
@@ -165,6 +169,6 @@ void cpu_idle(void)
 			local_irq_enable();
 		}
 
-		sched();
+		sched_yield();
 	}
 }

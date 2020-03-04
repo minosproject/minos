@@ -23,6 +23,7 @@
 	.global arch_get_lr
 	.global arch_get_sp
 	.global smc_call
+	.global arm64_task_exit
 
 func smp_processor_id
 	mrs 	x0, MPIDR_EL1
@@ -62,3 +63,10 @@ func smc_call
 	stp	x2, x3, [x4, #16]
 	ret
 endfunc smc_call
+
+func arm64_task_exit
+	mov	x0, x0
+	bl	task_exit
+1:
+	b	1b
+endfunc arm64_task_exit

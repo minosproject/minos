@@ -265,9 +265,6 @@ void release_task(struct task *task)
 	unsigned long flags;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	if (!task_is_vcpu(task))
-		panic("only support release vcpu tas now\n");
-
 	/*
 	 * need to make sure that when free the memory resource
 	 * can not be done in the interrupt context, so the
@@ -281,12 +278,46 @@ void release_task(struct task *task)
 	/*
 	 * real time task and percpu time all link to
 	 * the stop list, and delete from the pcpu global
-	 * list
+	 * list, this function will always run ont the current
+	 * cpu, mask the idle_block_flag to avoid cpu enter into
+	 * idle state
 	 */
 	spin_lock_irqsave(&pcpu->lock, flags);
-	list_del(&task->list);
+	if (task_is_percpu(task))
+		list_del(&task->list);
 	list_add_tail(&pcpu->stop_list, &task->list);
+	pcpu->idle_block_flags |= PCPU_IDLE_F_TASKS_RELEASE;
 	spin_unlock_irqrestore(&pcpu->lock, flags);
+}
+
+void task_exit(int result)
+{
+	struct task *task = current;
+
+	preempt_disable();
+
+	/*
+	 * set the task to stop stat, then call release_task
+	 * to release the task
+	 */
+	set_task_sleep(task, 0);
+	task->stat = TASK_STAT_STOPPED;
+
+	/*
+	 * to free the resource which the task obtain and releas
+	 * it in case to block other task
+	 */
+	release_task(task);
+
+	preempt_enable();
+
+	/*
+	 * nerver return after sched()
+	 */
+	sched();
+	pr_fatal("task exit failed should not be here\n");
+
+	while (1);
 }
 
 int create_task(char *name, task_func_t func,

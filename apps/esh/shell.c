@@ -70,7 +70,7 @@ static int shell_cmd_tty(int argc, char **argv)
 }
 DEFINE_SHELL_COMMAND(tty, "tty", "tty related command", shell_cmd_tty);
 
-static void shell_task(void *data)
+static int shell_task(void *data)
 {
 	char ch;
 
@@ -106,6 +106,17 @@ static void shell_task(void *data)
 
 		msleep(10);
 	}
+
+	return 0;
 }
 DEFINE_REALTIME_TASK("shell_task", shell_task,
 		NULL, CONFIG_SHELL_TASK_PRIO, 4096, 0);
+
+static int test_task(void *arg)
+{
+	printf("test task\n");
+
+	return 0;
+}
+DEFINE_REALTIME_TASK("test_task", test_task,
+		NULL, 62, 4096, 0);

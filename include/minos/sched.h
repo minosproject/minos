@@ -15,6 +15,8 @@ typedef enum _pcpu_state_t {
 	PCPU_STATE_OFFLINE,
 } pcpu_state_t;
 
+#define PCPU_IDLE_F_TASKS_RELEASE	(1 << 0)
+
 struct pcpu {
 	uint32_t pcpu_id;
 	volatile int state;
@@ -34,6 +36,8 @@ struct pcpu {
 	struct list_head stop_list;
 
 	struct task *running_task;
+
+	unsigned long idle_block_flags;
 
 	/*
 	 * link to the task for the pcpu and the
