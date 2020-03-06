@@ -512,7 +512,8 @@ static int __request_virq(struct vcpu *vcpu, struct virq_desc *desc,
 	if (desc->vno && (desc->vno != virq))
 		pr_warn("virq-%d may has been requested\n", virq);
 
-	pr_debug("vm-%d request virq %d --> hwirq %d\n", virq, hwirq);
+	pr_debug("vm-%d request virq %d --> hwirq %d\n",
+			get_vmid(vcpu), virq, hwirq);
 
 	desc->vno = virq;
 	desc->hno = hwirq;
