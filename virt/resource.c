@@ -35,6 +35,8 @@ static int create_vm_vdev_of(struct vm *vm, struct device_node *node)
 {
 	vdev_init_t func;
 
+	pr_info("%s name\n", __func__, node->name);
+
 	if (!node->compatible)
 		return -EINVAL;
 
@@ -68,7 +70,6 @@ static void *create_vm_irqchip_of(struct device_node *node, void *arg)
 	if (!func) {
 		pr_warn("virq-chip :%s not found\n", node->compatible ?
 				node->compatible : "Null");
-		node->class = DT_CLASS_PDEV;
 		return NULL;
 	}
 
@@ -76,6 +77,7 @@ static void *create_vm_irqchip_of(struct device_node *node, void *arg)
 	if (!vm->virq_chip)
 		return NULL;
 
+	node->class = DT_CLASS_VIRQCHIP;
 	pr_info("create virq_chip %s successfully\n", node->compatible);
 
 	return node;
@@ -156,7 +158,7 @@ static int create_pdev_virq_of(struct vm *vm, struct device_node *node)
 	struct virq_chip *vc = vm->virq_chip;
 	unsigned long type;
 
-	if (node->class == DT_CLASS_IRQCHIP)
+	if (node->class == DT_CLASS_VIRQCHIP)
 		return 0;
 
 	val = (of32_t *)of_getprop(node, "interrupts", &len);
@@ -227,10 +229,10 @@ static int create_pdev_iomem_of(struct vm *vm, struct device_node *node)
 		/* map the physical memory for vm */
 		pr_info("[VM%d IOMEM] 0x%x->0x%x 0x%x %s\n", vm->vmid,
 				addr, addr, size, node->name);
-		split_vmm_area(&vm->mm, addr, size, VM_IO);
+		split_vmm_area(&vm->mm, addr, size, VM_IO | VM_MAP_PT);
 
-		/* irqchip do not map the virtual address */
-		if (node->class != DT_CLASS_IRQCHIP)
+		/* virqchip do not map the virtual address */
+		if (node->class != DT_CLASS_VIRQCHIP)
 			create_guest_mapping(&vm->mm, addr,
 					addr, size, VM_IO | VM_MAP_PT);
 	}
@@ -262,6 +264,7 @@ static void *__create_vm_resource_of(struct device_node *node, void *arg)
 
 	switch(node->class) {
 	case DT_CLASS_IRQCHIP:
+	case DT_CLASS_VIRQCHIP:
 	case DT_CLASS_PCI_BUS:
 	case DT_CLASS_PDEV:
 		create_vm_pdev_of(vm, node);

@@ -38,7 +38,7 @@ static void *varm_timer_init(struct vm *vm, struct device_node *node)
 	 * virtual timer's irq num will with the index 2
 	 */
 	ret = get_device_irq_index(node, &irq, &flags, 2);
-	if (ret || (irq < 16) || (irq > 32)) {
+	if (ret || (irq > 32)) {
 		pr_err("can not find virtual timer for VM\n");
 		return  NULL;
 	}

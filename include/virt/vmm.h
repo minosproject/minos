@@ -40,7 +40,7 @@ int split_vmm_area(struct mm_struct *mm, unsigned long base,
 		unsigned long size, unsigned long flags);
 
 int map_vmm_area(struct mm_struct *mm, struct vmm_area *va,
-		uint32_t vmid, unsigned long pbase, unsigned long flags);
+		unsigned long pbase);
 
 struct vmm_area *alloc_free_vmm_area(struct mm_struct *mm,
 		size_t size, unsigned long mask, unsigned long flags);

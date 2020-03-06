@@ -381,14 +381,14 @@ static int vmbox_device_attach(struct vmbox_controller *_vc,
 	if (!vdev->vring_virq || !vdev->ipc_virq)
 		return -ENOSPC;
 
-	va = alloc_free_vmm_area(&vm->mm, vmbox->shmem_size, PAGE_MASK, 0);
+	va = alloc_free_vmm_area(&vm->mm, vmbox->shmem_size,
+			PAGE_MASK, VM_MAP_SHARED | VM_IO);
 	if (!va)
 		return -ENOMEM;
 
 	vdev->iomem = va->start;
 	vdev->iomem_size = vmbox->shmem_size;
-	map_vmm_area(&vm->mm, va, 0, (unsigned long)vmbox->shmem,
-			VM_MAP_SHARED | VM_IO);
+	map_vmm_area(&vm->mm, va, (unsigned long)vmbox->shmem);
 
 	vdev->devid = _vc->dev_cnt++;
 	_vc->devices[vdev->devid] = vdev;

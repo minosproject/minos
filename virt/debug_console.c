@@ -104,7 +104,7 @@ static int dcon_init(struct vm *vm, struct vm_debug_console *dcon, void *ring)
 	}
 
 	dcon->ring_addr = va->start;
-	map_vmm_area(&vm->mm, va, 0, (unsigned long)ring, 0);
+	map_vmm_area(&vm->mm, va, (unsigned long)ring);
 
 	/*
 	 * init the vm ring struct
@@ -125,7 +125,7 @@ static int dcon_init(struct vm *vm, struct vm_debug_console *dcon, void *ring)
 	return 0;
 }
 
-static int create_dconsole(void *item, void *args)
+static int __init_text create_dconsole(void *item, void *args)
 {
 	void *ring;
 	struct vm *vm = item;

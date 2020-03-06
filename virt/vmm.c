@@ -263,20 +263,14 @@ static inline int vmm_area_map_pg(struct mm_struct *mm, struct vmm_area *va)
 	return 0;
 }
 
-int map_vmm_area(struct mm_struct *mm, struct vmm_area *va,
-		uint32_t vmid, unsigned long pbase, unsigned long flags)
+int map_vmm_area(struct mm_struct *mm,
+		struct vmm_area *va, unsigned long pbase)
 {
-	va->flags |= flags;
-	va->vmid = vmid;
 	va->pstart = pbase;
 
-	if ((va->flags & VM_TYPE_MASK) == 0)
-		va->flags |= VM_NORMAL;
-
 	switch (va->flags & VM_MAP_TYPE_MASK) {
-	case VM_MAP_SHARED:
-	case VM_MAP_PRIVATE:
 	case VM_MAP_PT:
+		va->pstart = va->start;
 		vmm_area_map_ln(mm, va);
 		break;
 	case VM_MAP_BK:
@@ -286,8 +280,7 @@ int map_vmm_area(struct mm_struct *mm, struct vmm_area *va,
 		vmm_area_map_pg(mm, va);
 		break;
 	default:
-		pr_warn("unkown vmm_area map type 0x%p\n",
-				va->flags & VM_MAP_TYPE_MASK);
+		vmm_area_map_ln(mm, va);
 		break;
 	}
 
@@ -397,7 +390,8 @@ int split_vmm_area(struct mm_struct *mm, unsigned long base,
 	struct vmm_area *old = NULL;
 	struct vmm_area *old1 = NULL;
 
-	if ((!IS_PAGE_ALIGN(base) || !IS_PAGE_ALIGN(size) )) {
+	if ((flags & VM_NORMAL) && (!IS_PAGE_ALIGN(base)
+				|| !IS_PAGE_ALIGN(size))) {
 		pr_err("vm_area is not PAGE align 0x%p 0x%x\n",
 				base, size);
 		return -EINVAL;
@@ -560,7 +554,7 @@ static void release_vmm_area_in_vm0(struct vm *vm)
 		 * the kernel memory space for vm, mapped as NORMAL and
 		 * PT attr, need to unmap it
 		 */
-		if ((va->flags & VM_NORMAL) && (va->flags & VM_MAP_PT)) {
+		if (va->flags & VM_MAP_GUEST) {
 			(void)__vm_unmap(mm, va);
 		} else if (va->flags & VM_MAP_PRIVATE) {
 			destroy_guest_mapping(&vm0->mm, va->start, va->size);
@@ -572,6 +566,23 @@ static void release_vmm_area_in_vm0(struct vm *vm)
 	}
 
 	spin_unlock(&mm->vmm_area_lock);
+}
+
+static void release_vmm_area_memory(struct vmm_area *va)
+{
+	switch (va->flags & VM_MAP_TYPE_MASK) {
+	case VM_MAP_PT:
+		break;
+	case VM_MAP_BK:
+		release_vmm_area_bk(va);
+		break;
+	case VM_MAP_PG:
+		release_vmm_area_pg(va);
+		break;
+	default:
+		free((void *)va->pstart);
+		break;
+	}
 }
 
 void release_vm_memory(struct vm *vm)
@@ -594,20 +605,8 @@ void release_vm_memory(struct vm *vm)
 	 * running, do not to require the lock
 	 */
 	list_for_each_entry_safe(va, n, &mm->vmm_area_used, list) {
-		switch (va->flags & VM_MAP_TYPE_MASK) {
-		case VM_MAP_PRIVATE:
-			free((void *)va->pstart);
-			break;
-		case VM_MAP_BK:
-			release_vmm_area_bk(va);
-			break;
-		case VM_MAP_PG:
-			release_vmm_area_pg(va);
-			break;
-		default:
-			break;
-		}
-
+		if (va->flags & VM_MAP_PRIVATE)
+			release_vmm_area_memory(va);
 		list_del(&va->list);
 		free(va);
 	}
@@ -637,12 +636,13 @@ unsigned long create_hvm_iomem_map(struct vm *vm,
 	struct vmm_area *va;
 	struct vm *vm0 = get_vm_by_id(0);
 
-	va = alloc_free_vmm_area(&vm0->mm, size, PAGE_MASK, 0);
+	va = alloc_free_vmm_area(&vm0->mm, size,
+			PAGE_MASK, VM_MAP_PRIVATE | VM_IO);
 	if (!va)
 		return INVALID_ADDRESS;
 
-	map_vmm_area(&vm0->mm, va, vm->vmid,
-			phy, VM_MAP_PRIVATE | VM_IO);
+	va->vmid = vm->vmid;
+	map_vmm_area(&vm0->mm, va, phy);
 
 	flush_tlb_guest();
 
@@ -770,7 +770,7 @@ struct vmm_area *vm_mmap(struct vm *vm, unsigned long offset, size_t size)
 	 * all the memory
 	 */
 	va = alloc_free_vmm_area(&vm0->mm, size, BLOCK_MASK,
-			VM_NORMAL | VM_MAP_PT);
+			VM_NORMAL | VM_MAP_GUEST);
 	if (!va)
 		return 0;
 
@@ -830,7 +830,7 @@ int alloc_vm_memory(struct vm *vm)
 		if (__alloc_vm_memory(mm, va))
 			goto out;
 
-		if (map_vmm_area(mm, va, 0, 0, VM_MAP_BK))
+		if (map_vmm_area(mm, va, 0))
 			goto out;
 	}
 
@@ -914,7 +914,7 @@ int vm_mm_init(struct vm *vm)
 		if (!(va->flags & VM_NORMAL))
 			continue;
 
-		ret = map_vmm_area(mm, va, 0, va->start, VM_MAP_PT);
+		ret = map_vmm_area(mm, va, va->start);
 		if (ret) {
 			pr_err("build mem ma failed for vm-%d 0x%p 0x%p\n",
 				vm->vmid, va->start, va->size);
