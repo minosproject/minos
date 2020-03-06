@@ -846,6 +846,24 @@ void irq_exit(gp_regs *regs)
 	tf->flags &= ~__TIF_SOFTIRQ_MASK;
 }
 
+static inline int
+get_affinity_from_dts(struct device_node *node, uint64_t *aff)
+{
+	uint32_t value[2];
+	int ret;
+
+	ret = of_get_u32_array(node, "reg", value, 2);
+	if (ret <= 0)
+		return -EINVAL;
+
+	if (ret == 1)
+		*aff = value[0];
+	else
+		*aff = ((uint64_t)value[0] << 32) | value[1];
+
+	return 0;
+}
+
 static void __used *of_setup_pcpu(struct device_node *node, void *data)
 {
 	int cpuid;
@@ -856,8 +874,10 @@ static void __used *of_setup_pcpu(struct device_node *node, void *data)
 	if (node->class != DT_CLASS_CPU)
 		return NULL;
 
-	if (!of_get_u64_array(node, "reg", &affinity, 2))
+	if (get_affinity_from_dts(node, &affinity)) {
+		pr_err("get affinity from dts failed\n");
 		return NULL;
+	}
 
 	cpuid = affinity_to_cpuid(affinity);
 	if (cpuid >= NR_CPUS)
