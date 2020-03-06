@@ -499,6 +499,10 @@ int bcm2836_send_virq(struct vcpu *vcpu, uint32_t virq)
 
 static int bcm2838_generate_virq(uint32_t *addr, int virq)
 {
+	if (virq < VM_LOCAL_VIRQ_NR)
+		return 0;
+
+	virq -= VM_LOCAL_VIRQ_NR;
 	addr[0] = cpu_to_of32(virq / 32);
 	addr[1] = cpu_to_of32(virq % 32);
 
@@ -571,6 +575,8 @@ static struct virq_chip *bcm2836_virqchip_init(struct vm *vm,
 	void *base;
 	struct virq_chip *vc;
 
+	pr_notice("%s enter\n", __func__);
+
 	bcm2836 = zalloc(sizeof(struct bcm2836_virq));
 	if (!bcm2836)
 		return NULL;
@@ -612,6 +618,7 @@ static struct virq_chip *bcm2836_virqchip_init(struct vm *vm,
 	 * 0x40000200 - 0x40000300 : bcm2835 inc controller
 	 *
 	 */
+	split_vmm_area(&vm->mm, 0x400000000, 0x1000, VM_IO | VM_MAP_PRIVATE);
 	create_guest_mapping(&vm->mm, BCM2836_INC_BASE, (unsigned long)bcm2836->iomem,
 			PAGE_SIZE, VM_IO | VM_RO);
 
@@ -625,6 +632,8 @@ static struct virq_chip *bcm2836_virqchip_init(struct vm *vm,
 	vc->generate_virq = bcm2838_generate_virq;
 	vc->update_virq = bcm2836_update_virq;
 	vc->inc_pdata = (void *)bcm2836;
+
+	pr_notice("%s exit\n", __func__);
 
 	return vc;
 }

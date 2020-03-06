@@ -98,6 +98,14 @@ static void raspberry3_system_shutdown(void)
 
 }
 
+static int raspberry4_iomem_valid(unsigned long addr)
+{
+	if ((addr >= 0x40000000) && (addr < 0x40001000))
+		return 0;
+
+	return 1;
+}
+
 static void raspberry3_parse_mem_info(void)
 {
 	/* memory start at 0x3b400000 may has been used
@@ -114,5 +122,6 @@ static struct platform platform_raspberry3 = {
 	.setup_hvm	 = raspberry3_setup_hvm,
 #endif
 	.parse_mem_info  = raspberry3_parse_mem_info,
+	.iomem_valid	 = raspberry4_iomem_valid,
 };
 DEFINE_PLATFORM(platform_raspberry3);

@@ -107,6 +107,7 @@ static uint32_t bcm2836_get_pending(void)
 	uint32_t irq;
 
 	stat = readl_relaxed(bcm2836_base + LOCAL_IRQ_PENDING0 + 4 * cpu);
+	mb();
 
 	if (stat & BIT(LOCAL_IRQ_MAILBOX0)) {
 		void *mailbox0;

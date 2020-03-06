@@ -15,6 +15,7 @@ typedef enum __device_class {
 	DT_CLASS_PDEV,
 	DT_CLASS_VM,
 	DT_CLASS_VMBOX,
+	DT_CLASS_VIRQCHIP,
 	DT_CLASS_OTHER,
 } device_class_t;
 

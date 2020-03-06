@@ -35,7 +35,7 @@ char *gicv3_match_table[] = {
 };
 
 char *bcmirq_match_table[] = {
-	"brcm,bcm2836-l1-intc",
+	"brcm,bcm2836-armctrl-ic",
 	NULL
 };
 
