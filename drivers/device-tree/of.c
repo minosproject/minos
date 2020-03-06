@@ -540,8 +540,8 @@ int of_n_addr_count(struct device_node *node)
 	int len;
 	const void *prop;
 
-	na = of_n_addr_cells(node);
-	ns = of_n_size_cells(node);
+	na = fdt_n_addr_cells(node->data, node->offset);
+	ns = fdt_n_size_cells(node->data, node->offset);
 
 	prop = fdt_getprop(node->data, node->offset, "reg", &len);
 	if (!prop)
