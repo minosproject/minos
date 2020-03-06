@@ -184,7 +184,7 @@ static int build_pmd_entry(struct mm_struct *mm,
 
 		if (IS_PMD_ALIGN(vaddr) && IS_PMD_ALIGN(paddr) &&
 				(map_size == PMD_MAP_SIZE)) {
-			pr_debug("0x%x--->0x%x @0x%x mapping as PUD block\n",
+			pr_debug("0x%x--->0x%x @0x%x mapping as PMD block\n",
 					vaddr, paddr, map_size);
 			map_as_block = 1;
 		}
