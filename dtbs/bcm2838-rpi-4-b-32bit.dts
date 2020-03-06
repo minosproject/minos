@@ -13,7 +13,7 @@
 	};
 
 	chosen {
-		stdout-path = "serial0:115200n8";
+		minos,stdout = "bcm283x_mu";
 		extra-memory = <0x40000000 0xbc000000>;
 	};
 
