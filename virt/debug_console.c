@@ -92,7 +92,7 @@ static int dcon_init(struct vm *vm, struct vm_debug_console *dcon, void *ring)
 	struct vmm_area *va;
 
 	va = alloc_free_vmm_area(&vm->mm, DCON_RING_SIZE,
-			PAGE_MASK, VM_NORMAL | VM_MAP_PRIVATE);
+			PAGE_MASK, VM_IO | VM_MAP_PRIVATE);
 
 	if (!va)
 		return -ENOMEM;
