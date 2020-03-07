@@ -611,7 +611,7 @@ static int __vm_power_off(struct vm *vm, void *args, int byself)
 		preempt_enable();
 
 		/* called by itself need to sched out */
-		sched_yield();
+		sched();
 	} else
 		preempt_enable();
 
@@ -754,7 +754,7 @@ static int __vm_reset(struct vm *vm, void *args, int byself)
 		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
 				VMTRAP_REASON_REBOOT, 0, NULL);
 		preempt_enable();
-		sched_yield();
+		sched();
 	} else
 		preempt_enable();
 

@@ -53,7 +53,7 @@ extern void sched_tick_enable(unsigned long exp);
 
 #define sched_allow_check()	\
 	do {			\
-		if (irq_disabled())	\
+		if (irq_disabled() && !preempt_allowed())	\
 			panic("sched is disabled %s %d\n", __func__, __LINE__);	\
 	} while (0)
 
@@ -622,7 +622,8 @@ void sched_yield(void)
 	struct pcpu *pcpu;
 	struct task *cur = current;
 
-	sched_allow_check();
+	if (irq_disabled())
+		panic("irq is disabled please use sched()\n");
 
 	if (!preempt_allowed())
 		return;
