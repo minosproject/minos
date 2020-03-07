@@ -423,6 +423,8 @@ static int bcm2836_clear_spi(struct vcpu *vcpu, uint32_t virq)
 		p0 &= ~BIT(9);
 
 	writel_relaxed(p0, dev->bcm2835_pending[0]);
+	mb();
+
 	return 0;
 }
 
@@ -440,6 +442,7 @@ static int bcm2836_clear_ppi(struct vcpu *vcpu, uint32_t virq)
 	base = dev->iomem + LOCAL_IRQ_PENDING0 + (vcpu->vcpu_id * 4);
 	v = readl_relaxed(base) & ~BIT(virq);
 	writel_relaxed(v, base);
+	mb();
 
 	return 0;
 }
@@ -467,11 +470,13 @@ static int bcm2836_inject_spi(struct vcpu *vcpu, uint32_t virq)
 
 	v = readl_relaxed(base) | BIT(bit);
 	writel_relaxed(v, base);
+	mb();
 
 	/* set the bcm2836 pending register BIT8 */
 	base = dev->iomem + LOCAL_IRQ_PENDING0;
 	v = readl_relaxed(base) | BIT(8);
 	writel_relaxed(v, base);
+	mb();
 
 	return 0;
 }

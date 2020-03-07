@@ -182,5 +182,9 @@ int vm_create_vmcs_irq(struct vm *vm, int vcpu_id)
 	if (vcpu->vmcs_irq < 0)
 		pr_err("alloc virq for vmcs failed\n");
 
+#ifdef CONFIG_PLATFORM_BCM2837
+	return vcpu->vmcs_irq - 32;
+#else
 	return vcpu->vmcs_irq;
+#endif
 }

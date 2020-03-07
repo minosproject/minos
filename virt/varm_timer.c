@@ -25,6 +25,7 @@
 #include <minos/irq.h>
 #include <virt/vmbox.h>
 #include <minos/platform.h>
+#include <virt/resource.h>
 
 static void *varm_timer_init(struct vm *vm, struct device_node *node)
 {
@@ -37,7 +38,7 @@ static void *varm_timer_init(struct vm *vm, struct device_node *node)
 	 * ticks, here we get the virtual timer's irq number, the
 	 * virtual timer's irq num will with the index 2
 	 */
-	ret = get_device_irq_index(node, &irq, &flags, 2);
+	ret = vm_get_device_irq_index(vm, node, &irq, &flags, 2);
 	if (ret || (irq > 32)) {
 		pr_err("can not find virtual timer for VM\n");
 		return  NULL;
