@@ -259,10 +259,12 @@ void vgicv2_send_sgi(struct vcpu *vcpu, uint32_t sgi_value)
 			cpumask_set_cpu(bit, &cpumask);
 		}
 	} else
-		cpumask_set_cpu(smp_processor_id(), &cpumask);
+		cpumask_set_cpu(vcpu->vcpu_id, &cpumask);
 
 	for_each_cpu(bit, &cpumask) {
 		target = get_vcpu_in_vm(vm, bit);
+		if (target == NULL)
+			panic("vcpu%d is not in vm\n", bit);
 		send_virq_to_vcpu(target, sgi);
 	}
 }
