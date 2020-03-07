@@ -273,7 +273,8 @@ void release_task(struct task *task)
 	 * task to the stop list of the pcpu, when the idle
 	 * task is run, the idle task will release this task
 	 */
-	stop_task_vmodule_state(task);
+	if (task->context)
+		stop_task_vmodule_state(task);
 
 	/*
 	 * real time task and percpu time all link to
