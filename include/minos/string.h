@@ -27,6 +27,7 @@ int vsprintf(char *buf, const char *fmt, va_list arg);
 int sprintf(char *str, const char *format, ...);
 char *strrchr(const char *s, int c);
 unsigned long strtoul(const char *cp, char **endp, unsigned int base);
+char *strsep(char **stringp, const char *delim);
 
 static inline int is_digit(char ch)
 {
