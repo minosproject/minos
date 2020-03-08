@@ -51,11 +51,38 @@ extern struct task *os_task_table[OS_NR_TASKS];
 extern void sched_tick_disable(void);
 extern void sched_tick_enable(unsigned long exp);
 
-#define sched_allow_check()	\
-	do {			\
+#define sched_allow_check()		\
+	do {				\
 		if (irq_disabled() && !preempt_allowed())	\
 			panic("sched is disabled %s %d\n", __func__, __LINE__);	\
 	} while (0)
+
+#define sched_yield_allow_check()	\
+	do {				\
+		if (in_interrupt() && !preempt_allowed())	\
+			panic("sched is disabled %s %d\n", __func__, __LINE__);	\
+	} while (0)
+
+static inline void __percpu_task_ready(struct pcpu *pcpu,
+		struct task *task, int preempt)
+{
+	if (preempt)
+		add_task_to_ready_list(pcpu, task);
+	else
+		add_task_to_ready_list_tail(pcpu, task);
+
+	pcpu->local_rdy_grp |= task->local_mask;
+}
+
+static inline void __percpu_task_sleep(struct pcpu *pcpu,
+		struct task *task)
+{
+	list_del(&task->stat_list);
+	task->stat_list.next = NULL;
+
+	if (is_list_empty(&pcpu->ready_list[task->local_prio]))
+		pcpu->local_rdy_grp &= ~task->local_mask;
+}
 
 static inline void percpu_task_ready(struct pcpu *pcpu,
 		struct task *task, int preempt)
@@ -65,20 +92,15 @@ static inline void percpu_task_ready(struct pcpu *pcpu,
 		list_del(&task->stat_list);
 	}
 
-	if (preempt)
-		list_add(&pcpu->ready_list, &task->stat_list);
-	else
-		list_add_tail(&pcpu->ready_list, &task->stat_list);
+	__percpu_task_ready(pcpu, task, preempt);
 }
 
-static inline void precpu_task_sleep(struct pcpu *pcpu, struct task *task)
+static inline void percpu_task_sleep(struct pcpu *pcpu, struct task *task)
 {
-	if (task->stat_list.next == NULL) {
+	if (task->stat_list.next == NULL)
 		pr_err("%s: wrong task state %d\n", __func__, task->stat);
-	} else {
-		list_del(&task->stat_list);
-		task->stat_list.next = NULL;
-	}
+	else
+		__percpu_task_sleep(pcpu, task);
 }
 
 static inline void smp_percpu_task_ready(struct pcpu *pcpu,
@@ -179,7 +201,7 @@ int set_task_sleep(struct task *task, uint32_t ms)
 			return -EPERM;
 		}
 
-		precpu_task_sleep(pcpu, task);
+		percpu_task_sleep(pcpu, task);
 	}
 
 	task->delay = ms;
@@ -347,27 +369,25 @@ static void inline no_task_sched_return(struct pcpu *pcpu, struct task *task)
 	task_sched_return(task);
 }
 
+static inline struct task *get_next_local_run_task(struct pcpu *pcpu)
+{
+	prio_t prio = ffs_one_table[pcpu->local_rdy_grp];
+
+	if (is_list_empty(&pcpu->ready_list[prio]))
+		panic("no more task on ready list %d\n", prio);
+
+	return list_first_entry(&pcpu->ready_list[prio],
+			struct task, stat_list);
+}
+
 static inline struct task *get_next_global_run_task(struct pcpu *pcpu)
 {
 	prio_t prio = os_highest_rdy[pcpu->pcpu_id];
 
-	if (prio <= OS_LOWEST_PRIO)
+	if (prio <= OS_LOWEST_REALTIME_PRIO)
 		return os_task_table[prio];
-
-	if (!is_list_empty(&pcpu->ready_list))
-		return list_first_entry(&pcpu->ready_list,
-				struct task, stat_list);
-
-	return pcpu->idle_task;
-}
-
-static inline struct task *get_next_local_run_task(struct pcpu *pcpu)
-{
-	if (!is_list_empty(&pcpu->ready_list))
-		return list_first_entry(&pcpu->ready_list,
-				struct task, stat_list);
-
-	return pcpu->idle_task;
+	else
+		return get_next_local_run_task(pcpu);
 }
 
 static inline void save_task_context(struct task *task)
@@ -381,7 +401,7 @@ static inline void restore_task_context(struct task *task)
 }
 
 static inline void
-recal_task_run_time(struct task *task, struct pcpu *pcpu, int ready)
+recal_task_run_time(struct task *task, struct pcpu *pcpu)
 {
 	unsigned long now;
 
@@ -398,11 +418,8 @@ recal_task_run_time(struct task *task, struct pcpu *pcpu, int ready)
 	 */
 	if (now < 15) {
 		task->run_time = CONFIG_TASK_RUN_TIME + now;
-
-		if (ready) {
-			list_del(&task->stat_list);
-			list_add_tail(&pcpu->ready_list, &task->stat_list);
-		}
+		list_del(&task->stat_list);
+		add_task_to_ready_list_tail(pcpu, task);
 	} else {
 		task->run_time = now;
 	}
@@ -411,7 +428,7 @@ recal_task_run_time(struct task *task, struct pcpu *pcpu, int ready)
 static void global_switch_out(struct pcpu *pcpu,
 		struct task *cur, struct task *next)
 {
-	if (task_is_idle(next))
+	if (task_is_percpu(next))
 		os_prio_cur[pcpu->pcpu_id] = OS_PRIO_PCPU;
 	else
 		os_prio_cur[pcpu->pcpu_id] = next->prio;
@@ -480,18 +497,18 @@ void switch_to_task(struct task *cur, struct task *next)
 	 * check the current task's stat and do some action
 	 * to it, check whether it suspend time is set or not
 	 *
-	 * if the task is ready state, adjust theurun time of
+	 * if the task is ready state, adjust the run time of
 	 * this task
 	 */
 	if (!task_is_ready(cur)) {
-		recal_task_run_time(cur, pcpu, 0);
+		cur->run_time = CONFIG_TASK_RUN_TIME;
 		if (cur->delay) {
 			mod_timer(&cur->delay_timer,
 				NOW() + MILLISECS(cur->delay));
 		}
 		cur->stat &= ~TASK_STAT_RUNNING;
 	} else {
-		recal_task_run_time(cur, pcpu, 1);
+		recal_task_run_time(cur, pcpu);
 		cur->stat = TASK_STAT_RDY;
 	}
 
@@ -527,7 +544,7 @@ unsigned long sched_tick_handler(unsigned long data)
 	unsigned long delta;
 
 	task = get_current_task();
-	if (task->prio != OS_PRIO_PCPU) {
+	if (!task_is_percpu(task)) {
 		pr_debug("wrong task type on tick handler %d\n", task->pid);
 		return 0;
 	}
@@ -543,9 +560,13 @@ unsigned long sched_tick_handler(unsigned long data)
 	 * task is switch out, so directly return, do not switch
 	 * to other task
 	 */
-	if (delta < MILLISECS(task->run_time))
+	if (delta < MILLISECS(task->run_time)) {
 		pr_debug("Bug happend on timer tick sched 0x%p 0x%p %d %d\n",
 				now, task->start_ns, task->run_time, delta);
+		sched_tick_enable(MILLISECS(task->run_time - delta));
+
+		return 0;
+	}
 
 	/*
 	 * if the preempt is disable at this time, what will
@@ -558,9 +579,9 @@ unsigned long sched_tick_handler(unsigned long data)
 
 	if (task_is_ready(task)) {
 		list_del(&task->stat_list);
-		list_add_tail(&pcpu->ready_list, &task->stat_list);
+		add_task_to_ready_list_tail(pcpu, task);
 	} else
-		pr_notice("task is not ready now\n");
+		pr_warn("task is not ready now\n");
 
 	set_need_resched();
 
@@ -621,12 +642,9 @@ void sched_yield(void)
 {
 	struct pcpu *pcpu;
 	struct task *cur = current;
+	unsigned long flags;
 
-	if (irq_disabled())
-		panic("irq is disabled please use sched()\n");
-
-	if (!preempt_allowed())
-		return;
+	sched_yield_allow_check();
 
 	/*
 	 * if current task is percpu task, and is not in
@@ -634,15 +652,15 @@ void sched_yield(void)
 	 * then need to set it to the tail of the ready list
 	 */
 	if (!task_is_realtime(cur)) {
-		local_irq_disable();
+		local_irq_save(flags);
 
 		pcpu = get_cpu_var(pcpu);
 		if (!task_is_idle(cur) && task_is_ready(cur)) {
 			list_del(&cur->stat_list);
-			list_add_tail(&pcpu->ready_list, &cur->stat_list);
+			add_task_to_ready_list_tail(pcpu, cur);
 		}
 
-		local_irq_enable();
+		local_irq_restore(flags);
 		pcpu_resched(pcpu->pcpu_id);
 	} else
 		pr_warn("realtime task can not call %s\n", __func__);
@@ -654,9 +672,6 @@ void sched(void)
 	struct task *cur = get_current_task();
 
 	sched_allow_check();
-
-	if (!preempt_allowed())
-		return;
 
 	while (need_resched()) {
 		local_irq_disable();
@@ -703,7 +718,9 @@ void sched_task(struct task *task)
 	local_irq_restore(flags);
 
 	/*
-	 * percpu task will not run on the current pcpu
+	 * percpu task will not run on the current pcpu and the
+	 * task has been set ready then send a irqwork irq to
+	 * the dst pcpu, so just return
 	 */
 	if (!realtime_task && (s_cpu != t_cpu))
 		return;
@@ -727,8 +744,8 @@ void sched_task(struct task *task)
  */
 void cpus_resched(void)
 {
-	unsigned long flags;
 	int cpuid, cpu;
+	unsigned long flags;
 
 	local_irq_save(flags);
 	cpuid = smp_processor_id();
@@ -737,8 +754,6 @@ void cpus_resched(void)
 			pcpu_resched(cpu);
 	}
 	local_irq_restore(flags);
-
-	cpu_resched();
 }
 
 void irq_enter(gp_regs *regs)
@@ -847,6 +862,11 @@ void irq_exit(gp_regs *regs)
 	tf->flags &= ~__TIF_SOFTIRQ_MASK;
 }
 
+int select_task_run_cpu(void)
+{
+	return 0;
+}
+
 static inline int
 get_affinity_from_dts(struct device_node *node, uint64_t *aff)
 {
@@ -913,9 +933,16 @@ void pcpus_init(void)
 		pcpu = &pcpus[i];
 		pcpu->state = PCPU_STATE_OFFLINE;
 		init_list(&pcpu->task_list);
-		init_list(&pcpu->ready_list);
 		init_list(&pcpu->new_list);
 		init_list(&pcpu->stop_list);
+		init_list(&pcpu->ready_list[0]);
+		init_list(&pcpu->ready_list[1]);
+		init_list(&pcpu->ready_list[2]);
+		init_list(&pcpu->ready_list[3]);
+		init_list(&pcpu->ready_list[4]);
+		init_list(&pcpu->ready_list[5]);
+		init_list(&pcpu->ready_list[6]);
+		init_list(&pcpu->ready_list[7]);
 		pcpu->pcpu_id = i;
 		get_per_cpu(pcpu, i) = pcpu;
 		spin_lock_init(&pcpu->lock);
@@ -969,6 +996,7 @@ int sched_init(void)
 static int irqwork_handler(uint32_t irq, void *data)
 {
 	int need_resched = 0;
+	int preempt;
 	struct task *task, *n;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
@@ -983,12 +1011,15 @@ static int irqwork_handler(uint32_t irq, void *data)
 			continue;
 		}
 
+		preempt = task_need_resched(task);
+		need_resched += preempt;
 		list_del(&task->stat_list);
-		if (task_need_resched(task)) {
-			list_add(&pcpu->ready_list, &task->stat_list);
-			task_clear_resched(task);
-		} else {
-			list_add_tail(&pcpu->ready_list, &task->stat_list);
+		__percpu_task_ready(pcpu, task, preempt);
+
+		task_clear_resched(task);
+		if (task->delay) {
+			del_timer(&task->delay_timer);
+			task->delay = 0;
 		}
 	}
 	raw_spin_unlock(&pcpu->lock);

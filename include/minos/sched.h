@@ -36,17 +36,17 @@ struct pcpu {
 	struct list_head stop_list;
 
 	struct task *running_task;
-
-	unsigned long idle_block_flags;
+	struct task *idle_task;
 
 	/*
-	 * link to the task for the pcpu and the
-	 * task which is ready and which is sleep, these
-	 * two list can only be accessed by the cpu
-	 * which the task is affinitied.
+	 * each pcpu has its local sched list, 8 priority
+	 * local_rdy_grp only use [0 - 8], in these 8
+	 * priority:
+	 * 7 - used for idle task
+	 * 6 - used for vcpu task
 	 */
-	struct list_head ready_list;
-	struct task *idle_task;
+	uint8_t local_rdy_grp;
+	struct list_head ready_list[8];
 
 	/* sched class callback for each pcpu */
 	void (*sched)(struct pcpu *pcpu, struct task *cur);
@@ -56,6 +56,11 @@ struct pcpu {
 	void (*switch_to)(struct pcpu *pcpu, struct task *cur,
 			struct task *next);
 };
+
+#define add_task_to_ready_list(pcpu, task)	\
+	list_add(&pcpu->ready_list[task->local_prio], &task->stat_list)
+#define add_task_to_ready_list_tail(pcpu, task)	\
+	list_add_tail(&pcpu->ready_list[task->local_prio], &task->stat_list)
 
 void pcpus_init(void);
 void sched(void);
@@ -73,5 +78,6 @@ void irq_enter(gp_regs *regs);
 void irq_exit(gp_regs *regs);
 void sched_task(struct task *task);
 void cpus_resched(void);
+int select_task_run_cpu(void);
 
 #endif

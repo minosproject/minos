@@ -25,12 +25,12 @@ static inline prio_t get_task_prio(struct task *task)
 
 static inline int task_is_realtime(struct task *task)
 {
-	return (task->prio <= OS_LOWEST_PRIO);
+	return (task->prio <= OS_LOWEST_REALTIME_PRIO);
 }
 
 static inline int task_is_percpu(struct task *task)
 {
-	return (task->prio == OS_PRIO_PCPU);
+	return (task->prio > OS_LOWEST_REALTIME_PRIO);
 }
 
 static inline int task_is_pending(struct task *task)

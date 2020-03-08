@@ -6,30 +6,42 @@
 #include <minos/atomic.h>
 #include <minos/timer.h>
 
-/* the max realtime task will be 64 */
+/*
+ * 0  - 63 : realtime task
+ * 64 - 50 : physical cpu local task, non-realtime task
+ * 51	   : idle task
+ */
+
 #define OS_NR_TASKS		512
 #define OS_REALTIME_TASK	64
 
-#define OS_LOWEST_PRIO		(OS_REALTIME_TASK - 1)
-#define OS_PRIO_PCPU		(OS_LOWEST_PRIO + 1)
-#define OS_PRIO_IDLE		(OS_LOWEST_PRIO + 2)
+#define OS_LOWEST_REALTIME_PRIO	(OS_REALTIME_TASK - 1)
+#define OS_PRIO_IDLE		71
+#define OS_PRIO_LOWEST		OS_IDLE_PRIO
+#define OS_PRIO_VCPU		70
+
+#define OS_PRIO_PCPU		72
 
 #define OS_RDY_TBL_SIZE		(OS_REALTIME_TASK / 8)
 
 #define OS_TASK_RESERVED	((struct task *)1)
 
+#define OS_LOCAL_PRIO(p)	(p - OS_REALTIME_TASK)
+
 #define TASK_FLAGS_IDLE_BIT	0
 #define TASK_FLAGS_VCPU_BIT	1
-#define TASK_FLAGS_PERCPU_BIT	2
-#define TASK_FLAGS_32BIT_BIT	3
+#define TASK_FLAGS_REALTIME_BIT	3
+#define TASK_FLAGS_32BIT_BIT	4
 
 #define TASK_FLAGS_IDLE		(1 << TASK_FLAGS_IDLE_BIT)
 #define TASK_FLAGS_VCPU		(1 << TASK_FLAGS_VCPU_BIT)
 #define TASK_FLAGS_PERCPU	(1 << TASK_FLAGS_PERCPU_BIT)
+#define TASK_FLAGS_REALTIME	(1 << TASK_FLAGS_REALTIME_BIT)
 #define TASK_FLAGS_32BIT	(1 << TASK_FLAGS_32BIT_BIT)
 
-#define PCPU_AFF_NONE		0xffff
-#define PCPU_AFF_PERCPU		0xfffe
+#define PCPU_AFF_ANY		0xffff
+#define PCPU_AFF_LOCAL		0xfffe
+#define PCPU_AFF_PERCPU		0xfffd
 
 #define TASK_NAME_SIZE		(31)
 
@@ -88,12 +100,13 @@ struct task {
 	volatile uint32_t stat;
 	volatile uint32_t pend_stat;
 
-	uint8_t del_req;
-	uint8_t prio;
-	uint8_t bx;
-	uint8_t by;
+	prio_t prio;
+	prio_t bx;
+	prio_t by;
 	prio_t bitx;
 	prio_t bity;
+	prio_t local_prio;
+	prio_t local_mask;
 
 	atomic_t event_timeout;
 	struct event *lock_event;

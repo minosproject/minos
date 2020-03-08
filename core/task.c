@@ -42,7 +42,6 @@ static DEFINE_PER_CPU(struct task *, idle_task);
 static int alloc_pid(prio_t prio, int cpuid)
 {
 	int pid = -1;
-	struct pcpu *pcpu = get_per_cpu(pcpu, cpuid);
 
 	/*
 	 * check whether this task is a global task or
@@ -53,12 +52,7 @@ static int alloc_pid(prio_t prio, int cpuid)
 	 */
 	spin_lock(&pid_lock);
 
-	if (prio > OS_LOWEST_PRIO) {
-		if (prio == OS_PRIO_IDLE) {
-			if (pcpu->idle_task)
-				goto out;
-		}
-
+	if (prio > OS_LOWEST_REALTIME_PRIO) {
 		pid = find_next_zero_bit(pid_map, OS_NR_TASKS,
 				OS_REALTIME_TASK);
 		if (pid >= OS_NR_TASKS)
@@ -72,7 +66,6 @@ static int alloc_pid(prio_t prio, int cpuid)
 		}
 	}
 
-out:
 	spin_unlock(&pid_lock);
 
 	return pid;
@@ -149,9 +142,9 @@ static void task_init(struct task *task, char *name,
 	task->udata = arg;
 	task->flags = opt;
 	task->pid = pid;
-	task->prio = prio;	
+	task->prio = prio;
 
-	if (prio <= OS_LOWEST_PRIO) {
+	if (prio <= OS_LOWEST_REALTIME_PRIO) {
 		task->by = prio >> 3;
 		task->bx = prio & 0x07;
 		task->bity = 1ul << task->by;
@@ -163,14 +156,18 @@ static void task_init(struct task *task, char *name,
 		task->stat = TASK_STAT_SUSPEND;
 	else
 		task->stat = TASK_STAT_RDY;
+
+	if (aff == PCPU_AFF_ANY)
+		aff = select_task_run_cpu();
 	
 	task->affinity = aff;
 	task->flags = opt;
-	task->del_req = 0;
-	task->run_time = CONFIG_TASK_RUN_TIME;
 
-	if (task->prio == OS_PRIO_IDLE)
-		task->flags |= TASK_FLAGS_IDLE;	
+	if (task->prio > OS_LOWEST_REALTIME_PRIO) {
+		task->local_prio = task->prio - OS_REALTIME_TASK;
+		task->local_mask = BIT(task->local_prio);
+		task->run_time = CONFIG_TASK_RUN_TIME;
+	}
 
 	spin_lock_init(&task->lock);
 
@@ -188,7 +185,7 @@ static struct task *__create_task(char *name, task_func_t func,
 	void *stack = NULL;
 
 	/* now create the task and init it */
-	task = zalloc(sizeof(*task));
+	task = zalloc(sizeof(struct task));
 	if (!task) {
 		pr_err("no more memory for task\n");
 		return NULL;
@@ -220,11 +217,6 @@ static struct task *__create_task(char *name, task_func_t func,
 	/* store this task to the task table */
 	os_task_table[pid] = task;
 	atomic_inc(&os_task_nr);
-
-	if (aff == PCPU_AFF_NONE)
-		aff = 0;
-	else if (aff == PCPU_AFF_PERCPU)
-		aff = smp_processor_id();
 
 	task_init(task, name, stack, arg, prio,
 			pid, aff, stk_size, opt);
@@ -287,7 +279,6 @@ void release_task(struct task *task)
 	if (task_is_percpu(task))
 		list_del(&task->list);
 	list_add_tail(&pcpu->stop_list, &task->list);
-	pcpu->idle_block_flags |= PCPU_IDLE_F_TASKS_RELEASE;
 	spin_unlock_irqrestore(&pcpu->lock, flags);
 }
 
@@ -330,18 +321,34 @@ int create_task(char *name, task_func_t func,
 	unsigned long flags;
 	struct pcpu *pcpu;
 
-	if ((aff >= NR_CPUS) && (aff != PCPU_AFF_NONE))
+	if ((aff >= NR_CPUS) && (aff != PCPU_AFF_LOCAL) &&
+			(aff != PCPU_AFF_ANY))
 		return -EINVAL;
+
+	if (prio >= OS_PRIO_IDLE) {
+		pr_err("invalid prio for task: %d\n", prio);
+		return -EINVAL;
+	}
+
+	if (aff == PCPU_AFF_LOCAL) {
+		preempt_disable();
+		aff = smp_processor_id();
+		preempt_disable();
+	}
 
 	pid = alloc_pid(prio, aff);
 	if (pid < 0)
 		return -ENOPID;
+
+	if (prio <= OS_LOWEST_REALTIME_PRIO)
+		opt |= TASK_FLAGS_REALTIME;
 
 	task = __create_task(name, func, arg, prio,
 			pid, aff, stk_size, opt);
 	if (!task) {
 		release_pid(pid);
 		pid = -ENOPID;
+		return pid;
 	}
 
 	task_create_hook(task);
@@ -355,7 +362,7 @@ int create_task(char *name, task_func_t func,
 	 * the ready list directly, this action need done after
 	 * the task has been finish all the related init things
 	 */
-	if ((aff < NR_CPUS) && (prio == OS_PRIO_PCPU)) {
+	if (task_is_percpu(task)) {
 		local_irq_save(flags);
 		pcpu = get_per_cpu(pcpu, aff);
 
@@ -363,10 +370,12 @@ int create_task(char *name, task_func_t func,
 		list_add_tail(&pcpu->task_list, &task->list);
 
 		if (task->stat == TASK_STAT_RDY) {
-			if (aff == smp_processor_id())
-				list_add_tail(&pcpu->ready_list, &task->stat_list);
-			else
+			if (aff == smp_processor_id()) {
+				add_task_to_ready_list_tail(pcpu, task);
+				pcpu->local_rdy_grp |= task->local_mask;
+			} else {
 				list_add_tail(&pcpu->new_list, &task->stat_list);
+			}
 		}
 
 		pcpu->nr_pcpu_task++;
@@ -388,19 +397,30 @@ int create_task(char *name, task_func_t func,
 			kernel_lock_irqsave(flags);
 			set_task_ready(task, 0);
 			kernel_unlock_irqrestore(flags);
+			set_need_resched();
 		}
 
 		/* 
 		 * if the task is a realtime task and the os
 		 * sched is running then resched the task
 		 * otherwise send a ipi to the task
+		 *
+		 * if the os is not runing, may be need
+		 * to send a ipi to other cpu which may aready
+		 * ready to sched task
 		 */
 		if (task_is_realtime(task)) {
 			if (os_is_running())
 				sched();
+			else
+				cpus_resched();
 		} else {
-			if (aff != smp_processor_id())
+			if (aff != smp_processor_id()) {
 				pcpu_irqwork(aff);
+			} else if (task->local_prio < current->local_prio) {
+				set_need_resched();
+				sched_yield();
+			}
 		}
 	}
 	
@@ -415,19 +435,16 @@ int create_idle_task(void)
 	int aff = smp_processor_id();
 	struct pcpu *pcpu = get_per_cpu(pcpu, aff);
 
-	pid = alloc_pid(OS_PRIO_IDLE, aff);
-	if (pid < -1)
-		panic("can not create task, PID error\n");
-
 	task = get_cpu_var(idle_task);
-	if (!task)
-		panic("error to get idle task\n");
+	pid = alloc_pid(OS_PRIO_IDLE, aff);
 
 	os_task_table[pid] = task;
 	atomic_inc(&os_task_nr);
-	sprintf(task_name, "cpu_idle_cpu%d", aff);
+	sprintf(task_name, "idle@%d", aff);
+
 	task_init(task, task_name, NULL, NULL,
 			OS_PRIO_IDLE, pid, aff, 0, 0);
+
 	task_vmodules_init(task);
 
 	/* reinit the task's stack information */
@@ -443,7 +460,6 @@ int create_idle_task(void)
 	task->flags |= TASK_FLAGS_IDLE;
 	task->run_time = 0;
 
-	pcpu->idle_task = task;
 	pcpu->running_task = task;
 
 	/* call the hooks for the idle task */
@@ -451,6 +467,10 @@ int create_idle_task(void)
 
 	set_current_prio(OS_PRIO_PCPU);
 	set_next_prio(OS_PRIO_PCPU);
+
+	add_task_to_ready_list(pcpu, task);
+	pcpu->local_rdy_grp |= task->local_mask;
+	pcpu->idle_task = task;
 
 	return 0;
 }
@@ -503,32 +523,62 @@ static int __init_text task_early_init(void)
 }
 early_initcall_percpu(task_early_init);
 
-int create_percpu_task(char *name, task_func_t func,
-		void *arg, size_t ss, unsigned long flags)
+int create_percpu_tasks(char *name, task_func_t func, void *arg,
+		prio_t prio, size_t ss, unsigned long flags)
 {
 	int cpu, ret = 0;
 
+	if (prio <= OS_LOWEST_REALTIME_PRIO)
+		return -EINVAL;
+
 	for_each_online_cpu(cpu) {
-		ret = create_task(name, func, arg,
-				OS_PRIO_PCPU, cpu, ss, flags);
-		if (ret < 0) {
-			pr_err("create [%s] fail on cpu%d\n",
-					name, cpu);
-		}
+		ret = create_task(name, func, arg, prio, cpu, ss, flags);
+		if (ret < 0)
+			pr_err("create [%s] fail on cpu%d\n", name, cpu);
 	}
 
 	return 0;
 }
 
+int create_migrating_task(char *name, task_func_t func, void *arg,
+		prio_t prio, size_t ss, unsigned long flags)
+{
+	if (prio <= OS_LOWEST_REALTIME_PRIO)
+		return -EINVAL;
+
+	return create_task(name, func, arg, prio, PCPU_AFF_ANY, ss, flags);
+}
+
+int create_local_task(char *name, task_func_t func, void *arg,
+		prio_t prio, size_t ss, unsigned long flags)
+{
+	if (prio <= OS_LOWEST_REALTIME_PRIO)
+		return -EINVAL;
+
+	return create_task(name, func, arg, prio, PCPU_AFF_LOCAL, ss, flags);
+}
+
+int create_task_on_cpu(char *name, task_func_t func, void *arg,
+		prio_t prio, int cpu, size_t ss, unsigned long flags)
+{
+	if (prio <= OS_LOWEST_REALTIME_PRIO)
+		return -EINVAL;
+
+	return create_task(name, func, arg, prio, cpu, ss, flags);
+}
+
 int create_realtime_task(char *name, task_func_t func, void *arg,
 		prio_t prio, size_t ss, unsigned long flags)
 {
+	if (prio > OS_LOWEST_REALTIME_PRIO)
+		return -EINVAL;
+
 	return create_task(name, func, arg, prio, 0, ss, flags);
 }
 
 int create_vcpu_task(char *name, task_func_t func,
 		void *arg, int aff, unsigned long flags)
 {
-	return create_task(name, func, arg, OS_PRIO_PCPU,
+	return create_task(name, func, arg, OS_PRIO_VCPU,
 			aff, 0, flags | TASK_FLAGS_VCPU);
 }

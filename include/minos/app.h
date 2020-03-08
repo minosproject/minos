@@ -37,13 +37,13 @@ struct task_desc {
 		.flags = fl		\
 	}
 
-#define DEFINE_PERCPU_TASK(nn, f, a, ss, fl) \
+#define DEFINE_PERCPU_TASK(nn, f, a, p, ss, fl) \
 	static const struct task_desc __used \
 	task_desc_##f __section(.__task_desc) = { \
 		.name = nn,		\
 		.func = f,		\
 		.arg = a,		\
-		.prio = OS_PRIO_PCPU,	\
+		.prio = p,	\
 		.aff = PCPU_AFF_PERCPU,	\
 		.size = ss,		\
 		.flags = fl		\

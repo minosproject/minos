@@ -36,7 +36,7 @@ static void create_static_tasks(int cpu)
 	section_for_each_item(__task_desc_start, __task_desc_end, tdesc) {
 		if (tdesc->aff == PCPU_AFF_PERCPU) {
 			ret = create_task(tdesc->name, tdesc->func,
-					tdesc->arg, OS_PRIO_PCPU,
+					tdesc->arg, tdesc->prio,
 					cpu, tdesc->size, tdesc->flags);
 			if (ret < 0) {
 				pr_err("create [%s] fail on cpu%d\n",
@@ -83,9 +83,6 @@ int system_suspend(void)
 
 static inline bool pcpu_can_idle(struct pcpu *pcpu)
 {
-	if (pcpu->idle_block_flags)
-		return 0;
-
 	return true;
 }
 
@@ -110,8 +107,6 @@ static void os_clean(void)
 
 void cpu_idle(void)
 {
-	unsigned long flags;
-	struct task *task;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
 	create_static_tasks(pcpu->pcpu_id);
@@ -135,25 +130,6 @@ void cpu_idle(void)
 	pcpu_resched(pcpu->pcpu_id);
 
 	while (1) {
-		/*
-		 * check whether there are some task need to free
-		 * if yes, do release the task
-		 */
-		spin_lock_irqsave(&pcpu->lock, flags);
-		while (!is_list_empty(&pcpu->stop_list)) {
-			task = list_first_entry(&pcpu->stop_list,
-					struct task, list);
-			list_del(&task->list);
-
-			spin_unlock_irqrestore(&pcpu->lock, flags);
-
-			do_release_task(task);
-
-			spin_lock_irqsave(&pcpu->lock, flags);
-		}
-		pcpu->idle_block_flags &= ~PCPU_IDLE_F_TASKS_RELEASE;
-		spin_unlock_irqrestore(&pcpu->lock, flags);
-
 		/*
 		 * need to check whether the pcpu can go to idle
 		 * state to avoid the interrupt happend before wfi
