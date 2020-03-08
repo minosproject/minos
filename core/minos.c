@@ -27,6 +27,7 @@
 #include <minos/softirq.h>
 #include <minos/platform.h>
 #include <config/version.h>
+#include <minos/of.h>
 
 extern void softirq_init(void);
 extern void init_timers(void);
@@ -59,6 +60,10 @@ void boot_main(void)
 	 * free mem or free pages
 	 */
 	bootmem_init();
+
+#ifdef CONFIG_DEVICE_TREE
+	of_init_bootargs();
+#endif
 
 	early_init();
 	early_init_percpu();

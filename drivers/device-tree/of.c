@@ -19,6 +19,7 @@
 #include <libfdt/libfdt.h>
 #include <minos/of.h>
 #include <minos/irq.h>
+#include <minos/bootarg.h>
 
 #define OF_MAX_DEEPTH	5
 
@@ -868,25 +869,40 @@ int get_device_irq_index(struct device_node *node, uint32_t *irq,
 	return irq_xlate(node, irqv, irq_cells, irq, flags);
 }
 
+int of_init_bootargs(void)
+{
+	void *dtb = hv_dtb;
+	int node, len;
+	const void *data = NULL;
+
+	node = fdt_path_offset(dtb, "/chosen");
+	if (node <= 0)
+		return -ENOENT;
+
+	data = fdt_getprop(dtb, node, "bootargs", &len);
+	if (!data || (len == 0))
+		return -ENOENT;
+
+	bootargs_init(data);
+
+	return 0;
+}
+
 int of_get_console_name(void *dtb, char **name)
 {
 	int node,  len;
 	const void *data = NULL;
 
-	if (dtb && !fdt_check_header(dtb)) {
-		node = fdt_path_offset(dtb, "/chosen");
-		if (node <= 0)
-			return -ENOENT;
+	node = fdt_path_offset(dtb, "/chosen");
+	if (node <= 0)
+		return -ENOENT;
 
-		data = fdt_getprop(dtb, node, "minos,stdout", &len);
-		if (!data || (len == 0))
-			return -ENOENT;
+	data = fdt_getprop(dtb, node, "minos,stdout", &len);
+	if (!data || (len == 0))
+		return -ENOENT;
 
-		*name = (char *)data;
-		return 0;
-	}
-
-	return -ENOENT;
+	*name = (char *)data;
+	return 0;
 }
 
 void *of_device_node_match(struct device_node *node, void *s, void *e)
