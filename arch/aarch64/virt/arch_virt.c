@@ -17,7 +17,7 @@
 #include <asm/aarch64_common.h>
 #include <asm/aarch64_helper.h>
 #include <virt/vm.h>
-#include <minos/vmodule.h>
+#include <virt/vmodule.h>
 #include <asm/arch.h>
 #include <minos/string.h>
 #include <minos/print.h>
@@ -86,11 +86,10 @@ void arch_init_vcpu(struct vcpu *vcpu, void *entry, void *arg)
 				AARCH64_SPSR_A | (1 << 4);
 }
 
-static void aarch64_system_state_init(struct task *task, void *c)
+static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
 {
 	struct aarch64_system_context *context =
 			(struct aarch64_system_context *)c;
-	struct vcpu *vcpu = (struct vcpu *)task->pdata;
 
 	memset(context, 0, sizeof(*context));
 
@@ -123,17 +122,16 @@ static void aarch64_system_state_init(struct task *task, void *c)
 	if (!(vcpu->vm->flags & VM_FLAGS_NATIVE_WFI))
 		context->hcr_el2 |= HCR_EL2_TWI;
 
-	if (task_is_64bit(task))
+	if (task_is_64bit(vcpu->task))
 		context->hcr_el2 |= HCR_EL2_RW;
 
 	/*
 	 * this require HVM's vcpu affinity need start with 0
 	 */
 	if (vm_is_hvm(vcpu->vm))
-		context->vmpidr = cpuid_to_affinity(
-				get_vcpu_id(task_to_vcpu(task)));
+		context->vmpidr = cpuid_to_affinity(get_vcpu_id(vcpu));
 	else
-		context->vmpidr = get_vcpu_id(task_to_vcpu(task));
+		context->vmpidr = get_vcpu_id(vcpu);
 
 	pr_notice("vmpidr is 0x%x\n", context->vmpidr);
 
@@ -153,12 +151,12 @@ static void aarch64_system_state_init(struct task *task, void *c)
 		context->hcr_el2 |= HCR_EL2_TDZ;
 }
 
-static void aarch64_system_state_resume(struct task *task, void *c)
+static void aarch64_system_state_resume(struct vcpu *vcpu, void *c)
 {
-	aarch64_system_state_init(task, c);
+	aarch64_system_state_init(vcpu, c);
 }
 
-static void aarch64_system_state_save(struct task *task, void *c)
+static void aarch64_system_state_save(struct vcpu *vcpu, void *c)
 {
 	struct aarch64_system_context *context =
 			(struct aarch64_system_context *)c;
@@ -186,7 +184,7 @@ static void aarch64_system_state_save(struct task *task, void *c)
 	context->afsr0 = read_sysreg(AFSR0_EL1);
 	context->afsr1 = read_sysreg(AFSR1_EL1);
 
-	if (task_is_32bit(task)) {
+	if (task_is_32bit(vcpu->task)) {
 		//context->teecr = read_sysreg32(TEECR32_EL1);
 		//context->teehbr = read_sysreg32(TEEHBR32_EL1);
 		context->dacr32_el2 = read_sysreg32(DACR32_EL2);
@@ -194,7 +192,7 @@ static void aarch64_system_state_save(struct task *task, void *c)
 	}
 }
 
-static void aarch64_system_state_restore(struct task *task, void *c)
+static void aarch64_system_state_restore(struct vcpu *vcpu, void *c)
 {
 	struct aarch64_system_context *context =
 			(struct aarch64_system_context *)c;
@@ -221,7 +219,7 @@ static void aarch64_system_state_restore(struct task *task, void *c)
 	write_sysreg(context->afsr0, AFSR0_EL1);
 	write_sysreg(context->afsr1, AFSR1_EL1);
 
-	if (task_is_32bit(task)) {
+	if (task_is_32bit(vcpu->task)) {
 		//write_sysreg(context->teecr, TEECR32_EL1);
 		//write_sysreg(context->teehbr, TEEHBR32_EL1);
 		write_sysreg(context->dacr32_el2, DACR32_EL2);
@@ -231,11 +229,6 @@ static void aarch64_system_state_restore(struct task *task, void *c)
 	dsb();
 }
 
-static int aarch64_system_valid_for_task(struct task *task)
-{
-	return !!(task->flags & TASK_FLAGS_VCPU);
-}
-
 static int aarch64_system_init(struct vmodule *vmodule)
 {
 	vmodule->context_size = sizeof(struct aarch64_system_context);
@@ -243,7 +236,6 @@ static int aarch64_system_init(struct vmodule *vmodule)
 	vmodule->state_save = aarch64_system_state_save;
 	vmodule->state_restore = aarch64_system_state_restore;
 	vmodule->state_resume = aarch64_system_state_resume;
-	vmodule->valid_for_task = aarch64_system_valid_for_task;
 
 	return 0;
 }
@@ -257,6 +249,29 @@ static int __init_text mpidr_el1_init(void)
 	return 0;
 }
 arch_initcall_percpu(mpidr_el1_init);
+
+struct vcpu *get_vcpu_from_reg(void)
+{
+	/*
+	 * need double check if there is someting
+	 * missing
+	 */
+	uint32_t vmid = read_sysreg(VTTBR_EL2) >> 48;
+	uint32_t vcpuid = read_sysreg(VMPIDR_EL2);
+
+	return get_vcpu_by_id(vmid, vcpuid);
+}
+
+void set_current_vmid(uint32_t vmid)
+{
+	write_sysreg((uint64_t)vmid << 48, VTTBR_EL2);
+	wmb();
+}
+
+uint32_t get_current_vmid(void)
+{
+	return (uint64_t)read_sysreg(VTTBR_EL2) >> 48;
+}
 
 static int arm_create_vm(void *item, void *context)
 {

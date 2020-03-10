@@ -16,7 +16,6 @@
 
 #include <asm/aarch64_common.h>
 #include <asm/aarch64_helper.h>
-#include <minos/vmodule.h>
 #include <asm/arch.h>
 #include <minos/string.h>
 #include <minos/print.h>

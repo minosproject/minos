@@ -18,8 +18,11 @@
 #include <minos/sched.h>
 #include <minos/mm.h>
 #include <minos/atomic.h>
-#include <minos/vmodule.h>
 #include <minos/task.h>
+
+#ifdef CONFIG_VIRT
+#include <virt/vmodule.h>
+#endif
 
 static DEFINE_SPIN_LOCK(pid_lock);
 static DECLARE_BITMAP(pid_map, OS_NR_TASKS);
@@ -229,9 +232,6 @@ static struct task *__create_task(char *name, task_func_t func,
 	task_init(task, name, stack, arg, prio,
 			pid, aff, stk_size, opt);
 
-	if (!(task->flags & TASK_FLAGS_VCPU))
-		task_vmodules_init(task);
-
 	return task;
 }
 
@@ -251,10 +251,11 @@ void do_release_task(struct task *task)
 	release_pid(task->pid);
 	atomic_dec(&os_task_nr);
 
+#ifdef CONFIG_VIRT
+	if (task_is_vcpu(task))
+		vcpu_vmodules_deinit(task->pdata);
+#endif
 	arch_release_task(task);
-
-	task_vmodules_deinit(task);
-	free(task->context);
 
 	free((task->stack_origin - task->stack_size + TASK_INFO_SIZE));
 	free(task);
@@ -264,18 +265,7 @@ void release_task(struct task *task)
 {
 	unsigned long flags;
 	struct pcpu *pcpu = get_cpu_var(pcpu);
-
-	/*
-	 * need to make sure that when free the memory resource
-	 * can not be done in the interrupt context, so the
-	 * destroy a task will done in the idle task, here
-	 * just call vmodule_stop call back, then set the
-	 * task to the stop list of the pcpu, when the idle
-	 * task is run, the idle task will release this task
-	 */
-	if (task->context)
-		stop_task_vmodule_state(task);
-
+	
 	/*
 	 * real time task and percpu time all link to
 	 * the stop list, and delete from the pcpu global
@@ -428,7 +418,6 @@ int create_idle_task(void)
 	sprintf(task_name, "cpu_idle_cpu%d", aff);
 	task_init(task, task_name, NULL, NULL,
 			OS_PRIO_IDLE, pid, aff, 0, 0);
-	task_vmodules_init(task);
 
 	/* reinit the task's stack information */
 	task->stack_size = TASK_STACK_SIZE;

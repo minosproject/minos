@@ -15,10 +15,9 @@
  */
 #include <minos/minos.h>
 #include <asm/arch.h>
-#include <minos/vmodule.h>
 #include <minos/irq.h>
 #include <asm/io.h>
-#include <minos/vmodule.h>
+#include <virt/vmodule.h>
 #include <minos/cpumask.h>
 #include <minos/irq.h>
 #include <minos/sched.h>

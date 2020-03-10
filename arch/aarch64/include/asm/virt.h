@@ -18,4 +18,8 @@ struct arm_virt_data {
 			int read, unsigned long *value);
 };
 
+void set_current_vmid(uint32_t vmid);
+uint32_t get_current_vmid(void);
+struct vcpu *get_vcpu_from_reg(void);
+
 #endif

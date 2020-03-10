@@ -39,7 +39,7 @@ extern int create_idle_task(void);
 extern int vmodules_init(void);
 
 #ifdef CONFIG_VIRT
-extern int virt_init(void);
+#include <virt/virt.h>
 #endif
 
 void boot_main(void)

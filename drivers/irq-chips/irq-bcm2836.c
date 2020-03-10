@@ -20,7 +20,6 @@
 #include <minos/spinlock.h>
 #include <minos/print.h>
 #include <minos/errno.h>
-#include <minos/vmodule.h>
 #include <asm/arch.h>
 #include <minos/cpumask.h>
 #include <minos/irq.h>

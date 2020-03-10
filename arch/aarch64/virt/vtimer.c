@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <minos/minos.h>
-#include <minos/vmodule.h>
+#include <virt/vmodule.h>
 #include <minos/timer.h>
 #include <asm/io.h>
 #include <asm/reg.h>
@@ -91,7 +91,7 @@ static void virt_timer_expire_function(unsigned long data)
 	send_virq_to_vcpu(vtimer->vcpu, vtimer->virq);
 }
 
-static void vtimer_state_restore(struct task *task, void *context)
+static void vtimer_state_restore(struct vcpu *vcpu, void *context)
 {
 	struct vtimer_context *c = (struct vtimer_context *)context;
 	struct vtimer *vtimer = &c->virt_timer;
@@ -104,8 +104,9 @@ static void vtimer_state_restore(struct task *task, void *context)
 	dsb();
 }
 
-static void vtimer_state_save(struct task *task, void *context)
+static void vtimer_state_save(struct vcpu *vcpu, void *context)
 {
+	struct task *task = vcpu->task;
 	struct vtimer_context *c = (struct vtimer_context *)context;
 	struct vtimer *vtimer = &c->virt_timer;
 
@@ -127,10 +128,9 @@ static void vtimer_state_save(struct task *task, void *context)
 	dsb();
 }
 
-static void vtimer_state_init(struct task *task, void *context)
+static void vtimer_state_init(struct vcpu *vcpu, void *context)
 {
 	struct vtimer *vtimer;
-	struct vcpu *vcpu = task_to_vcpu(task);
 	struct arm_virt_data *arm_data = vcpu->vm->arch_data;
 	struct vtimer_context *c = (struct vtimer_context *)context;
 
@@ -160,7 +160,7 @@ static void vtimer_state_init(struct task *task, void *context)
 	vtimer->cnt_cval = 0;
 }
 
-static void vtimer_state_stop(struct task *task, void *context)
+static void vtimer_state_stop(struct vcpu *vcpu, void *context)
 {
 	struct vtimer_context *c = (struct vtimer_context *)context;
 
@@ -192,7 +192,7 @@ static void vtimer_handle_cntp_ctl(struct vcpu *vcpu, int access,
 	struct vtimer_context *c;
 	unsigned long ns;
 
-	c = get_vmodule_data_by_id(vcpu->task, vtimer_vmodule_id);
+	c = get_vmodule_data_by_id(vcpu, vtimer_vmodule_id);
 	get_access_vtimer(vtimer, c, access);
 
 	if (read) {
@@ -224,7 +224,7 @@ static void vtimer_handle_cntp_tval(struct vcpu *vcpu,
 	unsigned long ticks;
 	struct vtimer_context *c;
 
-	c = get_vmodule_data_by_id(vcpu->task, vtimer_vmodule_id);
+	c = get_vmodule_data_by_id(vcpu, vtimer_vmodule_id);
 	get_access_vtimer(vtimer, c, access);
 	now = get_sys_ticks() - c->offset;
 
@@ -250,7 +250,7 @@ static void vtimer_handle_cntp_cval(struct vcpu *vcpu,
 	struct vtimer *vtimer;
 	struct vtimer_context *c;
 
-	c = get_vmodule_data_by_id(vcpu->task, vtimer_vmodule_id);
+	c = get_vmodule_data_by_id(vcpu, vtimer_vmodule_id);
 	get_access_vtimer(vtimer, c, access);
 
 	if (read) {
@@ -285,11 +285,6 @@ static int arm_phy_timer_trap(struct vcpu *vcpu,
 	return 0;
 }
 
-static int vtimer_valid_for_task(struct task *task)
-{
-	return !!(task->flags & TASK_FLAGS_VCPU);
-}
-
 static int vtimer_vmodule_init(struct vmodule *vmodule)
 {
 	vmodule->context_size = sizeof(struct vtimer_context);
@@ -298,7 +293,6 @@ static int vtimer_vmodule_init(struct vmodule *vmodule)
 	vmodule->state_restore = vtimer_state_restore;
 	vmodule->state_stop = vtimer_state_stop;
 	vmodule->state_reset = vtimer_state_stop;
-	vmodule->valid_for_task = vtimer_valid_for_task;
 	vtimer_vmodule_id = vmodule->id;
 
 	return 0;
@@ -306,9 +300,7 @@ static int vtimer_vmodule_init(struct vmodule *vmodule)
 
 int arch_vtimer_init(uint32_t virtual_irq, uint32_t phy_irq)
 {
-	register_task_vmodule("vtimer_module", vtimer_vmodule_init);
-
-	return 0;
+	return register_vcpu_vmodule("vtimer_module", vtimer_vmodule_init);
 }
 
 int virtual_timer_irq_handler(uint32_t irq, void *data)
@@ -317,11 +309,11 @@ int virtual_timer_irq_handler(uint32_t irq, void *data)
 	struct vcpu *vcpu = get_current_vcpu();
 
 	/*
-	 * if the current vcpu is idle, disable the vtimer
+	 * if the current task is not a vcpu, disable the vtimer
 	 * since the pending request vtimer irq is set to
 	 * the timer
 	 */
-	if (!vcpu || (!task_is_vcpu(vcpu->task))) {
+	if (!task_is_vcpu(current)) {
 		write_sysreg32(0, CNTV_CTL_EL0);
 		return 0;
 	}

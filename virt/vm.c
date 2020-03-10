@@ -22,7 +22,7 @@
 #include <minos/bitmap.h>
 #include <virt/os.h>
 #include <virt/vm.h>
-#include <minos/vmodule.h>
+#include <virt/vmodule.h>
 #include <virt/virq.h>
 #include <virt/vmm.h>
 #include <virt/vdev.h>
@@ -253,6 +253,17 @@ void kick_vcpu(struct vcpu *vcpu, int preempt)
 
 static void inline release_vcpu(struct vcpu *vcpu)
 {
+	/*
+	 * need to make sure that when free the memory resource
+	 * can not be done in the interrupt context, so the
+	 * destroy a task will done in the idle task, here
+	 * just call vmodule_stop call back, then set the
+	 * task to the stop list of the pcpu, when the idle
+	 * task is run, the idle task will release this task
+	 */
+	if (vcpu->context)
+		stop_vcpu_vmodule_state(vcpu);
+
 	if (vcpu->task)
 		release_task(vcpu->task);
 
@@ -333,7 +344,7 @@ int vcpu_reset(struct vcpu *vcpu)
 	if (!vcpu)
 		return -EINVAL;
 
-	task_vmodules_reset(vcpu->task);
+	vcpu_vmodules_reset(vcpu);
 	vcpu_virq_struct_reset(vcpu);
 
 	return 0;
@@ -793,7 +804,7 @@ static int vm_resume(struct vm *vm)
 		if (get_vcpu_id(vcpu) == 0)
 			continue;
 
-		resume_task_vmodule_state(vcpu->task);
+		resume_vcpu_vmodule_state(vcpu);
 	}
 
 	do_hooks((void *)vm, NULL, OS_HOOK_RESUME_VM);
@@ -823,7 +834,7 @@ static int __vm_suspend(struct vm *vm)
 			return -EINVAL;
 		}
 
-		suspend_task_vmodule_state(vcpu->task);
+		suspend_vcpu_vmodule_state(vcpu);
 	}
 
 	vm->state = VM_STAT_SUSPEND;
@@ -957,7 +968,7 @@ int vm_vcpus_init(struct vm *vm)
 		pr_notice("vm-%d vcpu-%d affnity to pcpu-%d\n",
 				vm->vmid, vcpu->vcpu_id, vcpu_affinity(vcpu));
 
-		task_vmodules_init(vcpu->task);
+		vcpu_vmodules_init(vcpu);
 
 		if (!vm_is_native(vm)) {
 			vcpu->vmcs->host_index = 0;
@@ -996,6 +1007,28 @@ static int create_vcpus(struct vm *vm)
 	}
 
 	return 0;
+}
+
+void save_vcpu_context(struct task *task)
+{
+	save_vcpu_vmodule_state(task_to_vcpu(task));
+	set_current_vmid(0xff);
+}
+
+void restore_vcpu_context(struct task *task)
+{
+	struct vcpu *vcpu = task_to_vcpu(task);
+	int vmid = get_current_vmid();
+
+	/*
+	 * if the current context in the register has
+	 * been saved, then direclty restore the vcpu
+	 * context, otherwise need to save the context
+	 * to the vcpu
+	 */
+	if ((vcpu->vm->vmid != vmid) && (vmid != 0xff))
+		save_vcpu_vmodule_state(get_vcpu_from_reg());
+	restore_vcpu_vmodule_state(vcpu);
 }
 
 static struct vm *__create_vm(struct vmtag *vme)

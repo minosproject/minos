@@ -19,10 +19,10 @@
 #include <minos/sched.h>
 #include <minos/irq.h>
 #include <minos/softirq.h>
-#include <minos/vmodule.h>
 #include <minos/of.h>
 
 #ifdef CONFIG_VIRT
+#include <virt/virt.h>
 #include <virt/vm.h>
 #endif
 
@@ -370,16 +370,6 @@ static inline struct task *get_next_local_run_task(struct pcpu *pcpu)
 	return pcpu->idle_task;
 }
 
-static inline void save_task_context(struct task *task)
-{
-	save_task_vmodule_state(task);
-}
-
-static inline void restore_task_context(struct task *task)
-{
-	restore_task_vmodule_state(task);
-}
-
 static inline void
 recal_task_run_time(struct task *task, struct pcpu *pcpu, int ready)
 {
@@ -473,8 +463,10 @@ void switch_to_task(struct task *cur, struct task *next)
 {
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-	/* save the task contex for the current task */
-	save_task_context(cur);
+#ifdef VIRT
+	if (task_is_vcpu(cur) && task_is_vcpu(next))
+		save_vcpu_context(cur);
+#endif
 
 	/* 
 	 * check the current task's stat and do some action
@@ -507,7 +499,10 @@ void switch_to_task(struct task *cur, struct task *next)
 	pcpu->running_task = next;
 	sched_tick_enable(MILLISECS(next->run_time));
 
-	restore_task_context(next);
+#ifdef CONFIG_VIRT
+	if (task_is_vcpu(next))
+		restore_vcpu_context(next);
+#endif
 
 	next->stat = TASK_STAT_RUNNING;
 	task_info(next)->cpu = pcpu->pcpu_id;

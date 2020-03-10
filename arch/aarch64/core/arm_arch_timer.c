@@ -21,7 +21,6 @@
 #include <minos/stdlib.h>
 #include <minos/softirq.h>
 #include <minos/sched.h>
-#include <minos/vmodule.h>
 #include <minos/irq.h>
 #include <minos/of.h>
 #include <asm/reg.h>

@@ -125,7 +125,6 @@ struct task {
 
 	void *pdata;		/* connect to the vcpu */
 	void *arch_data;	/* arch data to this task */
-	void **context;
 } __align_cache_line;
 
 /*
