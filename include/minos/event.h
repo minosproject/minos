@@ -20,13 +20,13 @@
 #define OS_POST_OPT_NO_SCHED    0x04
 
 struct event {
-	uint8_t type;				/* event type */
+	uint16_t type;				/* event type */
 	uint16_t owner;				/* event owner the pid */
-	uint16_t cnt;				/* event cnt */
+	uint32_t cnt;				/* event cnt */
 	void *data;				/* event pdata for transfer */
 	spinlock_t lock;			/* the lock of the event for smp */
-	prio_t wait_grp;			/* realtime task waiting on this event */
-	prio_t wait_tbl[OS_RDY_TBL_SIZE];	/* wait bitmap */
+	uint8_t wait_grp;			/* realtime task waiting on this event */
+	uint8_t wait_tbl[OS_RDY_TBL_SIZE];	/* wait bitmap */
 	struct list_head wait_list;		/* non realtime task waitting list */
 };
 

@@ -30,8 +30,7 @@ typedef unsigned long vir_addr_t;
 
 typedef unsigned long uintptr_t;
 
-typedef short prio_t;
-typedef int	bool;
+typedef int bool;
 
 enum {
 	false = 0,

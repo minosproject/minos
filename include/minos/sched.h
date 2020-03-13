@@ -73,7 +73,7 @@ int sched_can_idle(struct pcpu *pcpu);
 int set_task_ready(struct task *task, int preempt);
 void set_task_suspend(uint32_t delay);
 int set_task_sleep(struct task *task, uint32_t ms);
-struct task *get_highest_task(uint8_t group, prio_t *ready);
+struct task *get_highest_task(uint8_t group, uint8_t *ready);
 void irq_enter(gp_regs *regs);
 void irq_exit(gp_regs *regs);
 void sched_task(struct task *task);

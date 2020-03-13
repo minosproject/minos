@@ -8,8 +8,8 @@
 #include <minos/bitops.h>
 #include <minos/task_def.h>
 
-extern prio_t os_highest_rdy[NR_CPUS];
-extern prio_t os_prio_cur[NR_CPUS];
+extern uint8_t os_highest_rdy[NR_CPUS];
+extern uint8_t os_prio_cur[NR_CPUS];
 
 DECLARE_PER_CPU(int, __os_running);
 
@@ -18,12 +18,12 @@ static inline struct task *get_current_task(void)
 	return current_task_info()->task;
 }
 
-static inline void set_current_prio(prio_t prio)
+static inline void set_current_prio(uint8_t prio)
 {
 	os_prio_cur[smp_processor_id()] = prio;
 }
 
-static inline void set_next_prio(prio_t prio)
+static inline void set_next_prio(uint8_t prio)
 {
 	os_highest_rdy[smp_processor_id()] = prio;
 }

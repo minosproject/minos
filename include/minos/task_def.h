@@ -21,12 +21,11 @@
 #define OS_PRIO_VCPU		70
 
 #define OS_PRIO_PCPU		72
-
 #define OS_RDY_TBL_SIZE		(OS_REALTIME_TASK / 8)
+#define OS_LOCAL_PRIO(p)	(p - OS_REALTIME_TASK)
+#define OS_INVALID_PRIO		0xff
 
 #define OS_TASK_RESERVED	((struct task *)1)
-
-#define OS_LOCAL_PRIO(p)	(p - OS_REALTIME_TASK)
 
 #define TASK_FLAGS_IDLE_BIT	0
 #define TASK_FLAGS_VCPU_BIT	1
@@ -100,13 +99,13 @@ struct task {
 	volatile uint32_t stat;
 	volatile uint32_t pend_stat;
 
-	prio_t prio;
-	prio_t bx;
-	prio_t by;
-	prio_t bitx;
-	prio_t bity;
-	prio_t local_prio;
-	prio_t local_mask;
+	uint8_t prio;
+	uint8_t bx;
+	uint8_t by;
+	uint8_t bitx;
+	uint8_t bity;
+	uint8_t local_prio;
+	uint8_t local_mask;
 
 	atomic_t event_timeout;
 	struct event *lock_event;

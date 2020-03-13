@@ -18,7 +18,7 @@ static inline int get_task_pid(struct task *task)
 	return task->pid;
 }
 
-static inline prio_t get_task_prio(struct task *task)
+static inline uint8_t get_task_prio(struct task *task)
 {
 	return task->prio;
 }
@@ -90,13 +90,13 @@ int create_percpu_task(char *name, task_func_t func,
 		void *arg, size_t stk_size, unsigned long flags);
 
 int create_realtime_task(char *name, task_func_t func, void *arg,
-		prio_t prio, size_t stk_size, unsigned long flags);
+		uint8_t prio, size_t stk_size, unsigned long flags);
 
 int create_vcpu_task(char *name, task_func_t func, void *arg,
 		int aff, unsigned long flags);
 
 int create_task(char *name, task_func_t func,
-		void *arg, prio_t prio, uint16_t aff,
+		void *arg, uint8_t prio, uint16_t aff,
 		size_t stk_size, unsigned long opt);
 
 void release_task(struct task *task);
