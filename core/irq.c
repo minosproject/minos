@@ -233,7 +233,7 @@ int request_irq_percpu(uint32_t irq, irq_handle_t handler,
 	struct irq_desc *irq_desc;
 	unsigned long flag;
 
-	unused_arg(name);
+	unused(name);
 
 	if ((irq >= NR_PERCPU_IRQS) || !handler)
 		return -EINVAL;
@@ -267,7 +267,7 @@ int request_irq(uint32_t irq, irq_handle_t handler,
 	struct irq_desc *irq_desc;
 	unsigned long flag;
 
-	unused_arg(name);
+	unused(name);
 
 	if (!handler)
 		return -EINVAL;
