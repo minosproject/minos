@@ -59,6 +59,7 @@ struct vcpu {
 
 	struct vmcs *vmcs;
 	int vmcs_irq;
+	void **context;
 } __align_cache_line;
 
 struct vm {

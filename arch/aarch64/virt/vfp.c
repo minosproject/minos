@@ -15,7 +15,7 @@
  */
 
 #include <minos/minos.h>
-#include <minos/vmodule.h>
+#include <virt/vmodule.h>
 #include <minos/task.h>
 
 #ifdef CONFIG_VIRT
@@ -31,19 +31,17 @@ struct vfp_context {
 	uint32_t fpcr;
 };
 
-static void vfp_state_init(struct task *task, void *context)
+static void vfp_state_init(struct vcpu *vcpu, void *context)
 {
 	memset(context, 0, sizeof(struct vfp_context));
 }
 
-static void vfp_state_save(struct task *task, void *context)
+static void vfp_state_save(struct vcpu *vcpu, void *context)
 {
 	struct vfp_context *c = (struct vfp_context *)context;
 
-#ifdef CONFIG_VIRT
-	if (task_is_32bit(task))
+	if (task_is_32bit(vcpu->task))
 		c->fpexc32_el2 = read_sysreg32(FPEXC32_EL2);
-#endif
 
 	c->fpsr = read_sysreg32(FPSR);
 	c->fpcr = read_sysreg32(FPCR);
@@ -67,14 +65,12 @@ static void vfp_state_save(struct task *task, void *context)
                      : "=Q" (*c->regs) : "r" (c->regs));
 }
 
-static void vfp_state_restore(struct task *task, void *context)
+static void vfp_state_restore(struct vcpu *vcpu, void *context)
 {
 	struct vfp_context *c = (struct vfp_context *)context;
 
-#ifdef CONFIG_VIRT
-	if (task_is_32bit(task))
+	if (task_is_32bit(vcpu->task))
 		write_sysreg(c->fpexc32_el2, FPEXC32_EL2);
-#endif
 
 	write_sysreg(c->fpsr, FPSR);
 	write_sysreg(c->fpcr, FPCR);
@@ -107,5 +103,4 @@ static int vfp_vmodule_init(struct vmodule *vmodule)
 
 	return 0;
 }
-
 MINOS_MODULE_DECLARE(vfp, "vfp", (void *)vfp_vmodule_init);

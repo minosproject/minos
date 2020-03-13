@@ -18,10 +18,8 @@
 
 #include <minos/minos.h>
 #include <asm/arch.h>
-#include <minos/vmodule.h>
 #include <minos/irq.h>
 #include <asm/io.h>
-#include <minos/vmodule.h>
 #include <minos/cpumask.h>
 #include <minos/irq.h>
 #include <minos/sched.h>
@@ -29,6 +27,7 @@
 #include <virt/vdev.h>
 #include <virt/resource.h>
 #include <virt/virq_chip.h>
+#include <virt/vmodule.h>
 #include <minos/of.h>
 
 #define AIC_REV				0x0000

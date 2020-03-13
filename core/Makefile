@@ -17,7 +17,6 @@ obj-y += softirq.o
 obj-y += stdlib.o
 obj-y += string.o
 obj-y += timer.o
-obj-y += vmodule.o
 obj-y += task.o
 obj-y += event.o
 obj-y += mutex.o

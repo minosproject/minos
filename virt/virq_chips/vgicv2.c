@@ -17,7 +17,6 @@
 #include <asm/arch.h>
 #include <device/gicv2.h>
 #include <asm/io.h>
-#include <minos/vmodule.h>
 #include <minos/cpumask.h>
 #include <minos/irq.h>
 #include <minos/sched.h>
@@ -26,6 +25,7 @@
 #include <virt/resource.h>
 #include <virt/virq_chip.h>
 #include "vgic.h"
+#include <virt/vmodule.h>
 #include <minos/of.h>
 
 struct vgicv2_dev {
@@ -650,7 +650,7 @@ static struct virq_chip *vgicv2_virqchip_init(struct vm *vm,
 VIRQCHIP_DECLARE(gic400_virqchip, gicv2_match_table,
 		vgicv2_virqchip_init);
 
-static void gicv2_state_restore(struct task *task, void *context)
+static void gicv2_state_restore(struct vcpu *vcpu, void *context)
 {
 	int i;
 	struct gicv2_context *c = (struct gicv2_context *)context;
@@ -664,7 +664,7 @@ static void gicv2_state_restore(struct task *task, void *context)
 	isb();
 }
 
-static void gicv2_state_init(struct task *task, void *context)
+static void gicv2_state_init(struct vcpu *vcpu, void *context)
 {
 	struct gicv2_context *c = (struct gicv2_context *)context;
 
@@ -672,7 +672,7 @@ static void gicv2_state_init(struct task *task, void *context)
 	c->hcr = 1;
 }
 
-static void gicv2_state_save(struct task *task, void *context)
+static void gicv2_state_save(struct vcpu *vcpu, void *context)
 {
 	int i;
 	struct gicv2_context *c = (struct gicv2_context *)context;
@@ -689,9 +689,9 @@ static void gicv2_state_save(struct task *task, void *context)
 	isb();
 }
 
-static void gicv2_state_resume(struct task *task, void *context)
+static void gicv2_state_resume(struct vcpu *vcpu, void *context)
 {
-	gicv2_state_init(task, context);
+	gicv2_state_init(vcpu, context);
 }
 
 static int gicv2_vmodule_init(struct vmodule *vmodule)
@@ -723,7 +723,7 @@ int vgicv2_init(uint64_t *data, int len)
 	gicv2_nr_lrs = (vtr & 0x3f) + 1;
 	pr_notice("vgicv2 vtr 0x%x nr_lrs : 0x%d\n", vtr, gicv2_nr_lrs);
 
-	register_task_vmodule("gicv2", gicv2_vmodule_init);
+	register_vcpu_vmodule("gicv2", gicv2_vmodule_init);
 
 	return 0;
 }

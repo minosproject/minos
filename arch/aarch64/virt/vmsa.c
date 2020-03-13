@@ -17,12 +17,12 @@
 #include <minos/minos.h>
 #include <minos/mmu.h>
 #include <config/config.h>
-#include <minos/task.h>
-#include <minos/vmodule.h>
+#include <virt/vmodule.h>
 #include <asm/arch.h>
 #include <virt/vmm.h>
 #include <virt/vm.h>
 #include <minos/tlb.h>
+#include <minos/task_def.h>
 
 /*
  * a - Non-shareable
@@ -131,9 +131,9 @@ static int __init_text el2_stage2_init(void)
 }
 early_initcall(el2_stage2_init);
 
-static void vmsa_state_init(struct task *task, void *context)
+static void vmsa_state_init(struct vcpu *vcpu, void *context)
 {
-	struct vm *vm = task_to_vm(task);
+	struct vm *vm = vcpu->vm;
 	struct vmsa_context *c = (struct vmsa_context *)context;
 
 	c->vtcr_el2 = generate_vtcr_el2();
@@ -146,7 +146,7 @@ static void vmsa_state_init(struct task *task, void *context)
 	c->amair_el1 = 0;
 }
 
-static void vmsa_state_save(struct task *task, void *context)
+static void vmsa_state_save(struct vcpu *vcpu, void *context)
 {
 	struct vmsa_context *c = (struct vmsa_context *)context;
 
@@ -161,7 +161,7 @@ static void vmsa_state_save(struct task *task, void *context)
 	c->amair_el1 = read_sysreg(AMAIR_EL1);
 }
 
-static void vmsa_state_restore(struct task *task, void *context)
+static void vmsa_state_restore(struct vcpu *vcpu, void *context)
 {
 	struct vmsa_context *c = (struct vmsa_context *)context;
 
@@ -175,18 +175,13 @@ static void vmsa_state_restore(struct task *task, void *context)
 	write_sysreg(c->par_el1, PAR_EL1);
 	dsb();
 
-	if (task->ctx_sw_cnt == 0)
+	if (vcpu->task->ctx_sw_cnt == 0)
 		flush_local_tlb_guest();
 }
 
-static void vmsa_state_resume(struct task *task, void *context)
+static void vmsa_state_resume(struct vcpu *vcpu, void *context)
 {
-	vmsa_state_init(task, context);
-}
-
-static int vmsa_valid_for_task(struct task *task)
-{
-	return !!(task->flags & TASK_FLAGS_VCPU);
+	vmsa_state_init(vcpu, context);
 }
 
 static int vmsa_vmodule_init(struct vmodule *vmodule)
@@ -196,9 +191,7 @@ static int vmsa_vmodule_init(struct vmodule *vmodule)
 	vmodule->state_save = vmsa_state_save;
 	vmodule->state_restore = vmsa_state_restore;
 	vmodule->state_resume = vmsa_state_resume;
-	vmodule->valid_for_task = vmsa_valid_for_task;
 
 	return 0;
 }
-
 MINOS_MODULE_DECLARE(vmsa, "armv8-mmu", (void *)vmsa_vmodule_init);

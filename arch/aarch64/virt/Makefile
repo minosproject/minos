@@ -4,3 +4,4 @@ obj-y	+= svc_service.o
 obj-y	+= trap.o
 obj-y	+= vmsa.o
 obj-y	+= vtimer.o
+obj-y	+= vfp.o

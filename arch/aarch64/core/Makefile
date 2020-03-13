@@ -9,4 +9,3 @@ obj-y += cpu.o
 obj-y += el2_vector.o
 obj-y += mem_map.o
 obj-y += vector.o
-obj-y += vfp.o

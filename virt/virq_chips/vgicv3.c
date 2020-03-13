@@ -18,7 +18,7 @@
 #include <minos/irq.h>
 #include <device/gicv3.h>
 #include <asm/io.h>
-#include <minos/vmodule.h>
+#include <virt/vmodule.h>
 #include <minos/cpumask.h>
 #include <minos/sched.h>
 #include <virt/virq.h>
@@ -892,7 +892,7 @@ static void gicv3_save_aprn(struct gicv3_context *c, uint32_t count)
 	}
 }
 
-static void gicv3_state_save(struct task *task, void *context)
+static void gicv3_state_save(struct vcpu *vcpu, void *context)
 {
 	struct gicv3_context *c = (struct gicv3_context *)context;
 
@@ -966,7 +966,7 @@ static void gicv3_restore_lrs(struct gicv3_context *c, uint32_t count)
 	}
 }
 
-static void gicv3_state_restore(struct task *task, void *context)
+static void gicv3_state_restore(struct vcpu *vcpu, void *context)
 {
 	struct gicv3_context *c = (struct gicv3_context *)context;
 
@@ -978,7 +978,7 @@ static void gicv3_state_restore(struct task *task, void *context)
 	dsb();
 }
 
-static void gicv3_state_init(struct task *task, void *context)
+static void gicv3_state_init(struct vcpu *vcpu, void *context)
 {
 	struct gicv3_context *c = (struct gicv3_context *)context;
 
@@ -988,9 +988,9 @@ static void gicv3_state_init(struct task *task, void *context)
 	c->ich_hcr_el2 = GICH_HCR_EN;
 }
 
-static void gicv3_state_resume(struct task *task, void *context)
+static void gicv3_state_resume(struct vcpu *vcpu, void *context)
 {
-	gicv3_state_init(task, context);
+	gicv3_state_init(vcpu, context);
 }
 
 static int gicv3_vmodule_init(struct vmodule *vmodule)
@@ -1021,7 +1021,7 @@ int vgicv3_init(uint64_t *data, int len)
 	gicv3_nr_lr = (val & 0x3f) + 1;
 	gicv3_nr_pr = ((val >> 29) & 0x7) + 1;
 
-	register_task_vmodule("gicv3-vmodule", gicv3_vmodule_init);
+	register_vcpu_vmodule("gicv3-vmodule", gicv3_vmodule_init);
 
 	return 0;
 }
