@@ -19,7 +19,7 @@ struct task_desc {
 	char *name;
 	task_func_t func;
 	void *arg;
-	prio_t prio;
+	uint8_t prio;
 	uint16_t aff;
 	size_t size;
 	unsigned long flags;

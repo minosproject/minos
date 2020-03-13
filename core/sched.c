@@ -254,7 +254,7 @@ static void sched_new(struct pcpu *pcpu)
 	 * table, if there is no any realtime task ready
 	 * just exist
 	 */
-	memset(os_highest_rdy, 0, sizeof(os_highest_rdy));
+	memset(os_highest_rdy, OS_PRIO_PCPU, sizeof(os_highest_rdy));
 	if (__rdy_table == 0)
 		return;
 
