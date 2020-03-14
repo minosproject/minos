@@ -42,15 +42,20 @@ static void create_static_tasks(int cpu)
 				pr_err("create [%s] fail on cpu%d\n",
 						tdesc->name, cpu);
 			}
-		} else if ((tdesc->aff != PCPU_AFF_PERCPU) && (cpu == 0)) {
-			ret = create_realtime_task(tdesc->name, tdesc->func,
-					tdesc->arg, tdesc->prio,
-					tdesc->size, tdesc->flags);
-			if (ret < 0) {
-				pr_err("create [%s] fail on cpu-%d@%d\n",
+		} else if ((tdesc->aff == PCPU_AFF_ANY) && (cpu == 0)) {
+			if (tdesc->prio <= OS_LOWEST_REALTIME_PRIO)
+				ret = create_realtime_task(tdesc->name,
+						tdesc->func, tdesc->arg,
+						tdesc->prio, tdesc->size,
+						tdesc->flags);
+			else
+				ret = create_migrating_task(tdesc->name,
+						tdesc->func, tdesc->arg,
+						tdesc->prio, tdesc->size,
+						tdesc->flags);
+			if (ret < 0)
+				pr_err("create task [%s] fail on cpu-%d@%d\n",
 					tdesc->name, tdesc->aff, tdesc->prio);
-			}
-
 		}
 	}
 }
@@ -145,6 +150,7 @@ void cpu_idle(void)
 			local_irq_enable();
 		}
 
-		sched_yield();
+		set_need_resched();
+		sched();
 	}
 }

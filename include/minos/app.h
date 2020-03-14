@@ -25,14 +25,14 @@ struct task_desc {
 	unsigned long flags;
 };
 
-#define DEFINE_TASK(nn, f, a, p, af, ss, fl) \
+#define DEFINE_TASK(nn, f, a, p, ss, fl) \
 	static const struct task_desc __used \
 	task_desc_##f __section(.__task_desc) = { \
 		.name = nn,		\
 		.func = f,		\
 		.arg = a,		\
 		.prio = p,		\
-		.aff = af,		\
+		.aff = PCPU_AFF_ANY,	\
 		.size = ss,		\
 		.flags = fl		\
 	}
@@ -60,5 +60,21 @@ struct task_desc {
 		.size = ss,		\
 		.flags = fl		\
 	}
+
+int create_percpu_task(char *name, task_func_t func,
+		void *arg, size_t stk_size, unsigned long flags);
+
+int create_realtime_task(char *name, task_func_t func, void *arg,
+		uint8_t prio, size_t stk_size, unsigned long flags);
+
+int create_vcpu_task(char *name, task_func_t func, void *arg,
+		int aff, unsigned long flags);
+
+int create_task(char *name, task_func_t func,
+		void *arg, uint8_t prio, uint16_t aff,
+		size_t stk_size, unsigned long opt);
+
+int create_migrating_task(char *name, task_func_t func, void *arg,
+		uint8_t prio, size_t ss, unsigned long flags);
 
 #endif

@@ -33,6 +33,7 @@
 #include <virt/resource.h>
 #include <common/gvm.h>
 #include <virt/vmbox.h>
+#include <minos/shell_command.h>
 
 extern void virqs_init(void);
 
@@ -1245,3 +1246,41 @@ int virt_init(void)
 
 	return 0;
 }
+
+void start_vm(int vmid)
+{
+	struct vcpu *vcpu = get_vcpu_by_id(vmid, 0);
+
+	if (vcpu)
+		vcpu_online(vcpu);
+	else
+		pr_err("vm create with error, vm%d not exist\n", vmid);
+}
+
+void start_all_vm(void)
+{
+	struct vm *vm;
+
+	list_for_each_entry(vm, &vm_list, vm_list)
+		start_vm(vm->vmid);
+}
+
+/*
+ * vm start 0 - start the vm which vmid is 0
+ */
+static int vm_command_hdl(int argc, char **argv)
+{
+	uint32_t vmid;
+
+	if ((strcmp(argv[1], "start") == 0) && (argc > 2)) {
+		vmid = atoi(argv[2]);
+		if (vmid == 0xff)
+			start_all_vm();
+		else
+			start_vm(vmid);
+	}
+
+	return 0;
+}
+DEFINE_SHELL_COMMAND(vm, "vm", "virtual machine cmd",
+		vm_command_hdl, 2);

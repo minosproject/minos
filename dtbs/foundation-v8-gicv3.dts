@@ -9,7 +9,7 @@
 
 	chosen {
 		minos,stdout = "pl011";
-		bootargs = "console=ttyAMA1 earlycon=pl011,0x1c0a0000 loglevel=8 consolelog=9 root=/dev/vda2 rw";
+		bootargs = "bootwait=3 tty=vm0";
 	};
 
 	aliases {

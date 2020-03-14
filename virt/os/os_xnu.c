@@ -136,8 +136,6 @@ static void xnu_vcpu_init(struct vcpu *vcpu)
 		arch_init_vcpu(vcpu, (void *)vcpu->vm->entry_point, NULL);
 		regs = (gp_regs *)vcpu->task->stack_base;
 		regs->x0 = (uint64_t)vcpu->vm->setup_data;
-
-		vcpu_online(vcpu);
 	}
 
 	virq_set_fiq(vcpu, vcpu->vm->vtimer_virq);

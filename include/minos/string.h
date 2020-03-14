@@ -40,6 +40,6 @@ static inline int isalpha(char ch)
 			((ch >= 'A') && (ch <= 'Z')));
 }
 
-#define atoi(str) strtoul(str, NULL, 10)
+#define atoi(str) strtoul((str), NULL, 10)
 
 #endif

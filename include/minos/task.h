@@ -5,6 +5,7 @@
 #include <minos/flag.h>
 #include <config/config.h>
 #include <minos/task_def.h>
+#include <minos/app.h>
 
 #define task_info(task)	((struct task_info *)task->stack_origin)
 
@@ -85,19 +86,6 @@ static inline int task_need_resched(struct task *task)
 
 	return (tf->flags & TIF_NEED_RESCHED);
 }
-
-int create_percpu_task(char *name, task_func_t func,
-		void *arg, size_t stk_size, unsigned long flags);
-
-int create_realtime_task(char *name, task_func_t func, void *arg,
-		uint8_t prio, size_t stk_size, unsigned long flags);
-
-int create_vcpu_task(char *name, task_func_t func, void *arg,
-		int aff, unsigned long flags);
-
-int create_task(char *name, task_func_t func,
-		void *arg, uint8_t prio, uint16_t aff,
-		size_t stk_size, unsigned long opt);
 
 void release_task(struct task *task);
 void do_release_task(struct task *task);

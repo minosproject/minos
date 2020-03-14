@@ -29,4 +29,4 @@ static int ps_cmd(int argc, char **argv)
 
 	return 0;
 }
-DEFINE_SHELL_COMMAND(ps, "ps", "List all task information", ps_cmd);
+DEFINE_SHELL_COMMAND(ps, "ps", "List all task information", ps_cmd, 0);

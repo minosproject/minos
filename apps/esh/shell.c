@@ -49,11 +49,6 @@ static int shell_cmd_tty(int argc, char **argv)
 {
 	uint32_t id;
 
-	if (argc < 3) {
-		printf("invalid argument\n");
-		return -EINVAL;
-	}
-
 	if (strcmp(argv[1], "attach") == 0) {
 		id = atoi(argv[2]);
 
@@ -68,9 +63,10 @@ static int shell_cmd_tty(int argc, char **argv)
 
 	return 0;
 }
-DEFINE_SHELL_COMMAND(tty, "tty", "tty related command", shell_cmd_tty);
+DEFINE_SHELL_COMMAND(tty, "tty", "tty related command",
+		shell_cmd_tty, 2);
 
-static int shell_task(void *data)
+int shell_task(void *data)
 {
 	char ch;
 
@@ -79,13 +75,12 @@ static int shell_task(void *data)
 	esh_register_print(pesh, __esh_putc);
 
 	esh_rx(pesh, '\n');
+	while ((ch = console_getc()) > 0)
+		esh_rx(pesh, ch);
 
-	pesh->tty = open_tty(0xabcd0000);
+	if (data && !strncmp(data, "vm", 2))
+		pesh->tty = open_tty(0xabcd0000 + atoi(data + 2));
 
-	/* clear the fifo */
-	while (console_getc() > 0)
-		cpu_relax();
-	
 	while (1) {
 		for (; ;) {
 			ch = console_getc();
@@ -93,7 +88,7 @@ static int shell_task(void *data)
 				break;
 
 			if (pesh->tty) {
-				if (ch == 27)	/* esc key */
+				if (ch == 4)	/*  ctrl + D */
 					shell_detach_tty();
 				else
 					pesh->tty->ops->put_char(pesh->tty, ch);
@@ -109,14 +104,3 @@ static int shell_task(void *data)
 
 	return 0;
 }
-DEFINE_REALTIME_TASK("shell_task", shell_task,
-		NULL, CONFIG_SHELL_TASK_PRIO, 4096, 0);
-
-static int test_task(void *arg)
-{
-	printf("test task\n");
-
-	return 0;
-}
-DEFINE_REALTIME_TASK("test_task", test_task,
-		NULL, 62, 4096, 0);
