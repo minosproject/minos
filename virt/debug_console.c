@@ -133,11 +133,15 @@ static int __init_text create_dconsole(void *item, void *args)
 	struct vm *vm = item;
 	struct tty *tty;
 	struct vm_debug_console *dcon;
+	char name[16];
 
 	if (!vm_is_native(vm) || (vm->vmid >= NR_DC))
 		return 0;
 
-	tty = alloc_tty(vm->vmid | DCON_TTY_MAGIC, 0);
+	memset(name, 0, 16);
+	sprintf(name, "vm%d", vm->vmid);
+
+	tty = alloc_tty(name, vm->vmid | DCON_TTY_MAGIC, 0);
 	if (!tty)
 		return -ENOENT;
 

@@ -5,6 +5,8 @@
 
 struct tty;
 
+#define TTY_NAME_SIZE	16
+
 struct tty_ops {
 	int (*put_char)(struct tty *tty, char ch);
 	int (*put_chars)(struct tty *tty, char *str, int count);
@@ -13,6 +15,7 @@ struct tty_ops {
 };
 
 struct tty {
+	char name[TTY_NAME_SIZE];
 	uint32_t id;
 	int open;
 	unsigned long flags;
@@ -21,10 +24,10 @@ struct tty {
 	struct list_head list;
 };
 
-struct tty *alloc_tty(uint32_t id, unsigned long flags);
+struct tty *alloc_tty(char *name, uint32_t id, unsigned long flags);
 int register_tty(struct tty *tty);
 int release_tty(struct tty *tty);
 void close_tty(struct tty *tty);
-struct tty *open_tty(uint32_t id);
+struct tty *open_tty(char *name);
 
 #endif

@@ -21,12 +21,12 @@
 static LIST_HEAD(tty_list);
 static DEFINE_SPIN_LOCK(tty_lock);
 
-struct tty *alloc_tty(uint32_t id, unsigned long flags)
+struct tty *alloc_tty(char *name, uint32_t id, unsigned long flags)
 {
 	struct tty *tty;
 
 	list_for_each_entry(tty, &tty_list, list) {
-		if (tty->id == id) {
+		if ((tty->id == id) || (strcmp(name, tty->name)==0)) {
 			pr_err("tty is areadly register 0x%x\n", id);
 			return NULL;
 		}
@@ -38,6 +38,7 @@ struct tty *alloc_tty(uint32_t id, unsigned long flags)
 
 	tty->id = id;
 	tty->flags = flags;
+	strncpy(tty->name, name, TTY_NAME_SIZE - 1);
 
 	return tty;
 }
@@ -75,12 +76,12 @@ int release_tty(struct tty *tty)
 }
 EXPORT_SYMBOL(release_tty);
 
-struct tty *open_tty(uint32_t id)
+struct tty *open_tty(char *name)
 {
 	struct tty *tty, *__tty = NULL;
 
 	list_for_each_entry(tty, &tty_list, list) {
-		if (tty->id == id) {
+		if (strcmp(name, tty->name) == 0) {
 			__tty = tty;
 			break;
 		}

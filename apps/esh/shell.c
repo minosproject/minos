@@ -47,12 +47,8 @@ static void shell_detach_tty(void)
 
 static int shell_cmd_tty(int argc, char **argv)
 {
-	uint32_t id;
-
 	if (strcmp(argv[1], "attach") == 0) {
-		id = atoi(argv[2]);
-
-		pesh->tty = open_tty(0xabcd0000 | id);
+		pesh->tty = open_tty(argv[2]);
 		if (!pesh->tty) {
 			printf("no such tty\n");
 			return -EINVAL;
@@ -79,7 +75,7 @@ int shell_task(void *data)
 		esh_rx(pesh, ch);
 
 	if (data && !strncmp(data, "vm", 2))
-		pesh->tty = open_tty(0xabcd0000 + atoi(data + 2));
+		pesh->tty = open_tty(data);
 
 	while (1) {
 		for (; ;) {
