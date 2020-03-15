@@ -97,6 +97,8 @@ static int dcon_init(struct vm *vm, struct vm_debug_console *dcon, void *ring)
 	if (!va)
 		return -ENOMEM;
 
+	pr_notice("debug_console base: 0x%x\n", va->start);
+
 	dcon->irq = alloc_vm_virq(vm);
 	if (dcon->irq < 0) {
 		release_vmm_area(&vm->mm, va);
@@ -143,7 +145,7 @@ static int __init_text create_dconsole(void *item, void *args)
 	if (!dcon)
 		goto release_tty;
 
-	ring = get_free_pages(PAGE_NR(DCON_RING_SIZE));
+	ring = get_io_pages(PAGE_NR(DCON_RING_SIZE));
 	if (!ring)
 		goto release_dcon;
 
