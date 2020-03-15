@@ -46,7 +46,6 @@
 			setup_data = <0x0 0x33e00000>;
 			vcpu_affinity = <2 0 0 0>;
 			memory = <0x0 0x30000000 0x0 0x7200000>;
-			cmdline = "console=hvc1 earlycon=dbcon,io,0x0 loglevel=8 consolelog=9";
 		};
 
 		vm2 {
