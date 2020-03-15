@@ -57,14 +57,11 @@ void bcm283x_mu_putc(char c)
 
 char bcm283x_mu_getc(void)
 {
-	uint32_t data;
-
 	if (!(ioread32(serial_base + AUX_MU_LSR) &
 				BCM283X_MU_LSR_RX_READY))
-		return -EAGAIN;
+		return 0;
 
-	data = ioread32(serial_base + AUX_MU_IO);
-	return (int)data;
+	return ioread32(serial_base + AUX_MU_IO);
 }
 
 int bcm283x_mu_init(char *arg)
