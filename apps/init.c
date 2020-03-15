@@ -26,6 +26,7 @@
 static int init_task(void *main)
 {
 #ifdef CONFIG_SHELL
+	int i;
 	char *tty = NULL;
 	int skip_vm_boot = 0;
 	uint32_t wait = 0;
@@ -42,20 +43,29 @@ static int init_task(void *main)
 #ifdef CONFIG_VIRT
 	bootarg_parse_uint("bootwait", &wait);
 	if (wait > 0) {
-		printf("\nPress any key to stop vm startup"
-				" waiting %d seconds\n", wait);
-		timeout = NOW() + SECONDS(wait);
+		printf("\nPress any key to stop vm startup: %d ", wait);
+		for (i = 0; i < wait; i++) {
+			timeout = NOW() + SECONDS(1);
 
-		while (NOW() < timeout) {
-			if (console_getc() > 0) {
-				skip_vm_boot = 1;
-				break;
+			printf("\b\b%d ", wait - i);
+
+			while (NOW() < timeout) {
+				if (console_getc() > 0) {
+					skip_vm_boot = 1;
+					break;
+				}
 			}
+
+			if (skip_vm_boot)
+				break;
 		}
 	}
 
-	if (!skip_vm_boot)
+	if (!skip_vm_boot) {
+		printf("\b\b0 ");
+		printf("\n");
 		start_all_vm();
+	}
 #endif
 	if (!skip_vm_boot)
 		bootarg_parse_string("tty", &tty);
