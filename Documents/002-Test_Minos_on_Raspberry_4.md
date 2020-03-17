@@ -34,6 +34,7 @@ This is only for raspberry-4b 4GB version, other please modify the config.
 
    ```
    git clone https://github.com/minosproject/linux-raspberry.git
+   git checkout -b minos-rpi4 origin/minos-rpi4
    ```
 
    - 32bit Kernel
