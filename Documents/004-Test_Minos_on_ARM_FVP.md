@@ -2,7 +2,7 @@
 
 Minos uses ARM FVP (Fixed Virtual Platform) for debugging. It has test on latest version of ARM FVP(installed in DS-5_v5.29.3). This guide is based on the DS-5.
 
-You can follow the [ARM FVP Linux Kernel Debugging Concise Manual:](https://www.jianshu.com/p/c0a9a4b9569d) for the first view of DS-5 and ARM FVP. Then following the instructions below to debug minos.
+You can follow the [ARM FVP Linux Kernel Debugging Concise Manual](https://www.jianshu.com/p/c0a9a4b9569d) for the first view of DS-5 and ARM FVP. Then following the instructions below to debug minos.
 
 ## 1. Create a working directory
 
@@ -89,11 +89,16 @@ mkdir ~/minos-workspace/arm-fvp
   --data cluster0.cpu0=/home/{whoami}/minos-workspace/arm-fvp/Image@0x80080000 \
   --data cluster0.cpu0=/home/{whoami}/minos-workspace/arm-fvp/minos.bin@0xc0008000 \
   --data cluster0.cpu0=/home/{whoami}/minos-workspace/arm-fvp/fdt.dtb@0xc3e00000
-```
+  ```
   At debugger tab, select Run control as Connect only. Select Execute debug commands and input command showing below:
+  
   ```shell script
   add-symbol-file minos.elf EL2:0x0
   ```
-  You need make sure that the `minos.elf` is in your DS-5 workspace. Then, set the Source Path as minos location.
+  You need to make sure that the `minos.elf` is in your DS-5 workspace. Then, set the Source Path as minos location.
+ 
+- Start debug  
+
+  When you start debug, firstly, the DS-5 will stop at arm-trusted-firmware entry point(in EL3). You need set breakpoint at `_start` to entry minos. Using command `b EL2N:_start` to do that. The prefix is needed in the first time to entry the minos code(in EL2).
   
-  When you start debug, firstly, the DS-5 will stop at arm-trusted-firmware entry point(in EL3). You need set breakpoint at `_start` to entry minos. Using command `b EL2N:_start` to do that. The prefix is needed in the first time to entry the minos code(in EL2). Then enjoy it!
+  Then enjoy it!
