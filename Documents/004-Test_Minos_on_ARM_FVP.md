@@ -53,7 +53,15 @@ mkdir ~/minos-workspace/arm-fvp
    mv vexpress64-openembedded_minimal-armv8-gcc-4.9_20140727-682.img sd.img
    ```
 
-## 6. Collecting everything ARM FVP needed
+## 6. Get other images
+
+  ```shell script
+  git clone https://github.com/minosproject/minos-misc.git
+  ```
+  
+  In this repository includes some other built images and dtb.
+
+## 7. Collecting everything ARM FVP needed
 
   ```shell script
   cd ~/minos-workspace/arm-fvp
@@ -61,9 +69,10 @@ mkdir ~/minos-workspace/arm-fvp
   ln -s ~/minos-workspace/arm-trusted-firmware/build/fvp/release/bl31.bin bl31.bin
   ln -s ~/minos-workspace/linux-marvell/arch/arm64/boot/Image Image
   ln -s ~/minos-workspace/minos/dtbs/foundation-v8-gicv3.dtb fdt.dtb
-  ln -s ~/minos-workspace/minos-hypervisor/hypervisor/minos.bin minos.bin 
+  ln -s ~/minos-workspace/minos-hypervisor/hypervisor/minos.bin minos.bin
+  ln -s ~/minos-workspace/minos-misc/arm-fvp/fvp_linux.dtb fvp_linux.dtb
   ```
-## 7. Boot minos on DS-5
+## 8. Boot minos on DS-5
 
 - Setup DS-5
 
@@ -89,6 +98,7 @@ mkdir ~/minos-workspace/arm-fvp
   --data cluster0.cpu0=/home/{whoami}/minos-workspace/arm-fvp/Image@0x80080000 \
   --data cluster0.cpu0=/home/{whoami}/minos-workspace/arm-fvp/minos.bin@0xc0008000 \
   --data cluster0.cpu0=/home/{whoami}/minos-workspace/arm-fvp/fdt.dtb@0xc3e00000
+  --data cluster0.cpu0=/home/{whoami}/minos-workspace/arm-fvp/fvp_linux.dtb@0x83e00000
   ```
   At debugger tab, select Run control as Connect only. Select Execute debug commands and input command showing below:
   
