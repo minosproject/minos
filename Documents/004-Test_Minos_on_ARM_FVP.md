@@ -39,7 +39,7 @@ mkdir ~/minos-workspace/arm-fvp
    cd ~/minos-workspace
    git clone https://github.com/ARM-software/arm-trusted-firmware.git
    cd arm-trusted-firmware
-   make CROSS_COMPILE=aarch64-linux-gnu- PLAT=fvp RESET_TO_BL31=1 ARM_LINUX_KERNEL_AS_BL33=1 PRELOADED_BL33_BASE=0xc0000000 ARM_PRELOADED_DTB_BASE=0x83e00000
+   make CROSS_COMPILE=aarch64-linux-gnu- PLAT=fvp RESET_TO_BL31=1 ARM_LINUX_KERNEL_AS_BL33=1 PRELOADED_BL33_BASE=0xc0008000 ARM_PRELOADED_DTB_BASE=0xc3e00000
    ```
    
    That will build the `bl31.bin` in `arm-trusted-firmware/build/fvp/release/`. ARM FVP using `bl31.bin` to do something like bootloader(u-boot) to boot minos.
