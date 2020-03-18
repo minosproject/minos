@@ -34,6 +34,7 @@
 #include <common/gvm.h>
 #include <virt/vmbox.h>
 #include <minos/shell_command.h>
+#include <virt/virt.h>
 
 extern void virqs_init(void);
 
@@ -576,6 +577,11 @@ int vm_power_up(int vmid)
 
 	vm_vcpus_init(vm);
 	vm->state = VM_STAT_ONLINE;
+
+	/*
+	 * start the vm now
+	 */
+	start_vm(vmid);
 
 	return 0;
 }
