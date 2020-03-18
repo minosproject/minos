@@ -42,12 +42,15 @@ static void esh_excute_command(struct esh *esh,
 static void shell_detach_tty(void)
 {
 	close_tty(pesh->tty);
+	printf("\nDetach tty: %s\n", pesh->tty->name);
 	pesh->tty = NULL;
 }
 
 static int shell_cmd_tty(int argc, char **argv)
 {
 	if (strcmp(argv[1], "attach") == 0) {
+		printf("Attach tty: %s press any key to active the console\n",
+				argv[2]);
 		pesh->tty = open_tty(argv[2]);
 		if (!pesh->tty) {
 			printf("no such tty\n");
@@ -74,8 +77,10 @@ int shell_task(void *data)
 	while ((ch = console_getc()) > 0)
 		esh_rx(pesh, ch);
 
-	if (data && !strncmp(data, "vm", 2))
+	if (data && !strncmp(data, "vm", 2)) {
+		printf("\nAttach tty: %s\n", (char *)data);
 		pesh->tty = open_tty(data);
+	}
 
 	while (1) {
 		for (; ;) {
@@ -84,10 +89,12 @@ int shell_task(void *data)
 				break;
 
 			if (pesh->tty) {
-				if (ch == 4)	/*  ctrl + D */
+				if (ch == 4)	/*  ctrl + D */ {
 					shell_detach_tty();
-				else
+					esh_rx(pesh, '\n');
+				} else {
 					pesh->tty->ops->put_char(pesh->tty, ch);
+				}
 			} else {
 				if (ch == '\r')
 					ch = '\n';
