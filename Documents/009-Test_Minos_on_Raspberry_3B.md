@@ -142,9 +142,9 @@ use below command to create a 64bit Guest VM
 sudo ./mvm run_as_daemon memory=64M vm_name=linux vm_os=linux vcpus=2 os-64bit bootimage=aarch64-boot.img cmdline="console=hvc0 loglevel=8 consolelog=9" gic=gicv2 device@virtio-console,backend=@pty
 ```
 
-and below command cna create a 32bit Guest VM
+and below command can create a 32bit Guest VM with the virtioblk rootfs
 
 ```
-sudo ./mvm run_as_daemon memory=64M vm_name=linux vm_os=linux vcpus=2 bootimage=boot32.img cmdline="console=hvc0 loglevel=8 consolelog=9" gic=gicv2 device@virtio-console,backend=@pty device@virtio_blk,/virtio_image_path/xxx.img
+sudo ./mvm run_as_daemon memory=64M vm_name=linux vm_os=linux vcpus=2 bootimage=boot32.img no-ramdisk cmdline="console=hvc0 loglevel=8 consolelog=9 root=/dev/vda2 rw" gic=gicv2 device@virtio-console,backend=@pty device@virtio_blk,/virtio_image_path/xxx.img
 ```
 
