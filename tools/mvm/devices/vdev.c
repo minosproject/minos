@@ -246,6 +246,8 @@ int create_vdev(struct vm *vm, char *name, char *args)
 	struct vdev *vdev = NULL;
 	struct vdev_ops *vdev_ops;
 
+	pr_info("new vdev is %s %s\n", name, args);
+
 	vdev_ops = get_vdev_ops(name);
 	if (!vdev_ops)
 		return -ENOENT;

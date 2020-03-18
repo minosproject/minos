@@ -437,7 +437,6 @@ int mvm_parse_option_group(int group, void *data)
 			}
 
 			found = 1;
-			break;
 		}
 
 		if ((found == 0) && (p->force)) {

@@ -1,9 +1,9 @@
 ifeq ($(BUILD), 32bit)
-ARCH		:= aarch32
-CROSS_COMPILE	:= armv8l-linux-gnueabihf-
+ARCH		?= aarch32
+CROSS_COMPILE	?= armv8l-linux-gnueabihf-
 else
-ARCH 		:= aarch64
-CROSS_COMPILE 	:= aarch64-linux-gnu-
+ARCH 		?= aarch64
+CROSS_COMPILE 	?= aarch64-linux-gnu-
 endif
 
 CC 		:= $(CROSS_COMPILE)gcc

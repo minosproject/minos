@@ -299,6 +299,8 @@ virtio_blk_init(struct vdev *vdev, char *opts)
 		return -1;
 	}
 
+	pr_info("virtio block image path: %s\n", opts);
+
 	/*
 	 * The supplied backing file has to exist
 	 */
