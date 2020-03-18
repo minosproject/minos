@@ -397,7 +397,7 @@ recal_task_run_time(struct task *task, struct pcpu *pcpu)
 		return;
 
 	now = (NOW() - task->start_ns) / 1000000;
-	now = now > CONFIG_TASK_RUN_TIME ? 0 : CONFIG_TASK_RUN_TIME - now;
+	now = now > task->run_time ? 0 : task->run_time - now;
 
 	/*
 	 * the task is preempted by other task, if the task is
@@ -491,7 +491,8 @@ void switch_to_task(struct task *cur, struct task *next)
 	 * this task
 	 */
 	if (!task_is_ready(cur)) {
-		cur->run_time = CONFIG_TASK_RUN_TIME;
+		if (!task_is_realtime(cur))
+			cur->run_time = CONFIG_TASK_RUN_TIME;
 		if (cur->delay) {
 			mod_timer(&cur->delay_timer,
 				NOW() + MILLISECS(cur->delay));
