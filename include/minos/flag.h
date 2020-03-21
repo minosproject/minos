@@ -19,7 +19,6 @@
 #define FLAG_SET             1
 
 struct flag_grp {
-	int type;
 	flag_t flags;
 	spinlock_t lock;
 	struct list_head wait_list;
@@ -35,7 +34,6 @@ struct flag_node {
 
 static void inline flag_init(struct flag_grp *fg, flag_t flags)
 {
-	fg->type = OS_EVENT_TYPE_FLAG;
 	fg->flags = flags;
 	init_list(&fg->wait_list);
 	spin_lock_init(&fg->lock);
