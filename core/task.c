@@ -302,7 +302,7 @@ void task_exit(int result)
 	while (1);
 }
 
-int create_task(char *name, task_func_t func,
+struct task *create_task(char *name, task_func_t func,
 		void *arg, uint8_t prio, uint16_t aff,
 		size_t stk_size, unsigned long opt)
 {
@@ -313,11 +313,11 @@ int create_task(char *name, task_func_t func,
 
 	if ((aff >= NR_CPUS) && (aff != PCPU_AFF_LOCAL) &&
 			(aff != PCPU_AFF_ANY))
-		return -EINVAL;
+		return NULL;
 
 	if (prio >= OS_PRIO_IDLE) {
 		pr_err("invalid prio for task: %d\n", prio);
-		return -EINVAL;
+		return NULL;
 	}
 
 	if (aff == PCPU_AFF_LOCAL) {
@@ -328,7 +328,7 @@ int create_task(char *name, task_func_t func,
 
 	pid = alloc_pid(prio, aff);
 	if (pid < 0)
-		return -ENOPID;
+		return NULL;
 
 	if (prio <= OS_LOWEST_REALTIME_PRIO)
 		opt |= TASK_FLAGS_REALTIME;
@@ -337,8 +337,7 @@ int create_task(char *name, task_func_t func,
 			pid, aff, stk_size, opt);
 	if (!task) {
 		release_pid(pid);
-		pid = -ENOPID;
-		return pid;
+		return NULL;
 	}
 
 	task_create_hook(task);
@@ -414,7 +413,7 @@ int create_task(char *name, task_func_t func,
 		}
 	}
 	
-	return pid;
+	return task;
 }
 
 int create_idle_task(void)
@@ -514,57 +513,58 @@ early_initcall_percpu(task_early_init);
 int create_percpu_tasks(char *name, task_func_t func, void *arg,
 		uint8_t prio, size_t ss, unsigned long flags)
 {
-	int cpu, ret = 0;
+	int cpu;
+	struct task *ret;
 
 	if (prio <= OS_LOWEST_REALTIME_PRIO)
 		return -EINVAL;
 
 	for_each_online_cpu(cpu) {
 		ret = create_task(name, func, arg, prio, cpu, ss, flags);
-		if (ret < 0)
+		if (ret == NULL)
 			pr_err("create [%s] fail on cpu%d\n", name, cpu);
 	}
 
 	return 0;
 }
 
-int create_migrating_task(char *name, task_func_t func, void *arg,
+struct task *create_migrating_task(char *name, task_func_t func, void *arg,
 		uint8_t prio, size_t ss, unsigned long flags)
 {
 	if (prio <= OS_LOWEST_REALTIME_PRIO)
-		return -EINVAL;
+		return NULL;
 
 	return create_task(name, func, arg, prio, PCPU_AFF_ANY, ss, flags);
 }
 
-int create_local_task(char *name, task_func_t func, void *arg,
+struct task *create_local_task(char *name, task_func_t func, void *arg,
 		uint8_t prio, size_t ss, unsigned long flags)
 {
 	if (prio <= OS_LOWEST_REALTIME_PRIO)
-		return -EINVAL;
+		return NULL;
 
 	return create_task(name, func, arg, prio, PCPU_AFF_LOCAL, ss, flags);
 }
 
-int create_task_on_cpu(char *name, task_func_t func, void *arg,
+struct task *create_task_on_cpu(char *name, task_func_t func, void *arg,
 		uint8_t prio, int cpu, size_t ss, unsigned long flags)
 {
 	if (prio <= OS_LOWEST_REALTIME_PRIO)
-		return -EINVAL;
+		return NULL;
 
 	return create_task(name, func, arg, prio, cpu, ss, flags);
 }
 
-int create_realtime_task(char *name, task_func_t func, void *arg,
+struct task *create_realtime_task(char *name, task_func_t func, void *arg,
 		uint8_t prio, size_t ss, unsigned long flags)
 {
 	if (prio > OS_LOWEST_REALTIME_PRIO)
-		return -EINVAL;
+		return NULL;
 
 	return create_task(name, func, arg, prio, 0, ss, flags);
 }
 
-int create_vcpu_task(char *name, task_func_t func,
+struct task *create_vcpu_task(char *name, task_func_t func,
 		void *arg, int aff, unsigned long flags)
 {
 	return create_task(name, func, arg, OS_PRIO_VCPU,

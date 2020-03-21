@@ -61,20 +61,20 @@ struct task_desc {
 		.flags = fl		\
 	}
 
-int create_percpu_task(char *name, task_func_t func,
+struct task *create_percpu_task(char *name, task_func_t func,
 		void *arg, size_t stk_size, unsigned long flags);
 
-int create_realtime_task(char *name, task_func_t func, void *arg,
+struct task *create_realtime_task(char *name, task_func_t func, void *arg,
 		uint8_t prio, size_t stk_size, unsigned long flags);
 
-int create_vcpu_task(char *name, task_func_t func, void *arg,
+struct task *create_vcpu_task(char *name, task_func_t func, void *arg,
 		int aff, unsigned long flags);
 
-int create_task(char *name, task_func_t func,
+struct task *create_task(char *name, task_func_t func,
 		void *arg, uint8_t prio, uint16_t aff,
 		size_t stk_size, unsigned long opt);
 
-int create_migrating_task(char *name, task_func_t func, void *arg,
+struct task *create_migrating_task(char *name, task_func_t func, void *arg,
 		uint8_t prio, size_t ss, unsigned long flags);
 
 #endif

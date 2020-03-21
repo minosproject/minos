@@ -28,7 +28,7 @@ static atomic_t kernel_ref;
 
 static void create_static_tasks(int cpu)
 {
-	int ret = 0;
+	struct task *ret = 0;
 	struct task_desc *tdesc;
 	extern unsigned char __task_desc_start;
 	extern unsigned char __task_desc_end;
@@ -38,10 +38,9 @@ static void create_static_tasks(int cpu)
 			ret = create_task(tdesc->name, tdesc->func,
 					tdesc->arg, tdesc->prio,
 					cpu, tdesc->size, tdesc->flags);
-			if (ret < 0) {
+			if (ret == NULL)
 				pr_err("create [%s] fail on cpu%d\n",
 						tdesc->name, cpu);
-			}
 		} else if ((tdesc->aff == PCPU_AFF_ANY) && (cpu == 0)) {
 			if (tdesc->prio <= OS_LOWEST_REALTIME_PRIO)
 				ret = create_realtime_task(tdesc->name,
@@ -53,7 +52,7 @@ static void create_static_tasks(int cpu)
 						tdesc->func, tdesc->arg,
 						tdesc->prio, tdesc->size,
 						tdesc->flags);
-			if (ret < 0)
+			if (ret == NULL)
 				pr_err("create task [%s] fail on cpu-%d@%d\n",
 					tdesc->name, tdesc->aff, tdesc->prio);
 		}

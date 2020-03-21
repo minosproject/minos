@@ -309,7 +309,6 @@ free_vcpu:
 
 static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 {
-	int pid;
 	char name[64];
 	struct vcpu *vcpu;
 	struct task *task;
@@ -317,12 +316,10 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 	/* generate the name of the vcpu task */
 	memset(name, 0, 64);
 	sprintf(name, "%s-vcpu-%d", vm->name, vcpu_id);
-	pid = create_vcpu_task(name, vm->entry_point, NULL,
+	task = create_vcpu_task(name, vm->entry_point, NULL,
 			vm->vcpu_affinity[vcpu_id], 0);
-	if (pid < 0)
+	if (task == NULL)
 		return NULL;
-
-	task = pid_to_task(pid);
 
 	vcpu = alloc_vcpu();
 	if (!vcpu) {
