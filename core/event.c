@@ -40,6 +40,10 @@ void event_task_wait(struct task *task, void *ev, int stat, uint32_t to)
 	task->pend_stat = TASK_STAT_PEND_OK;
 	task->delay = to;
 
+	/*
+	 * the process of flag is different with other IPC
+	 * method
+	 */
 	if (stat == TASK_STAT_FLAG) {
 		task->flag_node = ev;
 	} else {

@@ -6,6 +6,7 @@
 #include <minos/timer.h>
 #include <minos/atomic.h>
 #include <minos/task.h>
+#include <minos/flag.h>
 
 DECLARE_PER_CPU(struct pcpu *, pcpu);
 
@@ -47,6 +48,13 @@ struct pcpu {
 	 */
 	uint8_t local_rdy_grp;
 	struct list_head ready_list[8];
+
+	/*
+	 * each pcpu will have one kernel task which
+	 * will do some maintenance work for the pcpu
+	 */
+	struct task *kworker;
+	struct flag_grp fg;
 
 	/* sched class callback for each pcpu */
 	void (*sched)(struct pcpu *pcpu, struct task *cur);

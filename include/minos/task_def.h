@@ -38,12 +38,14 @@
 #define TASK_FLAGS_VCPU_BIT	1
 #define TASK_FLAGS_REALTIME_BIT	3
 #define TASK_FLAGS_32BIT_BIT	4
+#define TASK_FLAGS_KERNEL_BIT	5
 
-#define TASK_FLAGS_IDLE		(1 << TASK_FLAGS_IDLE_BIT)
-#define TASK_FLAGS_VCPU		(1 << TASK_FLAGS_VCPU_BIT)
-#define TASK_FLAGS_PERCPU	(1 << TASK_FLAGS_PERCPU_BIT)
-#define TASK_FLAGS_REALTIME	(1 << TASK_FLAGS_REALTIME_BIT)
-#define TASK_FLAGS_32BIT	(1 << TASK_FLAGS_32BIT_BIT)
+#define TASK_FLAGS_IDLE		BIT(TASK_FLAGS_IDLE_BIT)
+#define TASK_FLAGS_VCPU		BIT(TASK_FLAGS_VCPU_BIT)
+#define TASK_FLAGS_PERCPU	BIT(TASK_FLAGS_PERCPU_BIT)
+#define TASK_FLAGS_REALTIME	BIT(TASK_FLAGS_REALTIME_BIT)
+#define TASK_FLAGS_32BIT	BIT(TASK_FLAGS_32BIT_BIT)
+#define TASK_FLAGS_KERNEL	BIT(TASK_FLAGS_KERNEL_BIT)
 
 #define PCPU_AFF_ANY		0xffff
 #define PCPU_AFF_LOCAL		0xfffe
@@ -73,6 +75,9 @@
 typedef int (*task_func_t)(void *data);
 struct flag_node;
 struct event;
+
+#define KWORKER_FLAG_MASK	0xffff
+#define KWORKER_TASK_RECYCLE	BIT(0)
 
 struct task {
 	void *stack_base;
@@ -122,7 +127,7 @@ struct task {
 	struct flag_node *flag_node;
 
 	/*
-	 * list to the event which the task waitting for
+	 * event_list - list to the event which the task waitting for
 	 */
 	struct list_head event_list;
 

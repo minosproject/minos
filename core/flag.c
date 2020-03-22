@@ -22,6 +22,14 @@
 #include <minos/sched.h>
 #include <minos/spinlock.h>
 
+struct flag_node {
+	struct list_head list;
+	struct task *task;
+	void *flag_grp;
+	flag_t flags;
+	int wait_type;
+};
+
 static inline flag_t flag_wait_set_all(struct flag_grp *grp,
 		flag_t flags, int consume)
 {
@@ -43,11 +51,8 @@ static inline flag_t flag_wait_set_any(struct flag_grp *grp,
 	flag_t flags_rdy;
 
 	flags_rdy = grp->flags & flags;
-	if (flags_rdy != 0) {
-		if (consume)
-			grp->flags &= ~flags_rdy;
-	} else
-		flags_rdy = 0;
+	if ((flags_rdy != 0) && consume)
+		grp->flags &= ~flags_rdy;
 	
 	return flags_rdy;
 }
@@ -73,11 +78,8 @@ static inline flag_t flag_wait_clr_any(struct flag_grp *grp,
 	flag_t flags_rdy;
 
 	flags_rdy = ~grp->flags & flags;
-	if (flags_rdy != 0) {
-		if (consume)
-			grp->flags |= flags_rdy;
-	} else
-		flags_rdy = 0;
+	if ((flags_rdy != 0) && consume)
+		grp->flags |= flags_rdy;
 	
 	return flags_rdy;
 }
@@ -122,10 +124,10 @@ flag_t flag_accept(struct flag_grp *grp, flag_t flags, int wait_type)
 
 static int flag_task_ready(struct flag_node *node, flag_t flags)
 {
-	int sched = 0;
 	struct task *task = node->task;
 
 	task_lock(task);
+
 	/*
 	 * if the task already timeout, then do nothing, else
 	 * wake up the releated task, here do not need to call
@@ -135,14 +137,13 @@ static int flag_task_ready(struct flag_node *node, flag_t flags)
 	if (task_is_pending(task)) {
 		task->flags_rdy = flags;
 		task->pend_stat = TASK_STAT_PEND_OK;
-		task->msg = NULL;
-		task->wait_event = NULL;
+		task->stat = TASK_STAT_RDY;
 		set_task_ready(task, 0);
-		sched = (task->stat == TASK_STAT_RDY);
 	}
+
 	task_unlock(task);
 
-	return sched;
+	return (task->prio < current->prio);
 }
 
 static void flag_block(struct flag_grp *grp, struct flag_node *pnode,
@@ -150,7 +151,7 @@ static void flag_block(struct flag_grp *grp, struct flag_node *pnode,
 {
 	struct task *task = get_current_task();
 
-	memset(pnode, 0, sizeof(*pnode));
+	memset(pnode, 0, sizeof(struct flag_node));
 	pnode->flags = flags;
 	pnode->wait_type = wait_type;
 	pnode->task = task;
@@ -182,7 +183,8 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 
 	/*
 	 * check the related flags is set or clear, if the
-	 * condition is matched, then return
+	 * condition is matched, then return. if the type is
+	 * not support, the task will wait forever
 	 */
 	switch (wait_type) {
 	case FLAG_WAIT_SET_ALL:
@@ -253,16 +255,7 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 
 flag_t flag_pend_get_flags_ready(void)
 {
-	struct task *task = get_current_task();
-	unsigned long irq;
-	flag_t flags;
-
-	/* TBD */
-	spin_lock_irqsave(&task->lock, irq);
-	flags = task->flags_rdy;
-	spin_unlock_irqrestore(&task->lock, irq);
-
-	return flags;
+	return current->flags_rdy;
 }
 
 flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt)
@@ -328,11 +321,7 @@ flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt)
 	spin_unlock_irqrestore(&grp->lock, irq);
 
 	if (need_sched)
-		cpus_resched();
+		sched_yield();
 
-	spin_lock_irqsave(&grp->lock, irq);
-	flags_rdy = grp->flags;
-	spin_unlock_irqrestore(&grp->lock, irq);
-
-	return flags_rdy;
+	return grp->flags;
 }

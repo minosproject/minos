@@ -23,6 +23,7 @@
 #include <minos/of.h>
 #include <minos/task.h>
 #include <minos/app.h>
+#include <minos/flag.h>
 
 static atomic_t kernel_ref;
 
@@ -90,6 +91,42 @@ static inline bool pcpu_can_idle(struct pcpu *pcpu)
 	return true;
 }
 
+static void pcpu_release_task(struct pcpu *pcpu)
+{
+	struct task *task;
+	unsigned long flags;
+
+	spin_lock_irqsave(&pcpu->lock, flags);
+
+	while (!is_list_empty(&pcpu->stop_list)) {
+		task = list_first_entry(&pcpu->stop_list, struct task, list);
+		list_del(&task->list);
+
+		spin_unlock_irqrestore(&pcpu->lock, flags);
+
+		do_release_task(task);
+
+		spin_lock_irqsave(&pcpu->lock, flags);
+	}
+
+	spin_unlock_irqrestore(&pcpu->lock, flags);
+}
+
+static int pcpu_kworker_task(void *data)
+{
+	flag_t flag;
+	struct pcpu *pcpu = data;
+
+	for (; ;) {
+		flag = flag_pend(&pcpu->fg, KWORKER_FLAG_MASK,
+				FLAG_WAIT_SET_ANY | FLAG_CONSUME, 0);
+		if (flag & KWORKER_TASK_RECYCLE)
+			pcpu_release_task(pcpu);
+	}
+
+	return 0;
+}
+
 static void os_clean(void)
 {
 	/* recall the memory for init function and data */
@@ -114,6 +151,15 @@ void cpu_idle(void)
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
 	create_static_tasks(pcpu->pcpu_id);
+
+	pcpu->kworker = create_task("pcpu_kworker",
+			pcpu_kworker_task, pcpu,
+			OS_PRIO_DEFAULT_0, pcpu->pcpu_id,
+			4096, TASK_FLAGS_KERNEL);
+	if (NULL == pcpu->kworker)
+		panic("create kworker fail on pcpu%d\n", pcpu->pcpu_id);
+
+	flag_init(&pcpu->fg, 0);
 
 	set_os_running();
 	atomic_inc(&kernel_ref);

@@ -24,14 +24,6 @@ struct flag_grp {
 	struct list_head wait_list;
 };
 
-struct flag_node {
-	struct list_head list;
-	struct task *task;
-	void *flag_grp;
-	flag_t flags;
-	int wait_type;
-};
-
 static void inline flag_init(struct flag_grp *fg, flag_t flags)
 {
 	fg->flags = flags;
@@ -46,5 +38,8 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 
 flag_t flag_pend_get_flags_ready(void);
 flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt);
+
+#define flag_set(grp, flags)	flag_post(grp, flags, FLAG_SET)
+#define flag_clear(grp, flags)	flag_post(grp, flags, FLAG_CLEAR)
 
 #endif

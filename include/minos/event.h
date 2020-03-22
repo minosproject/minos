@@ -28,6 +28,7 @@ struct event {
 	uint8_t wait_grp;			/* realtime task waiting on this event */
 	uint8_t wait_tbl[OS_RDY_TBL_SIZE];	/* wait bitmap */
 	struct list_head wait_list;		/* non realtime task waitting list */
+	struct list_head list;			/* list to the task's owner list */
 };
 
 #define to_event(e)	(struct event *)e

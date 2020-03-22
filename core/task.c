@@ -236,6 +236,7 @@ void do_release_task(struct task *task)
 {
 	pr_notice("release task pid: %d name: %s\n",
 			task->pid, task->name);
+
 	/*
 	 * this function can not be called at interrupt
 	 * context, use release_task is more safe
@@ -269,6 +270,7 @@ void release_task(struct task *task)
 	if (task_is_percpu(task))
 		list_del(&task->list);
 	list_add_tail(&pcpu->stop_list, &task->list);
+	flag_set(&pcpu->fg, KWORKER_TASK_RECYCLE);
 	spin_unlock_irqrestore(&pcpu->lock, flags);
 }
 
