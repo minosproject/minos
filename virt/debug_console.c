@@ -22,6 +22,9 @@
 #include <virt/hypercall.h>
 #include <asm/svccc.h>
 #include <minos/console.h>
+#include <virt/vmm.h>
+#include <minos/of.h>
+#include <virt/resource.h>
 
 #define DCON_TTY_MAGIC		0xabcd0000
 
@@ -32,13 +35,18 @@
 #define NR_DC			8
 
 struct vm_debug_console {
-	int irq;
+	uint32_t irq;
 	int open;
 	struct vm *vm;
 	struct tty *tty;
 	unsigned long ring_addr;
 	struct vm_ring *tx;
 	struct vm_ring *rx;
+};
+
+static char *vm_debug_console_match[] = {
+	"minos,vm_console",
+	NULL
 };
 
 static struct vm_debug_console *dcons[NR_DC];
@@ -86,24 +94,61 @@ struct tty_ops vm_tty_ops = {
 	.close		= dcon_close,
 };
 
-static int dcon_init(struct vm *vm, struct vm_debug_console *dcon, void *ring)
+static int dcon_get_resource(struct vm *vm, struct device_node *node,
+		struct vmm_area **__va, uint32_t *__irq)
+{
+	int ret;
+	struct vmm_area *va;
+	unsigned long flags;
+	uint64_t base, size;
+	uint32_t irq = 0;
+
+	if (!of_get_bool(node, "vc-dynamic-res")) {
+		ret = translate_device_address(node, &base, &size);
+		if (ret)
+			return -EINVAL;
+
+		if (size < DCON_RING_SIZE) {
+			pr_err("vm console size too small\n");
+			return -EINVAL;
+		}
+
+		ret = vm_get_device_irq_index(vm, node, &irq, &flags, 0);
+		if (ret)
+			return -EINVAL;
+
+		request_virq(vm, irq, 0);
+		va = request_vmm_area(&vm->mm, base, 0, size,
+				VM_IO | VM_MAP_PRIVATE);
+
+	} else {
+		/*
+		 * since the debug console is only for native vm which
+		 * will never released, so it is ok not set the physical
+		 * address in the vmm_area
+		 */
+		va = alloc_free_vmm_area(&vm->mm, DCON_RING_SIZE,
+			PAGE_MASK, VM_IO | VM_MAP_PRIVATE);
+		if (!va)
+			return -ENOMEM;
+	}
+
+	*__va = va;
+	*__irq = irq;
+
+	return 0;
+}
+
+static int dcon_init(struct vm *vm, struct device_node *node,
+		struct vm_debug_console *dcon, void *ring)
 {
 	struct vm_ring *r;
 	struct vmm_area *va;
 
-	va = alloc_free_vmm_area(&vm->mm, DCON_RING_SIZE,
-			PAGE_MASK, VM_IO | VM_MAP_PRIVATE);
-
-	if (!va)
-		return -ENOMEM;
+	if (dcon_get_resource(vm, node, &va, &dcon->irq))
+		return -ENODEV;
 
 	pr_notice("debug_console base: 0x%x\n", va->start);
-
-	dcon->irq = alloc_vm_virq(vm);
-	if (dcon->irq < 0) {
-		release_vmm_area(&vm->mm, va);
-		return -ENOENT;
-	}
 
 	dcon->ring_addr = va->start;
 	map_vmm_area(&vm->mm, va, (unsigned long)ring);
@@ -127,10 +172,9 @@ static int dcon_init(struct vm *vm, struct vm_debug_console *dcon, void *ring)
 	return 0;
 }
 
-static int __init_text create_dconsole(void *item, void *args)
+static int __init_text create_dconsole(struct vm *vm, struct device_node *node)
 {
 	void *ring;
-	struct vm *vm = item;
 	struct tty *tty;
 	struct vm_debug_console *dcon;
 	char name[16];
@@ -153,7 +197,7 @@ static int __init_text create_dconsole(void *item, void *args)
 	if (!ring)
 		goto release_dcon;
 
-	if (dcon_init(vm, dcon, ring))
+	if (dcon_init(vm, node, dcon, ring))
 		goto free_ring;
 
 	dcon->tty = tty;
@@ -174,6 +218,8 @@ release_tty:
 	release_tty(tty);
 	return -ENOMEM;
 }
+
+VDEV_DECLARE(vm_debug_console, vm_debug_console_match, create_dconsole);
 
 static void dcon_write(struct vm_debug_console *dcon)
 {
@@ -215,10 +261,16 @@ static int dcon_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 		HVC_RET1(c, dcon->ring_addr);
 		break;
 	case HVC_DC_GET_IRQ:
+		if (dcon->irq == 0) {
+			dcon->irq = alloc_vm_virq(vm);
+			if (dcon->irq < 0)
+				dcon->irq = 0;
+		}
 		HVC_RET1(c, dcon->irq);
 		break;
 	case HVC_DC_WRITE:
 		dcon_write(dcon);
+		break;
 	case HVC_DC_OPEN:
 		dcon->open = 1;
 		break;
@@ -231,14 +283,3 @@ static int dcon_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 }
 DEFINE_HVC_HANDLER("debug_console_hvc", HVC_TYPE_DEBUG_CONSOLE,
 		HVC_TYPE_DEBUG_CONSOLE, dcon_hvc_handler);
-
-static int __init_text dconsole_init(void)
-{
-	/*
-	 * for vm debugging puperpose, hypervisor will allocate a
-	 * debug console for each Native virtual machine, this console
-	 * will use hypercall and irq for interactive.
-	 */
-	return register_hook(create_dconsole, OS_HOOK_SETUP_VM);
-}
-subsys_initcall(dconsole_init);
