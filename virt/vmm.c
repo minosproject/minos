@@ -380,7 +380,7 @@ struct vmm_area *alloc_free_vmm_area(struct mm_struct *mm,
 	return new;
 }
 
-int split_vmm_area(struct mm_struct *mm, unsigned long base,
+struct vmm_area *split_vmm_area(struct mm_struct *mm, unsigned long base,
 		unsigned long size, unsigned long flags)
 {
 	unsigned long start, end;
@@ -394,7 +394,7 @@ int split_vmm_area(struct mm_struct *mm, unsigned long base,
 				|| !IS_PAGE_ALIGN(size))) {
 		pr_err("vm_area is not PAGE align 0x%p 0x%x\n",
 				base, size);
-		return -EINVAL;
+		return NULL;
 	}
 
 	spin_lock(&mm->vmm_area_lock);
@@ -441,7 +441,7 @@ int split_vmm_area(struct mm_struct *mm, unsigned long base,
 	if ((old == NULL) && (new == NULL)) {
 		pr_err("invalid vmm_area config 0x%p 0x%x\n", base, size);
 		spin_unlock(&mm->vmm_area_lock);
-		return -EINVAL;
+		return NULL;
 	}
 
 	list_del(&va->list);
@@ -458,7 +458,22 @@ int split_vmm_area(struct mm_struct *mm, unsigned long base,
 
 	spin_unlock(&mm->vmm_area_lock);
 
-	return 0;
+	return new;
+}
+
+struct vmm_area *request_vmm_area(struct mm_struct *mm, unsigned long base,
+		unsigned long pbase, size_t size,
+		unsigned long flags)
+{
+	struct vmm_area *va;
+
+	va = split_vmm_area(mm, base, size, flags);
+	if (!va)
+		return NULL;
+
+	va->pstart = pbase;
+
+	return va;
 }
 
 static void dump_vmm_areas(struct mm_struct *mm)

@@ -325,18 +325,18 @@ static void linux_vm_setup(struct vm *vm)
 
 static int linux_create_native_vm_resource(struct vm *vm)
 {
-	/*
-	 * first check whether there are some resource need
-	 * to created from the hypervisor's dts
-	 */
-	create_native_vm_resource_common(vm);
-
 	if (vm->setup_data) {
 		if (of_data(vm->setup_data)) {
 			vm->flags |= VM_FLAGS_SETUP_OF;
 			create_vm_resource_of(vm, vm->setup_data);
 		}
 	}
+
+	/*
+	 * check whether there are some resource need
+	 * to created from the hypervisor's dts
+	 */
+	create_native_vm_resource_common(vm);
 
 	return 0;
 }

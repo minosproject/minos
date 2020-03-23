@@ -313,6 +313,7 @@ int create_vm_resource_of(struct vm *vm, void *data)
 
 	/* here we can free all the device node to save memory */
 	of_release_all_node(node);
+
 	return 0;
 }
 
@@ -322,7 +323,7 @@ static int create_vm_virqchip_common(struct vm *vm, struct device_node *node)
 	struct device_node *virq_node;
 
 	memset(name, 0, 32);
-	sprintf(name, "virq_chip@%d", vm->vmid);
+	sprintf(name, "virq_chip_vm%d", vm->vmid);
 	virq_node = of_find_node_by_name(node, name);
 	if (!virq_node)
 		return -ENOENT;
@@ -405,7 +406,8 @@ static int create_vm_virqs_common(struct vm *vm, struct device_node *node)
 
 static void *create_vm_vdev_common(struct device_node *node, void *vm)
 {
-	create_vm_vdev_of(vm, node);
+	if (of_get_bool(node, "virtual_device"))
+		create_vm_vdev_of(vm, node);
 
 	return NULL;
 }
@@ -422,11 +424,15 @@ int create_native_vm_resource_common(struct vm *vm)
 	if (!node)
 		return -ENOENT;
 
-	ret = create_vm_virqchip_common(vm, node);
-	if (ret)
-		pr_warn("virqchip is not found in hv dts\n");
+	if (!vm->virq_chip) {
+		ret = create_vm_virqchip_common(vm, node);
+		if (ret)
+			pr_warn("virqchip is not found in hv dts\n");
+	}
 
-	ret += create_vm_vtimer_common(vm, node);
+	if (vm->vtimer_virq <= 0)
+		ret += create_vm_vtimer_common(vm, node);
+
 	ret += create_vm_iomem_common(vm, node);
 	ret += create_vm_virqs_common(vm, node);
 
