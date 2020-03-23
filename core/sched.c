@@ -656,8 +656,11 @@ void sched_yield(void)
 
 		local_irq_restore(flags);
 		pcpu_resched(pcpu->pcpu_id);
-	} else
-		pcpu_resched(pcpu->pcpu_id);
+	} else {
+		local_irq_save(flags);
+		pcpu_resched(smp_processor_id());
+		local_irq_restore(flags);
+	}
 }
 
 void sched(void)
