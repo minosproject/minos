@@ -114,6 +114,9 @@ int vcpu_vmodules_deinit(struct vcpu *vcpu)
 	struct vmodule *vmodule;
 	void *data;
 
+	if (NULL == vcpu->context)
+		return 0;
+
 	list_for_each_entry(vmodule, &vmodule_list, list) {
 		data = vcpu->context[vmodule->id];
 		if (vmodule->state_deinit && data)

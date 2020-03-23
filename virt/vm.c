@@ -659,7 +659,7 @@ int vm_power_off(int vmid, void *arg, int byself)
 
 static int guest_mm_init(struct vm *vm, uint64_t base, uint64_t size)
 {
-	if (split_vmm_area(&vm->mm, base, size, VM_NORMAL)) {
+	if (split_vmm_area(&vm->mm, base, size, VM_NORMAL) == NULL) {
 		pr_err("invalid memory config for guest VM\n");
 		return -EINVAL;
 	}
