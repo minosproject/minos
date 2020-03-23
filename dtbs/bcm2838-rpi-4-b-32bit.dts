@@ -69,7 +69,7 @@
 			vm_name = "fvp_zephyr_vm2";
 			type = "zephyr";
 			vcpus = <1>;
-			entry = <0x0 0x37200388>;
+			entry = <0x0 0x372003b8>;
 			setup_data = <0x0 0x0>;
 			vcpu_affinity = <3>;
 			native_wfi;
