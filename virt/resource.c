@@ -414,7 +414,7 @@ static void *create_vm_vdev_common(struct device_node *node, void *vm)
 
 int create_native_vm_resource_common(struct vm *vm)
 {
-	int ret;
+	int ret = 0;
 	char name[32];
 	struct device_node *node;
 
