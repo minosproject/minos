@@ -27,7 +27,7 @@
 
 6. Download Minos source code
 
-       # git clone https://github.com/minosproject/minos.git
+       # git clone https://github.com/minosproject/minos-hypervisor.git
 
 ### Compile Minos
 

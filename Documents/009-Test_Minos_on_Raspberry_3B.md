@@ -44,7 +44,7 @@ Plug in the SD card to Ubuntu system again, the two partition will be mounted au
 1. ### Build Minos
 
    ```
-   # git clone https://github.com/minosproject/minos.git
+   # git clone https://github.com/minosproject/minos-hypervisor.git
    # cd minos
    # make rpi_3_defconfig
    # make && make dtbs && make mvm

@@ -14,7 +14,7 @@ mkdir ~/minos-workspace/arm-fvp
 
    ```shell script
    cd ~/minos-workspace
-   git clone https://github.com/minosproject/minos.git
+   git clone https://github.com/minosproject/minos-hypervisor.git
    cd minos
    make ARCH=aarch64 CROSS_COMPILE=aarch64-linux-gnu- fvp_defconfig
    make ARCH=aarch64 CROSS_COMPILE=aarch64-linux-gnu- O=0

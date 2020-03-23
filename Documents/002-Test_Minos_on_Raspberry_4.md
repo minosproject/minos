@@ -15,7 +15,7 @@ This is only for raspberry-4b 4GB version, other please modify the config.
 1. ### Build Minos
 
    ```
-   # git clone https://github.com/minosproject/minos.git
+   # git clone https://github.com/minosproject/minos-hypervisor.git
    # cd minos
    # make rpi_4_defconfig
    # make && make dtbs && make mvm
