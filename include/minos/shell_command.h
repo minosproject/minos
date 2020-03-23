@@ -1,6 +1,8 @@
 #ifndef __MINOS_COMMAND_H__
 #define __MINOS_COMMAND_H__
 
+#include <minos/compiler.h>
+
 struct shell_command {
 	int min_args;
 	char *name;
