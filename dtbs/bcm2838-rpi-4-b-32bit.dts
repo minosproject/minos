@@ -32,6 +32,13 @@
 			vcpu_affinity = <0 1 0 0>;
 			memory = <0x0 0x00000000 0x0 0x30000000 0x0 0x40000000 0x0 0x7c000000>;
 			cmdline = "coherent_pool=1M 8250.nr_uarts=1 earlycon=dbcon,io,0x0 loglevel=9 cma=64M cma=256M video=HDMI-A-1:720x576M@50,margin_left=0,margin_right=0,margin_top=0,margin_bottom=0 smsc95xx.macaddr=DC:A6:32:1C:65:A1 vc_mem.mem_base=0x3ec00000 vc_mem.mem_size=0x40000000 dwc_otg.fiq_fix_enable=0 console=tty1 console=hvc0 root=/dev/mmcblk0p2 rw rootfstype=ext4 rootwait rootflags=noload net.ifnames=0 loglevel=9";
+			vm0_bdi {
+				vm_console_vm0 {
+					virtual_device;
+					vc-dynamic-res;
+					compatible = "minos,vm_console";
+				};
+			};
 		};
 
 		vm1 {
@@ -46,6 +53,14 @@
 			setup_data = <0x0 0x33e00000>;
 			vcpu_affinity = <2 0 0 0>;
 			memory = <0x0 0x30000000 0x0 0x7200000>;
+
+			vm1_bdi {
+				vm_console_vm1 {
+					virtual_device;
+					vc-dynamic-res;
+					compatible = "minos,vm_console";
+				};
+			};
 		};
 
 		vm2 {
@@ -66,7 +81,7 @@
 
 				vtimer_irq = <27>;
 
-				virq_chip@2 {
+				virq_chip_vm2 {
 					compatible = "arm,gicv2";
 					#address-cells = <0x1>;
 					#size-cells = <0x1>;
@@ -77,10 +92,16 @@
 				};
 
 				vmbox_controller@20000000 {
-					virtual_device;
 					compatible = "minos,vmbox-controller";
 					reg = <0x20000000 0x1000>;
 					interrupts = <0 10 4>;
+				};
+
+				vm_console_vm2 {
+					virtual_device;
+					compatible = "minos,vm_console";
+					reg = <0x20001000 0x2000>;
+					interrupts = <0 0 4>;
 				};
 			};
 		};
