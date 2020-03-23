@@ -30,6 +30,14 @@
 			vcpu_affinity = <0 1 2 3>;
 			cmdline = "console=hvc0 earlycon=dbcon,io,0x0 loglevel=8 consolelog=9 root=/dev/vda2 rw";
 			memory = <0x0 0x80000000 0x0 0x10000000>;
+
+			vm0_bdi {
+				vm_console_vm0 {
+					virtual_device;
+					vc-dynamic-res;
+					compatible = "minos,vm_console";
+				};
+			};
 		};
 	};
 
