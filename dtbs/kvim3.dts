@@ -9,6 +9,7 @@
 
 	chosen {
 		minos,stdout = "aml_meson";
+		bootargs = "bootwait=3 tty=vm0";
 	};
 
 	psci {
@@ -147,7 +148,7 @@
 					<0xc1 0xc1>, /* 193 bifrost */
 					<0xc0 0xc0>; /* 192 bifrost */
 
-				virq_chip@0 {
+				virq_chip_vm0 {
 					compatible = "arm,gicv2";
 					#address-cells = <0x1>;
 					#size-cells = <0x1>;
@@ -155,6 +156,77 @@
 						<0xffc02000 0x2000>,
 						<0xffc04000 0x2000>,
 						<0xffc06000 0x2000>;
+				};
+
+				vm_console_vm0 {
+					virtual_device;
+					vc-dynamic-res;
+					compatible = "minos,vm_console";
+				};
+			};
+		};
+
+		vm1 {
+			device_type = "virtual_machine";
+			vmid = <1>;
+			vm_name = "vim3_pro_vm1";
+			type = "linux";
+			native_wfi;
+			vcpus = <1>;
+			entry = <0x0 0x80080000>;
+			setup_data = <0x0 0x83e00000>;
+			vcpu_affinity = <4 0 0 0>;
+			memory = <0x0 0x80000000 0x0 0x8000000>;
+			cmdline = "console=hvc0 earlycon=earlycon=dbcon,io,0x0 loglevel=8 consolelog=9";
+
+			vm1_bdi {
+				vm_console_vm1 {
+					virtual_device;
+					vc-dynamic-res;
+					compatible = "minos,vm_console";
+				};
+			};
+		};
+
+		vm2 {
+			device_type = "virtual_machine";
+			vmid = <2>;
+			vm_name = "fvp_zephyr_vm2";
+			type = "zephyr";
+			vcpus = <1>;
+			entry = <0x0 0x880003b8>;
+			setup_data = <0x0 0x0>;
+			vcpu_affinity = <5>;
+			native_wfi;
+			memory = <0x0 0x88000000 0x0 0x00200000>;
+
+			vm2_bdi {
+				#address-cells = <0x1>;
+				#size-cells = <0x1>;
+
+				vtimer_irq = <27>;
+
+				virq_chip_vm2 {
+					compatible = "arm,gicv2";
+					#address-cells = <0x1>;
+					#size-cells = <0x1>;
+					reg = <0x2f000000 0x10000>,
+						<0x2c000000 0x2000>,
+						<0x2c010000 0x2000>,
+						<0x2c02f000 0x2000>;
+				};
+
+				vmbox_controller@20000000 {
+					compatible = "minos,vmbox-controller";
+					reg = <0x20000000 0x1000>;
+					interrupts = <0 10 4>;
+				};
+
+				vm_console_vm2 {
+					virtual_device;
+					compatible = "minos,vm_console";
+					reg = <0x20001000 0x2000>;
+					interrupts = <0 0 4>;
 				};
 			};
 		};
