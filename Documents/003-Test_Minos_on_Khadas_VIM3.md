@@ -43,7 +43,7 @@ git clone https://github.com/minosproject/minos-misc.git
 cd ~/minos-vim3
 cp minos-hypervisor/minos.bin /var/lib/tftpboot/minos.bin
 cp minos-hypervisor/dtbs/kvim3.dtb /var/lib/tftpboot/minos.dtb
-cd minos-misc
+cd minos-misc/khadas-vim3-pro
 cp vm0_dtb.img vm0_Image vm1_dtb.dts vm1_dtb.img vm1_Image vm1_ramdisk.img zephyr.bin /var/lib/tftpboot/
   ```
 
