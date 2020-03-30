@@ -322,11 +322,8 @@ struct task *create_task(char *name, task_func_t func,
 		return NULL;
 	}
 
-	if (aff == PCPU_AFF_LOCAL) {
-		preempt_disable();
+	if (aff == PCPU_AFF_LOCAL)
 		aff = smp_processor_id();
-		preempt_disable();
-	}
 
 	pid = alloc_pid(prio, aff);
 	if (pid < 0)

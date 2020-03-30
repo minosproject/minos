@@ -18,14 +18,14 @@
 #include <asm/asm_marco.S>
 #include <config/config.h>
 
-	.global smp_processor_id
+	.global get_cpuid
 	.global arch_get_fp
 	.global arch_get_lr
 	.global arch_get_sp
 	.global smc_call
 	.global arm64_task_exit
 
-func smp_processor_id
+func get_cpuid
 	mrs 	x0, MPIDR_EL1
 #ifdef CONFIG_MPIDR_SHIFT
 	ubfx    x1, x0, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
@@ -39,7 +39,7 @@ func smp_processor_id
 	add	x0, x2, x1
 	dsb	sy
 	ret
-endfunc smp_processor_id
+endfunc get_cpuid
 
 func arch_get_fp
 	mov	x0, x29

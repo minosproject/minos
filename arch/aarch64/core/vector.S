@@ -119,17 +119,7 @@ arch_switch_task_sw:
 	str	x30, [sp, #-8]!
 	dsb	sy
 
-	mrs	arg4, MPIDR_EL1		/* get the cpuid */
-#ifdef	CONFIG_MPIDR_SHIFT
-	ubfx    arg1, arg4, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
-	ubfx    arg2, arg4, #MPIDR_EL1_AFF2_LSB, #MPIDR_EL1_AFF_WIDTH
-#else
-	ubfx    arg1, arg4, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
-	ubfx    arg2, arg4, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
-#endif
-	mov	arg3, #CONFIG_NR_CPUS_CLUSTER0
-	mul	arg2, arg2, arg3
-	add	cpuid, arg2, arg1
+	mrs	cpuid, TPIDR_EL2
 
 	lsl	arg1, cpuid, #3
 	ldr	arg5, =__current_tasks	/* get the next task */
@@ -265,17 +255,7 @@ __irq_handler:
 	mov	arg0, sp
 	bl	irq_c_handler		/* call the c irq handler */
 
-	mrs	arg4, MPIDR_EL1		/* get the cpuid */
-#ifdef	CONFIG_MPIDR_SHIFT
-	ubfx    arg1, arg4, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
-	ubfx    arg2, arg4, #MPIDR_EL1_AFF2_LSB, #MPIDR_EL1_AFF_WIDTH
-#else
-	ubfx    arg1, arg4, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
-	ubfx    arg2, arg4, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
-#endif
-	mov	arg3, #CONFIG_NR_CPUS_CLUSTER0
-	mul	arg2, arg2, arg3
-	add	cpuid, arg2, arg1
+	mrs	cpuid, TPIDR_EL2
 
 	ldr	arg5, =__current_tasks
 	lsl	arg1, cpuid, #3

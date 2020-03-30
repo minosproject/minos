@@ -50,8 +50,13 @@ do_start:
 	msr	vpidr_el2, x0
 	msr	vmpidr_el2, x1
 
-	bl	smp_processor_id		// cpuid save to x19
+	bl	get_cpuid		// cpuid save to x19
 	mov	x19, x0
+
+	/*
+	 * store the cpuid to TPIDR_EL2
+	 */
+	msr	TPIDR_EL2, x0
 
 	msr	VTTBR_EL2, xzr
 	isb

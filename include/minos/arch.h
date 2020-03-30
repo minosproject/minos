@@ -3,6 +3,6 @@
 
 #include <asm/arch.h>
 
-int smp_processor_id(void);
+#define smp_processor_id()	arch_smp_processor_id()
 
 #endif

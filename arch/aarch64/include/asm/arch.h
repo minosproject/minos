@@ -214,6 +214,13 @@ static inline void inv_icache_all(void)
 	dsbsy();
 }
 
+static inline int arch_smp_processor_id(void)
+{
+	uint64_t v;
+	__asm__ volatile("mrs %0, TPIDR_EL2" : "=r" (v));
+	return v;
+}
+
 void flush_dcache_range(unsigned long addr, size_t size);
 void inv_dcache_range(unsigned long addr, size_t size);
 void flush_cache_all(void);

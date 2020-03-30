@@ -3,8 +3,8 @@
 
 #include <config/config.h>
 #include <minos/types.h>
+#include <minos/arch.h>
 
-extern int smp_processor_id(void);
 extern unsigned long percpu_offset[];
 
 void percpus_init(void);
