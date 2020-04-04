@@ -38,11 +38,12 @@
 
 func __atomic_set
 	str	w0, [x1]
-	dsb	sy
+	dmb	ish
 	ret
 endfunc __atomic_set
 
 func __atomic_get
+	dmb	ish
 	ldr	w1, [x0]
 	mov	w0, w1
 	ret
@@ -53,7 +54,6 @@ func atomic_add
 	ldaxr	w2, [x1]
 	add	w2, w2, w0
 	stxr	w3, w2, [x1]
-	nop
 	cbnz	w3, 1b
 	ret
 endfunc atomic_add
@@ -62,8 +62,7 @@ func atomic_sub
 2:
 	ldaxr	w2, [x1]
 	sub	w2, w2, w0
-	stxr	w3, w2, [x1]
-	nop
+	stlxr	w3, w2, [x1]
 	cbnz	w3, 2b
 	ret
 endfunc atomic_sub
@@ -72,8 +71,7 @@ func atomic_add_return
 3:
 	ldaxr	w2, [x1]
 	add	w2, w2, w0
-	stxr	w3, w2, [x1]
-	nop
+	stlxr	w3, w2, [x1]
 	cbnz	w3, 3b
 	mov	w0, w2
 	ret
@@ -83,8 +81,7 @@ func atomic_sub_return
 4:
 	ldaxr	w2, [x1]
 	sub	w2, w2, w0
-	stxr	w3, w2, [x1]
-	nop
+	stlxr	w3, w2, [x1]
 	cbnz	w3, 4b
 	mov	w0, w2
 	ret
@@ -94,8 +91,7 @@ func atomic_add_return_old
 3:
 	ldaxr	w2, [x1]
 	add	w2, w2, w0
-	stxr	w3, w2, [x1]
-	nop
+	stlxr	w3, w2, [x1]
 	cbnz	w3, 3b
 	sub	w0, w2, w0
 	ret
@@ -105,8 +101,7 @@ func atomic_sub_return_old
 4:
 	ldaxr	w2, [x1]
 	sub	w2, w2, w0
-	stxr	w3, w2, [x1]
-	nop
+	stlxr	w3, w2, [x1]
 	cbnz	w3, 4b
 	add	w0, w2, w0
 	ret
