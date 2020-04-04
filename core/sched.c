@@ -420,7 +420,7 @@ static void global_switch_out(struct pcpu *pcpu,
 		os_prio_cur[pcpu->pcpu_id] = OS_PRIO_PCPU;
 	else
 		os_prio_cur[pcpu->pcpu_id] = next->prio;
-	wmb();
+	smp_wmb();
 
 	/* release the kernel lock now */
 	kernel_unlock();

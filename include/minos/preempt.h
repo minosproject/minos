@@ -21,23 +21,25 @@ static inline struct task *get_current_task(void)
 static inline void set_current_prio(uint8_t prio)
 {
 	os_prio_cur[smp_processor_id()] = prio;
+	smp_wmb();
 }
 
 static inline void set_next_prio(uint8_t prio)
 {
 	os_highest_rdy[smp_processor_id()] = prio;
+	smp_wmb();
 }
 
 static inline void set_need_resched(void)
 {
 	set_bit(TIF_NEED_RESCHED, &current_task_info()->flags);
-	wmb();
+	smp_wmb();
 }
 
 static inline void clear_need_resched(void)
 {
 	clear_bit(TIF_NEED_RESCHED, &current_task_info()->flags);
-	wmb();
+	smp_wmb();
 }
 
 static inline int need_resched(void)
