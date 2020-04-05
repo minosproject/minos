@@ -30,10 +30,8 @@ static void inline raw_spin_lock(spinlock_t *lock)
 	int ticket;
 
 	ticket = atomic_add_return_old(1, &lock->next_ticket);
-	mb();
-
 	while (ticket != __atomic_get(&lock->ticket_in_service))
-		mb();
+		cpu_relax();
 }
 
 static void inline raw_spin_unlock(spinlock_t *lock)
@@ -42,7 +40,6 @@ static void inline raw_spin_unlock(spinlock_t *lock)
 
 	ticket = __atomic_get(&lock->ticket_in_service);
 	__atomic_set(ticket + 1, &lock->ticket_in_service);
-	mb();
 }
 #else
 #define DEFINE_SPIN_LOCK(name) spinlock_t name
