@@ -37,6 +37,7 @@
 #include <virt/virt.h>
 
 extern void virqs_init(void);
+extern int vmodules_init(void);
 
 struct vm *vms[CONFIG_MAX_VM];
 static int total_vms = 0;
@@ -1208,6 +1209,8 @@ static int of_create_vmboxs(void)
 int virt_init(void)
 {
 	struct vm *vm;
+
+	vmodules_init();
 
 	/* parse the vm information from dtb */
 	parse_and_create_vms();
