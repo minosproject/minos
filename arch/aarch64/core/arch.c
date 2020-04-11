@@ -38,7 +38,6 @@ void arch_set_virq_flag(void)
 {
 	uint64_t hcr_el2;
 
-	dsb();
 	hcr_el2 = read_sysreg(HCR_EL2);
 	hcr_el2 |= HCR_EL2_VI;
 	write_sysreg(hcr_el2, HCR_EL2);
@@ -49,7 +48,6 @@ void arch_set_vfiq_flag(void)
 {
 	uint64_t hcr_el2;
 
-	dsb();
 	hcr_el2 = read_sysreg(HCR_EL2);
 	hcr_el2 |= HCR_EL2_VF;
 	write_sysreg(hcr_el2, HCR_EL2);
@@ -60,7 +58,6 @@ void arch_clear_virq_flag(void)
 {
 	uint64_t hcr_el2;
 
-	dsb();
 	hcr_el2 = read_sysreg(HCR_EL2);
 	hcr_el2 &= ~HCR_EL2_VI;
 	hcr_el2 &= ~HCR_EL2_VF;
@@ -72,7 +69,6 @@ void arch_clear_vfiq_flag(void)
 {
 	uint64_t hcr_el2;
 
-	dsb();
 	hcr_el2 = read_sysreg(HCR_EL2);
 	hcr_el2 &= ~HCR_EL2_VF;
 	write_sysreg(hcr_el2, HCR_EL2);
