@@ -25,14 +25,13 @@ func arch_spin_lock
 l1:	wfe
 l2:	ldaxr	w1, [x0]
 	cbnz	w1, l1
-	stxr	w1, w2, [x0]
-	nop
+	stlxr	w1, w2, [x0]
 	cbnz	w1, l1
 	ret
 endfunc arch_spin_lock
 
 func arch_spin_unlock
 	stlr	wzr, [x0]
-	nop
+	dmb	ish
 	ret
 endfunc arch_spin_unlock
