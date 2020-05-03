@@ -273,6 +273,6 @@ struct os_ops lushan_os_ops = {
 
 static int __init_text os_lushan_init(void)
 {
-	return register_os("lushan", OS_TYPE_TAISHAN, &lushan_os_ops);
+	return register_os("lushan", OS_TYPE_LUSHAN, &lushan_os_ops);
 }
 module_initcall(os_lushan_init);
