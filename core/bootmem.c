@@ -73,7 +73,6 @@ void bootmem_init(void)
 {
 	size_t min_size = 0, size;
 	extern unsigned char __code_end;
-	extern unsigned char __code_start;
 
 #ifdef CONFIG_BOOTMEM_SIZE
 	min_size = CONFIG_BOOTMEM_SIZE;
@@ -83,7 +82,7 @@ void bootmem_init(void)
 	min_size = BOOTMEM_MIN_SIZE;
 #endif
 
-	size = (&__code_end) - (&__code_start);
+	size = (unsigned long)(&__code_end) - CONFIG_MINOS_START_ADDRESS;
 	size = PAGE_BALIGN(size);
 
 	if ((size + min_size) >= CONFIG_MINOS_RAM_SIZE)
