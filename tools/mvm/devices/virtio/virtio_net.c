@@ -632,14 +632,16 @@ virtio_net_proctx(struct virtio_net *net, struct virt_queue *vq)
 		return;
 
 	plen = 0;
+	vq->iovec[0].iov_len -= net->rx_vhdrlen;
+	vq->iovec[0].iov_base += net->rx_vhdrlen;
+
 	tlen = vq->iovec[0].iov_len;
 	for (i = 1; i < out; i++) {
 		plen += vq->iovec[i].iov_len;
 		tlen += vq->iovec[i].iov_len;
 	}
 
-	pr_notice("virtio: packet send, %d %d bytes, %d segs\n\r", tlen, plen, out);
-	net->virtio_net_tx(net, &vq->iovec[1], out - 1, plen);
+	net->virtio_net_tx(net, &vq->iovec[0], out, plen);
 
 	/* chain is processed, release it and set tlen */
 	virtq_add_used(vq, idx, tlen);
@@ -857,7 +859,7 @@ static void virtio_net_neg_features(struct virtio_device *dev)
 	net = virtio_dev_to_net(dev);
 	net->features = dev->acked_features;
 
-	if (!(net->features & VIRTIO_NET_F_MRG_RXBUF)) {
+	if (!(net->features & (1 << VIRTIO_NET_F_MRG_RXBUF))) {
 		net->rx_merge = 0;
 		/* non-merge rx header is 2 bytes shorter */
 		net->rx_vhdrlen -= 2;
