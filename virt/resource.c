@@ -91,6 +91,17 @@ int parse_vm_info_of(struct device_node *node, struct vmtag *vmtag)
 
 	of_get_u32_array(node, "vmid", &vmtag->vmid, 1);
 	of_get_string(node, "vm_name", vmtag->name, 32);
+
+	/*
+	 * check whether this vm is disabled by dts, if this
+	 * vm is disabled, the VM will not created
+	 */
+	if (of_get_bool(node, "disabled")) {
+		pr_notice("vm%d [%s] is disabled in dts",
+				vmtag->vmid, vmtag->name);
+		return -ENOENT;
+	}
+
 	of_get_string(node, "type", vmtag->os_type, 16);
 	of_get_u32_array(node, "vcpus", (uint32_t *)&vmtag->nr_vcpu, 1);
 	of_get_u64_array(node, "entry", (uint64_t *)&vmtag->entry, 1);
