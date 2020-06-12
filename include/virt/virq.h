@@ -45,14 +45,27 @@ struct irqtag;
 #define MAX_HVM_VIRQ		(HVM_SPI_VIRQ_NR + VM_LOCAL_VIRQ_NR)
 #define MAX_GVM_VIRQ		(GVM_SPI_VIRQ_NR + VM_LOCAL_VIRQ_NR)
 
-#define VIRQS_PENDING		(1 << 0)
-#define VIRQS_ENABLED		(1 << 1)
-#define VIRQS_SUSPEND		(1 << 2)
-#define VIRQS_HW		(1 << 3)
-#define VIRQS_CAN_WAKEUP	(1 << 4)
-#define VIRQS_REQUESTED		(1 << 6)
-#define VIRQS_FIQ		(1 << 7)
+#define VIRQS_PENDING_BIT	0
+#define VIRQS_ENABLED_BIT	1
+#define VIRQS_SUSPEND_BIT	2
+#define VIRQS_HW_BIT		3
+#define VIRQS_CAN_WAKEUP_BIT	4
+#define VIRQS_REQUESTED_BIT	6
+#define VIRQS_FIQ_BIT		7
 
+#define VIRQS_PENDING		(1 << VIRQS_PENDING_BIT)
+#define VIRQS_ENABLED		(1 << VIRQS_ENABLED_BIT)
+#define VIRQS_SUSPEND		(1 << VIRQS_SUSPEND_BIT)
+#define VIRQS_HW		(1 << VIRQS_HW_BIT)
+#define VIRQS_CAN_WAKEUP	(1 << VIRQS_CAN_WAKEUP_BIT)
+#define VIRQS_REQUESTED		(1 << VIRQS_REQUESTED_BIT)
+#define VIRQS_FIQ		(1 << VIRQS_FIQ_BIT)
+
+/*
+ * VIRQF is used for request_virq but hypervisor will
+ * use VIRQS_XXX internally, VIRQF will be convert to
+ * VIRQS when request_virq
+ */
 #define VIRQF_CAN_WAKEUP	(1 << 4)
 #define VIRQF_ENABLE		(1 << 5)
 #define VIRQF_FIQ		(1 << 7)
@@ -61,13 +74,13 @@ struct virq_desc {
 	uint8_t id;
 	uint8_t state;
 	uint8_t pr;
-	uint8_t src;
 	uint8_t type;
-	uint8_t vcpu_id;
+	uint16_t src;
+	uint16_t vcpu_id;
 	uint16_t vmid;
 	uint16_t vno;
 	uint16_t hno;
-	uint32_t flags;
+	unsigned long flags;
 	struct list_head list;
 };
 
