@@ -19,6 +19,7 @@
 #include <minos/compiler.h>
 #include <minos/shell_command.h>
 #include <minos/tty.h>
+#include <minos/print.h>
 #include "esh.h"
 #include "esh_internal.h"
 

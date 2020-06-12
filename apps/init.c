@@ -18,6 +18,7 @@
 #include <minos/console.h>
 #include <minos/shell_command.h>
 #include <minos/bootarg.h>
+#include <minos/print.h>
 
 #ifdef CONFIG_VIRT
 #include <virt/virt.h>

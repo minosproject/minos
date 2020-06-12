@@ -4,6 +4,7 @@
 #include <config/config.h>
 #include <minos/types.h>
 #include <minos/arch.h>
+#include <minos/preempt.h>
 
 extern unsigned long percpu_offset[];
 
@@ -19,5 +20,17 @@ void percpus_init(void);
 	(*((__typeof__(per_cpu_##name)*)((unsigned char*)&per_cpu_##name - percpu_offset[0] + percpu_offset[cpu])))
 
 #define get_cpu_var(name) get_per_cpu(name, smp_processor_id())
+
+#define get_cpu_data(name)	\
+({				\
+	preempt_disable();	\
+	get_cpu_var(name);	\
+})
+
+#define put_cpu_data(name)	\
+({				\
+	(void)(name)		\
+	preempt_enable();	\
+})
 
 #endif
