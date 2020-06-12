@@ -29,6 +29,7 @@ typedef unsigned long phy_addr_t;
 typedef unsigned long vir_addr_t;
 
 typedef unsigned long uintptr_t;
+typedef int irqreturn_t;
 
 typedef int bool;
 
