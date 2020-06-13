@@ -167,30 +167,6 @@ static void dump_memory_info(void)
 	}
 }
 
-static void map_os_memory(void)
-{
-	int type;
-	unsigned long flags = 0;
-	struct memory_region *region;
-
-	list_for_each_entry(region, &mem_list, list) {
-		type = memory_region_type(region);
-		if ((type != MEMORY_REGION_TYPE_NORMAL) &&
-				(type != MEMORY_REGION_TYPE_DMA))
-			continue;
-
-		if (type == MEMORY_REGION_TYPE_DMA)
-			flags |= VM_IO;
-		else
-			flags |= VM_NORMAL;
-
-		create_host_mapping(region->vir_base, region->phy_base,
-				region->size, flags);
-	}
-
-	flush_tlb_host();
-}
-
 #ifdef CONFIG_SIMPLE_MM_ALLOCATER
 #include "mm_simple.c"
 #else
@@ -205,12 +181,6 @@ int mm_init(void)
 
 	dump_memory_info();
 	mm_do_init();
-
-	/*
-	 * need ensure that hypervisor has enough
-	 * memory to map all the memory
-	 */
-	map_os_memory();
 
 	return 0;
 }

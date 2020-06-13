@@ -489,20 +489,16 @@ static int __init_text task_early_init(void)
 	int i = smp_processor_id();
 	extern struct task *__current_tasks[NR_CPUS];
 	extern struct task *__next_tasks[NR_CPUS];
-	unsigned long stack_base;
 
 	task = &idle_tasks[i];
 	memset(task, 0, sizeof(struct task));
 	get_per_cpu(idle_task, i) = task;
-	stack_base = CONFIG_MINOS_ENTRY_ADDRESS - i * TASK_STACK_SIZE;
 
 	__current_tasks[i] = task;
 	__next_tasks[i] = task;
 
 	/* init the task info for the thread */
-	ti = (struct task_info *)(stack_base -
-			sizeof(struct task_info));
-
+	ti = current_task_info();
 	TASK_INFO_INIT(ti, task, i);
 
 	return 0;

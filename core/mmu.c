@@ -21,10 +21,7 @@
 
 static struct mm_struct host_mm;
 
-extern unsigned char __el2_ttb0_pgd;
-extern unsigned char __el2_ttb0_pud;
-extern unsigned char __el2_ttb0_pmd_code;
-extern unsigned char __el2_ttb0_pmd_io;
+extern unsigned char __el2_page_table;
 
 #define PHYSIC_ADDRESS_MASK	(0x0000ffffffffffff)
 
@@ -382,14 +379,13 @@ int create_mem_mapping(struct mm_struct *mm, vir_addr_t addr,
 		phy_addr_t phy, size_t size, unsigned long flags)
 {
 	int ret;
-	unsigned long fl;
 
-	spin_lock_irqsave(&mm->mm_lock, fl);
+	spin_lock(&mm->mm_lock);
 
 	ret = create_table_entry(mm, (uint64_t *)mm->pgd_base,
 			addr, phy, size, flags);
 
-	spin_unlock_irqrestore(&mm->mm_lock, fl);
+	spin_unlock(&mm->mm_lock);
 
 	if (ret)
 		pr_err("map fail 0x%x->0x%x size:%x\n", addr, phy, size);
@@ -616,11 +612,11 @@ int create_host_mapping(vir_addr_t vir, phy_addr_t phy,
 
 	/*
 	 * for host mapping, IO and Normal memory all mapped
-	 * as MEM_BLOCK_SIZE ALIGN
+	 * as PAGE_SIZE ALIGN
 	 */
-	tmp = BALIGN(vir + size, MEM_BLOCK_SIZE);
-	vir_base = ALIGN(vir, MEM_BLOCK_SIZE);
-	phy_base = ALIGN(phy, MEM_BLOCK_SIZE);
+	tmp = BALIGN(vir + size, PAGE_SIZE);
+	vir_base = ALIGN(vir, PAGE_SIZE);
+	phy_base = ALIGN(phy, PAGE_SIZE);
 	new_size = tmp - vir_base;
 
 	flags |= VM_HOST;
@@ -665,7 +661,7 @@ void io_unmap(unsigned long vir, size_t size)
 static int __init_text vmm_early_init(void)
 {
 	spin_lock_init(&host_mm.mm_lock);
-	host_mm.pgd_base = (unsigned long)&__el2_ttb0_pgd;
+	host_mm.pgd_base = (unsigned long)&__el2_page_table;
 
 	return 0;
 }

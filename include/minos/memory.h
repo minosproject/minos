@@ -22,6 +22,12 @@
 
 #define VM_MAX_MEM_REGIONS	10
 
+extern unsigned long minos_start;
+extern unsigned long minos_bootmem_base;
+extern unsigned long minos_stack_top;
+extern unsigned long minos_stack_bottom;
+extern unsigned long minos_end;
+
 struct memory_region {
 	uint32_t flags;
 	phy_addr_t phy_base;
@@ -39,6 +45,14 @@ struct mem_block {
 	uint16_t bm_current;
 	struct list_head list;
 	unsigned long *pages_bitmap;
+};
+
+struct slab_header {
+	unsigned long size;
+	union {
+		unsigned long magic;
+		struct slab_header *next;
+	};
 };
 
 /*

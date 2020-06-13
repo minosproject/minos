@@ -45,18 +45,31 @@ _start:
 
 do_start:
 	mov	x27, x0				// save the dtb blob to x27
+
+	adr	x1, _start			// entry address must 4K align
+	and	x0, x1, #0xfff
+	cbnz	x0, minos_panic
+
+	// minos_start to __code_start is the reserve memory
+	// for minos
+	ldr	x3, =0xffffffffffe00000
+	and	x1, x1, x3
+	adr	x2, minos_start
+	str	x1, [x2]
+
 	mrs	x0, midr_el1
 	mrs	x1, mpidr_el1
 	msr	vpidr_el2, x0
 	msr	vmpidr_el2, x1
 
-	bl	get_cpuid		// cpuid save to x19
+	bl	get_cpuid			// cpuid save to x19
 	mov	x19, x0
 
 	/*
 	 * store the cpuid to TPIDR_EL2
 	 */
 	msr	TPIDR_EL2, x0
+	dsb	sy
 
 	msr	VTTBR_EL2, xzr
 	isb
@@ -71,27 +84,18 @@ do_start:
 	msr	spsel, #1
 	dsb	sy
 
-	/* each idle task will have 8k stack */
-	ldr	x0, =CONFIG_MINOS_ENTRY_ADDRESS
-	sub	x0, x0, x19, lsl #CONFIG_TASK_STACK_SHIFT
-	sub	x0, x0, #TASK_INFO_SIZE
-	mov	x1, 0
-	mov	x2, #TASK_INFO_SIZE
-	bl	memset
-
-	mov	sp, x0
-	mov	x28, x0		/* task info save to x28 */
-
 	ldr	x1, =el2_vectors
 	msr	VBAR_EL2, x1
+	dsb	sy
 
 	/* invalid the dcache and flush the tlb */
 	bl	inv_dcache_all
-	isb
 	dsb	sy
+	isb
+
 	tlbi	alle2
-	isb
 	dsb	sy
+	isb
 
 	ldr	x1, =SCTLR_EL2_VALUE
 	msr	SCTLR_EL2, x1
@@ -99,7 +103,7 @@ do_start:
 	isb
 
 	/* setup the el2 page table */
-	ldr	x1, = __el2_ttb0_pgd
+	ldr	x1, = __el2_page_table
 	msr	TTBR0_EL2, x1
 	dsb	sy
 	isb
@@ -119,8 +123,8 @@ do_start:
 	 */
 	ldr	x1, =0xff440c0400
 	msr	MAIR_EL2, x1
-	isb
 	dsb	sy
+	isb
 
 	/* get the physical address range */
 	mrs	x0, ID_AA64MMFR0_EL1
@@ -138,14 +142,52 @@ do_start:
 	orr	x1, x1, #(3 << 12)	// Inner shareable
 	orr	x1, x1, #(1 << 23)	// Reserved, res1.
 	msr	TCR_EL2, x1
-	isb
+	dsb	sy
 
 	/* idle task is in EL2 */
 	mov	x1, #0x1c9
 	msr	spsr_el2, x1
-	isb
+	dsb	sy
 
 	cbnz	x19, secondary_start_up
+
+	ldr	x0, =__minos_end
+	adr	x1, minos_stack_top
+	adr	x2, minos_bootmem_base
+	adr	x3, minos_stack_bottom
+
+	/* store the bootmem base */
+	add	x0, x0, #4095
+	mov	x4, #4095
+	mvn	x5, x4
+	and	x0, x0, x5
+	str	x0, [x2]
+
+	/* idle task stack need NK align */
+	mov	x4, #(CONFIG_TASK_STACK_SIZE - 1)
+	add	x0, x0, x4
+	mvn	x5, x4
+	and	x0, x0, x5
+
+	/* store the minos stack bottom */
+	str	x0, [x3]
+
+	/* store the minos stack top */
+	mov	x4, #CONFIG_TASK_STACK_SIZE
+	mov	x5, #CONFIG_NR_CPUS
+	mul	x5, x4, x5
+	add	x0, x0, x5
+	str	x0, [x1]
+	dsb	sy
+
+	/* each idle task will have 8k stack */
+	sub	x0, x0, x19, lsl #CONFIG_TASK_STACK_SHIFT
+	sub	x0, x0, #TASK_INFO_SIZE
+	mov	x1, 0
+	mov	x2, #TASK_INFO_SIZE
+	bl	memset
+	mov	sp, x0
+	mov	x28, x0		/* task info save to x28 */
 
 	ldr	x0, =__bss_start
 	mov	x1, #0
@@ -156,6 +198,7 @@ do_start:
 
 	/* map the boot memory when booting */
 	bl	map_boot_mem
+	dsb	sy
 
 	ldr	x26, =mmu_on
 
@@ -166,14 +209,13 @@ do_start:
 	orr	x1, x1, #SCTLR_ELx_I
 	bic	x1, x1, #SCTLR_ELx_SA
 	bic	x1, x1, #SCTLR_ELx_A
-	dsb	sy
 	msr	SCTLR_EL2, x1
+	dsb	sy
 	isb
+
 	br	x26
 
 mmu_on:
-	dsb	sy
-	isb
 	tlbi	alle2
 	dsb sy
 	isb
@@ -183,10 +225,21 @@ mmu_on:
 	nop
 
 secondary_start_up:
+	/* setup the idle task stack */
+	adr	x0, minos_stack_top
+	ldr	x0, [x0]
+	sub	x0, x0, x19, lsl #CONFIG_TASK_STACK_SHIFT
+	sub	x0, x0, #TASK_INFO_SIZE
+	mov	x1, 0
+	mov	x2, #TASK_INFO_SIZE
+	bl	memset
+	mov	sp, x0
+	mov	x28, x0		/* task info save to x28 */
+
 	ldr	x1, =SCTLR_EL2_VALUE
 	msr	SCTLR_EL2, x1
-	isb
 	dsb	sy
+	isb
 
 	/* enable the dcache and the icache */
 	mrs	x1, SCTLR_EL2
@@ -195,11 +248,10 @@ secondary_start_up:
 	orr	x1, x1, #SCTLR_ELx_M
 	bic	x1, x1, #SCTLR_ELx_SA
 	bic	x1, x1, #SCTLR_ELx_A
-	dsb	sy
 	msr	SCTLR_EL2, x1
+	dsb	sy
 	isb
 
-	dsb	sy
 	ic	ialluis
 	dsb	sy
 	isb
@@ -217,3 +269,21 @@ secondary_start_up:
 	/* here wait for boot cpu finish tht init work */
 	bl	boot_secondary
 	nop
+
+minos_panic:
+	nop
+	b	minos_panic
+
+	.data
+	.global minos_start
+	.global minos_bootmem_base
+	.global minos_stack_top
+	.global minos_stack_bottom
+	.global minos_end
+	.balignl 16, 0xdeadbeef
+
+minos_start:		.quad	0x0
+minos_bootmem_base:	.quad	0x0
+minos_stack_top:	.quad	0x0
+minos_stack_bottom:	.quad	0x0
+minos_end:		.quad	0x0

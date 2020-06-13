@@ -182,6 +182,15 @@ static void __fdt_parse_memreserve(void)
 	int count, i, ret;
 	uint64_t address, size;
 
+	/*
+	 * system can reseve some memory at the head of minos
+	 * memory space
+	 */
+	if (CONFIG_MINOS_ENTRY_ADDRESS != minos_start) {
+		split_memory_region(minos_start, CONFIG_MINOS_ENTRY_ADDRESS - minos_start,
+				MEMORY_REGION_F_RSV);
+	}
+
 	count = fdt_num_mem_rsv(hv_dtb);
 	if (count == 0)
 		return;
@@ -243,8 +252,7 @@ static void __fdt_parse_vm_mem(void)
 
 static void __fdt_parse_kernel_mem(void)
 {
-	split_memory_region(CONFIG_MINOS_START_ADDRESS,
-			CONFIG_MINOS_RAM_SIZE, MEMORY_REGION_F_KERNEL);
+	split_memory_region(minos_start, CONFIG_MINOS_RAM_SIZE, MEMORY_REGION_F_KERNEL);
 }
 
 int fdt_parse_memory_info(void)

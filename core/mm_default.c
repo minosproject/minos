@@ -40,14 +40,15 @@ extern struct list_head mem_list;
 
 #define MEM_SECTION_F_PAGE	(1 << 8)
 #define MEM_SECTION_F_BLOCK	(1 << 9)
+#define MEM_SECTION_F_MAPPED	(1 << 10)
 
 struct mem_section {
-	unsigned long phy_base;
 	int id;
-	int type;
 	size_t size;
-	size_t nr_blocks;
-	size_t free_blocks;
+	size_t total_cnt;
+	size_t free_cnt;
+	unsigned long flags;
+	unsigned long phy_base;
 	unsigned long *bitmap;
 	unsigned long bm_end;
 	unsigned long bm_current;
@@ -55,14 +56,6 @@ struct mem_section {
 	union {
 		struct mem_block *blocks;
 		struct page *pages;
-	};
-};
-
-struct slab_header {
-	unsigned long size;
-	union {
-		unsigned long magic;
-		struct slab_header *next;
 	};
 };
 
@@ -97,7 +90,8 @@ struct page_pool {
 #define PAGE_META_SIZE		(BLOCK_BITMAP_SIZE + PAGES_IN_BLOCK * sizeof(struct page))
 
 static int nr_sections;
-struct mem_section mem_sections[MAX_MEM_SECTIONS];
+static struct mem_section mem_sections[MAX_MEM_SECTIONS];
+
 static struct slab slab;
 static struct slab *pslab = &slab;
 static struct page_pool __page_pool;
@@ -164,65 +158,56 @@ static LIST_HEAD(host_list);
 #define FREE_POOL_OFFSET		(2)
 #define CACHE_POOL_OFFSET		(1)
 
-static int inline add_page_section(phy_addr_t base, size_t size)
+static int add_page_section(phy_addr_t base, size_t size, int type)
 {
 	struct mem_section *ms;
-	phy_addr_t mem_base, mem_end;
-	size_t real_size, left;
 
 	if ((size == 0) || (nr_sections >= MAX_MEM_SECTIONS)) {
 		pr_err("no enough memory section for page section\n");
 		return -EINVAL;
 	}
 
-	mem_end = ALIGN(base + size, PAGE_SIZE);
-	mem_base = BALIGN(base, PAGE_SIZE);
-	real_size = mem_end - mem_base;
-
-	if (real_size == 0) {
-		add_slab_mem(base, size);
-		return 0;
+	if (!PAGE_ALIGN(base) || !PAGE_ALIGN(size)) {
+		pr_err("memory section is not page align 0x%x 0x%x\n", base, size);
+		return -EINVAL;
 	}
 
-	pr_notice("PAGE  SECTION: 0x%p ---> 0x%p [0x%x]\n", mem_base,
-			mem_base + real_size, real_size);
+	pr_notice("PAGE  SECTION: 0x%p ---> 0x%p [0x%x]\n", base, base + size, size);
 
 	ms = &mem_sections[nr_sections];
 	spin_lock_init(&ms->lock);
 
-	/* nr_blocks or free_blocks means the pages count */
-	ms->phy_base = mem_base;
-	ms->size = real_size;
-	ms->type = MEM_SECTION_F_NORMAL | MEM_SECTION_F_PAGE;
-	ms->nr_blocks = real_size >> PAGE_SHIFT;
-	ms->free_blocks = ms->nr_blocks;
+	/* total_cnt or free_cnt means the pages count */
+	ms->phy_base = base;
+	ms->size = size;
+	ms->flags = (1 << type) | MEM_SECTION_F_PAGE;
+	ms->total_cnt = size >> PAGE_SHIFT;
+	ms->free_cnt = ms->total_cnt;
 	ms->id = nr_sections;
 
 	/* init the bitmaps and pages data for this section */
-	ms->bitmap = alloc_boot_mem(BITS_TO_LONGS(ms->nr_blocks));
+	ms->bitmap = alloc_boot_mem(BITS_TO_LONGS(ms->total_cnt));
 	if (!ms->bitmap) {
 		pr_err("no enough boot mem for section bitmap\n");
 		return -ENOMEM;
 	}
 
-	memset(ms->bitmap, 0, BITS_TO_LONGS(ms->nr_blocks));
+	memset(ms->bitmap, 0, BITS_TO_LONGS(ms->total_cnt));
 	ms->bm_current = 0;
-	ms->bm_end = ms->nr_blocks;
+	ms->bm_end = ms->total_cnt;
 
-	ms->pages = alloc_boot_mem(ms->nr_blocks * sizeof(struct page));
+	/*
+	 * just allocate the pages struct for this section
+	 * but do not init the memory data to 0, since if the
+	 * memory size is too big will slow down the boot time
+	 */
+	ms->pages = alloc_boot_mem(ms->total_cnt * sizeof(struct page));
 	if (!ms->pages) {
 		pr_err("no enough boot mem for section pages\n");
 		return -ENOMEM;
 	}
 
-	/* memset(ms->pages, 0, ms->nr_blocks * sizeof(struct page)); */
 	nr_sections++;
-
-	left = mem_base - base;
-	add_slab_mem(base, left);
-
-	left = (base + size) - mem_end;
-	add_slab_mem(base, left);
 
 	return 0;
 }
@@ -238,6 +223,19 @@ static int add_block_section(phy_addr_t base, size_t size, int type)
 		return -EINVAL;
 	}
 
+	/*
+	 * if memory used for DMA, always mapped as page
+	 * section
+	 */
+	if (type == MEMORY_REGION_TYPE_DMA)
+		return add_page_section(base, size, type);
+
+	/*
+	 * Minos memory always mapped as PAGE_SECTION
+	 */
+	if ((base >= minos_start) && (base < (minos_start + CONFIG_MINOS_RAM_SIZE)))
+		return add_page_section(base, size, type);
+
 	mem_end = ALIGN(base + size, MEM_BLOCK_SIZE);
 	mem_base = BALIGN(base, MEM_BLOCK_SIZE);
 	real_size = mem_end - mem_base;
@@ -247,21 +245,19 @@ static int add_block_section(phy_addr_t base, size_t size, int type)
 	 * is bigger than 32K, add it to a block list for page
 	 * allocater, otherwise add it to the slab lis
 	 */
-	if (real_size == 0) {
-		add_page_section(base, size);
-		return 0;
-	}
+	if (real_size == 0)
+		return add_page_section(base, size, type);
 
 	ms = &mem_sections[nr_sections];
 	spin_lock_init(&ms->lock);
 
 	ms->phy_base = mem_base;
 	ms->size = real_size;
-	ms->type = (type & MEM_SECTION_TYPE_MASK) | MEM_SECTION_F_BLOCK;
-	ms->nr_blocks = real_size >> MEM_BLOCK_SHIFT;
-	ms->free_blocks = ms->nr_blocks;
+	ms->flags = (1 << type) | MEM_SECTION_F_BLOCK;
+	ms->total_cnt = real_size >> MEM_BLOCK_SHIFT;
+	ms->free_cnt = ms->total_cnt;
 	ms->id = nr_sections;
-	free_blocks += ms->nr_blocks;
+	free_blocks += ms->total_cnt;
 	nr_sections++;
 
 	pr_notice("BLOCK SECTION: 0x%p ---> 0x%p [0x%p]\n", mem_base,
@@ -274,11 +270,11 @@ static int add_block_section(phy_addr_t base, size_t size, int type)
 	 */
 	left = mem_base - base;
 	if (left > 0)
-		add_page_section(base, left);
+		add_page_section(base, left, type);
 
 	left = (base + size) - mem_end;
 	if (left > 0)
-		add_page_section(mem_base + real_size, left);
+		add_page_section(mem_base + real_size, left, type);
 
 	return 0;
 }
@@ -295,6 +291,12 @@ static void parse_system_regions(void)
 			(type == MEMORY_REGION_TYPE_DTB))
 			continue;
 
+		if (!PAGE_ALIGN(region->vir_base) || !PAGE_ALIGN(region->size)) {
+			pr_err("memory section is not page align 0x%x 0x%x\n",
+					region->vir_base, region->size);
+			continue;
+		}
+
 		add_block_section(region->vir_base, region->size, type);
 	}
 }
@@ -310,13 +312,13 @@ static unsigned long blocks_bitmap_init(unsigned long base)
 	 */
 	for (i = 0; i < nr_sections; i++) {
 		section = &mem_sections[i];
-		if (!(section->type & MEM_SECTION_F_BLOCK))
+		if (!(section->flags & MEM_SECTION_F_BLOCK))
 			continue;
 
 		section->bitmap = (unsigned long *)bitmap_base;
 		section->bm_current = 0;
-		section->bm_end = section->nr_blocks;
-		bitmap_base += BITS_TO_LONGS(section->nr_blocks) *
+		section->bm_end = section->total_cnt;
+		bitmap_base += BITS_TO_LONGS(section->total_cnt) *
 			sizeof(unsigned long);
 	}
 
@@ -334,49 +336,32 @@ static unsigned long blocks_table_init(unsigned long base)
 	/* allocate memory for mem_block table need confirm */
 	for (i = 0; i < nr_sections; i++) {
 		section = &mem_sections[i];
-		if (!(section->type & MEM_SECTION_F_BLOCK))
+		if (!(section->flags & MEM_SECTION_F_BLOCK))
 			continue;
 
 		section->blocks = (struct mem_block *)tmp;
-		tmp += (section->nr_blocks) * sizeof(struct mem_block);
+		tmp += (section->total_cnt) * sizeof(struct mem_block);
 		tmp = BALIGN(tmp, sizeof(unsigned long));
 	}
-
-	/* memset((void *)base, 0, tmp - base); */
 
 	return tmp;
 }
 
-static int mem_sections_init(void)
+static void process_boot_section(void)
 {
-	int i;
-	size_t boot_block_size;
-	unsigned long mem_start, mem_end;
 	struct mem_section *section = NULL;
 	struct mem_section tmp_section;
 	struct mem_section *boot_section = NULL;
-	unsigned long code_base = CONFIG_MINOS_START_ADDRESS;
-	struct mem_block *block;
-
-	mem_start = (unsigned long)bootmem_end;
-	pr_notice("code_start:0x%x code_end:0x%x\n",
-			code_base, mem_start);
-
-	mem_start = BALIGN(mem_start, sizeof(unsigned long));
-	mem_start = blocks_table_init(mem_start);
-
-	mem_start = BALIGN(mem_start, sizeof(unsigned long));
-	mem_start = blocks_bitmap_init(mem_start);
-	pr_notice("code_start after blocks_init:0x%x\n", mem_start);
+	int i;
 
 	/*
 	 * find the boot section, boot section need always MEM_BLOCK
-	 * align, other section may not mapped
+	 * align, other section may not mapped at this time, may have
+	 * two boot section when the dtb is in the boot memory range
 	 */
 	for (i = 0; i < nr_sections; i++) {
 		section = &mem_sections[i];
-		if ((code_base >= section->phy_base) && (code_base <
-				(section->phy_base + section->size))) {
+		if (CONFIG_MINOS_ENTRY_ADDRESS == section->phy_base) {
 			boot_section = section;
 			break;
 		}
@@ -392,61 +377,93 @@ static int mem_sections_init(void)
 	 */
 	if (boot_section->id != 0) {
 		i = boot_section->id;
-		memset(&tmp_section, 0, sizeof(struct mem_section));
 		memcpy(&tmp_section, &mem_sections[0], sizeof(struct mem_section));
 		memcpy(&mem_sections[0], boot_section, sizeof(struct mem_section));
 		memcpy(&mem_sections[i], &tmp_section, sizeof(struct mem_section));
 		mem_sections[i].id = i;
 		mem_sections[0].id = 0;
+		mem_sections[0].flags = mem_sections[0].flags | MEM_SECTION_F_MAPPED;
 	}
 
-	mem_end = BALIGN(mem_start, MEM_BLOCK_SIZE);
-	pr_notice("minos : free_memory_start:0x%x\n", mem_end);
+	for (i = 1; i < nr_sections; i++) {
+		section = &mem_sections[i];
+		if ((section->phy_base + section->size) == (minos_start + CONFIG_MINOS_RAM_SIZE)) {
+			boot_section = section;
+			break;
+		}
+	}
+
+	if (boot_section && (boot_section->id != 1)) {
+		i = boot_section->id;
+		memcpy(&tmp_section, &mem_sections[1], sizeof(struct mem_section));
+		memcpy(&mem_sections[1], boot_section, sizeof(struct mem_section));
+		memcpy(&mem_sections[i], &tmp_section, sizeof(struct mem_section));
+		mem_sections[i].id = i;
+		mem_sections[1].id = 1;
+		mem_sections[1].flags = mem_sections[1].flags | MEM_SECTION_F_MAPPED;
+	}
+
+	if (!boot_section)
+		return;
+
+	for (i = 2; i < nr_sections; i++) {
+		section = &mem_sections[i];
+		if ((minos_start >= section->phy_base) && (minos_start <
+				(section->phy_base + section->size)))
+			panic("mm: more than 2 boot memory section\n");
+	}
+}
+
+static int mem_sections_init(void)
+{
+	size_t boot_page_size;
+	unsigned long mem_start, mem_end;
+	struct mem_section *section = NULL;
+	unsigned long code_base = minos_start;
 
 	/*
-	 * deal with the boot section, need to update the
-	 * information of boot section of hypervisor, since
-	 * the text and data memory is in boot section
+	 * after here can not call the bootmem api to allocate
+	 * memory
+	 */
+	mem_start = minos_end;
+	pr_notice("minos_start: 0x%x minos_end: 0x%x\n",
+			minos_start, mem_start);
+
+	mem_start = BALIGN(mem_start, sizeof(unsigned long));
+	mem_start = blocks_table_init(mem_start);
+
+	mem_start = BALIGN(mem_start, sizeof(unsigned long));
+	mem_start = blocks_bitmap_init(mem_start);
+
+	pr_debug("mem start after blocks init: 0x%x\n", mem_start);
+
+	mem_end = BALIGN(mem_start, PAGE_SIZE);
+	pr_notice("minos free memory start: 0x%x\n", mem_end);
+
+	process_boot_section();
+
+	/*
+	 * since the boot section will always as page section
+	 * init its page information now
 	 */
 	section = &mem_sections[0];
-	boot_block_size = (mem_end - code_base) >> MEM_BLOCK_SHIFT;
-	free_blocks -= boot_block_size;
-	section->free_blocks -= boot_block_size;
-	block = section->blocks;
+	boot_page_size = (mem_end - code_base) >> PAGE_SHIFT;
+	section->free_cnt -= boot_page_size;
 
-	for (i = 0; i < boot_block_size; i++) {
-		set_bit(i, section->bitmap);
-		init_list(&block->list);
-		block->free_pages = 0;
-		block->bm_current = 0;
-		block->phy_base = code_base;
-		block->flags = 0;
-
-		block++;
-		code_base += MEM_BLOCK_SIZE;
-	}
-
-	section->bm_current = boot_block_size;
+	/*
+	 * mask the used memory's bit let memory allocator do not
+	 * touch these memory
+	 */
+	bitmap_set(section->bitmap, 0, boot_page_size);
+	section->bm_current = boot_page_size;
 
 	/*
 	 * put this page to the slab allocater do not
 	 * waste the memory
 	 */
-	boot_block_size = mem_end - mem_start;
-	if (boot_block_size > SLAB_MIN_SIZE )
-		add_slab_mem(mem_start, boot_block_size);
-
-	/* add left bootmem to slab allocator */
-	boot_block_size = bootmem_page_base - bootmem_start;
-	if (boot_block_size > SLAB_MIN_SIZE) {
-		pr_notice("add left bootmem to slab 0x%p->0x%x\n",
-				bootmem_start, boot_block_size);
-		add_slab_mem((unsigned long)bootmem_start,
-				boot_block_size);
-	}
-
-	bootmem_size = 0;
-	bootmem_start = NULL;
+	boot_page_size = mem_end - mem_start;
+	if (boot_page_size > SLAB_MIN_SIZE )
+		add_slab_mem(mem_start, boot_page_size);
 
 	return 0;
 }
@@ -472,7 +489,7 @@ static struct mem_block *addr_to_mem_block(unsigned long addr)
 	struct mem_section *section = NULL;
 
 	section = addr_to_mem_section(addr);
-	if (!section || !(section->type & MEM_SECTION_F_BLOCK))
+	if (!section || !(section->flags & MEM_SECTION_F_BLOCK))
 		return NULL;
 
 	return (&section->blocks[(addr - section->phy_base) >>
@@ -503,23 +520,23 @@ __alloc_mem_block(struct mem_section *section, unsigned long f)
 	struct mem_block *block;
 
 	spin_lock(&section->lock);
-	if (section->free_blocks == 0) {
+	if (section->free_cnt == 0) {
 		spin_unlock(&section->lock);
 		return NULL;
 	}
 
-	bit = find_next_zero_bit_loop(section->bitmap, section->nr_blocks,
+	bit = find_next_zero_bit_loop(section->bitmap, section->total_cnt,
 			section->bm_current);
-	if (bit >= section->nr_blocks) {
-		pr_warn("section->free_blocks may be incorrect %d\n",
-				section->free_blocks);
+	if (bit >= section->total_cnt) {
+		pr_warn("section->free_cnt may be incorrect %d\n",
+				section->free_cnt);
 		spin_unlock(&section->lock);
 		return NULL;
 	}
 
-	section->free_blocks--;
+	section->free_cnt--;
 	section->bm_current++;
-	if (section->bm_current >= section->nr_blocks)
+	if (section->bm_current >= section->total_cnt)
 		section->bm_current = 0;
 
 	/*
@@ -548,7 +565,7 @@ struct mem_block *alloc_mem_block(unsigned long flags)
 
 	for (i = 0; i < nr_sections; i++) {
 		section = &mem_sections[i];
-		if (!(section->type & MEM_SECTION_F_BLOCK))
+		if (!(section->flags & MEM_SECTION_F_BLOCK))
 			continue;
 
 		block = __alloc_mem_block(section, flags);
@@ -727,25 +744,25 @@ static struct page *__alloc_pages_from_section(struct mem_section *section,
 	struct page *page, *tmp;
 
 	if (count == 1)
-		bit = find_next_zero_bit(section->bitmap, section->nr_blocks,
+		bit = find_next_zero_bit(section->bitmap, section->total_cnt,
 				section->bm_current);
 	else
 		bit = bitmap_find_next_zero_area_align(section->bitmap,
-				section->nr_blocks, 0, count, align);
-	if (bit >= section->nr_blocks)
+				section->total_cnt, 0, count, align);
+	if (bit >= section->total_cnt)
 		return NULL;
 
 	bitmap_set(section->bitmap, bit, count);
 	if ((count = 1) || (align == 1)) {
 		section->bm_current = bit + count;
-		if (section->bm_current >= section->nr_blocks)
+		if (section->bm_current >= section->total_cnt)
 			section->bm_current = 0;
 	}
 
 	tmp = page = section->pages + bit;
 	addr = (void *)PAGE_ADDR(section->phy_base, bit);
 	page->phy_base = (unsigned long)addr | (count & 0xfff);
-	section->free_blocks -= count;
+	section->free_cnt -= count;
 
 	/* indicate that other pages are not a page header */
 	for (i = 1; i < count; i++) {
@@ -764,11 +781,11 @@ static struct page *alloc_pages_from_section(int pages, int align)
 
 	for (i = 0; i < nr_sections; i++) {
 		section = &mem_sections[i];
-		if (!(section->type & MEM_SECTION_F_PAGE))
+		if (!(section->flags & MEM_SECTION_F_PAGE))
 			continue;
 
 		spin_lock(&section->lock);
-		if (section->free_blocks < pages) {
+		if (section->free_cnt < pages) {
 			spin_unlock(&section->lock);
 			continue;
 		}
@@ -790,15 +807,10 @@ struct page *__alloc_pages(int pages, int align)
 	if ((pages <= 0) || (align == 0))
 		return NULL;
 
-	/* can not make sure section's page can keep align */
-	if (align > 1)
-		goto from_pool;
-
 	page = alloc_pages_from_section(pages, align);
 	if (page)
 		return page;
 
-from_pool:
 	return alloc_pages_from_pool(page_pool, pages, align, GFB_PAGE);
 }
 
@@ -1290,7 +1302,7 @@ static int free_pages_in_section(void *addr, struct mem_section *ms)
 
 	/* just clear the bitmap from start with count */
 	bitmap_clear(ms->bitmap, start, count);
-	ms->free_blocks += count;
+	ms->free_cnt += count;
 
 	spin_unlock(&ms->lock);
 
@@ -1303,7 +1315,7 @@ void free_pages(void *addr)
 	struct mem_section *section;
 
 	section = addr_to_mem_section((vir_addr_t)addr);
-	if (section && (section->type & MEM_SECTION_F_PAGE)) {
+	if (section && (section->flags & MEM_SECTION_F_PAGE)) {
 		free_pages_in_section(addr, section);
 		return;
 	}
@@ -1341,7 +1353,7 @@ void free(void *addr)
 	if (!section)
 		goto free_slab;
 
-	if (section->type & MEM_SECTION_F_PAGE) {
+	if (section->flags & MEM_SECTION_F_PAGE) {
 		free_pages_in_section(addr, section);
 		return;
 	}
@@ -1396,6 +1408,35 @@ int has_enough_memory(size_t size)
 	return (free_blocks >= (size >> MEM_BLOCK_SHIFT));
 }
 
+static void reclaim_memory(void)
+{
+	reclaim_bootmem();
+}
+
+static void map_os_memory(void)
+{
+	unsigned long flags = 0;
+	struct mem_section *section;
+	int i;
+
+	for (i = 0; i < nr_sections; i++) {
+		section = &mem_sections[i];
+		if (section->flags & MEM_SECTION_F_MAPPED)
+			continue;
+
+		if (section->flags & MEM_SECTION_F_DMA)
+			flags |= VM_IO;
+		else
+			flags |= VM_NORMAL;
+
+		create_host_mapping(section->phy_base, section->phy_base,
+				section->size, flags);
+		section->flags |= MEM_SECTION_F_MAPPED;
+	}
+
+	flush_tlb_host();
+}
+
 int mm_do_init(void)
 {
 	/*
@@ -1409,6 +1450,19 @@ int mm_do_init(void)
 	page_pool_init();
 	parse_system_regions();
 	mem_sections_init();
+
+	/*
+	 * need ensure that hypervisor has enough
+	 * memory to map all the memory
+	 */
+	map_os_memory();
+
+	/*
+	 * reclaim the memory from the bootmem allocator
+	 * and the slab section and all the unused free
+	 * memory
+	 */
+	reclaim_memory();
 
 	return 0;
 }
