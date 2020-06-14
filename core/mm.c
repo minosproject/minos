@@ -167,12 +167,6 @@ static void dump_memory_info(void)
 	}
 }
 
-#ifdef CONFIG_SIMPLE_MM_ALLOCATER
-#include "mm_simple.c"
-#else
-#include "mm_default.c"
-#endif
-
 int mm_init(void)
 {
 #ifdef CONFIG_DEVICE_TREE

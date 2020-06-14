@@ -50,7 +50,7 @@ static inline void *get_io_pages(int pages)
 	return __get_io_pages(pages, 1);
 }
 
-#ifdef CONFIG_SIMPLE_MM_ALLOCATER
+#ifdef CONFIG_SIMPLE_MM_ALLOCATOR
 static inline struct mem_block *alloc_mem_block(unsigned long flags)
 {
 	return NULL;
@@ -72,5 +72,7 @@ void release_mem_block(struct mem_block *block);
 int has_enough_memory(size_t size);
 void add_slab_mem(unsigned long base, size_t size);
 #endif
+
+int mm_do_init(void);
 
 #endif

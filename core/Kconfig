@@ -100,6 +100,15 @@ choice
 		bool "Log Level ERROR"
 endchoice
 
+choice
+	prompt "Memory allocator"
+	default DEFAULT_MM_ALLOCATOR
+	config DEFAULT_MM_ALLOCATOR
+		bool "default mm allocator support"
+	config SIMPLE_MM_ALLOCATOR
+		bool "simple mm allocator for non-virtualaztion"
+endchoice
+
 config LOG_LEVEL
 	int
 	default 5 if PRINT_DEBUG

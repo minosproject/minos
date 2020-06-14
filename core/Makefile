@@ -29,3 +29,5 @@ obj-y += core.o
 obj-y += hook.o
 obj-y += console.o
 obj-y += bootarg.o
+obj-$(CONFIG_DEFAULT_MM_ALLOCATOR) += mm_default.o
+obj-$(CONFIG_SIMPLE_MM_ALLOCATOR) += mm_default.o
