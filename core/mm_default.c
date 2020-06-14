@@ -580,7 +580,7 @@ struct mem_block *alloc_mem_block(unsigned long flags)
 	 */
 	if (block && (!(flags & GFB_VM))) {
 		if (flags & GFB_IO)
-			f |= VM_IO;
+			f |= VM_NORMAL_NC;
 		else
 			f |= VM_NORMAL;
 
@@ -679,10 +679,10 @@ static struct page *alloc_pages_from_block(struct mem_block *block,
 	meta += bit;
 	page = meta;
 	addr = (void *)PAGE_ADDR(block->phy_base, bit);
-	meta->phy_base = (unsigned long)addr | (count & 0xfff);
+	meta->phy_base = (unsigned long)addr | count;
 	for (i = 1; i < count; i++) {
 		meta++;
-		meta->phy_base = (unsigned long)(addr + PAGE_SIZE * i) | 0xfff;
+		meta->phy_base = (unsigned long)(addr + PAGE_SIZE * i);
 	}
 
 	return page;
@@ -818,6 +818,11 @@ void *__get_free_pages(int pages, int align)
 {
 	struct page *page = NULL;
 
+	if (pages > MM_MAX_ALLOC_PAGES) {
+		pr_err("too many pages please use vmalloc instead\n");
+		return NULL;
+	}
+
 	page = __alloc_pages(pages, align);
 	if (page)
 		return (void *)(page->phy_base & __PAGE_MASK);
@@ -828,6 +833,11 @@ void *__get_free_pages(int pages, int align)
 void *__get_io_pages(int pages, int align)
 {
 	struct page *page = NULL;
+
+	if (pages > MM_MAX_ALLOC_PAGES) {
+		pr_err("too many pages please use vmalloc instead\n");
+		return NULL;
+	}
 
 	page = alloc_pages_from_pool(io_pool, pages, align, GFB_PAGE | GFB_IO);
 	if (page)

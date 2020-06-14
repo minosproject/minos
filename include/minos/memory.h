@@ -63,6 +63,8 @@ struct slab_header {
  * use page_to_addr(page) or addr_to_page() to convert
  * the address to page
  */
+#define MM_MAX_ALLOC_PAGES	512
+
 struct page {
 	union {
 		unsigned long phy_base;
