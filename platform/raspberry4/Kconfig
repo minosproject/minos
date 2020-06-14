@@ -1,9 +1,5 @@
 if SOC_BCM2838
 
-config MINOS_START_ADDRESS
-	hex "memory start address of system"
-	default 0x37400000
-
 config MINOS_ENTRY_ADDRESS
 	hex "entry address of system"
 	default 0x37408000

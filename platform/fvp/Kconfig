@@ -1,12 +1,8 @@
 if SOC_FVP
 
-config MINOS_START_ADDRESS
-	hex "memory start address of system"
-	default 0xc0000000
-
 config MINOS_ENTRY_ADDRESS
 	hex "entry address of system"
-	default 0xc0008000
+	default 0xc0000000
 	help
 	  the entry address is the start address plus
 	  nr_cpus * TASK_STACK_SIZE

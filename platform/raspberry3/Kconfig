@@ -5,10 +5,6 @@ config PLATFORM_BCM2837
 	select VIRQCHIP_BCM2836
 	select IRQCHIP_BCM2836
 
-config MINOS_START_ADDRESS
-	hex "memory start address of system"
-	default 0x28000000
-
 config MINOS_ENTRY_ADDRESS
 	hex "entry address of system"
 	default 0x28008000
