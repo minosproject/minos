@@ -25,10 +25,6 @@
 #include <asm/svccc.h>
 #include <virt/vdev.h>
 
-extern unsigned char __sync_desc_start;
-extern unsigned char __sync_desc_end;
-extern void sync_from_lower_EL_handler(gp_regs *data);
-
 static struct sync_desc *sync_descs[MAX_SYNC_TYPE] __align_cache_line;
 
 static inline int taken_from_el1(uint64_t spsr)
@@ -410,108 +406,41 @@ static int brk_ins_handler(gp_regs *reg, uint32_t esr_value)
 }
 
 /* type defination is at armv8-spec 1906 */
-DEFINE_SYNC_DESC(EC_UNKNOWN, EC_TYPE_BOTH,
-		unknown_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_WFI_WFE, EC_TYPE_BOTH,
-		wfi_wfe_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_MCR_MRC_CP15, EC_TYPE_BOTH,
-		mcr_mrc_cp15_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_MCRR_MRRC_CP15, EC_TYPE_AARCH32,
-		mcrr_mrrc_cp15_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_MCR_MRC_CP14, EC_TYPE_AARCH32,
-		mcr_mrc_cp14_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_LDC_STC_CP14, EC_TYPE_AARCH32,
-		ldc_stc_cp14_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_ACCESS_SIMD_REG, EC_TYPE_BOTH,
-		access_simd_reg_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_MCR_MRC_CP10, EC_TYPE_AARCH32,
-		mcr_mrc_cp10_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_MRRC_CP14, EC_TYPE_AARCH32,
-		mrrc_cp14_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_ILLEGAL_EXE_STATE, EC_TYPE_BOTH,
-		illegal_exe_state_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_SVC_AARCH32, EC_TYPE_AARCH32,
-		svc_aarch32_handler, 0, 0);
-
-DEFINE_SYNC_DESC(EC_HVC_AARCH32, EC_TYPE_AARCH32,
-		hvc_aarch32_handler, 0, 0);
-
-DEFINE_SYNC_DESC(EC_SMC_AARCH32, EC_TYPE_AARCH32,
-		smc_aarch32_handler, 0, 4);
-
-DEFINE_SYNC_DESC(EC_SVC_AARCH64, EC_TYPE_AARCH64,
-		svc_aarch64_handler, 0, 0);
-
-DEFINE_SYNC_DESC(EC_HVC_AARCH64, EC_TYPE_AARCH64,
-		hvc_aarch64_handler, 0, 0);
-
-DEFINE_SYNC_DESC(EC_SMC_AARCH64, EC_TYPE_AARCH64,
-		smc_aarch64_handler, 0, 4);
-
-DEFINE_SYNC_DESC(EC_ACESS_SYSTEM_REG, EC_TYPE_AARCH64,
-		access_system_reg_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_INSABORT_TFL, EC_TYPE_BOTH,
-		insabort_tfl_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_INSABORT_TWE, EC_TYPE_BOTH,
-		insabort_twe_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_MISALIGNED_PC, EC_TYPE_BOTH,
-		misaligned_pc_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_DATAABORT_TFL, EC_TYPE_BOTH,
-		dataabort_tfl_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_DATAABORT_TWE, EC_TYPE_BOTH,
-		dataabort_twe_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_STACK_MISALIGN, EC_TYPE_BOTH,
-		stack_misalign_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_FLOATING_AARCH32, EC_TYPE_AARCH32,
-		floating_aarch32_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_FLOATING_AARCH64, EC_TYPE_AARCH64,
-		floating_aarch64_handler, 1, 4);
-
+DEFINE_SYNC_DESC(EC_UNKNOWN, EC_TYPE_BOTH, unknown_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_WFI_WFE, EC_TYPE_BOTH, wfi_wfe_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_MCR_MRC_CP15, EC_TYPE_BOTH, mcr_mrc_cp15_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_MCRR_MRRC_CP15, EC_TYPE_AARCH32, mcrr_mrrc_cp15_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_MCR_MRC_CP14, EC_TYPE_AARCH32, mcr_mrc_cp14_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_LDC_STC_CP14, EC_TYPE_AARCH32, ldc_stc_cp14_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_ACCESS_SIMD_REG, EC_TYPE_BOTH, access_simd_reg_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_MCR_MRC_CP10, EC_TYPE_AARCH32, mcr_mrc_cp10_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_MRRC_CP14, EC_TYPE_AARCH32, mrrc_cp14_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_ILLEGAL_EXE_STATE, EC_TYPE_BOTH, illegal_exe_state_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_SVC_AARCH32, EC_TYPE_AARCH32, svc_aarch32_handler, 0, 0);
+DEFINE_SYNC_DESC(EC_HVC_AARCH32, EC_TYPE_AARCH32, hvc_aarch32_handler, 0, 0);
+DEFINE_SYNC_DESC(EC_SMC_AARCH32, EC_TYPE_AARCH32, smc_aarch32_handler, 0, 4);
+DEFINE_SYNC_DESC(EC_SVC_AARCH64, EC_TYPE_AARCH64, svc_aarch64_handler, 0, 0);
+DEFINE_SYNC_DESC(EC_HVC_AARCH64, EC_TYPE_AARCH64, hvc_aarch64_handler, 0, 0);
+DEFINE_SYNC_DESC(EC_SMC_AARCH64, EC_TYPE_AARCH64, smc_aarch64_handler, 0, 4);
+DEFINE_SYNC_DESC(EC_ACESS_SYSTEM_REG, EC_TYPE_AARCH64, access_system_reg_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_INSABORT_TFL, EC_TYPE_BOTH, insabort_tfl_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_INSABORT_TWE, EC_TYPE_BOTH, insabort_twe_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_MISALIGNED_PC, EC_TYPE_BOTH, misaligned_pc_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_DATAABORT_TFL, EC_TYPE_BOTH, dataabort_tfl_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_DATAABORT_TWE, EC_TYPE_BOTH, dataabort_twe_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_STACK_MISALIGN, EC_TYPE_BOTH, stack_misalign_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_FLOATING_AARCH32, EC_TYPE_AARCH32, floating_aarch32_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_FLOATING_AARCH64, EC_TYPE_AARCH64, floating_aarch64_handler, 1, 4);
 DEFINE_SYNC_DESC(EC_SERROR, EC_TYPE_BOTH, serror_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_BREAKPOINT_TFL, EC_TYPE_BOTH,
-		breakpoint_tfl_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_BREAKPOINT_TWE, EC_TYPE_BOTH,
-		breakpoint_twe_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_SOFTWARE_STEP_TFL, EC_TYPE_BOTH,
-		software_step_tfl_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_SOFTWARE_STEP_TWE, EC_TYPE_BOTH,
-		software_step_twe_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_WATCHPOINT_TFL, EC_TYPE_BOTH,
-		watchpoint_tfl_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_WATCHPOINT_TWE, EC_TYPE_BOTH,
-		watchpoint_twe_handler, 1, 4);
-
+DEFINE_SYNC_DESC(EC_BREAKPOINT_TFL, EC_TYPE_BOTH, breakpoint_tfl_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_BREAKPOINT_TWE, EC_TYPE_BOTH, breakpoint_twe_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_SOFTWARE_STEP_TFL, EC_TYPE_BOTH, software_step_tfl_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_SOFTWARE_STEP_TWE, EC_TYPE_BOTH, software_step_twe_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_WATCHPOINT_TFL, EC_TYPE_BOTH, watchpoint_tfl_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_WATCHPOINT_TWE, EC_TYPE_BOTH, watchpoint_twe_handler, 1, 4);
 DEFINE_SYNC_DESC(EC_BKPT_INS, EC_TYPE_AARCH32, bkpt_ins_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_VCTOR_CATCH, EC_TYPE_AARCH32,
-		vctor_catch_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_BRK_INS, EC_TYPE_AARCH64,
-		brk_ins_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_VCTOR_CATCH, EC_TYPE_AARCH32, vctor_catch_handler, 1, 4);
+DEFINE_SYNC_DESC(EC_BRK_INS, EC_TYPE_AARCH64, brk_ins_handler, 1, 4);
 
 void sync_from_lower_EL_handler(gp_regs *data)
 {
@@ -542,11 +471,13 @@ void sync_from_lower_EL_handler(gp_regs *data)
 out:
 	local_irq_disable();
 
-	enter_to_guest(get_current_vcpu(), NULL);
+	enter_to_guest(vcpu, NULL);
 }
 
 static int __init_text aarch64_sync_init(void)
 {
+	extern unsigned char __sync_desc_start;
+	extern unsigned char __sync_desc_end;
 	struct sync_desc *desc;
 
 	section_for_each_item(__sync_desc_start, __sync_desc_end, desc) {
