@@ -147,6 +147,9 @@ struct task {
 
 	char name[TASK_NAME_SIZE + 1];
 
+	void (*sched_out)(struct task *task);
+	void (*sched_in)(struct task *task);
+
 	void *pdata;		/* connect to the vcpu */
 	void *arch_data;	/* arch data to this task */
 } __align_cache_line;

@@ -447,29 +447,12 @@ static void local_switch_to(struct pcpu *pcpu,
 static void inline task_switch_out(struct pcpu *pcpu,
 		struct task *cur, struct task *next)
 {
-#ifdef CONFIG_VIRT
-	struct vm *vm;
-
-	if (task_is_vcpu(cur)) {
-		vm = task_to_vm(cur);
-		atomic_dec(&vm->vcpu_online_cnt);
-	}
-#endif
-
 	pcpu->switch_out(pcpu, cur, next);
 }
 
 static void inline task_switch_to(struct pcpu *pcpu,
 		struct task *cur, struct task *next)
 {
-#ifdef CONFIG_VIRT
-	struct vm *vm;
-
-	if (task_is_vcpu(next)) {
-		vm = task_to_vm(next);
-		atomic_inc(&vm->vcpu_online_cnt);
-	}
-#endif
 	pcpu->switch_to(pcpu, cur, next);
 	next->ctx_sw_cnt++;
 }
@@ -478,10 +461,8 @@ void switch_to_task(struct task *cur, struct task *next)
 {
 	struct pcpu *pcpu = get_cpu_var(pcpu);
 
-#ifdef CONFIG_VIRT
-	if (task_is_vcpu(cur))
-		save_vcpu_context(cur);
-#endif
+	if (cur->sched_out)
+		cur->sched_out(cur);
 
 	/* 
 	 * check the current task's stat and do some action
@@ -515,10 +496,8 @@ void switch_to_task(struct task *cur, struct task *next)
 	pcpu->running_task = next;
 	sched_tick_enable(MILLISECS(next->run_time));
 
-#ifdef CONFIG_VIRT
-	if (task_is_vcpu(next))
-		restore_vcpu_context(next);
-#endif
+	if (next->sched_in)
+		next->sched_in(next);
 
 	next->stat = TASK_STAT_RUNNING;
 	task_info(next)->cpu = pcpu->pcpu_id;

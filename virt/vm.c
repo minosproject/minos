@@ -308,6 +308,22 @@ free_vcpu:
 	return NULL;
 }
 
+static void vcpu_sched_out(struct task *task)
+{
+	struct vm *vm = task_to_vm(task);
+
+	save_vcpu_context(task);
+	atomic_inc(&vm->vcpu_online_cnt);
+}
+
+static void vcpu_sched_in(struct task *task)
+{
+	struct vm *vm = task_to_vm(task);
+
+	restore_vcpu_context(task);
+	atomic_dec(&vm->vcpu_online_cnt);
+}
+
 static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 {
 	char name[64];
@@ -327,6 +343,9 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 		release_task(task);
 		return NULL;
 	}
+
+	task->sched_out = vcpu_sched_out;
+	task->sched_in = vcpu_sched_in;
 
 	task->pdata = vcpu;
 	vcpu->task = task;
