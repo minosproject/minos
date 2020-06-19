@@ -22,8 +22,14 @@ static int bootmem_locked;
 
 static struct slab_header *bootmem_slab_free;
 
+int bootmem_is_locked(void)
+{
+	return bootmem_locked;
+}
+
 void reclaim_bootmem(void)
 {
+	static struct slab_header *sh;
 	bootmem_locked = 1;
 
 	/*
@@ -33,9 +39,10 @@ void reclaim_bootmem(void)
 	if (minos_stack_bottom > minos_bootmem_base)
 		add_slab_mem(minos_bootmem_base, minos_stack_bottom - minos_bootmem_base);
 
-	while (bootmem_slab_free != NULL) {
+	while (bootmem_slab_free) {
+		sh = bootmem_slab_free->next;
 		add_slab_mem((unsigned long)bootmem_slab_free, bootmem_slab_free->size);
-		bootmem_slab_free = bootmem_slab_free->next;
+		bootmem_slab_free = sh;
 	}
 }
 

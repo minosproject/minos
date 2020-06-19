@@ -279,74 +279,6 @@ static int add_block_section(phy_addr_t base, size_t size, int type)
 	return 0;
 }
 
-static void parse_system_regions(void)
-{
-	int type;
-	struct memory_region *region;
-
-	list_for_each_entry(region, &mem_list, list) {
-		type = memory_region_type(region);
-		if ((type == MEMORY_REGION_TYPE_RSV) ||
-			(type == MEMORY_REGION_TYPE_VM) ||
-			(type == MEMORY_REGION_TYPE_DTB))
-			continue;
-
-		if (!PAGE_ALIGN(region->vir_base) || !PAGE_ALIGN(region->size)) {
-			pr_err("memory section is not page align 0x%x 0x%x\n",
-					region->vir_base, region->size);
-			continue;
-		}
-
-		add_block_section(region->vir_base, region->size, type);
-	}
-}
-
-static unsigned long blocks_bitmap_init(unsigned long base)
-{
-	int i;
-	struct mem_section *section;
-	unsigned long bitmap_base = base;
-
-	/*
-	 * allocate memory for bitmap
-	 */
-	for (i = 0; i < nr_sections; i++) {
-		section = &mem_sections[i];
-		if (!(section->flags & MEM_SECTION_F_BLOCK))
-			continue;
-
-		section->bitmap = (unsigned long *)bitmap_base;
-		section->bm_current = 0;
-		section->bm_end = section->total_cnt;
-		bitmap_base += BITS_TO_LONGS(section->total_cnt) *
-			sizeof(unsigned long);
-	}
-
-	memset((void *)base, 0, bitmap_base - base);
-
-	return bitmap_base;
-}
-
-static unsigned long blocks_table_init(unsigned long base)
-{
-	int i;
-	struct mem_section *section;
-	unsigned long tmp = base;
-
-	/* allocate memory for mem_block table need confirm */
-	for (i = 0; i < nr_sections; i++) {
-		section = &mem_sections[i];
-		if (!(section->flags & MEM_SECTION_F_BLOCK))
-			continue;
-
-		section->blocks = (struct mem_block *)tmp;
-		tmp += (section->total_cnt) * sizeof(struct mem_block);
-		tmp = BALIGN(tmp, sizeof(unsigned long));
-	}
-
-	return tmp;
-}
-
 static void process_boot_section(void)
 {
 	struct mem_section *section = NULL;
@@ -414,12 +346,84 @@ static void process_boot_section(void)
 	}
 }
 
+static void parse_system_regions(void)
+{
+	int type;
+	struct memory_region *region;
+
+	list_for_each_entry(region, &mem_list, list) {
+		type = memory_region_type(region);
+		if ((type == MEMORY_REGION_TYPE_RSV) ||
+			(type == MEMORY_REGION_TYPE_VM) ||
+			(type == MEMORY_REGION_TYPE_DTB))
+			continue;
+
+		if (!PAGE_ALIGN(region->vir_base) || !PAGE_ALIGN(region->size)) {
+			pr_err("memory section is not page align 0x%x 0x%x\n",
+					region->vir_base, region->size);
+			continue;
+		}
+
+		add_block_section(region->vir_base, region->size, type);
+	}
+
+	process_boot_section();
+}
+
+static unsigned long blocks_bitmap_init(unsigned long base)
+{
+	int i;
+	struct mem_section *section;
+	unsigned long bitmap_base = base;
+
+	/*
+	 * allocate memory for bitmap
+	 */
+	for (i = 0; i < nr_sections; i++) {
+		section = &mem_sections[i];
+		if (!(section->flags & MEM_SECTION_F_BLOCK))
+			continue;
+
+		section->bitmap = (unsigned long *)bitmap_base;
+		section->bm_current = 0;
+		section->bm_end = section->total_cnt;
+		bitmap_base += BITS_TO_LONGS(section->total_cnt) *
+			sizeof(unsigned long);
+	}
+
+	memset((void *)base, 0, bitmap_base - base);
+
+	return bitmap_base;
+}
+
+static unsigned long blocks_table_init(unsigned long base)
+{
+	int i;
+	struct mem_section *section;
+	unsigned long tmp = base;
+
+	/* allocate memory for mem_block table need confirm */
+	for (i = 0; i < nr_sections; i++) {
+		section = &mem_sections[i];
+		if (!(section->flags & MEM_SECTION_F_BLOCK))
+			continue;
+
+		section->blocks = (struct mem_block *)tmp;
+		tmp += (section->total_cnt) * sizeof(struct mem_block);
+		tmp = BALIGN(tmp, sizeof(unsigned long));
+	}
+
+	return tmp;
+}
+
 static int mem_sections_init(void)
 {
 	size_t boot_page_size;
 	unsigned long mem_start, mem_end;
 	struct mem_section *section = NULL;
 	unsigned long code_base = minos_start;
+	struct page *page;
+	int i;
 
 	/*
 	 * after here can not call the bootmem api to allocate
@@ -440,8 +444,6 @@ static int mem_sections_init(void)
 	mem_end = BALIGN(mem_start, PAGE_SIZE);
 	pr_notice("minos free memory start: 0x%x\n", mem_end);
 
-	process_boot_section();
-
 	/*
 	 * since the boot section will always as page section
 	 * init its page information now
@@ -449,6 +451,12 @@ static int mem_sections_init(void)
 	section = &mem_sections[0];
 	boot_page_size = (mem_end - code_base) >> PAGE_SHIFT;
 	section->free_cnt -= boot_page_size;
+
+	for (i = 0; i < boot_page_size; i++) {
+		page = &section->pages[i];
+		page->phy_base = section->phy_base + (i >> PAGE_SHIFT) + 1;
+		page->magic = 0x4e50654f;
+	}
 
 	/*
 	 * mask the used memory's bit let memory allocator do not
@@ -1459,13 +1467,14 @@ int mm_do_init(void)
 	slab_init();
 	page_pool_init();
 	parse_system_regions();
-	mem_sections_init();
 
 	/*
 	 * need ensure that hypervisor has enough
 	 * memory to map all the memory
 	 */
 	map_os_memory();
+
+	mem_sections_init();
 
 	/*
 	 * reclaim the memory from the bootmem allocator

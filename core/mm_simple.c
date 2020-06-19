@@ -38,7 +38,7 @@ extern unsigned long bootmem_size;
 extern struct list_head mem_list;
 
 #define MEM_TYPE_SLAB	0xabcdef01
-#define MEM_TYPE_PAGE	0xabcdef02
+#define MEM_TYPE_PAGE	0x4e50654f
 
 static void init_mem_zone(unsigned long base, size_t size)
 {

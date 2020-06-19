@@ -102,9 +102,22 @@ unsigned long page_table_description(unsigned long flags)
 	return arch_page_table_description(flags);
 }
 
-static uint64_t alloc_mapping_page(struct mm_struct *mm)
+static unsigned long alloc_mapping_page(struct mm_struct *mm)
 {
 	struct page *page;
+	void *addr;
+
+	/*
+	 * will have two case:
+	 * 1 - when mapping bootmem when dynamic mm is not finised
+	 * 2 - dynamic mm is finished
+	 */
+	if (!bootmem_is_locked()) {
+		addr = alloc_boot_pages(1);
+		memset(addr, 0, PAGE_SIZE);
+
+		return (unsigned long)addr;
+	}
 
 	page = alloc_page();
 	if (!page)
