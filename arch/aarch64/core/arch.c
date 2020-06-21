@@ -204,13 +204,19 @@ static int __init_text aarch64_init_percpu(void)
 {
 	uint64_t reg;
 
+	pr_notice("current EL is 0x%x\n", GET_EL(read_CurrentEl()));
+#ifdef CONFIG_VIRT
+	if (!IS_IN_EL2())
+		panic("minos must run at EL2 mode\n");
+#endif
+
 	/*
 	 * set IMO and FMO let physic irq and fiq taken to
 	 * EL2, without this irq and fiq will not send to
 	 * the cpu
 	 */
 	reg = read_sysreg64(HCR_EL2);
-	reg |= HCR_EL2_IMO | HCR_EL2_FMO;
+	reg |= HCR_EL2_IMO | HCR_EL2_FMO | HCR_EL2_AMO;
 	write_sysreg64(reg, HCR_EL2);
 	dsb();
 
@@ -220,16 +226,6 @@ arch_initcall_percpu(aarch64_init_percpu);
 
 int arch_early_init(void)
 {
-	uint64_t value = read_sysreg(ID_ISAR5_EL1);
-
-	pr_notice("current EL is 0x%x\n", GET_EL(read_CurrentEl()));
-	pr_notice("ID_ISAR5_EL1: 0x%x\n", value);
-
-#ifdef CONFIG_VIRT
-	if (!IS_IN_EL2())
-		panic("minos must run at EL2 mode\n");
-#endif
-
 #ifdef CONFIG_DEVICE_TREE
 	fdt_early_init();
 #endif
@@ -242,6 +238,47 @@ int __arch_init(void)
 	fdt_init();
 #endif
 	return 0;
+}
+
+uint64_t cpuid_to_affinity(int cpuid)
+{
+	int aff0, aff1;
+
+	if (cpu_has_feature(ARM_FEATURE_MPIDR_SHIFT))  {
+		if (cpuid < CONFIG_NR_CPUS_CLUSTER0)
+			return (cpuid << MPIDR_EL1_AFF1_LSB);
+		else {
+			aff0 = cpuid - CONFIG_NR_CPUS_CLUSTER0;
+			aff1 = 1;
+
+			return (aff1 << MPIDR_EL1_AFF2_LSB) |
+				(aff0 << MPIDR_EL1_AFF1_LSB);
+		}
+	} else {
+		if (cpuid < CONFIG_NR_CPUS_CLUSTER0) {
+			return cpuid;
+		} else {
+			aff0 = cpuid - CONFIG_NR_CPUS_CLUSTER0;
+			aff1 = 1;
+
+			return (aff1 << MPIDR_EL1_AFF1_LSB) + aff0;
+		}
+	}
+}
+
+int affinity_to_cpuid(unsigned long affinity)
+{
+	int aff0, aff1;
+
+	if (cpu_has_feature(ARM_FEATURE_MPIDR_SHIFT))  {
+		aff0 = (affinity >> MPIDR_EL1_AFF1_LSB) & 0xff;
+		aff1 = (affinity >> MPIDR_EL1_AFF2_LSB) & 0xff;
+	} else {
+		aff0 = (affinity >> MPIDR_EL1_AFF0_LSB) & 0xff;
+		aff1 = (affinity >> MPIDR_EL1_AFF1_LSB) & 0xff;
+	}
+
+	return (aff1 * CONFIG_NR_CPUS_CLUSTER0) + aff0;
 }
 
 void arch_smp_init(phy_addr_t *smp_h_addr)

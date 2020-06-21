@@ -5,6 +5,7 @@
 #include <asm/aarch64_helper.h>
 #include <config/config.h>
 #include <minos/task_def.h>
+#include <asm/cpu_feature.h>
 
 #ifdef CONFIG_VIRT
 #include <asm/virt.h>
@@ -77,51 +78,10 @@
 
 #define nop() asm ("nop")
 
-static inline int affinity_to_cpuid(unsigned long affinity)
-{
-	int aff0, aff1;
-
-#ifdef CONFIG_MPIDR_SHIFT
-	aff0 = (affinity >> MPIDR_EL1_AFF1_LSB) & 0xff;
-	aff1 = (affinity >> MPIDR_EL1_AFF2_LSB) & 0xff;
-#else
-	aff0 = (affinity >> MPIDR_EL1_AFF0_LSB) & 0xff;
-	aff1 = (affinity >> MPIDR_EL1_AFF1_LSB) & 0xff;
-#endif
-
-	return (aff1 * CONFIG_NR_CPUS_CLUSTER0) + aff0;
-}
-
 static inline int affinity_to_logic_cpu(uint32_t aff3, uint32_t aff2,
 		uint32_t aff1, uint32_t aff0)
 {
 	return (aff1 * CONFIG_NR_CPUS_CLUSTER0) + aff0;
-}
-
-static inline uint64_t cpuid_to_affinity(int cpuid)
-{
-	int aff0, aff1;
-
-#ifdef CONFIG_MPIDR_SHIFT
-	if (cpuid < CONFIG_NR_CPUS_CLUSTER0)
-		return (cpuid << MPIDR_EL1_AFF1_LSB);
-	else {
-		aff0 = cpuid - CONFIG_NR_CPUS_CLUSTER0;
-		aff1 = 1;
-
-		return (aff1 << MPIDR_EL1_AFF2_LSB) |
-				(aff0 << MPIDR_EL1_AFF1_LSB);
-	}
-#else
-	if (cpuid < CONFIG_NR_CPUS_CLUSTER0) {
-		return cpuid;
-	} else {
-		aff0 = cpuid - CONFIG_NR_CPUS_CLUSTER0;
-		aff1 = 1;
-
-		return (aff1 << MPIDR_EL1_AFF1_LSB) + aff0;
-	}
-#endif
 }
 
 #ifdef CONFIG_VIRT
@@ -243,5 +203,8 @@ int __arch_init(void);
 int arch_early_init(void);
 void arch_init_task(struct task *task, void *entry, void *data);
 void arch_release_task(struct task *task);
+
+uint64_t cpuid_to_affinity(int cpuid);
+int affinity_to_cpuid(unsigned long affinity);
 
 #endif

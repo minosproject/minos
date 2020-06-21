@@ -14,16 +14,6 @@ config NR_CPUS_CLUSTER1
 	  cpu count in SOC cluster1, this
 	  will help to caculate the cpuid
 
-config MPIDR_SHIFT
-	bool "shifted affinities support"
-	default n
-	help
-	  The FVP_Base_RevC-2xAEMv8A FVP only supports shifted
-	  affinities, which is not compatible with legacy GIC
-	  configurations. Therefore this FVP does not support
-	  these legacy GIC configurations
-
-
 config PLATFORM_ADDRESS_RANGE
 	int "the virtual memory range of the system"
 	default 40

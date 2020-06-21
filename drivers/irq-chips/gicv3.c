@@ -26,17 +26,20 @@
 #include <minos/irq.h>
 #include <minos/of.h>
 #include <minos/mmu.h>
+#include <asm/cpu_feature.h>
 
 spinlock_t gicv3_lock;
 static void *gicd_base = 0;
 
 extern int vgicv3_init(uint64_t *data, int len);
 
-DEFINE_PER_CPU(void *, gicr_rd_base);
-DEFINE_PER_CPU(void *, gicr_sgi_base);
+static DEFINE_PER_CPU(void *, gicr_rd_base);
+static DEFINE_PER_CPU(void *, gicr_sgi_base);
 
 #define gicr_rd_base()	get_cpu_var(gicr_rd_base)
 #define gicr_sgi_base()	get_cpu_var(gicr_sgi_base)
+
+uint64_t cpus_affinity[NR_CPUS];
 
 extern int gic_xlate_irq(struct device_node *node,
 		uint32_t *intspec, unsigned int intsize,
@@ -151,36 +154,54 @@ static int gicv3_set_irq_affinity(uint32_t irq, uint32_t pcpu)
 	return 0;
 }
 
-static void gicv3_send_sgi_list(uint32_t sgi, cpumask_t *mask)
+static inline void __gicv3_send_sgi_list(uint32_t sgi, cpumask_t *mask)
 {
+	uint64_t val_cluster0 = 0;
+	uint64_t val_cluster1 = 0;
 	int cpu;
-	uint64_t val;
-	int list_cluster0 = 0;
-	int list_cluster1 = 0;
 
 	for_each_cpu(cpu, mask) {
 		if (cpu >= CONFIG_NR_CPUS_CLUSTER0)
-			list_cluster1 |= 1 << (cpu - CONFIG_NR_CPUS_CLUSTER0);
+			val_cluster1 |= cpus_affinity[cpu];
 		else
-			list_cluster0 |= (1 << cpu);
+			val_cluster0 |= cpus_affinity[cpu];
 	}
 
 	/*
 	 * TBD: now only support two cluster
 	 */
-	if (list_cluster0) {
-		val = list_cluster0 | (0ul << 16) | (0ul << 32) |
-			(0ul << 48) | (sgi << 24);
-		write_sysreg64(val, ICC_SGI1R_EL1);
-		isb();
+	if (val_cluster0) {
+		val_cluster0 |= (sgi << 24);
+		write_sysreg64(val_cluster0, ICC_SGI1R_EL1);
 	}
 
-	if (list_cluster1) {
-		val = list_cluster1 | (1ul << 16) | (0ul << 32) |
-			(0ul << 48) | (sgi << 24);
-		write_sysreg64(val, ICC_SGI1R_EL1);
-		isb();
+	if (val_cluster1) {
+		val_cluster1 |= (sgi << 24);
+		write_sysreg64(val_cluster1, ICC_SGI1R_EL1);
 	}
+
+	isb();
+}
+
+static inline void __gicv3_send_sgi_list_shif_mpidr(uint32_t sgi, cpumask_t *mask)
+{
+	int cpu;
+	uint64_t value;
+
+	for_each_cpu(cpu, mask) {
+		value = cpus_affinity[cpu] | (sgi << 24);
+		write_sysreg64(value, ICC_SGI1R_EL1);
+	}
+
+	isb();
+}
+
+static void gicv3_send_sgi_list(uint32_t sgi, cpumask_t *mask)
+{
+	if (cpu_has_feature(ARM_FEATURE_MPIDR_SHIFT))
+		__gicv3_send_sgi_list_shif_mpidr(sgi, mask);
+	else
+		__gicv3_send_sgi_list(sgi, mask);
 }
 
 static void gicv3_send_sgi(uint32_t sgi, enum sgi_mode mode, cpumask_t *cpu)
@@ -299,7 +320,24 @@ static void gicv3_wakeup_gicr(void)
 
 static int __init_text gicv3_gicc_init(void)
 {
+	unsigned char aff0, aff1, aff2, aff3;
 	unsigned long reg_value;
+	uint64_t mpidr = read_mpidr_el1();
+	int cpu = smp_processor_id();
+
+	aff0 = mpidr & 0xff;
+	aff1 = (mpidr & 0xff00) >> 8;
+	aff2 = (mpidr & 0xff0000) >> 16;
+	aff3 = (mpidr & 0xff00000000) >> 32;
+
+	if (aff0 > 16)
+		panic("mpidr 0x%x for cpu%d is wrong\n", mpidr, cpu);
+
+	/*
+	 * MPDIR SHIFT means each cluster has one core
+	 */
+	cpus_affinity[cpu] = (1 << aff0) | (aff1 << 16) |
+		((uint64_t)aff2 << 32) | ((uint64_t)aff3 << 48);
 
 	/* enable sre */
 	reg_value = read_icc_sre_el2();
@@ -311,6 +349,8 @@ static int __init_text gicv3_gicc_init(void)
 	write_sysreg32(1 << 1, ICC_CTLR_EL1);
 	write_sysreg32(1, ICC_IGRPEN1_EL1);
 	isb();
+
+
 
 	return 0;
 }
