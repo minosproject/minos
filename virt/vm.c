@@ -96,13 +96,13 @@ static int inline affinity_to_vcpuid(struct vm *vm, unsigned long affinity)
 	 * how to handle bit-little soc ? usually the hvm's
 	 * cpu map is as same as the true hardware, so here
 	 * if the VM is the VM0, the affinity is as same as
-	 * the real hardware
+	 * the real hardware, need better support later
 	 */
-	if (vm_is_hvm(vm))
-		return affinity_to_cpuid(affinity);
-
 	aff1 = (affinity >> 8) & 0xff;
 	aff0 = affinity & 0xff;
+
+	if (aff1 != 0)
+		pr_warn("minos only support one cluster for VM, please check dts\n");
 
 	return (aff1 * VM_NR_CPUS_CLUSTER) + aff0;
 }
