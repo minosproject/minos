@@ -125,11 +125,12 @@
 #define HCR_EL2_TVM		(1ul << 26)
 #define HCR_EL2_TGE		(1ul << 27)
 #define HCR_EL2_TDZ		(1ul << 28)
-#define HCR_EL2_HVC		(1ul << 29)
+#define HCR_EL2_HCD		(1ul << 29)
 #define HCR_EL2_TRVM		(1ul << 30)
 #define HCR_EL2_RW		(1ul << 31)
 #define HCR_EL2_CD		(1ul << 32)
 #define HCR_EL2_ID		(1ul << 33)
+#define HCR_EL2_E2H		(1ul << 34)
 
 #define LOUIS_SHIFT		(21)
 #define LOC_SHIFT		(24)

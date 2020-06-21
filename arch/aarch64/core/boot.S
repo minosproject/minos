@@ -88,6 +88,10 @@ do_start:
 	msr	VBAR_EL2, x1
 	dsb	sy
 
+	/* enable Abort now for early system abort */
+	msr	daifclr, #4
+	isb
+
 	/* invalid the dcache and flush the tlb */
 	bl	inv_dcache_all
 	dsb	sy

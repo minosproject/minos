@@ -29,7 +29,6 @@ void percpus_init(void);
 
 #define put_cpu_data(name)	\
 ({				\
-	(void)(name)		\
 	preempt_enable();	\
 })
 
