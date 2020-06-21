@@ -25,17 +25,6 @@
 #include <virt/vm.h>
 #endif
 
-#define REG_CNTCR	0x0
-
-static int fvp_time_init(void)
-{
-	io_remap(0x2a430000, 64 * 1024);
-
-	/* enable the counter */
-	iowrite32(1, (void *)0x2a430000 + REG_CNTCR);
-	return 0;
-}
-
 #ifdef CONFIG_VIRT
 static int inline fvp_setup_hvm_of(struct vm *vm, void *data)
 {
@@ -70,7 +59,6 @@ static int fvp_setup_hvm(struct vm *vm, void *data)
 
 static struct platform platform_fvp = {
 	.name 		 = "arm,fvp-base",
-	.time_init 	 = fvp_time_init,
 	.cpu_on		 = psci_cpu_on,
 	.cpu_off	 = psci_cpu_off,
 #ifdef CONFIG_VIRT
