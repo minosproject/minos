@@ -52,7 +52,7 @@ do_start:
 
 	// minos_start to __code_start is the reserve memory
 	// for minos
-	ldr	x3, =0xffffffffffe00000
+	ldr	x3, =0xfffffffffffff000
 	and	x1, x1, x3
 	adr	x2, minos_start
 	str	x1, [x2]

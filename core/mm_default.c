@@ -449,6 +449,9 @@ static int mem_sections_init(void)
 	 * init its page information now
 	 */
 	section = &mem_sections[0];
+	if (section->phy_base != code_base)
+		panic("boot memory section is worng\n");
+
 	boot_page_size = (mem_end - code_base) >> PAGE_SHIFT;
 	section->free_cnt -= boot_page_size;
 
@@ -761,7 +764,7 @@ static struct page *__alloc_pages_from_section(struct mem_section *section,
 		return NULL;
 
 	bitmap_set(section->bitmap, bit, count);
-	if ((count = 1) || (align == 1)) {
+	if ((1 == count) || (1 == align)) {
 		section->bm_current = bit + count;
 		if (section->bm_current >= section->total_cnt)
 			section->bm_current = 0;
