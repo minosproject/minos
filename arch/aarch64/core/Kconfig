@@ -27,4 +27,10 @@ config EXCEPTION_STACK_SIZE
 	help
 	  the stack size of the exception vector
 
+config ARMV8_ATOMIC_LSE
+	bool "use lse atomic instruction"
+	default n
+	help
+	  this require at leaset armv8.1 soc
+
 endmenu

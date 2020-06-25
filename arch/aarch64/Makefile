@@ -24,13 +24,16 @@ $(warning Detected assembler with broken .inst; disassembly will be unreliable)
   endif
 endif
 
-# Check for binutils support for specific extensions
-lseinstr := $(call as-instr,.arch_extension lse,-DCONFIG_AS_LSE=1)
+ifeq ($(CONFIG_ARMV8_ATOMIC_LSE), y)
+	ARMV8_ARCH	= armv8.1-a
+else
+	ARMV8_ARCH	= armv8-a
+endif
 
 MBUILD_LDFLAGS	+= -X
 
 MBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst)
-MBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables -march=armv8-a -ffixed-x28
+MBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables -march=$(ARMV8_ARCH) -ffixed-x28
 MBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
 
 ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)

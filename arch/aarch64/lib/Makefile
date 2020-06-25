@@ -1,4 +1,4 @@
-obj-y += atomic.o
+# obj-y += atomic.o
 obj-y += bitops.o
 obj-y += memchr.o
 obj-y += memcmp.o
