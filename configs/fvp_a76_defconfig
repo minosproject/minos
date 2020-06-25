@@ -1,0 +1,141 @@
+CONFIG_ARCH_AARCH64=y
+CONFIG_64BIT=y
+
+#
+# Minos aarch64 Arch Feature
+#
+CONFIG_NR_CPUS_CLUSTER0=2
+CONFIG_NR_CPUS_CLUSTER1=0
+# CONFIG_MPIDR_SHIFT is not set
+CONFIG_PLATFORM_ADDRESS_RANGE=40
+CONFIG_EXCEPTION_STACK_SIZE=0x2000
+# end of Minos aarch64 Arch Feature
+
+#
+# Minos aarch64 virtualaztion features
+#
+
+#
+# Minos OS configuration
+#
+CONFIG_MAX_CPU_NR=8
+# CONFIG_TASK_STACK_SIZE_4K is not set
+CONFIG_TASK_STACK_SIZE_8K=y
+CONFIG_TASK_STACK_SIZE=0x2000
+CONFIG_TASK_STACK_SHIFT=13
+CONFIG_STACK_PAGE_ALIGN=y
+CONFIG_MAX_SLAB_BLOCKS=10
+CONFIG_TASK_RUN_TIME=100
+CONFIG_MINOS_IRQWORK_IRQ=5
+CONFIG_SMP_FUNCTION_CALL_IRQ=6
+CONFIG_MINOS_RESCHED_IRQ=7
+CONFIG_SMP=y
+CONFIG_NR_SGI_IRQS=16
+CONFIG_NR_PPI_IRQS=16
+CONFIG_NR_SPI_IRQS=256
+# CONFIG_OS_REALTIME_CORE0 is not set
+# CONFIG_PRINT_DEBUG is not set
+# CONFIG_PRINT_INFO is not set
+CONFIG_PRINT_NOTICE=y
+# CONFIG_PRINT_WARN is not set
+# CONFIG_PRINT_ERROR is not set
+CONFIG_DEFAULT_MM_ALLOCATOR=y
+# CONFIG_SIMPLE_MM_ALLOCATOR is not set
+CONFIG_LOG_LEVEL=3
+# end of Minos OS configuration
+
+#
+# Minos Virtualization Configuration
+#
+CONFIG_VIRT=y
+CONFIG_VIRTIO_MMIO=y
+CONFIG_MAX_VM=64
+CONFIG_VRTC_PL031=y
+CONFIG_VWDT_SP805=y
+
+#
+# Virqchip controller support
+#
+CONFIG_VIRQCHIP_VGICV2=y
+CONFIG_VIRQCHIP_VGICV3=y
+# CONFIG_VIRQCHIP_BCM2836 is not set
+CONFIG_VIRQCHIP_AIC=y
+# end of Virqchip controller support
+
+CONFIG_VMBOX=y
+
+#
+# VM operating system support
+#
+CONFIG_OS_LINUX_SUPPORT=y
+CONFIG_OS_XNU_SUPPORT=y
+# end of VM operating system support
+# end of Minos Virtualization Configuration
+
+#
+# Device Drivers
+#
+
+#
+# Interrupt Controller Driver
+#
+CONFIG_IRQCHIP_GICV3=y
+CONFIG_IRQCHIP_GICV2=y
+# CONFIG_IRQCHIP_BCM2836 is not set
+# end of Interrupt Controller Driver
+
+#
+# Serial Drivers
+#
+CONFIG_SERIAL=y
+# CONFIG_SERIAL_BCM283X_MU is not set
+# CONFIG_SERIAL_MVEBU_A3700 is not set
+CONFIG_SERIAL_PL011=y
+# CONFIG_SERIAL_AMLOGIC is not set
+# end of Serial Drivers
+
+CONFIG_DEVICE_TREE=y
+# end of Device Drivers
+
+#
+# Platform Configuration
+#
+CONFIG_SOC_FVP=y
+# CONFIG_SOC_MARVELL_A3700 is not set
+# CONFIG_SOC_BCM2837 is not set
+# CONFIG_SOC_BCM2838 is not set
+# CONFIG_SOC_AMLOGIC is not set
+CONFIG_MINOS_ENTRY_ADDRESS=0xc0000000
+CONFIG_MINOS_RAM_SIZE=0x4000000
+CONFIG_NR_CPUS=2
+CONFIG_MPIDR_SHIFT=y
+CONFIG_UART_BASE=0x1c0a0000
+CONFIG_UART_IO_SIZE=0x1000
+# end of Platform Configuration
+
+#
+# Third Party Library And Module
+#
+
+#
+# Application Config
+#
+CONFIG_SHELL=y
+
+#
+# Shell config
+#
+CONFIG_SHELL_TASK_PRIO=63
+# end of Shell config
+# end of Application Config
+
+#
+# System libary config
+#
+
+#
+# Shell Command Support
+#
+CONFIG_SHELL_COMMAND_TASK=y
+# end of Shell Command Support
+# end of System libary config
