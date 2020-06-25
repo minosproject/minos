@@ -421,7 +421,6 @@ static int mem_sections_init(void)
 	size_t boot_page_size;
 	unsigned long mem_start, mem_end;
 	struct mem_section *section = NULL;
-	unsigned long code_base = minos_start;
 	struct page *page;
 	int i;
 
@@ -449,10 +448,10 @@ static int mem_sections_init(void)
 	 * init its page information now
 	 */
 	section = &mem_sections[0];
-	if (section->phy_base != code_base)
-		panic("boot memory section is worng\n");
+	if (section->phy_base != CONFIG_MINOS_ENTRY_ADDRESS)
+		panic("boot memory section is worng 0x%lx\n", section->phy_base);
 
-	boot_page_size = (mem_end - code_base) >> PAGE_SHIFT;
+	boot_page_size = (mem_end - section->phy_base) >> PAGE_SHIFT;
 	section->free_cnt -= boot_page_size;
 
 	for (i = 0; i < boot_page_size; i++) {
