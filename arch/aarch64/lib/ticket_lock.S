@@ -16,21 +16,36 @@
 
 #include <asm/asm_marco.S>
 
-	.global arch_spin_lock
-	.global arch_spin_unlock
+	.global arch_ticket_lock
+	.global arch_ticket_unlock
 
-func arch_spin_lock
-	mov	w2, #1
+func arch_ticket_lock
+	prfm    pstl1keep, [x0]
+	add	x4, x0, #4
+loop1:
+	ldaxr	w2, [x4]
+	add	w2, w2, #1
+	stlxr	w3, w2, [x4]
+	cbnz	w3, loop1
+	sub	w2, w2, #1
+
+	ldaxr	w1, [x0]
+	cmp	w1, w2
+	b.eq	out
+
 	sevl
-l1:	wfe
-l2:	ldaxr	w1, [x0]
-	cbnz	w1, l1
-	stlxr	w1, w2, [x0]
-	cbnz	w1, l1
+loop2:
+	wfe
+	ldaxr	w1, [x0]
+	cmp	w1, w2
+	b.ne	loop2
+out:
 	ret
-endfunc arch_spin_lock
+endfunc arch_ticket_lock
 
-func arch_spin_unlock
-	stlr	wzr, [x0]
+func arch_ticket_unlock
+	ldar	w1, [x0]
+	add	w1, w1, #1
+	stlr	w1, [x0]
 	ret
-endfunc arch_spin_unlock
+endfunc arch_ticket_unlock

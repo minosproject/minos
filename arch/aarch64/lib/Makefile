@@ -13,3 +13,4 @@ obj-y += strlen.o
 obj-y += strncmp.o
 obj-y += strnlen.o
 obj-y += strrchr.o
+obj-y += ticket_lock.o

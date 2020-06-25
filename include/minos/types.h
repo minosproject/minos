@@ -141,10 +141,14 @@ typedef struct {
 	int value;
 } atomic_t;
 
+/*
+ * [0  - 15] - current number
+ * [16 - 31] - next number
+ */
 typedef struct spinlock {
 #ifdef CONFIG_SMP
-	atomic_t next_ticket;
-	atomic_t ticket_in_service;
+	int current_ticket;
+	int next_ticket;
 #endif
 } spinlock_t;
 
