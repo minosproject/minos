@@ -123,7 +123,7 @@ Minos currently supports both 32-bit and 64-bit VMs, and supports official relat
 Connect your raspberry4 with a usb serial, and enter into u-boot command line mode
 
 ```
-# fatload mmc 0:1 0x37200000 zephyr.bin; fatload mmc 0:1 0x30008000 Image; fatload mmc 0:1 0x33e00000 vm1_dtb.img; fatload mmc 0:1 0x34000000 vm1_ramdisk.img; fatload mmc 0:1 0x37408000 minos.bin; fatload mmc  0:1 0x38000000 minos.dtb; fatload mmc 0:1 0x00008000 Image; fatload mmc 0:1 0x03e00000 vm0_dtb.img; booti 0x37408000 - 0x38000000
+# fatload mmc 0:1 0x37200000 zephyr.bin; fatload mmc 0:1 0x30008000 Image; fatload mmc 0:1 0x33e00000 vm1_dtb.img; fatload mmc 0:1 0x34000000 vm1_ramdisk.img; fatload mmc 0:1 0x37408000 minos.bin; fatload mmc  0:1 0x38000000 minos.dtb; fatload mmc 0:1 0x00080000 Image; fatload mmc 0:1 0x03e00000 vm0_dtb.img; booti 0x37408000 - 0x38000000
 ```
 
  More information, please see below video:
