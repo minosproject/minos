@@ -34,10 +34,10 @@
 		arch_restore_irqflags(flags); \
 	} while (0)
 #else
-#define spin_lock(l)			preempt_disable()
-#define spin_unlock(l)			preempt_enable()
-#define spin_lock_irqsave(l, flags)	local_irqsave(flags)
-#define spin_lock_irqrestore(l, flags)	local_irqrestore(flags);
+#define spin_lock(l)                     preempt_disable()
+#define spin_unlock(l)                   preempt_enable()
+#define spin_lock_irqsave(l, flags)      local_irq_save(flags)
+#define spin_unlock_irqrestore(l, flags) local_irq_restore(flags)
 #endif
 
 #endif
