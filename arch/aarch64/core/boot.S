@@ -31,7 +31,11 @@ _start:
 	/* interrupt disabled mmu/dcache/icache off */
 	msr	daifset, #2
 	b	do_start
+#ifdef CONFIG_MINOS_TEXT_OFFSET
+	.quad   CONFIG_MINOS_TEXT_OFFSET	     /* Image load offset from start of RAM */
+#else
 	.quad   CONFIG_MINOS_ENTRY_ADDRESS	     /* Image load offset from start of RAM */
+#endif
         .quad   __code_end - _start		     /* reserved */
         .quad   0				     /* reserved */
         .quad   0				     /* reserved */
