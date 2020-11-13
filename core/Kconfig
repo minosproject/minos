@@ -109,4 +109,10 @@ config LOG_LEVEL
 	default 1 if PRINT_ERROR
 	default 4
 
+config LOG_LEVEL_COLORFUL
+	bool "colorful log level"
+	default n
+	help
+	  color the log level to make the log easier to read
+
 endmenu
