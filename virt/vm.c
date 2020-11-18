@@ -1278,7 +1278,7 @@ static int vm_command_hdl(int argc, char **argv)
 {
 	uint32_t vmid;
 
-	if ((strcmp(argv[1], "start") == 0) && (argc > 2)) {
+	if (argc > 2 && strcmp(argv[1], "start") == 0) {
 		vmid = atoi(argv[2]);
 		if (vmid == 0xff)
 			start_all_vm();
