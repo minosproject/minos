@@ -6,11 +6,10 @@
 extern unsigned long __shell_command_start;
 extern unsigned long __shell_command_end;
 
-static int
-help_cmd(int argc, char** argv)
+static int help_cmd(int argc, char **argv)
 {
-    struct shell_command* cmd;
-    char* spaces = "       ";
+    struct shell_command *cmd;
+    char *spaces = "       ";
 
     section_for_each_item(__shell_command_start, __shell_command_end, cmd) {
         printf("%s%s - %s\n",
