@@ -89,7 +89,7 @@ int shell_task(void *data)
 				break;
 
 			if (pesh->tty) {
-				if (ch == 4)	/*  ctrl + D */ {
+				if (ch == 29) { // Ctrl-]
 					shell_detach_tty();
 					esh_rx(pesh, '\n');
 				} else {
