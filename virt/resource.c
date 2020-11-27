@@ -35,7 +35,7 @@ static int create_vm_vdev_of(struct vm *vm, struct device_node *node)
 {
 	vdev_init_t func;
 
-	pr_info("%s name\n", __func__, node->name);
+	pr_info("%s %s\n", __func__, node->name);
 
 	if (!node->compatible)
 		return -EINVAL;
