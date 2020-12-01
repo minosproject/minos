@@ -34,7 +34,12 @@ struct irqtag;
 
 #define HVM_SPI_VIRQ_BASE	(VM_LOCAL_VIRQ_NR)
 
+#ifndef CONFIG_GVM_SPI_VIRQ_NR
 #define GVM_SPI_VIRQ_NR		(64)
+#else
+#define GVM_SPI_VIRQ_NR		CONFIG_GVM_SPI_VIRQ_NR
+#endif
+
 #define GVM_SPI_VIRQ_BASE	(VM_LOCAL_VIRQ_NR)
 
 #define VIRQ_SPI_OFFSET(virq)	((virq) - VM_LOCAL_VIRQ_NR)
