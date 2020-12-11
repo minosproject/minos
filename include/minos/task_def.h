@@ -8,8 +8,8 @@
 
 /*
  * 0  - 63 : realtime task
- * 64 - 50 : physical cpu local task, non-realtime task
- * 51	   : idle task
+ * 64 - 70 : physical cpu local task, non-realtime task
+ * 71	   : idle task
  */
 
 #define OS_NR_TASKS		512
