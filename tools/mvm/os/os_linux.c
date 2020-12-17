@@ -547,7 +547,7 @@ static int linux_early_init(struct vm *vm)
 	 * memory must 2M align
 	 */
 	vm->mem_start += 0x1fffff;
-	vm->mem_start &= ~0x1ffff;
+	vm->mem_start &= ~0x1fffff;
 
 	if (vm->entry == 0) {
 		if (vm->flags & VM_FLAGS_64BIT)
