@@ -29,3 +29,4 @@ obj-y += core.o
 obj-y += hook.o
 obj-y += console.o
 obj-y += bootarg.o
+obj-y += ramdisk.o
