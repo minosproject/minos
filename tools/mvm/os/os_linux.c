@@ -532,7 +532,7 @@ static int linux_parse_bootimage(struct vm *vm)
 
 	vm->entry = hdr->kernel_addr;
 	vm->setup_data = hdr->second_addr;
-	vm->mem_start = vm->entry & ~(0x200000 - 1);
+	vm->mem_start = MEM_BLOCK_ALIGN(vm->entry);
 	vm->os_data = (void *)hdr;
 
 	return 0;
@@ -546,8 +546,7 @@ static int linux_early_init(struct vm *vm)
 	/*
 	 * memory must 2M align
 	 */
-	vm->mem_start += 0x1fffff;
-	vm->mem_start &= ~0x1ffff;
+	vm->mem_start = MEM_BLOCK_BALIGN(vm->mem_start);
 
 	if (vm->entry == 0) {
 		if (vm->flags & VM_FLAGS_64BIT)
