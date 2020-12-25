@@ -20,6 +20,7 @@
 #include <minos/of.h>
 #include <minos/irq.h>
 #include <minos/bootarg.h>
+#include <minos/ramdisk.h>
 
 #define OF_MAX_DEEPTH	5
 
@@ -902,6 +903,29 @@ int of_get_console_name(void *dtb, char **name)
 		return -ENOENT;
 
 	*name = (char *)data;
+	return 0;
+}
+
+int of_get_ramdisk(void)
+{
+	int node, len;
+	const fdt64_t *start, *end;
+
+	node = fdt_path_offset(hv_dtb, "/chosen");
+	if (node <= 0)
+		return -ENOENT;
+
+	start = fdt_getprop(hv_dtb, node, "minos,initrd-start", &len);
+	if (!start || (len == 0))
+		return -ENOENT;
+
+	end = fdt_getprop(hv_dtb, node, "minos,initrd-end", &len);
+	if (!end || (len == 0))
+		return -ENOENT;
+
+	set_ramdisk_address((void *)fdt64_to_cpu(*start),
+			    (void *)fdt64_to_cpu(*end));
+
 	return 0;
 }
 

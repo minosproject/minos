@@ -28,6 +28,7 @@
 #include <minos/platform.h>
 #include <config/version.h>
 #include <minos/of.h>
+#include <minos/ramdisk.h>
 
 extern void softirq_init(void);
 extern void init_timers(void);
@@ -68,6 +69,11 @@ void boot_main(void)
 	early_init_percpu();
 
 	mm_init();
+
+#ifdef CONFIG_DEVICE_TREE
+	of_get_ramdisk();
+#endif
+	ramdisk_init();
 
 	arch_init();
 	arch_init_percpu();

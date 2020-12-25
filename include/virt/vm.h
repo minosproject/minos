@@ -70,6 +70,9 @@ struct vm {
 	uint32_t vcpu_affinity[VM_MAX_VCPU];
 	void *entry_point;
 	void *setup_data;
+	void *load_address;
+	struct ramdisk_file image_file;
+	struct ramdisk_file dtb_file;
 	char name[VM_NAME_SIZE];
 	struct vcpu **vcpus;
 	struct list_head vcpu_list;

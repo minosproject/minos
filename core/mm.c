@@ -176,7 +176,12 @@ static void map_os_memory(void)
 	list_for_each_entry(region, &mem_list, list) {
 		type = memory_region_type(region);
 		if ((type != MEMORY_REGION_TYPE_NORMAL) &&
-				(type != MEMORY_REGION_TYPE_DMA))
+		    (type != MEMORY_REGION_TYPE_DMA) &&
+		    /*
+		     * Map the memory in VM region, because we may touch the
+		     * kernel and fdt.
+		     */
+		    (type != MEMORY_REGION_TYPE_VM))
 			continue;
 
 		if (type == MEMORY_REGION_TYPE_DMA)

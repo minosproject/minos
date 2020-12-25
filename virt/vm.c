@@ -885,15 +885,11 @@ int vm_suspend(int vmid)
 
 static void vm_setup(struct vm *vm)
 {
-	/*
-	 * here need first map the setup data into the
-	 * hypervisor memory space, in case data abort, sine
-	 * there may by many place use the setup memory
-	 */
-	if (vm->setup_data) {
-		create_host_mapping((vir_addr_t)vm->setup_data,
-				(phy_addr_t)vm->setup_data,
-				MEM_BLOCK_SIZE, 0);
+	if (vm->dtb_file.inode) {
+		pr_notice("copying %s to 0x%x\n", vm->dtb_file.inode->fname,
+			  vm->setup_data);
+		ramdisk_read(&vm->dtb_file, vm->setup_data,
+			     vm->dtb_file.inode->f_size, 0);
 	}
 
 	/* 
@@ -915,11 +911,6 @@ static void vm_setup(struct vm *vm)
 
 	os_setup_vm(vm);
 	do_hooks(vm, NULL, OS_HOOK_SETUP_VM);
-
-	if (vm->setup_data) {
-		destroy_host_mapping((vir_addr_t)vm->setup_data,
-				MEM_BLOCK_SIZE);
-	}
 }
 
 void destroy_vm(struct vm *vm)
@@ -1052,6 +1043,12 @@ static struct vm *__create_vm(struct vmtag *vme)
 	vm->vcpu_nr = vme->nr_vcpu;
 	vm->entry_point = (void *)vme->entry;
 	vm->setup_data = (void *)vme->setup_data;
+	vm->load_address =
+		(void *)(vme->load_address ? vme->load_address : vme->entry);
+
+	ramdisk_open(vme->image_file, &vm->image_file);
+	ramdisk_open(vme->dtb_file, &vm->dtb_file);
+
 	vm->state = VM_STAT_OFFLINE;
 	init_list(&vm->vdev_list);
 	memcpy(vm->vcpu_affinity, vme->vcpu_affinity,
@@ -1140,6 +1137,9 @@ static void *create_native_vm_of(struct device_node *node, void *arg)
 	pr_notice("    nr_vcpu: %d\n", vmtag.nr_vcpu);
 	pr_notice("    entry: 0x%p\n", vmtag.entry);
 	pr_notice("    setup_data: 0x%p\n", vmtag.setup_data);
+	pr_notice("    load-address: 0x%p\n", vmtag.load_address);
+	pr_notice("    image-file: %s\n", vmtag.image_file);
+	pr_notice("    dtb-file: %s\n", vmtag.dtb_file);
 	pr_notice("    %s-bit vm\n", vmtag.flags & VM_FLAGS_64BIT ? "64" : "32");
 	pr_notice("    flags: 0x%x\n", vmtag.flags);
 	pr_notice("    affinity: %d %d %d %d %d %d %d %d\n",
@@ -1256,6 +1256,14 @@ int virt_init(void)
 void start_vm(int vmid)
 {
 	struct vcpu *vcpu = get_vcpu_by_id(vmid, 0);
+	struct vm *vm = get_vm_by_id(vmid);
+
+	if (vm->image_file.inode) {
+		pr_notice("copying %s to 0x%x\n", vm->image_file.inode->fname,
+			  vm->load_address);
+		ramdisk_read(&vm->image_file, vm->load_address,
+			     vm->image_file.inode->f_size, 0);
+	}
 
 	if (vcpu)
 		vcpu_online(vcpu);
