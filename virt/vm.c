@@ -720,14 +720,26 @@ unmap_vmtag:
 	return ret;
 }
 
+bool vm_get_reset(struct vm *vm)
+{
+	return vm->pending_reset;
+}
+
+void vm_set_reset(struct vm *vm, bool reset)
+{
+	vm->pending_reset = reset;
+}
+
 static int __vm_reset(struct vm *vm, void *args, int byself)
 {
 	int ret;
 	struct vdev *vdev;
 	struct vcpu *vcpu;
 
+#if 0
 	if (vm_is_native(vm))
 		panic("native vm can not call reset vm\n");
+#endif
 
 	/* set the vm to offline state */
 	pr_notice("reset vm-%d by %s\n",
@@ -776,7 +788,10 @@ static int __vm_reset(struct vm *vm, void *args, int byself)
 
 	vm_virq_reset(vm);
 
-	if (byself) {
+	if (vm_is_native(vm)) {
+		preempt_enable();
+		vm_set_reset(vm, true);
+	} else if (byself) {
 		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
 				VMTRAP_REASON_REBOOT, 0, NULL);
 		preempt_enable();
@@ -1292,6 +1307,9 @@ static int vm_command_hdl(int argc, char **argv)
 			start_all_vm();
 		else
 			start_vm(vmid);
+	} else if (argc > 2 && strcmp(argv[1], "reset") == 0) {
+		vmid = atoi(argv[2]);
+		vm_reset(vmid, NULL, 0);
 	}
 
 	return 0;
