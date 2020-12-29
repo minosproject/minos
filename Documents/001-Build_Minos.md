@@ -7,12 +7,20 @@
        # mkdir ~/minos-workspace
        # cd ~/minos-workspace
 
-2. Install aarch64 gcc cross compilation tool
+2. Install gcc cross compilation tool
 
+       # arm64
        # wget https://releases.linaro.org/components/toolchain/binaries/7.2-2017.11/aarch64-linux-gnu/gcc-linaro-7.2.1-2017.11-x86_64_aarch64-linux-gnu.tar.xz
        # tar xjf gcc-linaro-7.2.1-2017.11-x86_64_aarch64-linux-gnu.tar.xz
        # sudo mv gcc-linaro-7.2.1-2017.11-x86_64_aarch64-linux-gnu /opt
        # echo "export PATH=/opt/gcc-linaro-7.2.1-2017.11-x86_64_aarch64-linux-gnu/bin:$PATH" >> ~/.bashrc
+
+       # arm32
+       # wget https://releases.linaro.org/components/toolchain/binaries/7.2-2017.11/armv8l-linux-gnueabihf/gcc-linaro-7.2.1-2017.11-x86_64_armv8l-linux-gnueabihf.tar.xz
+       # tar xjf gcc-linaro-7.2.1-2017.11-x86_64_armv8l-linux-gnueabihf.tar.xz
+       # sudo mv gcc-linaro-7.2.1-2017.11-x86_64_armv8l-linux-gnueabihf /opt
+       # echo "export PATH=/opt/gcc-linaro-7.2.1-2017.11-x86_64_armv8l-linux-gnueabihf/bin:$PATH" >> ~/.bashrc
+
        # source ~/.bashrc
 
 3. Install abootimg android image tool

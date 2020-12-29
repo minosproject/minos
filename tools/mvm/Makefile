@@ -6,12 +6,12 @@ ARCH 		?= aarch64
 CROSS_COMPILE 	?= aarch64-linux-gnu-
 endif
 
-CC 		:= $(CROSS_COMPILE)gcc
-LD 		:= $(CROSS_COMPILE)ld
-OBJ_COPY	:= $(CROSS_COMPILE)objcopy
-OBJ_DUMP 	:= $(CROSS_COMPILE)objdump
-NM		:= $(CROSS_COMPILE)nm
-STRIP		:= $(CROSS_COMPILE)strip
+CC 		?= $(CROSS_COMPILE)gcc
+LD 		?= $(CROSS_COMPILE)ld
+OBJ_COPY	?= $(CROSS_COMPILE)objcopy
+OBJ_DUMP 	?= $(CROSS_COMPILE)objdump
+NM		?= $(CROSS_COMPILE)nm
+STRIP		?= $(CROSS_COMPILE)strip
 
 PWD		:= $(shell pwd)
 
