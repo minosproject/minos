@@ -26,7 +26,6 @@ This is only for raspberry-4b 4GB version, other please modify the config.
    ```
    # git clone https://github.com/agherzan/u-boot.git
    # cd u-boot
-   # git checkout -b rpi4 origin/ag/rpi4
    # make CROSS_COMPILE=aarch64-linux-gnu- rpi_4_defconfig
    # make CROSS_COMPILE=aarch64-linux-gnu- -j8
    ```
