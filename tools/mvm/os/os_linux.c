@@ -480,7 +480,7 @@ static int linux_load_images(struct vm *vm)
 		return -EIO;
 	}
 
-	ret = load_spare_image(vm->dfd, base + 0x3e00000);
+	ret = load_spare_image(vm->dfd, base + vm->setup_data - vm->mem_start);
 	if (ret) {
 		pr_err("read dtb image failed\n");
 		return -EIO;
