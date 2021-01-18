@@ -150,4 +150,6 @@ int get_device_irq_index(struct device_node *node, uint32_t *irq,
 int of_get_console_name(void *dtb, char **name);
 int of_init_bootargs(void);
 
+int of_get_ramdisk(void);
+
 #endif

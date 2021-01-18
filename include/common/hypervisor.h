@@ -8,6 +8,8 @@
 #include <sys/types.h>
 #endif
 
+#include <minos/ramdisk.h>
+
 #define VM_NAME_SIZE	32
 #define VM_TYPE_SIZE	16
 
@@ -37,6 +39,9 @@ struct vmtag {
 	uint64_t mem_size;
 	uint64_t entry;
 	uint64_t setup_data;
+	uint64_t load_address;
+	char image_file[RAMDISK_FNAME_SIZE];
+	char dtb_file[RAMDISK_FNAME_SIZE];
 	uint64_t flags;
 	uint32_t vcpu_affinity[8];
 };
