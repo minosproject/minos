@@ -34,7 +34,7 @@ int ramdisk_init(void)
 		return -EINVAL;
 	}
 
-	if (strncmp(ramdisk_start, RAMDISK_MAGIC, 16) != 0) {
+	if (strncmp(ramdisk_start, RAMDISK_MAGIC, RAMDISK_MAGIC_SIZE) != 0) {
 		pr_err("bad ramdisk format\n");
 		return -EBADF;
 	}
@@ -44,16 +44,17 @@ int ramdisk_init(void)
 	 * information, inclue the superblock and the
 	 * root inode
 	 */
-	sb = (struct ramdisk_sb *)ramdisk_start;
+	sb = ramdisk_start + RAMDISK_MAGIC_SIZE;
+	root = ramdisk_start + sb->inode_offset;
+
 	return 0;
 }
 
 static struct ramdisk_inode *get_file_inode(const char *name)
 {
-	int i;
-	struct ramdisk_inode *inode = root;
+	struct ramdisk_inode *inode;
 
-	for (i = 0; i < sb->file_cnt; i++) {
+	for (inode = root; inode < root + sb->file_cnt; inode++) {
 		if (strcmp(inode->fname, name) == 0)
 			return inode;
 	}
@@ -76,8 +77,14 @@ int ramdisk_read(struct ramdisk_file *file, void *buf,
 
 int ramdisk_open(char *name, struct ramdisk_file *file)
 {
-	struct ramdisk_inode *inode = get_file_inode(name);
+	struct ramdisk_inode *inode;
 
+	if (!sb) {
+		pr_debug("super block not found\n");
+		return -ENOENT;
+	}
+
+	inode = get_file_inode(name);
 	if (!inode)
 		return -ENOENT;
 

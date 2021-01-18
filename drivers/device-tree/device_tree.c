@@ -247,6 +247,32 @@ static void __fdt_parse_kernel_mem(void)
 			CONFIG_MINOS_RAM_SIZE, MEMORY_REGION_F_KERNEL);
 }
 
+static void __fdt_parse_ramdisk_mem(void)
+{
+	extern void set_ramdisk_address(void *start, void *end);
+	const fdt64_t *data;
+	uint64_t start, end;
+	int node, len;
+
+	node = fdt_path_offset(hv_dtb, "/chosen");
+	if (node <= 0)
+		return;
+
+	data = fdt_getprop(hv_dtb, node, "minos,initrd-start", &len);
+	if (!data || (len == 0))
+		return;
+	start = fdt64_to_cpu(*data);
+
+	data = fdt_getprop(hv_dtb, node, "minos,initrd-end", &len);
+	if (!data || (len == 0))
+		return;
+	end = fdt64_to_cpu(*data);
+
+	set_ramdisk_address((void *)start, (void *)end);
+	split_memory_region(start, PAGE_BALIGN(end - start),
+			MEMORY_REGION_F_RAMDISK);
+}
+
 int fdt_parse_memory_info(void)
 {
 	int node;
@@ -266,6 +292,7 @@ int fdt_parse_memory_info(void)
 	__fdt_parse_kernel_mem();
 	__fdt_parse_memreserve();
 	__fdt_parse_dtb_mem();
+	__fdt_parse_ramdisk_mem();
 
 #ifdef CONFIG_VIRT
 	__fdt_parse_vm_mem();
