@@ -162,7 +162,7 @@ static int create_pdev_virq_of(struct vm *vm, struct device_node *node)
 		return 0;
 
 	val = (of32_t *)of_getprop(node, "interrupts", &len);
-	if (!val || (len < 4))
+	if (!val || (len < sizeof(of32_t)))
 		return 0;
 
 	/* get the irq count for the device */
@@ -170,12 +170,13 @@ static int create_pdev_virq_of(struct vm *vm, struct device_node *node)
 	if (nr_icells == 0)
 		return 0;
 
-	len = len / 4;
+	len = len / sizeof(of32_t);
 	if (vm_is_native(vm))
 		hw = 1;
 	else {
 		virq_affinity = (of32_t *)of_getprop(node, "virq_affinity", &len_aff);
-		if (virq_affinity && (len_aff == len))
+		if (virq_affinity &&
+		    (len_aff / sizeof(of32_t) == len / nr_icells))
 			hw = 1;
 	}
 
