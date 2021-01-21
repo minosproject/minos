@@ -55,7 +55,7 @@ static struct ramdisk_inode *get_file_inode(const char *name)
 	struct ramdisk_inode *inode;
 
 	for (inode = root; inode < root + sb->file_cnt; inode++) {
-		if (strcmp(inode->fname, name) == 0)
+		if (strncmp(inode->fname, name, RAMDISK_FNAME_SIZE - 1) == 0)
 			return inode;
 	}
 

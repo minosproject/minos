@@ -36,7 +36,7 @@ encode_number() {
 
 # ${1}: file
 pack_file() {
-    printf "%s" $(basename ${1}) |
+    printf "%.*s\0" $((FNAME_SIZE - 1)) $(basename ${1}) |
         dd conv=notrunc obs=${off1} of=${image} seek=1 2> /dev/null
 
     local size=$(stat -c "%s" ${1})
@@ -64,7 +64,7 @@ make_ramdisk() {
 
     local file
     for file in ${files[@]}; do
-        printf "Packing %.*s\n" ${FNAME_SIZE} $(basename ${file})
+        printf "Packing %.*s\n" $((FNAME_SIZE - 1)) $(basename ${file})
         pack_file ${file}
     done
 
