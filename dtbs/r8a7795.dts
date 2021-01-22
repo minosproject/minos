@@ -1,0 +1,150 @@
+// SPDX-License-Identifier: GPL-2.0
+
+/dts-v1/;
+
+/ {
+    model = "board based on r8a7795";
+    compatible = "renesas,r8a7795";
+    #address-cells = <2>;
+    #size-cells = <2>;
+    interrupt-parent = <&gic>;
+
+    chosen {
+        minos,stdout = "renesas,scif";
+    };
+
+    soc {
+        #address-cells = <2>;
+        #size-cells = <2>;
+
+        gic: interrupt-controller@f1010000 {
+            compatible = "arm,gic-400";
+            #interrupt-cells = <3>;
+            interrupt-controller;
+            reg = <0x0 0xf1010000 0 0x1000>,
+                  <0x0 0xf1020000 0 0x20000>,
+                  <0x0 0xf1040000 0 0x20000>,
+                  <0x0 0xf1060000 0 0x20000>;
+        };
+    };
+
+    timer {
+        compatible = "arm,armv8-timer";
+        interrupts = <1 13 0xff08>,
+                     <1 14 0xff08>,
+                     <1 11 0xff08>,
+                     <1 10 0xff08>;
+    };
+
+    cpus {
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        cpu@0 {
+            reg = <0x0>;
+        };
+
+        cpu@1 {
+            reg = <0x1>;
+        };
+
+        cpu@2 {
+            reg = <0x2>;
+        };
+
+        cpu@3 {
+            reg = <0x3>;
+        };
+
+        cpu@100 {
+            reg = <0x100>;
+        };
+
+        cpu@101 {
+            reg = <0x101>;
+        };
+
+        cpu@102 {
+            reg = <0x102>;
+        };
+
+        cpu@103 {
+            reg = <0x103>;
+        };
+    };
+
+    memory@48000000 {
+        /* first 128MB is reserved for secure area. */
+        reg = <0x0 0x48000000 0x0 0x38000000>,
+              <0x5 0x00000000 0x0 0x40000000>,
+              <0x6 0x00000000 0x0 0x40000000>,
+              <0x7 0x00000000 0x0 0x40000000>;
+    };
+
+    /*
+     *   0x48000000 -  0x4a000000   32 MB  Minos
+     *   0x4a000000 -  0x65000000  432 MB  VM0
+     *   0x65000000 -  0x80000000  432 MB  VM1
+     *  0x500000000 - 0x540000000    1 GB  VM0
+     *  0x600000000 - 0x620000000  512 MB  VM0
+     *  0x620000000 - 0x640000000  512 MB  VM1
+     *  0x700000000 - 0x740000000    1 GB  VM1
+     *
+     * Minos' memory size should be equal to MINOS_RAM_SIZE.
+     */
+
+    vms {
+        vm0 {
+            device_type = "virtual_machine";
+            vmid = <0>;
+            vm_name = "r8a7795_vm0";
+            type = "linux";
+            vcpus = <4>;
+            vcpu_affinity = <0 1 2 3>;
+            memory = <0x0 0x4a000000 0x0 0x1b000000>,
+                     <0x5 0x00000000 0x0 0x40000000>,
+                     <0x6 0x00000000 0x0 0x20000000>;
+            /*
+             * The entry must be equal to the memory start address plus Linux's
+             * TEXT_OFFSET.
+             */
+            entry = <0x0 0x4a080000>;
+            setup_data = <0x0 0x4a000000>;
+            native_wfi;
+
+            vm0_bdi {
+                vm_console_vm0 {
+                    virtual_device;
+                    compatible = "minos,vm_console";
+                    vc-dynamic-res;
+                };
+            };
+        };
+
+        vm1 {
+            device_type = "virtual_machine";
+            vmid = <1>;
+            vm_name = "r8a7795_vm1";
+            type = "linux";
+            vcpus = <4>;
+            vcpu_affinity = <4 5 6 7>;
+            /*
+             * The first memory range must be 32-bits for DMA addressing.
+             */
+            memory = <0x0 0x65000000 0x0 0x1b000000>,
+                     <0x6 0x20000000 0x0 0x20000000>,
+                     <0x7 0x00000000 0x0 0x40000000>;
+            entry = <0x0 0x65080000>;
+            setup_data = <0x0 0x65000000>;
+            native_wfi;
+
+            vm1_bdi {
+                vm_console_vm1 {
+                    virtual_device;
+                    compatible = "minos,vm_console";
+                    vc-dynamic-res;
+                };
+            };
+        };
+    };
+};
