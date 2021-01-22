@@ -7,3 +7,4 @@ obj-y += bcm2838-rpi-4-b-32bit.dtb
 obj-y += kvim3.dtb
 obj-y += foundation-v8-gicv3-zephyr.dtb
 obj-y += foundation-v8-gicv3-lushan.dtb
+obj-y += r8a7795.dtb

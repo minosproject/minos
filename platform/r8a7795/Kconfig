@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: GPL-2.0
+
+if SOC_R8A7795
+
+config MINOS_START_ADDRESS
+	hex "memory start address of system"
+	default 0x48000000
+
+config MINOS_ENTRY_ADDRESS
+	hex "entry address of system"
+	default 0x48010000
+	help
+	  MINOS_START_ADDRESS + TASK_STACK_SIZE * NR_CPUS
+
+config MINOS_RAM_SIZE
+	hex "memory size for Minos"
+	range 0x1000000 0x4000000
+	default 0x2000000
+	help
+	  the memory size for Minos
+
+config NR_CPUS
+	int "number of cpu in system"
+	range 1 1 if !SMP
+	range 1 8
+	default 1 if !SMP
+	default 8
+	help
+	  how many cpu in current system
+
+config UART_BASE
+	hex "uart controller iomem base address"
+	default 0xe6e88000
+
+config UART_IO_SIZE
+	hex "uart controller iomem size"
+	default 0x1000
+
+config MINOS_TEXT_OFFSET
+	hex "entry offset from start of ram"
+	default 0x10000
+	help
+	  MINOS_ENTRY_ADDRESS - 0x48000000
+
+config DTB_LOAD_ADDRESS
+	hex "device tree blob address"
+	default 0x49e00000
+	help
+	  MINOS_START_ADDRESS + MINOS_RAM_SIZE - 0x200000
+
+config HVM_SPI_VIRQ_NR
+	int "SPI VIRQ for vm0"
+	default 480
+	help
+	  NR_SPI_IRQS
+
+config GVM_SPI_VIRQ_NR
+	int "SPI VIRQ for non-vm0"
+	default 480
+	help
+	  NR_SPI_IRQS
+
+endif
