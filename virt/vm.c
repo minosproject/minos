@@ -35,6 +35,7 @@
 #include <virt/vmbox.h>
 #include <minos/shell_command.h>
 #include <virt/virt.h>
+#include <minos/ramdisk.h>
 
 extern void virqs_init(void);
 extern int vmodules_init(void);
