@@ -56,26 +56,26 @@ static LIST_HEAD(vmbox_hook_list);
 struct vring_used_elem {
 	uint32_t id;
 	uint32_t len;
-} __packed__;
+} __packed;
 
 struct vring_used {
 	uint16_t flags;
 	uint16_t idx;
 	struct vring_used_elem ring[];
-} __packed__;
+} __packed;
 
 struct vring_avail {
 	uint16_t flags;
 	uint16_t idx;
 	uint16_t ring[];
-} __packed__;
+} __packed;
 
 struct vring_desc {
 	uint64_t addr;
 	uint32_t len;
 	uint16_t flags;
 	uint16_t next;
-} __packed__;
+} __packed;
 
 typedef int (*vmbox_hvc_handler_t)(struct vm *vm,
 		struct vmbox_device *vmbox, unsigned long arg);

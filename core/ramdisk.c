@@ -15,7 +15,7 @@
  */
 
 #include <minos/minos.h>
-#include <minos/ramdisk.h>
+#include <common/hypervisor.h>
 
 void *ramdisk_start, *ramdisk_end;
 static struct ramdisk_inode *root;
