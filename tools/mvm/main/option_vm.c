@@ -203,6 +203,16 @@ static int setup_vm_gic(char *arg, char *sub_arg, void *data)
 	return 0;
 }
 
+static int setup_vm_wfi(char *arg, char *sub_arg, void *data)
+{
+	struct vm *vm = data;
+
+	pr_info("disable WFI trap\n");
+	vm->flags |= VM_FLAGS_NATIVE_WFI;
+
+	return 0;
+}
+
 DEFINE_OPTION_VM(mem_size, "memory", 1, setup_vm_mem_size);
 DEFINE_OPTION_VM(name, "vm_name", 0, setup_vm_name);
 DEFINE_OPTION_VM(os_type, "vm_os", 1, setup_vm_os_type);
@@ -219,3 +229,4 @@ DEFINE_OPTION_VM(setup_mem_base,
 DEFINE_OPTION_VM(type, "os-64bit", 0, setup_vm_type);
 DEFINE_OPTION_VM(cmdline, "cmdline", 0, setup_vm_cmdline);
 DEFINE_OPTION_VM(gic, "gic", 0, setup_vm_gic);
+DEFINE_OPTION_VM(wfi, "native_wfi", 0, setup_vm_wfi);
