@@ -44,11 +44,18 @@
 #define stack_to_gp_regs(base) \
 	(gp_regs *)(base - sizeof(gp_regs))
 
-#define get_reg_value(regs, index)	\
-	*((unsigned long *)(regs) + index + 3)
+static inline u64 get_reg_value(gp_regs *regs, int index)
+{
+	return (index == 31) ? 0 : *(&regs->x0 + index);
+}
 
-#define set_reg_value(regs, index, value)	\
-	*((unsigned long *)(regs) + index + 3) = (unsigned long)value
+static inline void set_reg_value(gp_regs *regs, int index, u64 value)
+{
+	if (index == 31)
+		return;
+
+	*(&regs->x0 + index) = value;
+}
 
 #define read_sysreg32(name) ({						\
 	uint32_t _r;							\
