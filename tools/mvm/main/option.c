@@ -58,6 +58,7 @@ DECLARE_VM_OPTION(setup_mem_base);
 DECLARE_VM_OPTION(type);
 DECLARE_VM_OPTION(cmdline);
 DECLARE_VM_OPTION(gic);
+DECLARE_VM_OPTION(wfi);
 
 DECLARE_VDEV_OPTION(device);
 
@@ -77,6 +78,7 @@ static struct mvm_option_parser *vm_parser_table[] = {
 	VM_OP(type),
 	VM_OP(cmdline),
 	VM_OP(gic),
+	VM_OP(wfi),
 };
 
 static struct mvm_option_parser *os_parser_table[] = {
