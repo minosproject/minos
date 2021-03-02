@@ -79,6 +79,14 @@ SECTIONS
 
 	. = ALIGN(8);
 
+	__iommu_ops_start = .;
+	.__iommu_ops : {
+		*(.__iommu_ops)
+	}
+	__iommu_ops_end = .;
+
+	. = ALIGN(8);
+
 	__virqchip_start = .;
 	.__virqchip : {
 		*(.__virqchip)

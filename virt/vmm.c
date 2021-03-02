@@ -18,6 +18,7 @@
 #include <virt/vm.h>
 #include <minos/mmu.h>
 #include <minos/tlb.h>
+#include <virt/iommu.h>
 
 extern unsigned char __el2_ttb0_pgd;
 extern unsigned char __el2_ttb0_pud;
@@ -66,6 +67,7 @@ int create_guest_mapping(struct mm_struct *mm, vir_addr_t vir,
 {
 	unsigned long tmp;
 	struct vm *vm = mm->vm;
+	int ret;
 
 	tmp = BALIGN(vir + size, PAGE_SIZE);
 	vir = ALIGN(vir, PAGE_SIZE);
@@ -75,7 +77,12 @@ int create_guest_mapping(struct mm_struct *mm, vir_addr_t vir,
 	pr_debug("map 0x%x->0x%x size-0x%x vm-%d\n", vir,
 			phy, size, vm->vmid);
 
-	return create_mem_mapping(mm, vir, phy, size, flags);
+	ret = create_mem_mapping(mm, vir, phy, size, flags);
+
+	if (!ret)
+		ret = iommu_iotlb_flush_all(vm);
+
+	return ret;
 }
 
 static int destroy_guest_mapping(struct mm_struct *mm,
@@ -95,6 +102,9 @@ static int destroy_guest_mapping(struct mm_struct *mm,
 	size = end - vir;
 
 	ret = destroy_mem_mapping(mm, vir, size, 0);
+
+	if (!ret)
+		ret = iommu_iotlb_flush_all(mm->vm);
 
 	return ret;
 }

@@ -36,6 +36,7 @@
 #include <minos/shell_command.h>
 #include <virt/virt.h>
 #include <minos/ramdisk.h>
+#include <virt/iommu.h>
 
 extern void virqs_init(void);
 extern int vmodules_init(void);
@@ -1094,6 +1095,8 @@ struct vm *create_vm(struct vmtag *vme)
 
 	if (native)
 		vm->flags |= VM_FLAGS_NATIVE;
+
+	iommu_vm_init(vm);
 
 	vm_mm_struct_init(vm);
 

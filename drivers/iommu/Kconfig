@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-2.0
+
+if VIRT
+
+menu "IOMMU drivers"
+
+config IOMMU
+	def_bool y
+
+endmenu
+
+endif
+
+comment "IOMMU drivers need virtualization support"
+	depends on !VIRT

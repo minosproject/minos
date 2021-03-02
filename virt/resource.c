@@ -25,6 +25,7 @@
 #include <minos/irq.h>
 #include <virt/vmbox.h>
 #include <minos/platform.h>
+#include <virt/iommu.h>
 
 static void *virqchip_start;
 static void *virqchip_end;
@@ -252,9 +253,10 @@ static int create_vm_pdev_of(struct vm *vm, struct device_node *node)
 
 	ret += create_pdev_iomem_of(vm, node);
 	ret += create_pdev_virq_of(vm, node);
+	ret += iommu_assign_node(vm, node);
 
 	if (ret)
-		pr_notice("create %s fail\n", node->name);
+		pr_err("create %s fail\n", node->name);
 
 	return ret;
 }
