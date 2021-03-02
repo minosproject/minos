@@ -62,6 +62,16 @@ struct vcpu {
 	void **context;
 } __align_cache_line;
 
+struct vm_iommu {
+	/* private information for iommu drivers */
+	void *priv;
+
+	const struct iommu_ops *ops;
+
+	/* list of device nodes assigned to this vm */
+	struct list_head nodes;
+};
+
 struct vm {
 	int vmid;
 	uint32_t vcpu_nr;
@@ -101,6 +111,8 @@ struct vm {
 	void *os_data;
 
 	void *arch_data;
+
+	struct vm_iommu iommu;
 } __align(sizeof(unsigned long));
 
 #define vm_name(vm)	devnode_name(vm->dev_node)

@@ -22,6 +22,11 @@ typedef enum __device_class {
 #define DEVICE_NODE_F_ROOT		(1 << 0)
 #define DEVICE_NODE_F_OF		(1 << 1)
 
+struct node_iommu {
+	/* private information for iommu drivers */
+	void *priv;
+};
+
 /*
  * data       - the data for all device such as dtb or acpi
  * offset     - node offset
@@ -30,6 +35,7 @@ typedef enum __device_class {
  * parent     - the parent node of device_node
  * child      - child nodes of the device_node
  * sibling    - brother of the device node
+ * iommu      - information for iommu
  */
 struct device_node {
 	void *data;
@@ -42,6 +48,7 @@ struct device_node {
 	struct device_node *next;
 	device_class_t class;
 	unsigned long flags;
+	struct node_iommu iommu;
 };
 
 #define devnode_name(node)	node->name
@@ -65,6 +72,13 @@ struct module_id {
 	module_match_##mname __section(.__irqchip) = { \
 		.comp = mn, \
 		.data = irqchip, \
+	}
+
+#define IOMMU_OPS_DECLARE(mname, mn, iommu_ops) \
+	static const struct module_id __used \
+	module_match_##mname __section(.__iommu_ops) = { \
+		.comp = mn, \
+		.data = iommu_ops, \
 	}
 
 #define VIRQCHIP_DECLARE(mname, mn, virqchip) \
