@@ -98,6 +98,7 @@ struct module_id {
 extern char *gicv2_match_table[];
 extern char *gicv3_match_table[];
 extern char *bcmirq_match_table[];
+extern char *ipmmu_match_table[];
 extern char *pl031_match_table[];
 extern char *sp805_match_table[];
 extern char *virtio_match_table[];
