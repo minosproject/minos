@@ -15,14 +15,12 @@ Minos is also designed as a real-time priority-based microkernel RTOS that suppo
 #### Supported hardware
 
 - [x] Marvell espressobin
-
 - [x] Raspberry 3B
-
 - [x] Raspberry 4
-
 - [x] Khadas VIM3
+- [x] Renesas R-Car r8a7795
 
-  Minos can be easily ported to other armv8-a based platform.
+Minos can be easily ported to other armv8-a based platform.
 
 #### Supported OSes
 
@@ -30,7 +28,7 @@ Minos is also designed as a real-time priority-based microkernel RTOS that suppo
 - [x] Ubuntu
 - [x] Android
 - [x] zephyr
-- [x] XNU (ios kernel)
+- [x] XNU (IOS kernel)
 
 ## Documentation
 
