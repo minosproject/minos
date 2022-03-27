@@ -211,7 +211,7 @@ static int __init_text create_dconsole(struct vm *vm, struct device_node *node)
 	return 0;
 
 free_ring:
-	free(ring);
+	free_shmem(ring);
 release_dcon:
 	free(dcon);
 release_tty:

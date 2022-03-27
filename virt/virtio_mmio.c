@@ -237,7 +237,7 @@ int virtio_mmio_init(struct vm *vm, unsigned long gbase,
 
 	hva = create_hvm_shmem_map(vm, (unsigned long)iomem, size);
 	if (hva == BAD_ADDRESS) {
-		free_pages(iomem);
+		free_shmem(iomem);
 		return -ENOMEM;
 	}
 
@@ -249,7 +249,7 @@ int virtio_mmio_init(struct vm *vm, unsigned long gbase,
 	 */
 	if (create_guest_mapping(&vm->mm, gbase, (unsigned long)iomem,
 				size, VM_IO | VM_RO)) {
-		free_pages(iomem);
+		free_shmem(iomem);
 		return -ENOMEM;
 	}
 

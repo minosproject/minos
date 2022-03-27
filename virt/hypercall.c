@@ -105,6 +105,19 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 	HVC_RET1(c, -EINVAL);
 }
 
+#define CHECK_VM_CAP(vm, cap, flg, value) \
+	(value) |= (flg) & VM_FLAGS_HOST ? (cap) : 0;
+
+static unsigned long get_vm_capability(struct vm *vm)
+{
+	unsigned long ret = 0;
+
+	CHECK_VM_CAP(vm, VM_CAP_HOST, VM_FLAGS_HOST, ret);
+	CHECK_VM_CAP(vm, VM_CAP_NATIVE, VM_FLAGS_NATIVE, ret);
+
+	return ret;
+}
+
 static int misc_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 {
 	struct vm *vm = get_current_vm();
@@ -116,6 +129,9 @@ static int misc_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 	case HVC_SCHED_OUT:
 		sched();
 		HVC_RET1(c, 0);
+		break;
+	case HVC_GET_VM_CAP:
+		HVC_RET1(c, get_vm_capability(vm));
 		break;
 	default:
 		break;

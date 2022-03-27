@@ -24,7 +24,8 @@
  * so it has 512 pages.
  */
 struct shmem_block {
-	void *phy_base;
+	struct mem_block *mb;
+	unsigned long phy_base;
 	uint16_t id;
 	uint16_t free_pages;
 	uint16_t current_index;
@@ -50,34 +51,33 @@ static struct shmem_block *shmem_blocks[MAX_SHMEM_ID];
 static struct shmem_block *alloc_shmem_block(void)
 {
 	struct shmem_block *sb;
-	void *addr;
 
-	sb = malloc(sizeof(struct shmem_block));
+	sb = zalloc(sizeof(struct shmem_block));
 	if (!sb) {
 		pr_err("no memory for shmem block\n");
 		return NULL;
 	}
 
-	addr = vmm_alloc_memblock();
-	if (addr == NULL) {
+	sb->mb = vmm_alloc_memblock();
+	if (sb->mb == NULL) {
 		free(sb);
 		return NULL;
 	}
+
+	sb->phy_base = BFN2PHY(sb->mb->bfn);
+	sb->free_pages = PAGES_IN_BLOCK;
 	
 	/*
 	 * mapping this memory block to the host address space.
 	 */
-	if (create_host_mapping(ptov(addr), ULONG(addr),
+	if (create_host_mapping(ptov(sb->phy_base), ULONG(sb->phy_base),
 			MEM_BLOCK_SIZE, VM_NORMAL_NC | VM_RW | VM_HUGE)) {
 		pr_err("mapping share memory failed\n");
 		free(sb);
-		vmm_free_memblock(addr);
+		vmm_free_memblock(sb->mb);
 		return NULL;
 	}
 
-	memset(sb, 0, sizeof(struct shmem_block));
-	sb->phy_base = addr;
-	sb->free_pages = PAGES_IN_BLOCK;
 	sb->id = sbid++;
 	shmem_blocks[sb->id] = sb;
 
@@ -87,7 +87,7 @@ static struct shmem_block *alloc_shmem_block(void)
 static void *__alloc_shmem(struct shmem_block *sb, int pages, int flags)
 {
 	struct shmem *shmem;
-	void *addr;
+	unsigned long addr;
 	int bits;
 
 	bits = bitmap_find_next_zero_area_align(sb->bitmap,

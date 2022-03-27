@@ -52,7 +52,7 @@ static void bcm2836_virq_deinit(struct vdev *vdev)
 {
 	struct bcm2836_virq *bcm2836 = vdev_to_bcm_virq(vdev);
 
-	free(bcm2836->iomem);
+	free_shmem(bcm2836->iomem);
 	vdev_release(vdev);
 	free(bcm2836);
 }

@@ -203,7 +203,10 @@ static void release_vmm_area_memory(struct vmm_area *va)
 		break;
 	default:
 		if (va->pstart) {
-			free_pages((void *)va->pstart);
+			if (va->flags |= VM_SHARED)
+				free_shmem((void *)va->pstart);
+			else
+				free_pages((void *)va->pstart);
 			va->pstart = 0;
 		}
 		break;
@@ -923,7 +926,7 @@ static int get_memblock_from_section(struct block_section *bs, uint32_t *bfn)
 	bs->current_index = id + 1;
 	bs->free_blocks -= 1;
 	free_blocks -= 1;
-	*bfn = id;
+	*bfn = (bs->start >> MEM_BLOCK_SHIFT) + id;
 
 	return 0;
 }

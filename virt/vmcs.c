@@ -162,7 +162,7 @@ unsigned long vm_create_vmcs(struct vm *vm)
 	hvm_vmcs = create_hvm_shmem_map(vm, (unsigned long)base, size);
 	if (hvm_vmcs == BAD_ADDRESS) {
 		pr_err("mapping vmcs to hvm failed\n");
-		free_pages(base);
+		free_shmem(base);
 		return 0;
 	}
 

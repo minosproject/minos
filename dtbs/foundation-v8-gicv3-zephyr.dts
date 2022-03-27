@@ -21,6 +21,8 @@
 			device_type = "virtual_machine";
 			vm_name = "fvp_linux_host";
 			host_vm;
+			native_wfi;
+			vmid = <1>;
 			type = "linux";
 			vcpus = <1>;
 			entry = <0x0 0x80080000>;
@@ -29,8 +31,8 @@
 			/* cmdline = "console=hvc0 earlycon=dbcon,io,0x0 loglevel=8 consolelog=9 root=/dev/vda2 rw"; */
 			memory = <0x0 0x80000000 0x0 0x10000000>;
 
-			vm0_bdi {
-				vm_console_vm0 {
+			vm1_bdi {
+				vm_console_vm1 {
 					virtual_device;
 					vc-dynamic-res;
 					compatible = "minos,vm_console";
