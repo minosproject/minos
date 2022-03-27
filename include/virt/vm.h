@@ -14,10 +14,7 @@
 #include <minos/task.h>
 #include <minos/sched.h>
 
-#define VM_MAX_VCPU		CONFIG_NR_CPUS
-
-#define VMID_INVALID		(-1)
-#define VMID_HVM		(0)
+#define VM_MAX_VCPU CONFIG_NR_CPUS
 
 #define VM_STAT_OFFLINE	(0)
 #define VM_STAT_ONLINE (1)
@@ -189,17 +186,18 @@ int vm_reset(int vmid, void *args, int byself);
 int vm_power_off(int vmid, void *arg, int byself);
 int vm_suspend(int vmid);
 
+struct vm *get_host_vm(void);
+
 static inline struct vm *get_vm_by_id(uint32_t vmid)
 {
-//	if (unlikely(vmid >= CONFIG_MAX_VM) || unlikely(vmid == 0))
-//		return NULL;
-
+	if (unlikely(vmid >= CONFIG_MAX_VM) || unlikely(vmid == 0))
+		return NULL;
 	return vms[vmid];
 }
 
-static inline int vm_is_hvm(struct vm *vm)
+static inline int vm_is_host_vm(struct vm *vm)
 {
-	return (vm->vmid == 1);
+	return !!(vm->flags & VM_FLAGS_HOST);
 }
 
 static inline int vm_is_32bit(struct vm *vm)

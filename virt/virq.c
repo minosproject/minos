@@ -24,13 +24,13 @@ static DEFINE_SPIN_LOCK(hvm_irq_lock);
 
 #define HVM_IRQ_LOCK(vm) 				\
 	do {						\
-		if (vm_is_hvm(vm))			\
+		if (vm_is_host_vm(vm))			\
 			spin_lock(&hvm_irq_lock); 	\
 	} while (0)
 
 #define HVM_IRQ_UNLOCK(vm) 				\
 	do {						\
-		if (vm_is_hvm(vm))			\
+		if (vm_is_host_vm(vm))			\
 			spin_unlock(&hvm_irq_lock); 	\
 	} while (0)
 
@@ -582,7 +582,7 @@ int request_hw_virq(struct vm *vm, uint32_t virq, uint32_t hwirq,
 {
 	int max;
 
-	if (vm_is_hvm(vm))
+	if (vm_is_host_vm(vm))
 		max = MAX_HVM_VIRQ;
 	else
 		max = MAX_GVM_VIRQ;

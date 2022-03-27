@@ -43,6 +43,8 @@ struct vm *vms[CONFIG_MAX_VM];
 static int total_vms = 0;
 LIST_HEAD(vm_list);
 
+static struct vm *host_vm;
+
 static DEFINE_SPIN_LOCK(vms_lock);
 static DECLARE_BITMAP(vmid_bitmap, CONFIG_MAX_VM);
 
@@ -72,7 +74,7 @@ static int inline affinity_to_vcpuid(struct vm *vm, unsigned long affinity)
 	 *
 	 * Can be different with real hardware ? TBD.
 	 */
-	if (vm_is_hvm(vm))
+	if (vm_is_host_vm(vm))
 		return affinity_to_cpuid(affinity);
 
 	aff1 = (affinity >> 8) & 0xff;
@@ -424,7 +426,7 @@ void get_vcpu_affinity(uint32_t *aff, int nr)
 	int i = 0;
 	int vm0_vcpu0_ok = 0;
 	int vm0_vcpus_ok = 0;
-	struct vm *vm0 = get_vm_by_id(0);
+	struct vm *vm0 = get_host_vm();
 	int vm0_vcpu0 = vm0->vcpu_affinity[0];
 
 	if (nr == NR_CPUS)
@@ -651,7 +653,7 @@ int create_vm_mmap(int vmid,  unsigned long offset,
 
 int create_guest_vm(struct vmtag __guest *tag)
 {
-	int ret = VMID_INVALID;
+	int ret = 0;
 	struct vm *vm;
 	struct vmtag vmtag;
 
@@ -1089,7 +1091,7 @@ struct vm *create_vm(struct vmtag *vme)
 	int ret = 0;
 	struct vm *vm;
 
-	if (vme->flags & VM_FLAGS_NATIVE) {
+	if (vme->vmid != 0)  {
 		pr_notice("request vmid %d\n", vme->vmid);
 		if (test_and_set_bit(vme->vmid, vmid_bitmap))
 			return NULL;
@@ -1114,7 +1116,7 @@ struct vm *create_vm(struct vmtag *vme)
 	ret = create_vcpus(vm);
 	if (ret) {
 		pr_err("create vcpus for vm failded\n");
-		ret = VMID_INVALID;
+		ret = 0;
 		goto release_vm;
 	}
 
@@ -1123,12 +1125,32 @@ struct vm *create_vm(struct vmtag *vme)
 		goto release_vm;
 	}
 
+	if ((vm->flags & VM_FLAGS_HOST)) {
+		ASSERT(host_vm == NULL);
+		host_vm = vm;
+	}
+
 	return vm;
 
 release_vm:
 	destroy_vm(vm);
 
 	return NULL;
+}
+
+struct vm *get_host_vm(void)
+{
+	return host_vm;
+}
+
+static inline const char *get_vm_type(struct vm *vm)
+{
+	if (vm->flags & VM_FLAGS_HOST)
+		return "Host";
+	else if (vm->flags & VM_FLAGS_NATIVE)
+		return "Native";
+	else
+		return "Guest";
 }
 
 static void *create_native_vm_of(struct device_node *node, void *arg)
@@ -1190,6 +1212,9 @@ static void *create_native_vm_of(struct device_node *node, void *arg)
 				meminfo[i * 2 + 1], VM_NATIVE_NORMAL);
 	}
 
+	pr_notice("create vm%d [%s %s] done\n", vm->vmid,
+			vm->name, get_vm_type(vm));
+
 	return vm;
 }
 
@@ -1229,12 +1254,16 @@ int virt_init(void)
 	extern void vmm_init(void);
 	struct vm *vm;
 
+	/*
+	 * VMID 0 is reserved
+	 */
+	set_bit(0, vmid_bitmap);
 	vmm_init();
 
 	parse_and_create_vms();
 
-	/* check whether VM0 has been create correctly */
-	vm = get_vm_by_id(VMID_HVM);
+	/* check whether host VM has been create correctly */
+	vm = get_host_vm();
 	if (!vm) {
 		pr_err("hvm has not been create correctly\n");
 		return -ENOENT;

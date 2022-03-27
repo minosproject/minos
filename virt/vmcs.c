@@ -27,7 +27,7 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 	unsigned long flags;
 	struct vcpu *vcpu = get_current_vcpu();
 	struct vmcs *vmcs = vcpu->vmcs;
-	struct vm *vm0 = get_vm_by_id(0);
+	struct vm *vm0 = get_host_vm();
 
 	if (vcpu->vmcs_irq < 0) {
 		pr_err("no hvm irq for this vcpu\n");

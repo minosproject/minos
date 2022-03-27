@@ -124,6 +124,9 @@ int parse_vm_info_of(struct device_node *node, struct vmtag *vmtag)
 	if (of_get_bool(node, "no_of_resource"))
 		vmtag->flags |= VM_FLAGS_NO_OF_RESOURCE;
 
+	if (of_get_bool(node, "host_vm"))
+		vmtag->flags |= VM_FLAGS_HOST;
+
 	vmtag->kernel_file = of_getprop(node, "kernel_image", NULL);
 	vmtag->dtb_file = of_getprop(node, "dtb_image", NULL);
 	vmtag->initrd_file = of_getprop(node, "initrd_image", NULL);
@@ -248,7 +251,7 @@ static int create_pdev_iomem_of(struct vm *vm, struct device_node *node)
 		if (size == 0)
 			continue;
 
-		if (vm_is_hvm(vm)) {
+		if (vm_is_host_vm(vm)) {
 			if (!platform_iomem_valid(addr))
 				continue;
 		}

@@ -507,7 +507,7 @@ static void dump_vmm_areas(struct mm_struct *mm)
 
 static void release_vmm_area_in_vm0(struct vm *vm)
 {
-	struct vm *vm0 = get_vm_by_id(VMID_HVM);
+	struct vm *vm0 = get_host_vm();
 	struct mm_struct *mm = &vm0->mm;
 	struct vmm_area *va, *n;
 
@@ -577,7 +577,7 @@ void release_vm_memory(struct vm *vm)
 unsigned long create_hvm_shmem_map(struct vm *vm,
 			unsigned long phy, uint32_t size)
 {
-	struct vm *vm0 = get_vm_by_id(VMID_HVM);
+	struct vm *vm0 = get_host_vm();
 	struct vmm_area *va;
 
 	va = alloc_free_vmm_area(&vm0->mm, size, PAGE_MASK, VM_GUEST_SHMEM | VM_RW);
@@ -636,7 +636,7 @@ int translate_guest_ipa(struct mm_struct *mm,
 static int do_vm_mmap(struct mm_struct *mm, unsigned long hvm_mmap_base,
 		unsigned long offset, unsigned long size)
 {
-	struct vm *vm0 = get_vm_by_id(VMID_HVM);
+	struct vm *vm0 = get_host_vm();
 	struct mm_struct *mm0 = &vm0->mm;
 	unsigned long pa;
 	int ret;
@@ -681,7 +681,7 @@ static int do_vm_mmap(struct mm_struct *mm, unsigned long hvm_mmap_base,
  */
 struct vmm_area *vm_mmap(struct vm *vm, unsigned long offset, size_t size)
 {
-	struct vm *vm0 = get_vm_by_id(VMID_HVM);
+	struct vm *vm0 = get_host_vm();
 	struct vmm_area *va;
 	int ret;
 

@@ -71,7 +71,7 @@ static int sip_smc_handler(gp_regs *c, uint32_t id, unsigned long *args)
 
 	pr_debug("sip function for amlogic 0x%x\n", id);
 
-	if (!vm_is_hvm(vm))
+	if (!vm_is_host_vm(vm))
 		return -EPERM;
 
 	fn = amlogic_smc_fn[id - AMLOGIC_SMC_BASE];

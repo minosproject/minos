@@ -20,6 +20,7 @@
 #define VM_FLAGS_NATIVE_WFI		(1 << 6)
 #define VM_FLAGS_NO_OF_RESOURCE		(1 << 7)
 #define VM_FLAGS_CAN_RESET		(1 << 8)
+#define VM_FLAGS_HOST			(1 << 9)
 #define VM_FLAGS_XNU_APPLE		(1 << 12)
 
 #define VM_FLAGS_SETUP_OF		(1 << 16)
@@ -29,6 +30,7 @@
 #define VM_FLAGS_SETUP_MASK		(0xf0000)
 
 struct vmtag {
+	uint32_t vmid;
 	char name[VM_NAME_SIZE];
 	char os_type[VM_TYPE_SIZE];
 	int32_t nr_vcpu;

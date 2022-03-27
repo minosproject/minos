@@ -223,7 +223,7 @@ int request_virq(struct vm *vm, uint32_t virq, unsigned long flags);
 
 static inline int alloc_hvm_virq(void)
 {
-	return alloc_vm_virq(get_vm_by_id(0));
+	return alloc_vm_virq(get_host_vm());
 }
 
 static inline int alloc_gvm_virq(struct vm *vm)
@@ -233,7 +233,7 @@ static inline int alloc_gvm_virq(struct vm *vm)
 
 static void inline release_hvm_virq(int virq)
 {
-	return release_vm_virq(get_vm_by_id(0), virq);
+	return release_vm_virq(get_host_vm(), virq);
 }
 
 static void inline release_gvm_virq(struct vm *vm, int virq)

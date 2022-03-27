@@ -49,7 +49,7 @@ static int inline vdev_notify_gvm(struct vdev *vdev, uint32_t irq)
 
 static int inline vdev_notify_hvm(struct vdev *vdev, uint32_t irq)
 {
-	return send_virq_to_vm(get_vm_by_id(0), irq);
+	return send_virq_to_vm(get_host_vm(), irq);
 }
 
 #endif

@@ -213,7 +213,7 @@ static int fdt_setup_cpu(struct vm *vm)
 	}
 
 	for (i = vm->vcpu_nr; i < CONFIG_MAX_CPU_NR; i++) {
-		if (vm_is_hvm(vm))
+		if (vm_is_host_vm(vm))
 			aff_id = cpuid_to_affinity(i);
 		else
 			aff_id = i;
@@ -306,7 +306,7 @@ static void fdt_vm_init(struct vm *vm)
 		return;
 	}
 
-	if (vm_is_hvm(vm))
+	if (vm_is_host_vm(vm))
 		fdt_setup_minos(vm);
 
 	/*
@@ -325,7 +325,7 @@ static void fdt_vm_init(struct vm *vm)
 
 	vmbox_init(vm);
 
-	if (platform->setup_hvm && vm_is_hvm(vm))
+	if (platform->setup_hvm && vm_is_host_vm(vm))
 		platform->setup_hvm(vm, fdt);
 
 	fdt_pack(fdt);

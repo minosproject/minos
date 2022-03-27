@@ -174,7 +174,7 @@ void arch_vcpu_state_init(struct vcpu *vcpu, void *c)
 	/*
 	 * this require HVM's vcpu affinity need start with 0
 	 */
-	if (vm_is_hvm(vcpu->vm))
+	if (vm_is_host_vm(vcpu->vm))
 		context->vmpidr = cpuid_to_affinity(get_vcpu_id(vcpu));
 	else
 		context->vmpidr = get_vcpu_id(vcpu);
