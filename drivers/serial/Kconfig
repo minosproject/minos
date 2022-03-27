@@ -28,10 +28,6 @@ config SERIAL_AMLOGIC
 	help
 	  serial driver for amlogic soc
 
-config SERIAL_SCIF
-	bool "scif for r8a7795 soc"
-	help
-	  serial driver for r8a7795 soc
 endif
 
 endmenu

@@ -41,14 +41,21 @@ static struct vmodule *create_vmodule(struct module_id *id)
 	strncpy(vmodule->name, id->name, sizeof(vmodule->name) - 1);
 	init_list(&vmodule->list);
 	vmodule->id = vmodule_class_nr++;
-
+	
 	/* call init routine */
 	if (id->data) {
 		fn = (vmodule_init_fn)id->data;
 		fn(vmodule);
 	}
 
-	list_add(&vmodule_list, &vmodule->list);
+	/*
+	 * always add the vcpu_core module as the first module.
+	 */
+	if (strcmp(vmodule->name, "vcpu_core") == 0)
+		list_add(&vmodule_list, &vmodule->list);
+	else
+		list_add_tail(&vmodule_list, &vmodule->list);
+
 	return vmodule;
 }
 
@@ -87,8 +94,7 @@ int vcpu_vmodules_init(struct vcpu *vcpu)
 		return 0;
 
 	vcpu->context = zalloc(size);
-	if (!vcpu->context)
-		panic("No more memory for vcpu vmodule cotnext\n");
+	ASSERT(vcpu->context != NULL);
 
 	list_for_each(&vmodule_list, list) {
 		vmodule = list_entry(list, struct vmodule, list);
@@ -119,7 +125,7 @@ int vcpu_vmodules_deinit(struct vcpu *vcpu)
 
 	list_for_each_entry(vmodule, &vmodule_list, list) {
 		data = vcpu->context[vmodule->id];
-		if (vmodule->state_deinit && data)
+		if (vmodule->state_deinit)
 			vmodule->state_deinit(vcpu, data);
 
 		if (data)
@@ -129,81 +135,26 @@ int vcpu_vmodules_deinit(struct vcpu *vcpu)
 	return 0;
 }
 
-int vcpu_vmodules_reset(struct vcpu *vcpu)
-{
-	struct vmodule *vmodule;
-	void *data;
-
-	list_for_each_entry(vmodule, &vmodule_list, list) {
-		data = vcpu->context[vmodule->id];
-		if (vmodule->state_reset && data)
-			vmodule->state_reset(vcpu, data);
+#define VCPU_VMODULE_ACTION(action)					\
+	void action##_vcpu_vmodule_state(struct vcpu *vcpu)		\
+	{								\
+		struct vmodule *vmodule;				\
+		list_for_each_entry(vmodule, &vmodule_list, list) {	\
+			if (vmodule->state_##action) {			\
+				vmodule->state_##action(vcpu,		\
+					vcpu->context[vmodule->id]);	\
+			}						\
+		}							\
 	}
 
-	return 0;
-}
+VCPU_VMODULE_ACTION(save)
+VCPU_VMODULE_ACTION(restore)
+VCPU_VMODULE_ACTION(reset)
+VCPU_VMODULE_ACTION(stop)
+VCPU_VMODULE_ACTION(suspend)
+VCPU_VMODULE_ACTION(resume)
 
-void restore_vcpu_vmodule_state(struct vcpu *vcpu)
-{
-	struct vmodule *vmodule;
-	void *context;
-
-	list_for_each_entry(vmodule, &vmodule_list, list) {
-		context = vcpu->context[vmodule->id];
-		if (vmodule->state_restore && context)
-			vmodule->state_restore(vcpu, context);
-	}
-}
-
-void save_vcpu_vmodule_state(struct vcpu *vcpu)
-{
-	struct vmodule *vmodule;
-	void *context;
-
-	list_for_each_entry(vmodule, &vmodule_list, list) {
-		context = vcpu->context[vmodule->id];
-		if (vmodule->state_save && context)
-			vmodule->state_save(vcpu, context);
-	}
-}
-
-void suspend_vcpu_vmodule_state(struct vcpu *vcpu)
-{
-	struct vmodule *vmodule;
-	void *context;
-
-	list_for_each_entry(vmodule, &vmodule_list, list) {
-		context = vcpu->context[vmodule->id];
-		if (vmodule->state_suspend && context)
-			vmodule->state_suspend(vcpu, context);
-	}
-}
-
-void resume_vcpu_vmodule_state(struct vcpu *vcpu)
-{
-	struct vmodule *vmodule;
-	void *context;
-
-	list_for_each_entry(vmodule, &vmodule_list, list) {
-		context = vcpu->context[vmodule->id];
-		if (vmodule->state_resume && context)
-			vmodule->state_resume(vcpu, context);
-	}
-}
-
-void stop_vcpu_vmodule_state(struct vcpu *vcpu)
-{
-	struct vmodule *vmodule;
-	void *context;
-
-	list_for_each_entry(vmodule, &vmodule_list, list) {
-		context = vcpu->context[vmodule->id];
-		if (vmodule->state_stop && context)
-			vmodule->state_stop(vcpu, context);
-	}
-}
-
-int vmodules_init(void)
+static int vmodules_init(void)
 {
 	struct module_id *mid;
 	struct vmodule *vmodule;
@@ -216,3 +167,4 @@ int vmodules_init(void)
 
 	return 0;
 }
+subsys_initcall(vmodules_init);

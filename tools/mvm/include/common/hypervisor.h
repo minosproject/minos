@@ -34,7 +34,7 @@ struct ramdisk_file {
 #define VM_NAME_SIZE	32
 #define VM_TYPE_SIZE	16
 
-#define VM_FLAGS_64BIT			(1 << 0)
+#define VM_FLAGS_32BIT			(1 << 0)
 #define VM_FLAGS_NATIVE			(1 << 1)
 #define VM_FLAGS_DYNAMIC_AFF		(1 << 2)
 #define VM_FLAGS_NO_RAMDISK		(1 << 3)
@@ -63,8 +63,17 @@ struct vmtag {
 	uint64_t flags;
 	uint32_t vcpu_affinity[8];
 	uint64_t load_address;
-	char image_file[RAMDISK_FNAME_SIZE];
-	char dtb_file[RAMDISK_FNAME_SIZE];
+
+	/*
+	 * for native VM, native VM can load from
+	 * ramdisk.
+	 */
+	char *kernel_file;
+	char *dtb_file;
+	char *initrd_file;
+
+	uint64_t initrd_base;
+	uint64_t initrd_size;
 };
 
 #define IOCTL_CREATE_VM			0xf000

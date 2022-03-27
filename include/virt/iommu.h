@@ -3,6 +3,9 @@
 #ifndef _MINOS_IOMMU_H_
 #define _MINOS_IOMMU_H_
 
+struct vm;
+struct device_node;
+
 struct iommu_ops {
 	int (*init)(struct device_node *node);
 	int (*vm_init)(struct vm *vm);

@@ -16,6 +16,15 @@
 #define UARTICR		0x44
 #define UARTDMACR	0x48
 
+#define INT_CTS                 (1 << 1)
+#define INT_RX                  (1 << 4)
+#define INT_TX                  (1 << 5)
+#define INT_RX_TIMEOUT          (1 << 6)
+#define INT_FRAMING_ERR         (1 << 7)
+#define INT_PARITY_ERR          (1 << 8)
+#define INT_BREAK_ERR           (1 << 9)
+#define INT_OVER_ERR            (1 << 10)
+
 /*
  * defines for control/status registers
  */

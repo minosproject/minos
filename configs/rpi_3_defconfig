@@ -7,7 +7,6 @@ CONFIG_64BIT=y
 CONFIG_NR_CPUS_CLUSTER0=4
 CONFIG_NR_CPUS_CLUSTER1=0
 # CONFIG_MPIDR_SHIFT is not set
-CONFIG_PLATFORM_ADDRESS_RANGE=40
 CONFIG_EXCEPTION_STACK_SIZE=0x2000
 # end of Minos aarch64 Arch Feature
 
@@ -39,6 +38,8 @@ CONFIG_NR_SPI_IRQS=256
 CONFIG_PRINT_NOTICE=y
 # CONFIG_PRINT_WARN is not set
 # CONFIG_PRINT_ERROR is not set
+CONFIG_DEFAULT_MM_ALLOCATOR=y
+# CONFIG_SIMPLE_MM_ALLOCATOR is not set
 CONFIG_LOG_LEVEL=3
 # end of Minos OS configuration
 
@@ -103,7 +104,6 @@ CONFIG_DEVICE_TREE=y
 CONFIG_SOC_BCM2837=y
 # CONFIG_SOC_BCM2838 is not set
 # CONFIG_SOC_AMLOGIC is not set
-CONFIG_MINOS_START_ADDRESS=0x28000000
 CONFIG_MINOS_ENTRY_ADDRESS=0x28008000
 CONFIG_MINOS_RAM_SIZE=0x2000000
 CONFIG_NR_CPUS=4
@@ -120,22 +120,10 @@ CONFIG_HVM_SPI_VIRQ_NR=96
 #
 # Application Config
 #
-CONFIG_SHELL=y
-
-#
-# Shell config
-#
-CONFIG_SHELL_TASK_PRIO=63
-# end of Shell config
+# CONFIG_SHELL is not set
 # end of Application Config
 
 #
 # System libary config
 #
-
-#
-# Shell Command Support
-#
-CONFIG_SHELL_COMMAND_TASK=y
-# end of Shell Command Support
 # end of System libary config

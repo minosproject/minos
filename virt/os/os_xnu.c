@@ -133,7 +133,7 @@ static void xnu_vcpu_init(struct vcpu *vcpu)
 	 * so set the setup data address to x0
 	 */
 	if (get_vcpu_id(vcpu) == 0) {
-		arch_init_vcpu(vcpu, (void *)vcpu->vm->entry_point, NULL);
+		arch_vcpu_init(vcpu, (void *)vcpu->vm->entry_point, NULL);
 		regs = (gp_regs *)vcpu->task->stack_base;
 		regs->x0 = (uint64_t)vcpu->vm->setup_data;
 	}

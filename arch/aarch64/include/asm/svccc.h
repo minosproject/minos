@@ -104,6 +104,10 @@ void smc_call(uint32_t id, unsigned long a1, unsigned long a2,
 		unsigned long a3, unsigned long a4, unsigned long a5,
 		unsigned long a6, unsigned long a7, struct arm_smc_res *res);
 
+void hvc_call(uint32_t id, unsigned long a1, unsigned long a2,
+		unsigned long a3, unsigned long a4, unsigned long a5,
+		unsigned long a6, unsigned long a7, struct arm_smc_res *res);
+
 int do_svc_handler(gp_regs *regs, uint32_t svc_id,
 		uint64_t *args, int smc);
 

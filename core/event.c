@@ -21,6 +21,24 @@
 #include <minos/mm.h>
 #include <minos/smp.h>
 
+static atomic_t event_token = { 1 };
+static atomic_t event_token_gen = { 0 };
+
+uint32_t new_event_token(void)
+{
+	uint32_t value;
+
+	while (1) {
+		value = (uint32_t)atomic_inc_return_old(&event_token);
+		if (value == 0)
+			atomic_inc(&event_token_gen);
+		else
+			break;
+	}
+
+	return value;
+}
+
 void event_init(struct event *event, int type, void *pdata)
 {
 	event->type = type;
@@ -29,120 +47,87 @@ void event_init(struct event *event, int type, void *pdata)
 	event->data = pdata;
 }
 
-void event_task_wait(struct task *task, void *ev, int stat, uint32_t to)
+void __event_task_wait(unsigned long token, int mode, uint32_t to)
 {
-	unsigned long flags;
-	struct event *event;
+	struct task *task = current;
 
-	task_lock_irqsave(task, flags);
+	/*
+	 * after __event_task_wait, the process will call sched()
+	 * by itself, before sched() is called, the task can not
+	 * be sched out, since at the same time another thread
+	 * may wake up this process, which may case dead lock
+	 * with current design.
+	 */
+	do_not_preempt();
 
-	task->stat |= stat;
+	task->stat = TASK_STAT_WAIT_EVENT;
+	smp_wmb();
+
 	task->pend_stat = TASK_STAT_PEND_OK;
-	task->delay = to;
+	task->wait_type = mode;
+	task->delay = (to == -1 ? 0 : to);
+	task->wait_event = token;
+}
+
+void event_task_wait(void *ev, int mode, uint32_t to)
+{
+	struct task *task = get_current_task();
+	struct event *event;
 
 	/*
 	 * the process of flag is different with other IPC
 	 * method
 	 */
-	if (stat == TASK_STAT_FLAG) {
+	if (mode == TASK_EVENT_FLAG) {
 		task->flag_node = ev;
 	} else {
 		event = (struct event *)ev;
-		task->wait_event = event;
-		if (task_is_realtime(task)) {
-			event->wait_grp |= task->bity;
-			event->wait_tbl[task->by] |= task->bitx;
-		} else
-			list_add_tail(&event->wait_list, &task->event_list);
+		list_add_tail(&event->wait_list, &task->event_list);
 	}
 
-	set_task_sleep(task, to);
-	task_unlock_irqrestore(task, flags);
+	__event_task_wait((unsigned long)ev, mode, to);
 }
 
 int event_task_remove(struct task *task, struct event *ev)
 {
-	int pending = task_is_pending(task);
-
 	/* if task has already timeout or deleted */
-	if (!task_is_realtime(task)) {
-		if (task->event_list.next != NULL) {
-			list_del(&task->event_list);
-			task->event_list.next = NULL;
-
-			/* if the task is pending now then success */
-			if (pending)
-				return 0;
-		}
-
-		return -EPERM;
-	} else {
-		ev->wait_tbl[task->by] &= ~task->bitx;
-		if (ev->wait_tbl[task->by] == 0)
-			ev->wait_grp &= ~task->bity;
-
-		if (pending)
-			return 0;
+	if (task->event_list.next != NULL) {
+		list_del(&task->event_list);
+		task->event_list.next = NULL;
 	}
 
-	return -EPERM;
+	return 0;
 }
 
 struct task *event_get_waiter(struct event *ev)
 {
-	if (ev->wait_grp != 0)
-		return get_highest_task(ev->wait_grp, ev->wait_tbl);
+	struct task *task;
 
-	if (!is_list_empty(&ev->wait_list)) {
-		return list_first_entry(&ev->wait_list,
-				struct task, event_list);
-	}
+	if (is_list_empty(&ev->wait_list))
+		return NULL;
 
-	return NULL;
-}
+	task = list_first_entry(&ev->wait_list, struct task, event_list);
+	event_task_remove(task, ev);
 
-static void inline event_task_ready(struct task *task, void *msg,
-		uint32_t msk, int pend_stat)
-{
-	task->pend_stat = pend_stat;
-
-	task->msg = msg;
-	task->stat &= ~msk;
-	task->wait_event = NULL;
-
-	set_task_ready(task, 1);
+	return task;
 }
 
 struct task *event_highest_task_ready(struct event *ev, void *msg,
 		uint32_t msk, int pend_stat)
 {
-	int retry = 0;
+	int retry;
 	struct task *task;
-	unsigned long flags = 0;
 
 again:
 	task = event_get_waiter(ev);
 	if (!task)
 		return NULL;
 
-	/* 
-	 * need to check whether this task has got
-	 * timeout firstly, since even it is timeout
-	 * the task will not remove from the waiter
-	 * list soon.
-	 *
-	 * this function will race with task_timeout_handler
-	 * so checkt the pend_stat to avoid race
+	/*
+	 * try to wake up the task and make sure is not wakeup
+	 * by timeout handler.
 	 */
-	task_lock_irqsave(task, flags);
-	if (!event_task_remove(task, ev)) {
-		event_task_ready(task, msg, msk, pend_stat);
-		retry = 0;
-	} else {
-		retry = 1;
-	}
-	task_unlock_irqrestore(task, flags);
-
+	retry = __wake_up(task, TASK_STAT_PEND_OK, msg);
 	if (retry)
 		goto again;
 
@@ -153,22 +138,42 @@ void event_del_always(struct event *ev)
 {
 	struct task *task, *n;
 
-	/* 
-	 * ready all the task waitting for this mutex
-	 * set the pend stat to PEND_ABORT to indicate
-	 * that the event is not valid when the task
-	 * has been waked up
-	 */
 	list_for_each_entry_safe(task, n, &ev->wait_list, event_list) {
 		event_task_remove(task, ev);
-		event_task_ready(task, NULL, TASK_STAT_MUTEX,
-					TASK_STAT_PEND_ABORT);
+		wake_up_abort(task);
 	}
+}
 
-	while (ev->wait_grp != 0) {
-		task = get_highest_task(ev->wait_grp, ev->wait_tbl);
-		event_task_ready(task, NULL, TASK_STAT_MUTEX,
-					TASK_STAT_PEND_ABORT);
-		event_task_remove(task, ev);
-	}
+void event_pend_down(struct task *task)
+{
+	task->pend_stat = TASK_STAT_PEND_OK;
+	task->wait_event = (unsigned long)NULL;
+	task->wait_type = 0;
+}
+
+long wait_event(void)
+{
+	struct task *task = current;
+	long status = TASK_STAT_PEND_OK;
+
+	ASSERT(task->stat == TASK_STAT_WAIT_EVENT);
+	sched();
+
+	status = task->pend_stat;
+	task->pend_stat = TASK_STAT_PEND_OK;
+
+	return status;
+}
+
+long wait_event_locked(int ev, uint32_t timeout, spinlock_t *lock)
+{
+	long status;
+
+	__event_task_wait(new_event_token(), ev, timeout);
+
+	if (lock) spin_unlock(lock);
+	status = wait_event();
+	if (lock) spin_lock(lock);
+
+	return status;
 }

@@ -32,7 +32,7 @@ struct task_desc {
 		.func = f,		\
 		.arg = a,		\
 		.prio = p,		\
-		.aff = PCPU_AFF_ANY,	\
+		.aff = TASK_AFF_ANY,	\
 		.size = ss,		\
 		.flags = fl		\
 	}
@@ -44,7 +44,7 @@ struct task_desc {
 		.func = f,		\
 		.arg = a,		\
 		.prio = p,	\
-		.aff = PCPU_AFF_PERCPU,	\
+		.aff = TASK_AFF_PERCPU,	\
 		.size = ss,		\
 		.flags = fl		\
 	}
@@ -56,7 +56,7 @@ struct task_desc {
 		.func = f,		\
 		.arg = a,		\
 		.prio = p,		\
-		.aff = PCPU_AFF_NONE,	\
+		.aff = TASK_AFF_NONE,	\
 		.size = ss,		\
 		.flags = fl		\
 	}

@@ -348,7 +348,7 @@ static int linux_setup_env(struct vm *vm, char *cmdline)
 	fdt_setup_commandline(vbase, arg);
 	fdt_setup_cpu(vbase, vm->nr_vcpus);
 	fdt_setup_memory(vbase, vm->mem_start, vm->mem_size,
-			!!vm->flags & VM_FLAGS_64BIT);
+			!vm->flags & VM_FLAGS_32BIT);
 	fdt_set_gic(vbase, vm->gic_type);
 
 	if (!(vm->flags & (VM_FLAGS_NO_RAMDISK))) {
@@ -549,10 +549,10 @@ static int linux_early_init(struct vm *vm)
 	vm->mem_start = MEM_BLOCK_BALIGN(vm->mem_start);
 
 	if (vm->entry == 0) {
-		if (vm->flags & VM_FLAGS_64BIT)
-			vm->entry = vm->mem_start + 0x80000;
-		else
+		if (vm->flags & VM_FLAGS_32BIT)
 			vm->entry = vm->mem_start + 0x8000;
+		else
+			vm->entry = vm->mem_start + 0x80000;
 	}
 
 	if (vm->setup_data == 0) {

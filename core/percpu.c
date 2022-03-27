@@ -17,34 +17,52 @@
 #include <minos/minos.h>
 #include <minos/percpu.h>
 #include <minos/sched.h>
+#include <minos/mm.h>
 
-extern unsigned char __percpu_start;
-extern unsigned char __percpu_end;
-extern unsigned char __percpu_section_size;
+struct pcpu pcpus[NR_CPUS];
+unsigned long __cache_line_align percpu_offset[CONFIG_NR_CPUS];
 
-unsigned long percpu_offset[CONFIG_NR_CPUS];
+#define PCPU_STAT_OFFLINE	0
+#define PCPU_STAT_ONLINE	1
 
-void percpus_init(void)
+void percpu_init(int cpuid)
 {
+	extern unsigned char __percpu_start;
+	extern unsigned char __percpu_section_size;
+	struct pcpu *pcpu;
 	int i;
-	size_t size;
 
-	size = (&__percpu_end) - (&__percpu_start);
-	memset(&__percpu_start, 0, size);
+	if ((cpuid < 0) || (cpuid >= NR_CPUS))
+		panic("cpuid too big %d >= %d\n", cpuid, NR_CPUS);
 
-	for (i = 0; i < CONFIG_NR_CPUS; i++) {
-		percpu_offset[i] = (phy_addr_t)(&__percpu_start) +
-			(size_t)(&__percpu_section_size) * i;
+	pcpu = &pcpus[cpuid];
+	get_per_cpu(pcpu, cpuid) = pcpu;
+
+	/*
+	 * the data of percpu section has been zeroed at boot code
+	 * here do not to zero it again.
+	 *
+	 * some member of pcpu has been init on boot stage, like cpuid.
+	 */
+	if (cpuid == 0) {
+		for (i = 0; i < CONFIG_NR_CPUS; i++) {
+			percpu_offset[i] = (phy_addr_t)(&__percpu_start) +
+				(size_t)(&__percpu_section_size) * i;
+			pr_info("percpu [%d] offset 0x%x\n", i, percpu_offset[i]);
+		}
 	}
+
+	pcpu->state = PCPU_STATE_RUNNING;
 }
 
-static int __init_text percpu_module_init(void)
+static int percpu_subsystem_init(void)
 {
-	int i;
+	struct pcpu *pcpu = get_pcpu();
 
-	for (i = 0; i < CONFIG_NR_CPUS; i++)
-		pr_info("percpu offset [%d] - 0x%x\n", i, percpu_offset[i]);
+	pcpu->stack = get_free_pages(2);
+	ASSERT(pcpu->stack != NULL);
+	pcpu->stack += 2 * PAGE_SIZE;
 
 	return 0;
 }
-early_initcall(percpu_module_init);
+subsys_initcall_percpu(percpu_subsystem_init);

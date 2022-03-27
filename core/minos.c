@@ -33,11 +33,12 @@
 extern void softirq_init(void);
 extern void init_timers(void);
 extern void cpu_idle(void);
-extern void sched_tick_enable(unsigned long exp);
-extern void bootmem_init(void);
 extern int allsymbols_init(void);
 extern void platform_init(void);
 extern int create_idle_task(void);
+extern int load_root_service(void);
+extern int kernel_vspace_init(void);
+extern void mm_init(void);
 
 #ifdef CONFIG_VIRT
 #include <virt/virt.h>
@@ -46,20 +47,14 @@ extern int create_idle_task(void);
 void boot_main(void)
 {
 	allsymbols_init();
-	percpus_init();
+	percpu_init(0);
 
-	pr_notice("Starting Minos %s\n", MINOS_VERSION_STR);
+	pr_notice("Minos %s\n", MINOS_VERSION_STR);
 
-	if (smp_processor_id() != 0)
-		panic("boot_main : cpu is not cpu0");
+	ASSERT(smp_processor_id() == 0);
 
-	/*
-	 * at the early stage when the memory mangement
-	 * has not been finish init, system can using
-	 * alloc_boot_mem or alloc_boot_page to get
-	 * free mem or free pages
-	 */
-	bootmem_init();
+	kernel_vspace_init();
+	mm_init();
 
 #ifdef CONFIG_DEVICE_TREE
 	of_init_bootargs();
@@ -68,20 +63,16 @@ void boot_main(void)
 	early_init();
 	early_init_percpu();
 
-	mm_init();
-
-	ramdisk_init();
-
 	arch_init();
 	arch_init_percpu();
 
-	pcpus_init();
 	platform_init();
 	irq_init();
+
 #ifdef CONFIG_SMP
 	smp_init();
 #endif
-	softirq_init();
+
 	init_timers();
 
 	subsys_init();
@@ -96,6 +87,7 @@ void boot_main(void)
 	device_init();
 	device_init_percpu();
 
+	ramdisk_init();
 	create_idle_task();
 
 #ifdef CONFIG_SMP
@@ -108,9 +100,9 @@ void boot_main(void)
 	cpu_idle();
 }
 
-void boot_secondary(void)
+void boot_secondary(int cpuid)
 {
-	pr_notice("cpu-%d is up\n", smp_processor_id());
+	pr_notice("cpu-%d is up\n", cpuid);
 
 	/*
 	 * need wait for all cpus up then excuted below
@@ -125,6 +117,8 @@ void boot_secondary(void)
 	 */
 	while (!is_cpus_all_up())
 		mb();
+
+	percpu_init(cpuid);
 
 	early_init_percpu();
 

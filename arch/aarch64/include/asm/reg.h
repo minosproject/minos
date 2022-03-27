@@ -3,8 +3,6 @@
 
 #include <minos/types.h>
 
-#define HPFAR_MASK	GENMASK(39, 4)
-
 /* ESR.EC == ESR_CP{15,14,10}_32 */
 #define HSR_CP32_OP2_MASK (0x000e0000)
 #define HSR_CP32_OP2_SHIFT (17)
@@ -161,28 +159,6 @@
 #define ESR_SYSREG_ASOC_PMC1      ESR_SYSREG(3,2,c15,c1,0)
 #define ESR_SYSREG_ASOC_PMCR1     ESR_SYSREG(3,1,c15,c1,0)
 #define ESR_SYSREG_ASOC_PMSR      ESR_SYSREG(3,1,c15,c13,0)
-
-
-#define FSC_TYPE_MASK (_AC(0x3,U)<<4)
-#define FSC_TYPE_FAULT (_AC(0x00,U)<<4)
-#define FSC_TYPE_ABT   (_AC(0x01,U)<<4)
-#define FSC_TYPE_OTH   (_AC(0x02,U)<<4)
-#define FSC_TYPE_IMPL  (_AC(0x03,U)<<4)
-
-#define FSC_FLT_TRANS  (0x04)
-#define FSC_FLT_ACCESS (0x08)
-#define FSC_FLT_PERM   (0x0c)
-#define FSC_SEA        (0x10) /* Synchronous External Abort */
-#define FSC_SPE        (0x18) /* Memory Access Synchronous Parity Error */
-#define FSC_APE        (0x11) /* Memory Access Asynchronous Parity Error */
-#define FSC_SEATT      (0x14) /* Sync. Ext. Abort Translation Table */
-#define FSC_SPETT      (0x1c) /* Sync. Parity. Error Translation Table */
-#define FSC_AF         (0x21) /* Alignment Fault */
-#define FSC_DE         (0x22) /* Debug Event */
-#define FSC_LKD        (0x34) /* Lockdown Abort */
-#define FSC_CPR        (0x3a) /* Coprocossor Abort */
-
-#define FSC_LL_MASK    (_AC(0x03,U)<<0)
 
 /*
  * AArch32 Co-processor registers.

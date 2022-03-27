@@ -3,14 +3,15 @@
 ENTRY(_start)
 SECTIONS
 {
-	.vectors CONFIG_MINOS_ENTRY_ADDRESS:
+	.vectors CONFIG_MINOS_ENTRY_ADDRESS + CONFIG_PTOV_MASK:
 	{
 		/*
 		 * put all asm code into this section
 		 */
+		__minos_start = .;
 		__code_start = .;
 		KEEP(*(__start_up))
-		KEEP(*(__el2_vectors __int_handlers __asm_code))
+		KEEP(*(__elx_vectors __int_handlers __asm_code))
 	}
 
 	.text :
@@ -18,7 +19,78 @@ SECTIONS
 		*(.text)
 	}
 
+	. = ALIGN(4096);
+	__code_end = .;
+
+	__init_start = .;
+	__init_func_start = .;
+	__init_func_0_start = .;
+	.__init_func_0 : {
+		*(.__init_func_0)
+	}
+	__init_func_1_start = .;
+	.__init_func_1 : {
+		*(.__init_func_1)
+	}
+	__init_func_2_start = .;
+	.__init_func_2 : {
+		*(.__init_func_2)
+	}
+	__init_func_3_start = .;
+	.__init_func_3 : {
+		*(.__init_func_3)
+	}
+	__init_func_4_start = .;
+	.__init_func_4 : {
+		*(.__init_func_4)
+	}
+	__init_func_5_start = .;
+	.__init_func_5 : {
+		*(.__init_func_5)
+	}
+	__init_func_6_start = .;
+	.__init_func_6 : {
+		*(.__init_func_6)
+	}
+	__init_func_7_start = .;
+	.__init_func_7 : {
+		*(.__init_func_7)
+	}
+	__init_func_8_start = .;
+	.__init_func_8 : {
+		*(.__init_func_8)
+	}
+	__init_func_9_start = .;
+	.__init_func_9 : {
+		*(.__init_func_9)
+	}
+	__init_func_end = .;
+
 	. = ALIGN(8);
+
+	__init_data_start = .;
+	.__init_data_section : {
+		*(.__init_data_section)
+	}
+	__init_data_end = .;
+
+	. = ALIGN(8);
+
+	__init_text_start = .;
+	.__init_text : {
+		*(__init_text)
+	}
+	__init_text_end = .;
+
+	. = ALIGN(4096);
+	__init_end = .;
+
+	__data_start = .;
+	.stage1_page_table : {
+		. = ALIGN(4096);
+		__stage1_page_table = .;
+		. = . + 0x1000;
+	}
 
 	.data : {*(.data)}
 
@@ -109,14 +181,6 @@ SECTIONS
 
 	. = ALIGN(8);
 
-	__sync_desc_start = .;
-	.__sync_desc : {
-		*(.__sync_desc)
-	}
-	__sync_desc_end = .;
-
-	. = ALIGN(8);
-
 	__smc_handler_start = .;
 	.__smc_handler : {
 		*(.__smc_handler)
@@ -133,120 +197,17 @@ SECTIONS
 
 	. = ALIGN(8);
 
-	__static_vcpu_info_start = .;
-	.__static_vcpu_info : {
-		*(.__static_vcpu_info)
-	}
-	__static_vcpu_info_end = .;
-
-	. = ALIGN(8);
-
 	__shell_command_start = .;
 	.__shell_command : {
 		*(.__shell_command)
 	}
 	__shell_command_end = .;
 
-	. = ALIGN(8);
+	. = ALIGN(4096);
+	__data_end = .;
 
-	__init_start = .;
-
-	__task_desc_start = .;
-	.__task_desc : {
-		*(.__task_desc)
-	}
-	__task_desc_end = .;
-
-	. = ALIGN(64);
-
-	__init_func_start = .;
-	__init_func_0_start = .;
-	.__init_func_0 : {
-		*(.__init_func_0)
-	}
-	__init_func_1_start = .;
-	.__init_func_1 : {
-		*(.__init_func_1)
-	}
-	__init_func_2_start = .;
-	.__init_func_2 : {
-		*(.__init_func_2)
-	}
-	__init_func_3_start = .;
-	.__init_func_3 : {
-		*(.__init_func_3)
-	}
-	__init_func_4_start = .;
-	.__init_func_4 : {
-		*(.__init_func_4)
-	}
-	__init_func_5_start = .;
-	.__init_func_5 : {
-		*(.__init_func_5)
-	}
-	__init_func_6_start = .;
-	.__init_func_6 : {
-		*(.__init_func_6)
-	}
-	__init_func_7_start = .;
-	.__init_func_7 : {
-		*(.__init_func_7)
-	}
-	__init_func_8_start = .;
-	.__init_func_8 : {
-		*(.__init_func_8)
-	}
-	__init_func_9_start = .;
-	.__init_func_9 : {
-		*(.__init_func_9)
-	}
-	__init_func_end = .;
-
-	. = ALIGN(8);
-
-	__init_data_start = .;
-	.__init_data_section : {
-		*(.__init_data_section)
-	}
-	__init_data_end = .;
-
-	. = ALIGN(8);
-
-	__init_text_start = .;
-	.__init_text : {
-		*(__init_text)
-	}
-	__init_text_end = .;
-
-	. = ALIGN(64);
-
-	__init_end = .;
-
-	.el2_ttb0_pgd : {
-		. = ALIGN(4096);
-		__el2_ttb0_pgd = .;
-		. = . + 0x1000;
-	}
-
-	/*
-	 * 4K level1 can map 512GB memory, for now
-	 * in hypervisor, just map max to 4GB when boot
-	 */
-	.el2_ttb0_pud : {
-		. = ALIGN(4096);
-		__el2_ttb0_pud = .;
-		. = . + 0x1000;
-	}
-
-	/* max map 4GB pmd when booting */
-	.el2_ttb0_pmd : {
-		. = ALIGN(4096);
-		__el2_ttb0_pmd = .;
-		. = . + 0x4000;
-	}
-
+	__rodata_start = .;
 	__symbols_start = .;
-
 	.__symbols__ : {
 		KEEP(*(.__symbols__))
 	}
@@ -258,5 +219,5 @@ SECTIONS
 		KEEP(*(.rodata.str1.8))
 	}
 
-	__code_end = .;
+	__minos_end = .;
 }

@@ -126,22 +126,7 @@ static int flag_task_ready(struct flag_node *node, flag_t flags)
 {
 	struct task *task = node->task;
 
-	task_lock(task);
-
-	/*
-	 * if the task already timeout, then do nothing, else
-	 * wake up the releated task, here do not need to call
-	 * event_remove_task, since flag_t will not put the task
-	 * to the event wait list
-	 */
-	if (task_is_pending(task)) {
-		task->flags_rdy = flags;
-		task->pend_stat = TASK_STAT_PEND_OK;
-		task->stat = TASK_STAT_RDY;
-		set_task_ready(task, 0);
-	}
-
-	task_unlock(task);
+	__wake_up(task, TASK_STAT_PEND_OK, (void *)(unsigned long)flags);
 
 	return (task->prio < current->prio);
 }
@@ -158,7 +143,7 @@ static void flag_block(struct flag_grp *grp, struct flag_node *pnode,
 	pnode->flag_grp = grp;
 	list_add_tail(&grp->wait_list, &pnode->list);
 
-	event_task_wait(task, pnode, TASK_STAT_FLAG, timeout);
+	event_task_wait(pnode, TASK_EVENT_FLAG, timeout);
 }
 
 flag_t flag_pend(struct flag_grp *grp, flag_t flags,
@@ -176,8 +161,9 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 	if (result) {
 		wait_type &= ~FLAG_CONSUME;
 		consume = 1;
-	} else
+	} else {
 		consume = 0;
+	}
 
 	spin_lock_irqsave(&grp->lock, irq);
 
@@ -320,8 +306,8 @@ flag_t flag_post(struct flag_grp *grp, flag_t flags, int opt)
 
 	spin_unlock_irqrestore(&grp->lock, irq);
 
-	if (need_sched)
-		sched_yield();
+	if (need_sched && !in_interrupt())
+		sched();
 
 	return grp->flags;
 }

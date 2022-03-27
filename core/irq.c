@@ -21,12 +21,7 @@
 #include <minos/device_id.h>
 #include <minos/sched.h>
 #include <minos/of.h>
-
-#define NR_PERCPU_IRQS		(CONFIG_NR_PPI_IRQS + CONFIG_NR_SGI_IRQS)
-#define PERCPU_IRQ_DESC_SIZE	(NR_PERCPU_IRQS * NR_CPUS)
-#define SPI_IRQ_DESC_SIZE	CONFIG_NR_SPI_IRQS
-#define SPI_IRQ_BASE		NR_PERCPU_IRQS
-#define MAX_IRQ_COUNT		(CONFIG_NR_SPI_IRQS + NR_PERCPU_IRQS)
+#include <minos/current.h>
 
 unsigned long cpu_irq_stack[NR_CPUS];
 
@@ -68,7 +63,7 @@ static int default_irq_handler(uint32_t irq, void *data)
 	return 0;
 }
 
-static inline int do_handle_host_irq(int cpuid, struct irq_desc *irq_desc)
+static int do_handle_host_irq(int cpuid, struct irq_desc *irq_desc)
 {
 	int ret;
 
@@ -79,12 +74,14 @@ static inline int do_handle_host_irq(int cpuid, struct irq_desc *irq_desc)
 	}
 
 	ret = irq_desc->handler(irq_desc->hno, irq_desc->pdata);
+	irq_chip->irq_eoi(irq_desc->hno);
 out:
 	/*
-	 * 1: if the hw irq is to vcpu do not dir it
-	 * 2: if the hw irq is to vcpu but failed to send then dir it
+	 * 1: if the hw irq is to vcpu do not DIR it.
+	 * 2: if the hw irq is to vcpu but failed to send then DIR it.
+	 * 3: if the hw irq is to userspace process, do not DIR it.
 	 */
-	if (ret || (!test_bit(IRQ_FLAGS_VCPU_BIT, &irq_desc->flags)))
+	if (ret || !(irq_desc->flags & IRQ_FLAGS_VCPU))
 		irq_chip->irq_dir(irq_desc->hno);
 
 	return ret;
@@ -117,6 +114,7 @@ struct irq_desc *get_irq_desc(uint32_t irq)
 void __irq_enable(uint32_t irq, int enable)
 {
 	struct irq_desc *irq_desc;
+	unsigned long flags;
 
 	irq_desc = get_irq_desc(irq);
 	if (!irq_desc)
@@ -128,7 +126,7 @@ void __irq_enable(uint32_t irq, int enable)
 	 * which do not set the bit, so here force to excute
 	 * the action
 	 */
-	spin_lock(&irq_desc->lock);
+	spin_lock_irqsave(&irq_desc->lock, flags);
 	if (enable) {
 		irq_chip->irq_unmask(irq);
 		irq_desc->flags &= ~IRQ_FLAGS_MASKED;
@@ -136,7 +134,12 @@ void __irq_enable(uint32_t irq, int enable)
 		irq_chip->irq_mask(irq);
 		irq_desc->flags |= IRQ_FLAGS_MASKED;
 	 }
-	spin_unlock(&irq_desc->lock);
+	spin_unlock_irqrestore(&irq_desc->lock, flags);
+}
+
+void irq_dir(uint32_t irq)
+{
+	irq_chip->irq_dir(irq);
 }
 
 void irq_clear_pending(uint32_t irq)
@@ -200,11 +203,10 @@ int do_irq_handler(void)
 		if (irq >= BAD_IRQ)
 			return 0;
 
-		irq_chip->irq_eoi(irq);
-
 		irq_desc = get_irq_desc_cpu(cpuid, irq);
 		if (unlikely(!irq_desc)) {
 			pr_err("irq is not actived %d\n", irq);
+			irq_chip->irq_eoi(irq);
 			irq_chip->irq_dir(irq);
 			continue;
 		}
@@ -324,34 +326,10 @@ static void *irqchip_init(struct device_node *node, void *arg)
 	return node;
 }
 
-static void of_irq_init(void)
-{
-	of_iterate_all_node(hv_node, irqchip_init, NULL);
-}
-
 int irq_init(void)
 {
-	int i;
-	unsigned long stk;
-	int nr = CONFIG_TASK_STACK_SIZE >> PAGE_SHIFT;
-
-	/*
-	 * init the irq stack here, when exit the irq handler
-	 * it will switch to the irq stack to do the task
-	 * switch
-	 */
-	for (i = 0; i < NR_CPUS; i++) {
-		stk = (unsigned long)__get_free_pages(nr, nr);
-		if (!stk)
-			panic("No more memory\n");
-
-		stk = stk + CONFIG_TASK_STACK_SIZE - TASK_INFO_SIZE;
-		memset((void *)stk, 0, TASK_INFO_SIZE);
-		cpu_irq_stack[i] = stk;
-	}
-
 #ifdef CONFIG_DEVICE_TREE
-	of_irq_init();
+	of_iterate_all_node(of_root_node, irqchip_init, NULL);
 #endif
 
 	if (!irq_chip)

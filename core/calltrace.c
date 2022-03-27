@@ -74,7 +74,7 @@ void __panic(gp_regs *regs, char *fmt, ...)
 	printed = printed >= 512 ? 511 : printed;
 	buffer[printed + 1] = 0;
 
-	pr_fatal("[Panic] : %s", buffer);
+	pr_fatal("[Panic] %s", buffer);
 	dump_stack(regs, NULL);
 
 	/* inform other cpu to do panic */

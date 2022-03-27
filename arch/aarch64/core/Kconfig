@@ -14,27 +14,30 @@ config NR_CPUS_CLUSTER1
 	  cpu count in SOC cluster1, this
 	  will help to caculate the cpuid
 
-config MPIDR_SHIFT
-	bool "shifted affinities support"
-	default n
-	help
-	  The FVP_Base_RevC-2xAEMv8A FVP only supports shifted
-	  affinities, which is not compatible with legacy GIC
-	  configurations. Therefore this FVP does not support
-	  these legacy GIC configurations
-
-
-config PLATFORM_ADDRESS_RANGE
-	int "the virtual memory range of the system"
-	default 40
-	help
-	  the virtual memory range of the system range
-	  is 0x0 - 2^PLATFORM_ADDRESS_RANGE
-
 config EXCEPTION_STACK_SIZE
 	hex "the stack size of the exception vector"
 	default 0x2000
 	help
 	  the stack size of the exception vector
+
+config ARM_ATOMIC_LSE
+	bool "use lse atomic instruction"
+	default n
+	help
+	  this require at leaset armv8.1 soc
+
+config ARM_ADDRESS_TAGGING
+	bool
+	default (VIRT && ARM_VHE) || (!VIRT)
+
+config PTOV_MASK
+	hex
+	default 0xffffff8000000000 if ARM_ADDRESS_TAGGING
+	default 0x0
+
+config VTOP_MASK
+	hex
+	default 0x0000007fffffffff if ARM_ADDRESS_TAGGING
+	default 0x0
 
 endmenu

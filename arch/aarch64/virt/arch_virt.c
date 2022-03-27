@@ -30,66 +30,111 @@
 #include <virt/vm.h>
 #include <virt/virq.h>
 #include <virt/os.h>
-
-struct aarch64_system_context {
-	uint64_t vbar_el1;
-	uint64_t esr_el1;
-	uint64_t sp_el1;
-	uint64_t sp_el0;
-	uint64_t elr_el1;
-	uint64_t vmpidr;
-	uint64_t vpidr;
-	uint64_t sctlr_el1;
-	uint64_t hcr_el2;
-	uint64_t spsr_el1;
-	uint64_t far_el1;
-	uint64_t actlr_el1;
-	uint64_t tpidr_el1;
-	uint64_t csselr;
-	uint64_t cpacr;
-	uint64_t contextidr;
-	uint64_t tpidr_el0;
-	uint64_t tpidrro_el0;
-	uint64_t cntkctl;
-	uint64_t afsr0;
-	uint64_t afsr1;
-	uint32_t teecr;
-	uint32_t teehbr;
-	uint32_t dacr32_el2;
-	uint32_t ifsr32_el2;
-}__align(sizeof(unsigned long));
-
-#define AARCH64_SYSTEM_VMODULE	"aarch64-system"
+#include <asm/vtcb.h>
 
 static uint32_t mpidr_el1[NR_CPUS];
 
-void arch_init_vcpu(struct vcpu *vcpu, void *entry, void *arg)
+void arch_set_virq_flag(void)
+{
+	uint64_t hcr_el2;
+
+	hcr_el2 = read_sysreg(HCR_EL2);
+	hcr_el2 |= HCR_EL2_VI;
+	write_sysreg(hcr_el2, HCR_EL2);
+	dsb();
+}
+
+void arch_set_vfiq_flag(void)
+{
+	uint64_t hcr_el2;
+
+	hcr_el2 = read_sysreg(HCR_EL2);
+	hcr_el2 |= HCR_EL2_VF;
+	write_sysreg(hcr_el2, HCR_EL2);
+	dsb();
+}
+
+void arch_clear_virq_flag(void)
+{
+	uint64_t hcr_el2;
+
+	hcr_el2 = read_sysreg(HCR_EL2);
+	hcr_el2 &= ~HCR_EL2_VI;
+	hcr_el2 &= ~HCR_EL2_VF;
+	write_sysreg(hcr_el2, HCR_EL2);
+	dsb();
+}
+
+void arch_clear_vfiq_flag(void)
+{
+	uint64_t hcr_el2;
+
+	hcr_el2 = read_sysreg(HCR_EL2);
+	hcr_el2 &= ~HCR_EL2_VF;
+	write_sysreg(hcr_el2, HCR_EL2);
+	dsb();
+}
+
+void arch_vcpu_init(struct vcpu *vcpu, void *entry, void *arg)
 {
 	struct task *task = vcpu->task;
 	gp_regs *regs;
 
-	regs = stack_to_gp_regs(task->stack_origin);
+	regs = stack_to_gp_regs(task->stack_top);
 	memset(regs, 0, sizeof(gp_regs));
-	task->stack_base = task->stack_origin - sizeof(gp_regs);
+	task->stack_base = task->stack_top - sizeof(gp_regs);
 
-	regs->elr_elx = (uint64_t)entry;
+	regs->pc = (uint64_t)entry;
 
-	if (task_is_64bit(vcpu->task))
-		regs->spsr_elx = AARCH64_SPSR_EL1h | \
-				AARCH64_SPSR_F | \
-				AARCH64_SPSR_I | \
-				AARCH64_SPSR_A;
-	else
-		regs->spsr_elx = AARCH32_SVC | \
+	if (task_is_32bit(vcpu->task))
+		regs->pstate = AARCH32_SVC | \
 				AARCH64_SPSR_F | \
 				AARCH64_SPSR_I | \
 				AARCH64_SPSR_A | (1 << 4);
+	else
+		regs->pstate = AARCH64_SPSR_EL1h | \
+				AARCH64_SPSR_F | \
+				AARCH64_SPSR_I | \
+				AARCH64_SPSR_A;
 }
 
-static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
+static inline uint64_t generate_vtcr_el2(void)
 {
-	struct aarch64_system_context *context =
-			(struct aarch64_system_context *)c;
+	uint64_t value = 0;
+
+	/*
+	 * vtcr_el2 used to defined the memory attribute
+	 * for the EL1, this is defined by hypervisor
+	 * and may do not related to physical information
+	 */
+	value |= (24 << 0);	// t0sz = 0x10 40bits vaddr
+	value |= (0x01 << 6);	// SL0: 4kb start at level1
+	value |= (0x1 << 8);	// Normal memory, Inner WBWA
+	value |= (0x1 << 10);	// Normal memory, Outer WBWA
+	value |= (0x3 << 12);	// Inner Shareable
+
+	// TG0 4K
+	value |= (0x0 << 14);
+
+	// PS --- pysical size 1TB
+	value |= (2 << 16);
+
+	// vmid -- 8bit
+	value |= (0x0 << 19);
+
+	return value;
+}
+
+static inline uint64_t generate_vttbr_el2(uint32_t vmid, unsigned long base)
+{
+	return (base | ((uint64_t)vmid << 48));
+}
+
+void arch_vcpu_state_init(struct vcpu *vcpu, void *c)
+{
+	struct vcpu_context *context = (struct vcpu_context *)c;
+	struct vm *vm = vcpu->vm;
+	uint64_t value;
 
 	memset(context, 0, sizeof(*context));
 
@@ -109,9 +154,10 @@ static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
 	 * RW : low level is 64bit, when 0 is 32 bit
 	 * VM : enable virtualzation
 	 */
-	context->hcr_el2 = 0ul | HCR_EL2_HVC | HCR_EL2_VM | \
-		     HCR_EL2_TIDCP | HCR_EL2_IMO | HCR_EL2_FMO | \
-		     HCR_EL2_BSU_IS | HCR_EL2_FB | HCR_EL2_PTW | \
+	value = read_sysreg64(HCR_EL2);
+	context->hcr_el2 = value | HCR_EL2_VM |
+		     HCR_EL2_TIDCP | HCR_EL2_IMO | HCR_EL2_FMO |
+		     HCR_EL2_BSU_IS | HCR_EL2_FB | HCR_EL2_PTW |
 		     HCR_EL2_TSC | HCR_EL2_TACR | HCR_EL2_AMO;
 
 	/*
@@ -122,7 +168,7 @@ static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
 	if (!(vcpu->vm->flags & VM_FLAGS_NATIVE_WFI))
 		context->hcr_el2 |= HCR_EL2_TWI;
 
-	if (task_is_64bit(vcpu->task))
+	if (!task_is_32bit(vcpu->task))
 		context->hcr_el2 |= HCR_EL2_RW;
 
 	/*
@@ -149,53 +195,65 @@ static void aarch64_system_state_init(struct vcpu *vcpu, void *c)
 	 */
 	if (vcpu->vm->os->type == OS_TYPE_XNU)
 		context->hcr_el2 |= HCR_EL2_TDZ;
+
+	context->vtcr_el2 = generate_vtcr_el2();
+	context->vttbr_el2 = generate_vttbr_el2(vm->vmid, vtop(vm->mm.pgdp));
+	context->ttbr0_el1 = 0;
+	context->ttbr1_el1 = 0;
+	context->mair_el1 = 0;
+	context->tcr_el1 = 0;
+	context->par_el1 = 0;
+	context->amair_el1 = 0;
 }
 
-static void aarch64_system_state_resume(struct vcpu *vcpu, void *c)
+static void arch_vcpu_state_save(struct vcpu *vcpu, void *c)
 {
-	aarch64_system_state_init(vcpu, c);
-}
+	struct vcpu_context *context = (struct vcpu_context *)c;
 
-static void aarch64_system_state_save(struct vcpu *vcpu, void *c)
-{
-	struct aarch64_system_context *context =
-			(struct aarch64_system_context *)c;
-
-	dsb();
-	context->vbar_el1 = read_sysreg(VBAR_EL1);
-	context->esr_el1 = read_sysreg(ESR_EL1);
-	context->elr_el1 = read_sysreg(ELR_EL1);
-	context->vmpidr = read_sysreg(VMPIDR_EL2);
-	context->vpidr = read_sysreg(VPIDR_EL2);
-	context->sctlr_el1 = read_sysreg(SCTLR_EL1);
-	context->hcr_el2 = read_sysreg(HCR_EL2);
-	context->sp_el1 = read_sysreg(SP_EL1);
-	context->sp_el0 = read_sysreg(SP_EL0);
-	context->spsr_el1 = read_sysreg(SPSR_EL1);
-	context->far_el1 = read_sysreg(FAR_EL1);
-	context->actlr_el1 = read_sysreg(ACTLR_EL1);
-	context->tpidr_el1 = read_sysreg(TPIDR_EL1);
-	context->csselr = read_sysreg(CSSELR_EL1);
-	context->cpacr = read_sysreg(CPACR_EL1);
-	context->contextidr = read_sysreg(CONTEXTIDR_EL1);
-	context->tpidr_el0 = read_sysreg(TPIDR_EL0);
-	context->tpidrro_el0 = read_sysreg(TPIDRRO_EL0);
-	context->cntkctl = read_sysreg(CNTKCTL_EL1);
-	context->afsr0 = read_sysreg(AFSR0_EL1);
-	context->afsr1 = read_sysreg(AFSR1_EL1);
+	context->vbar_el1 = read_sysreg(ARM64_VBAR_EL1);
+	context->esr_el1 = read_sysreg(ARM64_ESR_EL1);
+	context->elr_el1 = read_sysreg(ARM64_ELR_EL1);
+	context->vmpidr = read_sysreg(ARM64_VMPIDR_EL2);
+	context->vpidr = read_sysreg(ARM64_VPIDR_EL2);
+	context->sctlr_el1 = read_sysreg(ARM64_SCTLR_EL1);
+	context->hcr_el2 = read_sysreg(ARM64_HCR_EL2);
+	context->sp_el1 = read_sysreg(ARM64_SP_EL1);
+	context->sp_el0 = read_sysreg(ARM64_SP_EL0);
+	context->spsr_el1 = read_sysreg(ARM64_SPSR_EL1);
+	context->far_el1 = read_sysreg(ARM64_FAR_EL1);
+	context->actlr_el1 = read_sysreg(ARM64_ACTLR_EL1);
+	context->tpidr_el1 = read_sysreg(ARM64_TPIDR_EL1);
+	context->csselr = read_sysreg(ARM64_CSSELR_EL1);
+	context->cpacr = read_sysreg(ARM64_CPACR_EL1);
+	context->contextidr = read_sysreg(ARM64_CONTEXTIDR_EL1);
+	context->tpidr_el0 = read_sysreg(ARM64_TPIDR_EL0);
+	context->tpidrro_el0 = read_sysreg(ARM64_TPIDRRO_EL0);
+	context->cntkctl = read_sysreg(ARM64_CNTKCTL_EL1);
+	context->afsr0 = read_sysreg(ARM64_AFSR0_EL1);
+	context->afsr1 = read_sysreg(ARM64_AFSR1_EL1);
 
 	if (task_is_32bit(vcpu->task)) {
 		//context->teecr = read_sysreg32(TEECR32_EL1);
 		//context->teehbr = read_sysreg32(TEEHBR32_EL1);
-		context->dacr32_el2 = read_sysreg32(DACR32_EL2);
-		context->ifsr32_el2 = read_sysreg32(IFSR32_EL2);
+		context->dacr32_el2 = read_sysreg32(ARM64_DACR32_EL2);
+		context->ifsr32_el2 = read_sysreg32(ARM64_IFSR32_EL2);
 	}
+
+	context->vtcr_el2 = read_sysreg(ARM64_VTCR_EL2);
+	context->vttbr_el2 = read_sysreg(ARM64_VTTBR_EL2);
+	context->ttbr0_el1 = read_sysreg(ARM64_TTBR0_EL1);
+	context->ttbr1_el1 = read_sysreg(ARM64_TTBR1_EL1);
+	context->mair_el1 = read_sysreg(ARM64_MAIR_EL1);
+	context->tcr_el1 = read_sysreg(ARM64_TCR_EL1);
+	context->par_el1 = read_sysreg(ARM64_PAR_EL1);
+	context->amair_el1 = read_sysreg(ARM64_AMAIR_EL1);
+
+	mb();
 }
 
-static void aarch64_system_state_restore(struct vcpu *vcpu, void *c)
+static void arch_vcpu_state_restore(struct vcpu *vcpu, void *c)
 {
-	struct aarch64_system_context *context =
-			(struct aarch64_system_context *)c;
+	struct vcpu_context *context = (struct vcpu_context *)c;
 
 	write_sysreg(context->vbar_el1, VBAR_EL1);
 	write_sysreg(context->esr_el1, ESR_EL1);
@@ -226,58 +284,29 @@ static void aarch64_system_state_restore(struct vcpu *vcpu, void *c)
 		write_sysreg(context->ifsr32_el2, IFSR32_EL2);
 	}
 
-	dsb();
+	write_sysreg(context->vtcr_el2, ARM64_VTCR_EL2);
+	write_sysreg(context->vttbr_el2, ARM64_VTTBR_EL2);
+	write_sysreg(context->ttbr0_el1, ARM64_TTBR0_EL1);
+	write_sysreg(context->ttbr1_el1, ARM64_TTBR1_EL1);
+	write_sysreg(context->mair_el1, ARM64_MAIR_EL1);
+	write_sysreg(context->amair_el1, ARM64_AMAIR_EL1);
+	write_sysreg(context->tcr_el1, ARM64_TCR_EL1);
+	write_sysreg(context->par_el1, ARM64_PAR_EL1);
+
+	mb();
 }
 
-static int aarch64_system_init(struct vmodule *vmodule)
+static int aarch64_vcpu_context_init(struct vmodule *vmodule)
 {
-	vmodule->context_size = sizeof(struct aarch64_system_context);
-	vmodule->state_init = aarch64_system_state_init;
-	vmodule->state_save = aarch64_system_state_save;
-	vmodule->state_restore = aarch64_system_state_restore;
-	vmodule->state_resume = aarch64_system_state_resume;
+	vmodule->context_size = sizeof(struct vcpu_context);
+	vmodule->state_init = arch_vcpu_state_init;
+	vmodule->state_save = arch_vcpu_state_save;
+	vmodule->state_restore = arch_vcpu_state_restore;
 
 	return 0;
 }
-MINOS_MODULE_DECLARE(aarch64_system,
-	AARCH64_SYSTEM_VMODULE, (void *)aarch64_system_init);
-
-static int __init_text arch_virt_init_percpu(void)
-{
-	mpidr_el1[smp_processor_id()] = read_sysreg32(MIDR_EL1);
-
-	/*
-	 * on the boot set the vmid in vttbr_el2 to 0xff to
-	 * mark it as invalid
-	 */
-	set_current_vmid(0xff);
-
-	return 0;
-}
-arch_initcall_percpu(arch_virt_init_percpu);
-
-struct vcpu *get_vcpu_from_reg(void)
-{
-	/*
-	 * need double check if there is someting
-	 * missing
-	 */
-	uint32_t vmid = read_sysreg(VTTBR_EL2) >> 48;
-	uint32_t vcpuid = read_sysreg(VMPIDR_EL2);
-
-	return get_vcpu_by_id(vmid, vcpuid);
-}
-
-void set_current_vmid(uint32_t vmid)
-{
-	write_sysreg((uint64_t)vmid << 48, VTTBR_EL2);
-	wmb();
-}
-
-uint32_t get_current_vmid(void)
-{
-	return (uint64_t)read_sysreg(VTTBR_EL2) >> 48;
-}
+MINOS_MODULE_DECLARE(arch_vcpu, "aarch64 vcpu context",
+		(void *)aarch64_vcpu_context_init);
 
 static int arm_create_vm(void *item, void *context)
 {
@@ -294,8 +323,6 @@ static int arm_create_vm(void *item, void *context)
 
 static int arm_virt_init(void)
 {
-	register_hook(arm_create_vm, OS_HOOK_CREATE_VM);
-
-	return 0;
+	return register_hook(arm_create_vm, OS_HOOK_CREATE_VM);
 }
 module_initcall(arm_virt_init);

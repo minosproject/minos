@@ -1,2 +1,10 @@
 menu "Minos aarch64 virtualaztion features"
+
+config ARM_VHE
+	bool "enable VHE feature for minos"
+	depends on VIRT
+	default n
+	help
+	  this require at leaset armv8.1 soc
+
 endmenu

@@ -1,4 +1,4 @@
-obj-y += atomic.o
+# obj-y += atomic.o
 obj-y += bitops.o
 obj-y += memchr.o
 obj-y += memcmp.o
@@ -13,3 +13,4 @@ obj-y += strlen.o
 obj-y += strncmp.o
 obj-y += strnlen.o
 obj-y += strrchr.o
+obj-y += ticket_lock.o

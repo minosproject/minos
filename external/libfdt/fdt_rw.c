@@ -503,3 +503,36 @@ int fdt_pack(void *fdt)
 
 	return 0;
 }
+
+int fdt_set_node_reg(void *dtb, int node,
+		unsigned long iomem, size_t iomem_size)
+{
+	uint32_t tmp[4];
+	uint32_t *args = tmp;
+	int size = 0, size_cells, addr_cells;
+
+	size_cells = fdt_size_cells(dtb, 0);
+	addr_cells = fdt_address_cells(dtb, 0);
+
+	if (addr_cells == 1) {
+		*args++ = cpu_to_fdt32(iomem);
+		size++;
+	} else {
+		*args++ = cpu_to_fdt32(iomem >> 32);
+		*args++ = cpu_to_fdt32(iomem & 0xffffffff);
+		size += 2;
+	}
+
+	if (size_cells == 1) {
+		*args++ = cpu_to_fdt32(iomem_size);
+		size++;
+	} else {
+		*args++ = cpu_to_fdt32(iomem_size >> 32);
+		*args++ = cpu_to_fdt32(iomem_size & 0xffffffff);
+		size += 2;
+	}
+
+	fdt_setprop(dtb, node, "reg", (void *)tmp, size * 4);
+
+	return 0;
+}

@@ -22,43 +22,7 @@
 #include <minos/mm.h>
 #include <minos/of.h>
 #include <minos/task.h>
-#include <minos/app.h>
 #include <minos/flag.h>
-
-static atomic_t kernel_ref;
-
-static void create_static_tasks(int cpu)
-{
-	struct task *ret = 0;
-	struct task_desc *tdesc;
-	extern unsigned char __task_desc_start;
-	extern unsigned char __task_desc_end;
-
-	section_for_each_item(__task_desc_start, __task_desc_end, tdesc) {
-		if (tdesc->aff == PCPU_AFF_PERCPU) {
-			ret = create_task(tdesc->name, tdesc->func,
-					tdesc->arg, tdesc->prio,
-					cpu, tdesc->size, tdesc->flags);
-			if (ret == NULL)
-				pr_err("create [%s] fail on cpu%d\n",
-						tdesc->name, cpu);
-		} else if ((tdesc->aff == PCPU_AFF_ANY) && (cpu == 0)) {
-			if (tdesc->prio <= OS_LOWEST_REALTIME_PRIO)
-				ret = create_realtime_task(tdesc->name,
-						tdesc->func, tdesc->arg,
-						tdesc->prio, tdesc->size,
-						tdesc->flags);
-			else
-				ret = create_migrating_task(tdesc->name,
-						tdesc->func, tdesc->arg,
-						tdesc->prio, tdesc->size,
-						tdesc->flags);
-			if (ret == NULL)
-				pr_err("create task [%s] fail on cpu-%d@%d\n",
-					tdesc->name, tdesc->aff, tdesc->prio);
-		}
-	}
-}
 
 void system_reboot(void)
 {
@@ -88,98 +52,117 @@ int system_suspend(void)
 
 static inline bool pcpu_can_idle(struct pcpu *pcpu)
 {
-	return true;
+	return (pcpu->local_rdy_grp == (1 << OS_PRIO_IDLE)) &&
+			(is_list_empty(&pcpu->stop_list) &&
+			(is_list_empty(&pcpu->die_process)));
 }
 
-static void pcpu_release_task(struct pcpu *pcpu)
+static void do_pcpu_cleanup_work(struct pcpu *pcpu)
 {
+	extern void release_thread(struct task *task);
 	struct task *task;
-	unsigned long flags;
 
-	spin_lock_irqsave(&pcpu->lock, flags);
+	/*
+	 * the race may happen when other task in this pcpu
+	 * call stop(), so need to disable the preempt to avoid
+	 * the idle task preempt by other task here. currently
+	 * the stop list will only write when the task request stop
+	 * so do not need to diable the interrupt.
+	 */
+	for (; ;) {
+		task = NULL;
+		preempt_disable();
+		if (!is_list_empty(&pcpu->stop_list)) {
+			task = list_first_entry(&pcpu->stop_list,
+					struct task, stat_list);
+			list_del(&task->stat_list);
+		}
+		preempt_enable();
 
-	while (!is_list_empty(&pcpu->stop_list)) {
-		task = list_first_entry(&pcpu->stop_list, struct task, list);
-		list_del(&task->list);
-
-		spin_unlock_irqrestore(&pcpu->lock, flags);
+		if (!task)
+			break;
 
 		do_release_task(task);
-
-		spin_lock_irqsave(&pcpu->lock, flags);
 	}
-
-	spin_unlock_irqrestore(&pcpu->lock, flags);
 }
 
-static int pcpu_kworker_task(void *data)
+static int init_task(void *main)
 {
-	flag_t flag;
-	struct pcpu *pcpu = data;
+#ifdef CONFIG_SHELL
+	int i;
+	char *tty = NULL;
+	int skip_vm_boot = 0;
+	uint32_t wait = 0;
+	unsigned long timeout;
+	extern int shell_task(void *data);
+#endif
 
-	for (; ;) {
-		flag = flag_pend(&pcpu->fg, KWORKER_FLAG_MASK,
-				FLAG_WAIT_SET_ANY | FLAG_CONSUME, 0);
-		if (flag & KWORKER_TASK_RECYCLE)
-			pcpu_release_task(pcpu);
+	/*
+	 * first check whether need to stop to start all
+	 * VM automaticly if the shell is enabled, if the
+	 * shell is enabled, provide a debug mode to do some
+	 * debuging for VM
+	 */
+#ifdef CONFIG_SHELL
+#ifdef CONFIG_VIRT
+	bootarg_parse_uint("bootwait", &wait);
+	if (wait > 0) {
+		printf("\nPress any key to stop vm startup: %d ", wait);
+		for (i = 0; i < wait; i++) {
+			timeout = NOW() + SECONDS(1);
+
+			printf("\b\b%d ", wait - i);
+
+			while (NOW() < timeout) {
+				if (console_getc() > 0) {
+					skip_vm_boot = 1;
+					break;
+				}
+			}
+
+			if (skip_vm_boot)
+				break;
+		}
 	}
+
+	if (!skip_vm_boot) {
+		printf("\b\b0 ");
+		printf("\n");
+		start_all_vm();
+	}
+#endif
+	if (!skip_vm_boot)
+		bootarg_parse_string("tty", &tty);
+
+	create_task("shell_task", shell_task,
+			tty, CONFIG_SHELL_TASK_PRIO, 4096, 0);
+#else
+#ifdef CONFIG_VIRT
+	extern void start_all_vm(void);
+	start_all_vm();
+#endif
+#endif
 
 	return 0;
 }
 
-static void os_clean(void)
-{
-	/* recall the memory for init function and data */
-	extern unsigned char __init_start;
-	extern unsigned char __init_end;
-	unsigned long size;
-
-#ifdef CONFIG_DEVICE_TREE
-	of_release_all_node(hv_node);
-#endif
-
-	size = (unsigned long)&__init_end -
-		(unsigned long)&__init_start;
-	pr_notice("release unused memory [0x%x 0x%x]\n",
-			(unsigned long)&__init_start, size);
-
-	add_slab_mem((unsigned long)&__init_start, size);
-}
 
 void cpu_idle(void)
 {
-	struct pcpu *pcpu = get_cpu_var(pcpu);
-
-	create_static_tasks(pcpu->pcpu_id);
-
-	pcpu->kworker = create_task("pcpu_kworker",
-			pcpu_kworker_task, pcpu,
-			OS_PRIO_DEFAULT_0, pcpu->pcpu_id,
-			4096, TASK_FLAGS_KERNEL);
-	if (NULL == pcpu->kworker)
-		panic("create kworker fail on pcpu%d\n", pcpu->pcpu_id);
-
-	flag_init(&pcpu->fg, 0);
+	struct pcpu *pcpu = get_pcpu();
 
 	set_os_running();
-	atomic_inc(&kernel_ref);
-
 	local_irq_enable();
 
 	if (pcpu->pcpu_id == 0) {
-		while (atomic_read(&kernel_ref) != NR_CPUS)
-			cpu_relax();
-
-		os_clean();
+		pr_notice("create init task for system\n");
+		create_task("init", init_task, 0x2000,
+				OS_PRIO_DEFAULT, -1, 0, NULL);
 	}
 
-	/*
-	 * send a resched interrupt for the currently cpu
-	 * for the percpu task
-	 */
-	pcpu_resched(pcpu->pcpu_id);
-
 	while (1) {
+		do_pcpu_cleanup_work(pcpu);
+
 		/*
 		 * need to check whether the pcpu can go to idle
 		 * state to avoid the interrupt happend before wfi

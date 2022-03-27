@@ -339,15 +339,14 @@ static int __init_text bcm2836_irq_init(struct device_node *node)
 
 	pr_notice("boardcom bcm2836 l1 interrupt init\n");
 
-	bcm2836_base = (void *)0x40000000;
-	io_remap(0x40000000, 0x100);
+	bcm2836_base = io_remap(0x40000000, 0x100);
 
 	/*
 	 * set the timer to source for the 19.2Mhz crstal clock
 	 * and set the timer prescaler to 1:1
 	 */
 	writel_relaxed(0, bcm2836_base + LOCAL_CONTROL);
-	writel_relaxed(0x80000000, bcm2836_base + LOCAL_PRESCALER);
+	writel_relaxed(ptov(0x80000000), bcm2836_base + LOCAL_PRESCALER);
 
 	/*
 	 * int rpi-3b there are two irq_chip controller, the
@@ -363,8 +362,7 @@ static int __init_text bcm2836_irq_init(struct device_node *node)
 	writel_relaxed(1, bcm2836_base + LOCAL_MAILBOX_INT_CONTROL0 + 0xc);
 
 	/* init the bcm2835 interrupt controller for spi */
-	base = intc.base = (void *)0x3f00b200;
-	io_remap(0x3f00b200, 0x100);
+	base = intc.base = io_remap(ptov(0x3f00b200), 0x100);
 
 	for (b = 0; b < NR_BANKS; b++) {
 		intc.pending[b] = base + reg_pending[b];

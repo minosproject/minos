@@ -35,8 +35,7 @@ static DEFINE_SPIN_LOCK(hvm_irq_lock);
 	} while (0)
 
 
-static inline struct virq_desc *
-get_virq_desc(struct vcpu *vcpu, uint32_t virq)
+static inline struct virq_desc *get_virq_desc(struct vcpu *vcpu, uint32_t virq)
 {
 	struct vm *vm = vcpu->vm;
 
@@ -52,7 +51,7 @@ get_virq_desc(struct vcpu *vcpu, uint32_t virq)
 static void inline virq_kick_vcpu(struct vcpu *vcpu,
 		struct virq_desc *desc)
 {
-	kick_vcpu(vcpu, virq_is_hw(desc));
+	int preempt = virq_is_hw(desc);
 
 	/*
 	 * if the virq is not hardware virq, when the native
@@ -60,11 +59,15 @@ static void inline virq_kick_vcpu(struct vcpu *vcpu,
 	 * may not receive the virq immediately, and may wait
 	 * last physical irq come, then this pcpu can wakeup
 	 * from the WFI mode, so here need to send a phyical
-	 * irq to the target pcpu
+	 * irq to the target pcpu.
 	 */
 	if (!virq_is_hw(desc) && (vcpu->vm->flags & VM_FLAGS_NATIVE_WFI) &&
 			(current->affinity != vcpu_affinity(vcpu)))
-		pcpu_resched(vcpu_affinity(vcpu));
+		preempt = 1;
+	else
+		preempt = virq_is_hw(desc);
+
+	kick_vcpu(vcpu, preempt);
 }
 
 static int inline __send_virq(struct vcpu *vcpu, struct virq_desc *desc)
@@ -80,14 +83,16 @@ static int inline __send_virq(struct vcpu *vcpu, struct virq_desc *desc)
 	 * if the virq is in offline state, send it to vcpu
 	 * directly
 	 */
-	if (virq_is_pending(desc)) {
-		spin_unlock_irqrestore(&virq_struct->lock, flags);
-		return 0;
-	}
+	if (virq_is_pending(desc))
+		goto out;
 
 	virq_set_pending(desc);
-	dsb();
 
+	/*
+	 * SGI need set the irq source.
+	 */
+	if (desc->vno < VM_SGI_VIRQ_NR)
+		desc->src = get_vcpu_id(get_current_vcpu());
 	/*
 	 * if desc->list.next is not NULL, the virq is in
 	 * actvie or pending list do not change it
@@ -97,30 +102,33 @@ static int inline __send_virq(struct vcpu *vcpu, struct virq_desc *desc)
 		virq_struct->active_count++;
 	}
 
-	if (desc->vno < VM_SGI_VIRQ_NR)
-		desc->src = get_vcpu_id(get_current_vcpu());
-
+out:
 	spin_unlock_irqrestore(&virq_struct->lock, flags);
+
 	return 0;
 }
 
 static int send_virq(struct vcpu *vcpu, struct virq_desc *desc)
 {
-	int ret;
 	struct vm *vm = vcpu->vm;
+	int ret;
 
 	/* do not send irq to vm if not online or suspend state */
-	if ((vm->state == VM_STAT_OFFLINE) ||
-			(vm->state == VM_STAT_REBOOT)) {
-		pr_warn("send virq failed vm is offline or reboot\n");
+	if (check_vcpu_state(vcpu, TASK_STAT_STOP)) {
+		pr_warn("send virq failed vcpu is stoped\n");
+		return -EINVAL;
+	}
+
+	if (check_vm_state(vm, VM_STAT_OFFLINE) ||
+			check_vm_state(vm, VM_STAT_REBOOT)) {
+		pr_warn("send virq fail, vm is offline or rebooting\n");
 		return -EINVAL;
 	}
 
 	/*
-	 * check the state of the vm, if the vm
-	 * is in suspend state and the irq can not
-	 * wake up the vm, just return other wise
-	 * need to kick the vcpu
+	 * check the state of the vcpu, if the vm is in suspend state
+	 * and the irq can not wake up the vm, just return. Otherwise
+	 * need to kick the vcpu, kick_vcpu can wakeup the system.
 	 */
 	if (vm->state == VM_STAT_SUSPEND) {
 		if (!virq_can_wakeup(desc)) {

@@ -25,12 +25,6 @@
 #include <asm/svccc.h>
 #include <virt/vdev.h>
 
-extern unsigned char __sync_desc_start;
-extern unsigned char __sync_desc_end;
-extern void sync_from_lower_EL_handler(gp_regs *data);
-
-static struct sync_desc *sync_descs[MAX_SYNC_TYPE] __align_cache_line;
-
 static inline int taken_from_el1(uint64_t spsr)
 {
 	return ((spsr & 0xf) != AARCH64_SPSR_EL0t);
@@ -45,21 +39,18 @@ static inline void inject_virtual_data_abort(uint32_t esr_value)
 	wmb();
 }
 
-static int unknown_handler(gp_regs *reg, uint32_t esr_value)
+static int unknown_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
-	panic("unknown sync type\n");
-
 	return 0;
 }
 
-static int wfi_wfe_handler(gp_regs *reg, uint32_t esr_value)
+static int wfi_wfe_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
 	vcpu_idle(get_current_vcpu());
-
 	return 0;
 }
 
-static int mcr_mrc_cp15_handler(gp_regs *reg, uint32_t esr_value)
+static int mcr_mrc_cp15_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
 	switch (esr_value & HSR_CP32_REGS_MASK) {
 	case HSR_CPREG32(ACTLR):
@@ -72,7 +63,7 @@ static int mcr_mrc_cp15_handler(gp_regs *reg, uint32_t esr_value)
 	return 0;
 }
 
-static int mcrr_mrrc_cp15_handler(gp_regs *reg, uint32_t esr_value)
+static int mcrr_mrrc_cp15_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
 	struct esr_cp64 *sysreg = (struct esr_cp64 *)&esr_value;
 	unsigned long reg_value0, reg_value1;
@@ -100,51 +91,42 @@ static int mcrr_mrrc_cp15_handler(gp_regs *reg, uint32_t esr_value)
 	return 0;
 }
 
-static int mcr_mrc_cp14_handler(gp_regs *reg, uint32_t esr_value)
+static int mcr_mrc_cp14_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int ldc_stc_cp14_handler(gp_regs *reg, uint32_t esr_value)
+static int ldc_stc_cp14_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int access_simd_reg_handler(gp_regs *reg, uint32_t esr_value)
+static int access_simd_reg_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int mcr_mrc_cp10_handler(gp_regs *reg, uint32_t esr_value)
+static int mcr_mrc_cp10_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int mrrc_cp14_handler(gp_regs *reg, uint32_t esr_value)
+static int mrrc_cp14_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
 	return 0;
 }
 
-static int illegal_exe_state_handler(gp_regs *reg, uint32_t esr_value)
+static int illegal_exe_state_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
 	return 0;
 }
 
-static inline int
-__arm_svc_handler(gp_regs *reg, uint32_t esr_value, int smc)
+static int __arm_svc_handler(gp_regs *reg, int smc)
 {
-	int fast;
 	uint32_t id;
-	uint16_t imm;
 	unsigned long args[6];
 
-	imm = esr_value & 0xff;
-	if (imm != 0)
-		SVC_RET1(reg, -EINVAL);
-
 	id = reg->x0;
-	fast = !!(id & SVC_CTYPE_MASK);
-
 	args[0] = reg->x1;
 	args[1] = reg->x2;
 	args[2] = reg->x3;
@@ -152,75 +134,23 @@ __arm_svc_handler(gp_regs *reg, uint32_t esr_value, int smc)
 	args[4] = reg->x5;
 	args[5] = reg->x6;
 
-	if (!fast)
+	if (!(id & SVC_CTYPE_MASK))
 		local_irq_enable();
 
 	return do_svc_handler(reg, id, args, smc);
 }
 
-static inline int
-arm_svc_handler(gp_regs *regs, uint32_t esr_value, int smc)
+static int access_system_reg_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
+	struct esr_sysreg *sysreg = (struct esr_sysreg *)&esr_value;
 	struct vcpu *vcpu = get_current_vcpu();
 	struct arm_virt_data *arm_data = vcpu->vm->arch_data;
-
-	if (smc) {
-		if (arm_data->smc_handler)
-			return arm_data->smc_handler(vcpu, regs, esr_value);
-		else
-			__arm_svc_handler(regs, esr_value, 1);
-	} else {
-		if (arm_data->hvc_handler)
-			return arm_data->hvc_handler(vcpu, regs, esr_value);
-		else
-			__arm_svc_handler(regs, esr_value, 0);
-	}
-
-	return 0;
-}
-
-static int svc_aarch32_handler(gp_regs *reg, uint32_t esr_value)
-{
-	return 0;
-}
-
-static int hvc_aarch32_handler(gp_regs *reg, uint32_t esr_value)
-{
-	return arm_svc_handler(reg, esr_value, 0);
-}
-
-static int smc_aarch32_handler(gp_regs *reg, uint32_t esr_value)
-{
-	return arm_svc_handler(reg, esr_value, 1);
-}
-
-static int svc_aarch64_handler(gp_regs *reg, uint32_t esr_value)
-{
-	return 0;
-}
-
-static int hvc_aarch64_handler(gp_regs *reg, uint32_t esr_value)
-{
-	return arm_svc_handler(reg, esr_value, 0);
-}
-
-static int smc_aarch64_handler(gp_regs *reg, uint32_t esr_value)
-{
-	return arm_svc_handler(reg, esr_value, 1);
-}
-
-static int access_system_reg_handler(gp_regs *reg, uint32_t esr_value)
-{
-	int ret = 0, reg_name;
-	struct esr_sysreg *sysreg = (struct esr_sysreg *)&esr_value;
 	uint32_t regindex = sysreg->reg;
 	unsigned long reg_value = 0;
-	struct vcpu *vcpu = get_current_vcpu();
-	struct arm_virt_data *arm_data = vcpu->vm->arch_data;
+	int ret = 0, reg_name;
 
 	reg_name = esr_value & ESR_SYSREG_REGS_MASK;
-	if (!sysreg->read)
-		reg_value = get_reg_value(reg, regindex);
+	reg_value = sysreg->read ? 0 : get_reg_value(reg, regindex);
 
 	switch (reg_name) {
 	case ESR_SYSREG_ICC_SGI1R_EL1:
@@ -260,260 +190,203 @@ static int access_system_reg_handler(gp_regs *reg, uint32_t esr_value)
 	return ret;
 }
 
-static int insabort_tfl_handler(gp_regs *reg, uint32_t esr_value)
+static int insabort_tfl_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
+	panic("%s\n", __func__);
 	return 0;
 }
 
-static int insabort_twe_handler(gp_regs *reg, uint32_t esr_value)
+static int misaligned_pc_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
+	panic("%s\n", __func__);
 	return 0;
 }
 
-static int misaligned_pc_handler(gp_regs *reg, uint32_t esr_value)
+static inline bool dabt_isextabt(uint32_t dfsc)
 {
-	return 0;
+	switch (dfsc) {
+	case FSC_SEA:
+	case FSC_SEA_TTW0:
+	case FSC_SEA_TTW1:
+	case FSC_SEA_TTW2:
+	case FSC_SEA_TTW3:
+	case FSC_SECC:
+	case FSC_SECC_TTW0:
+	case FSC_SECC_TTW1:
+	case FSC_SECC_TTW2:
+	case FSC_SECC_TTW3:
+		return true;
+	default:
+		return false;
+	}
 }
 
 static inline unsigned long get_faulting_ipa(unsigned long vaddr)
 {
-	uint64_t hpfar = read_sysreg(HPFAR_EL2);
-	unsigned long ipa;
+        uint64_t hpfar = read_sysreg(HPFAR_EL2);
+        unsigned long ipa;
 
-	ipa = (hpfar & HPFAR_MASK) << (12 - 4);
-	ipa |= vaddr & (~(~PAGE_MASK));
+        ipa = (hpfar & HPFAR_MASK) << (12 - 4);
+        ipa |= vaddr & (~(~PAGE_MASK));
 
-	return ipa;
+        return ipa;
 }
 
-static int dataabort_tfl_handler(gp_regs *regs, uint32_t esr_value)
+static inline bool dabt_iswrite(uint32_t esr_value)
 {
-	int ret;
-	unsigned long vaddr;
-	unsigned long paddr;
-	unsigned long value;
-	struct esr_dabt *dabt = (struct esr_dabt *)&esr_value;
-	int dfsc = dabt->dfsc & ~FSC_LL_MASK;
+	return (!!(esr_value & ESR_ELx_WNR)) ||
+			(!!(esr_value & ESR_ELx_S1PTW));
+}
 
-	vaddr = read_sysreg(FAR_EL2);
-	if (dabt->s1ptw || (dfsc == FSC_FLT_TRANS))
-		paddr = get_faulting_ipa(vaddr);
-	else
-		paddr = guest_va_to_ipa(vaddr, 1);
+static int dataabort_tfl_handler(gp_regs *regs, int ec, uint32_t esr_value)
+{
+	uint32_t dfsc = esr_value & ESR_ELx_FSC_TYPE;
+	unsigned long vaddr, ipa, value;
+	int ret, iswrite, reg;
 
-	/*
-	 * dfsc contain the fault type of the dataabort
-	 * now only handle translation fault
-	 */
-	switch (dfsc) {
-	case FSC_FLT_PERM:
-	case FSC_FLT_ACCESS:
-	case FSC_FLT_TRANS:
-		if (dabt->write)
-			value = get_reg_value(regs, dabt->reg);
-
-		ret = vdev_mmio_emulation(regs, dabt->write, paddr, &value);
-		if (ret) {
-			pr_warn("handle mmio read/write fail 0x%x vmid:%d\n",
-					paddr, get_vmid(get_current_vcpu()));
-			/*
-			 * if failed to handle the mmio trap inject a
-			 * sync error to guest vm to generate a fault
-			 */
-			inject_virtual_data_abort(esr_value);
-		} else {
-			if (!dabt->write)
-				set_reg_value(regs, dabt->reg, value);
-		}
-		break;
-	default:
-		pr_notice("unsupport data abort type this time %d @0x%p\n",
-				dabt->dfsc & ~FSC_LL_MASK, paddr);
-		inject_virtual_data_abort(esr_value);
-		break;
+	if (dabt_isextabt(dfsc)) {
+		pr_err("data abort is external abort\n");
+		goto out_fail;
 	}
 
+	if ((dfsc != FSC_FAULT) && (dfsc != FSC_PERM)) {
+		pr_err("Unsupported data abort FSC: EC=%x xFSC=%x ESR_EL2=%x\n",
+				ec, dfsc, esr_value);
+		goto out_fail;
+	}
+
+	if (!(esr_value & ESR_ELx_ISV)) {
+		pr_err("Instruction syndrome not valid\n");
+		goto out_fail;
+	}
+
+	iswrite = dabt_iswrite(esr_value);
+	reg = ESR_ELx_SRT(esr_value);
+	value = iswrite ? get_reg_value(regs, reg) : 0;
+	vaddr = read_sysreg(FAR_EL2);
+	if ((esr_value &ESR_ELx_S1PTW) || (dfsc == FSC_FAULT))
+		ipa = get_faulting_ipa(vaddr);
+	else
+		ipa = guest_va_to_ipa(vaddr, 1);
+
+	ret = vdev_mmio_emulation(regs, iswrite, ipa, &value);
+	if (ret) {
+		pr_warn("handle mmio read/write fail 0x%x vmid:%d\n", ipa,
+				get_vmid(get_current_vcpu()));
+		/*
+		 * if failed to handle the mmio trap inject a
+		 * sync error to guest vm to generate a fault
+		 */
+		goto out_fail;
+	}
+	
+	if (!iswrite)
+		set_reg_value(regs, reg, value);
+
 	return 0;
+
+out_fail:
+	inject_virtual_data_abort(esr_value);
+	return -EFAULT;
 }
 
-static int dataabort_twe_handler(gp_regs *reg, uint32_t esr_value)
+static int stack_misalign_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
-	pr_fatal("Unable to handle NULL pointer at address:0x%p\n",
-			read_sysreg(FAR_EL2));
-
+	panic("%s\n", __func__);
 	return 0;
 }
 
-static int stack_misalign_handler(gp_regs *reg, uint32_t esr_value)
+static int floating_aarch32_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
+	panic("%s\n", __func__);
 	return 0;
 }
 
-static int floating_aarch32_handler(gp_regs *reg, uint32_t esr_value)
+static int floating_aarch64_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
+	panic("%s\n", __func__);
 	return 0;
 }
 
-static int floating_aarch64_handler(gp_regs *reg, uint32_t esr_value)
+static int serror_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
+	panic("%s\n", __func__);
 	return 0;
 }
 
-static int serror_handler(gp_regs *reg, uint32_t esr_value)
+int aarch64_hypercall_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
-	return 0;
+	struct vcpu *vcpu = get_current_vcpu();
+	struct arm_virt_data *arm_data = vcpu->vm->arch_data;
+
+	if (arm_data->hvc_handler)
+		return arm_data->hvc_handler(vcpu, reg, read_esr_el2());
+	else
+		return __arm_svc_handler(reg, 0);
 }
 
-static int breakpoint_tfl_handler(gp_regs *reg, uint32_t esr_value)
+int aarch64_smccall_handler(gp_regs *reg, int ec, uint32_t esr_value)
 {
-	return 0;
+	struct vcpu *vcpu = get_current_vcpu();
+	struct arm_virt_data *arm_data = vcpu->vm->arch_data;
+
+	if (arm_data->hvc_handler)
+		return arm_data->smc_handler(vcpu, reg, read_esr_el2());
+	else
+		return __arm_svc_handler(reg, 1);
 }
 
-static int breakpoint_twe_handler(gp_regs *reg, uint32_t esr_value)
-{
-	return 0;
-}
-
-static int software_step_tfl_handler(gp_regs *reg, uint32_t esr_value)
-{
-	return 0;
-}
-
-static int software_step_twe_handler(gp_regs *reg, uint32_t esr_value)
-{
-	return 0;
-}
-
-static int watchpoint_tfl_handler(gp_regs *reg, uint32_t esr_value)
-{
-	return 0;
-}
-
-static int watchpoint_twe_handler(gp_regs *reg, uint32_t esr_value)
-{
-	return 0;
-}
-
-static int bkpt_ins_handler(gp_regs *reg, uint32_t esr_value)
-{
-	return 0;
-}
-
-static int vctor_catch_handler(gp_regs *reg, uint32_t esr_value)
-{
-	return 0;
-}
-
-static int brk_ins_handler(gp_regs *reg, uint32_t esr_value)
-{
-	return 0;
-}
 
 /* type defination is at armv8-spec 1906 */
-DEFINE_SYNC_DESC(EC_UNKNOWN, EC_TYPE_BOTH,
-		unknown_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_WFx, EC_TYPE_BOTH, wfi_wfe_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_UNKNOWN, EC_TYPE_BOTH, unknown_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_CP15_32, EC_TYPE_BOTH, mcr_mrc_cp15_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_CP15_64, EC_TYPE_AARCH32, mcrr_mrrc_cp15_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_CP14_MR, EC_TYPE_AARCH32, mcr_mrc_cp14_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_CP14_LS, EC_TYPE_AARCH32, ldc_stc_cp14_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_FP_ASIMD, EC_TYPE_BOTH, access_simd_reg_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_CP10_ID, EC_TYPE_AARCH32, mcr_mrc_cp10_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_CP14_64, EC_TYPE_AARCH32, mrrc_cp14_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_ILL, EC_TYPE_BOTH, illegal_exe_state_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_SYS64, EC_TYPE_AARCH64, access_system_reg_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_IABT_LOW, EC_TYPE_BOTH, insabort_tfl_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_PC_ALIGN, EC_TYPE_BOTH, misaligned_pc_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_DABT_LOW, EC_TYPE_BOTH, dataabort_tfl_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_SP_ALIGN, EC_TYPE_BOTH, stack_misalign_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_FP_EXC32, EC_TYPE_AARCH32, floating_aarch32_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_FP_EXC64, EC_TYPE_AARCH64, floating_aarch64_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_SERROR, EC_TYPE_BOTH, serror_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_HVC32, EC_TYPE_AARCH32, aarch64_hypercall_handler, 1, 0);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_HVC64, EC_TYPE_AARCH64, aarch64_hypercall_handler, 1, 0);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_SMC32, EC_TYPE_AARCH32, aarch64_smccall_handler, 1, 4);
+DEFINE_SYNC_DESC(guest_ESR_ELx_EC_SMC64, EC_TYPE_AARCH64, aarch64_smccall_handler, 1, 4);
 
-DEFINE_SYNC_DESC(EC_WFI_WFE, EC_TYPE_BOTH,
-		wfi_wfe_handler, 1, 4);
+static struct sync_desc *guest_sync_descs[] = {
+	[0 ... ESR_ELx_EC_MAX]	= &sync_desc_guest_ESR_ELx_EC_UNKNOWN,
+	[ESR_ELx_EC_WFx]	= &sync_desc_guest_ESR_ELx_EC_WFx,
+	[ESR_ELx_EC_CP15_32]    = &sync_desc_guest_ESR_ELx_EC_CP15_32,
+	[ESR_ELx_EC_CP15_64]    = &sync_desc_guest_ESR_ELx_EC_CP15_64,
+	[ESR_ELx_EC_CP14_MR]    = &sync_desc_guest_ESR_ELx_EC_CP14_MR,
+	[ESR_ELx_EC_CP14_LS]    = &sync_desc_guest_ESR_ELx_EC_CP14_LS,
+	[ESR_ELx_EC_FP_ASIMD]   = &sync_desc_guest_ESR_ELx_EC_FP_ASIMD,
+	[ESR_ELx_EC_CP10_ID]    = &sync_desc_guest_ESR_ELx_EC_CP10_ID,
+	[ESR_ELx_EC_CP14_64]	= &sync_desc_guest_ESR_ELx_EC_CP14_64,
+	[ESR_ELx_EC_ILL]	= &sync_desc_guest_ESR_ELx_EC_ILL,
+	[ESR_ELx_EC_SYS64]	= &sync_desc_guest_ESR_ELx_EC_SYS64,
+	[ESR_ELx_EC_IABT_LOW]   = &sync_desc_guest_ESR_ELx_EC_IABT_LOW,
+	[ESR_ELx_EC_PC_ALIGN]   = &sync_desc_guest_ESR_ELx_EC_PC_ALIGN,
+	[ESR_ELx_EC_DABT_LOW]   = &sync_desc_guest_ESR_ELx_EC_DABT_LOW,
+	[ESR_ELx_EC_SP_ALIGN]   = &sync_desc_guest_ESR_ELx_EC_SP_ALIGN,
+	[ESR_ELx_EC_FP_EXC32]   = &sync_desc_guest_ESR_ELx_EC_FP_EXC32,
+	[ESR_ELx_EC_FP_EXC64]   = &sync_desc_guest_ESR_ELx_EC_FP_EXC64,
+	[ESR_ELx_EC_SERROR]	= &sync_desc_guest_ESR_ELx_EC_SERROR,
+	[ESR_ELx_EC_HVC32]	= &sync_desc_guest_ESR_ELx_EC_HVC32,
+	[ESR_ELx_EC_HVC64]	= &sync_desc_guest_ESR_ELx_EC_HVC64,
+	[ESR_ELx_EC_SMC32]	= &sync_desc_guest_ESR_ELx_EC_SMC32,
+	[ESR_ELx_EC_SMC64]	= &sync_desc_guest_ESR_ELx_EC_SMC64,
+};
 
-DEFINE_SYNC_DESC(EC_MCR_MRC_CP15, EC_TYPE_BOTH,
-		mcr_mrc_cp15_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_MCRR_MRRC_CP15, EC_TYPE_AARCH32,
-		mcrr_mrrc_cp15_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_MCR_MRC_CP14, EC_TYPE_AARCH32,
-		mcr_mrc_cp14_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_LDC_STC_CP14, EC_TYPE_AARCH32,
-		ldc_stc_cp14_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_ACCESS_SIMD_REG, EC_TYPE_BOTH,
-		access_simd_reg_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_MCR_MRC_CP10, EC_TYPE_AARCH32,
-		mcr_mrc_cp10_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_MRRC_CP14, EC_TYPE_AARCH32,
-		mrrc_cp14_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_ILLEGAL_EXE_STATE, EC_TYPE_BOTH,
-		illegal_exe_state_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_SVC_AARCH32, EC_TYPE_AARCH32,
-		svc_aarch32_handler, 0, 0);
-
-DEFINE_SYNC_DESC(EC_HVC_AARCH32, EC_TYPE_AARCH32,
-		hvc_aarch32_handler, 0, 0);
-
-DEFINE_SYNC_DESC(EC_SMC_AARCH32, EC_TYPE_AARCH32,
-		smc_aarch32_handler, 0, 4);
-
-DEFINE_SYNC_DESC(EC_SVC_AARCH64, EC_TYPE_AARCH64,
-		svc_aarch64_handler, 0, 0);
-
-DEFINE_SYNC_DESC(EC_HVC_AARCH64, EC_TYPE_AARCH64,
-		hvc_aarch64_handler, 0, 0);
-
-DEFINE_SYNC_DESC(EC_SMC_AARCH64, EC_TYPE_AARCH64,
-		smc_aarch64_handler, 0, 4);
-
-DEFINE_SYNC_DESC(EC_ACESS_SYSTEM_REG, EC_TYPE_AARCH64,
-		access_system_reg_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_INSABORT_TFL, EC_TYPE_BOTH,
-		insabort_tfl_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_INSABORT_TWE, EC_TYPE_BOTH,
-		insabort_twe_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_MISALIGNED_PC, EC_TYPE_BOTH,
-		misaligned_pc_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_DATAABORT_TFL, EC_TYPE_BOTH,
-		dataabort_tfl_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_DATAABORT_TWE, EC_TYPE_BOTH,
-		dataabort_twe_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_STACK_MISALIGN, EC_TYPE_BOTH,
-		stack_misalign_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_FLOATING_AARCH32, EC_TYPE_AARCH32,
-		floating_aarch32_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_FLOATING_AARCH64, EC_TYPE_AARCH64,
-		floating_aarch64_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_SERROR, EC_TYPE_BOTH, serror_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_BREAKPOINT_TFL, EC_TYPE_BOTH,
-		breakpoint_tfl_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_BREAKPOINT_TWE, EC_TYPE_BOTH,
-		breakpoint_twe_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_SOFTWARE_STEP_TFL, EC_TYPE_BOTH,
-		software_step_tfl_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_SOFTWARE_STEP_TWE, EC_TYPE_BOTH,
-		software_step_twe_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_WATCHPOINT_TFL, EC_TYPE_BOTH,
-		watchpoint_tfl_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_WATCHPOINT_TWE, EC_TYPE_BOTH,
-		watchpoint_twe_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_BKPT_INS, EC_TYPE_AARCH32, bkpt_ins_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_VCTOR_CATCH, EC_TYPE_AARCH32,
-		vctor_catch_handler, 1, 4);
-
-DEFINE_SYNC_DESC(EC_BRK_INS, EC_TYPE_AARCH64,
-		brk_ins_handler, 1, 4);
-
-void sync_from_lower_EL_handler(gp_regs *data)
+void handle_vcpu_sync_exception(gp_regs *regs)
 {
 	int cpuid = smp_processor_id();
 	uint32_t esr_value;
@@ -524,35 +397,21 @@ void sync_from_lower_EL_handler(gp_regs *data)
 	if ((!vcpu) || (vcpu->task->affinity != cpuid))
 		panic("this vcpu is not belong to the pcpu");
 
-	exit_from_guest(vcpu, data);
+	esr_value = read_esr_el2();
+	ec_type = (esr_value & ESR_ELx_EC_MASK) >> ESR_ELx_EC_SHIFT;
 
-	esr_value = data->esr_elx;
-	ec_type = (esr_value & 0xfc000000) >> 26;
+	if (ec_type >= ESR_ELx_EC_MAX) {
+		pr_err("unknown sync exception type from guest %d\n", ec_type);
+		goto out;
+	}
 
 	pr_debug("sync from lower EL, handle 0x%x\n", ec_type);
-	ec = sync_descs[ec_type];
-	if (ec == NULL)
-		goto out;
-
+	ec = guest_sync_descs[ec_type];
 	if (ec->irq_safe)
 		local_irq_enable();
 
-	data->elr_elx += ec->ret_addr_adjust;
-	ec->handler(data, esr_value);
+	regs->pc += ec->ret_addr_adjust;
+	ec->handler(regs, ec_type, esr_value);
 out:
 	local_irq_disable();
-
-	enter_to_guest(get_current_vcpu(), NULL);
 }
-
-static int __init_text aarch64_sync_init(void)
-{
-	struct sync_desc *desc;
-
-	section_for_each_item(__sync_desc_start, __sync_desc_end, desc) {
-		sync_descs[desc->type] = desc;
-	}
-
-	return 0;
-}
-arch_initcall(aarch64_sync_init);

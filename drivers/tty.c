@@ -42,7 +42,6 @@ struct tty *alloc_tty(char *name, uint32_t id, unsigned long flags)
 
 	return tty;
 }
-EXPORT_SYMBOL(alloc_tty);
 
 int register_tty(struct tty *tty)
 {
@@ -57,7 +56,6 @@ int register_tty(struct tty *tty)
 
 	return 0;
 }
-EXPORT_SYMBOL(register_tty);
 
 int release_tty(struct tty *tty)
 {
@@ -74,7 +72,6 @@ int release_tty(struct tty *tty)
 
 	return 0;
 }
-EXPORT_SYMBOL(release_tty);
 
 struct tty *open_tty(char *name)
 {
@@ -96,7 +93,6 @@ struct tty *open_tty(char *name)
 
 	return __tty;
 }
-EXPORT_SYMBOL(open_tty);
 
 void close_tty(struct tty *tty)
 {
@@ -107,4 +103,3 @@ void close_tty(struct tty *tty)
 		tty->ops->close(tty);
 	tty->open = 0;
 }
-EXPORT_SYMBOL(close_tty);

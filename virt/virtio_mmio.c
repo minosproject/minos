@@ -23,7 +23,7 @@
 #include <minos/sched.h>
 #include <virt/vdev.h>
 #include <virt/virq.h>
-#include <common/virtio_mmio.h>
+#include <uapi/virtio_mmio.h>
 #include <virt/resource.h>
 #include <virt/vmcs.h>
 #include <minos/of.h>
@@ -197,8 +197,8 @@ static void *virtio_create_device(struct vm *vm, struct device_node *node)
 	request_virq(vm, irq, 0);
 
 	/* set up the iomem base of the vdev */
-	vdev->iomem = (void *)translate_vm_address(vm, base);
-	if (!vdev->iomem) {
+	ret = translate_guest_ipa(&vm->mm, base, (phy_addr_t *)&vdev->iomem);
+	if (ret) {
 		pr_err("get iomem for virtio_device failed\n");
 		release_virtio_dev(vm, virtio_dev);
 		return NULL;
@@ -229,14 +229,14 @@ int virtio_mmio_init(struct vm *vm, unsigned long gbase,
 	}
 
 	size = PAGE_BALIGN(size);
-	iomem = get_io_pages(PAGE_NR(size));
+	iomem = alloc_shmem(PAGE_NR(size));
 	if (!iomem)
 		return -ENOMEM;
 
 	memset(iomem, 0, size);
 
-	hva = create_hvm_iomem_map(vm, (unsigned long)iomem, size);
-	if (hva == INVALID_ADDRESS) {
+	hva = create_hvm_shmem_map(vm, (unsigned long)iomem, size);
+	if (hva == BAD_ADDRESS) {
 		free_pages(iomem);
 		return -ENOMEM;
 	}

@@ -15,8 +15,8 @@ typedef fdt64_t of64_t;
 
 typedef void * (*of_iterate_fn)(struct device_node *, void *arg);
 
-extern struct device_node *hv_node;
-extern void *hv_dtb;
+extern struct device_node *of_root_node;
+extern void *dtb_address;
 
 #define of_node_for_each_child(node, child)	\
 	for (child = node->child; child != NULL; child = child->sibling)
@@ -73,7 +73,7 @@ int of_translate_address_index(struct device_node *node,
 int of_translate_address(struct device_node *node,
 		uint64_t *address, uint64_t *size);
 
-struct device_node *of_parse_device_tree(void *data);
+struct device_node *of_parse_device_tree(void *);
 void of_release_all_node(struct device_node *node);
 void *of_device_node_match(struct device_node *node, void *s, void *e);
 int of_get_phandle(struct device_node *node);
@@ -147,7 +147,14 @@ static inline int translate_device_address(struct device_node *node,
 int get_device_irq_index(struct device_node *node, uint32_t *irq,
 		unsigned long *flags, int index);
 
-int of_get_console_name(void *dtb, char **name);
+int of_get_console_name(char **name);
 int of_init_bootargs(void);
+
+int of_init(void *dtb);
+void of_setup_platform(void);
+int of_get_ramdisk_address(unsigned long *start, unsigned long *end);
+int of_spin_table_init(phy_addr_t *smp_holding);
+
+int of_parse_memory_info(void);
 
 #endif

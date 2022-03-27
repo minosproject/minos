@@ -19,7 +19,7 @@
 	vms {
 		vm0 {
 			device_type = "virtual_machine";
-			vmid = <0>;
+			vmid = <1>;
 			vm_name = "fvp_linux_host";
 			type = "linux";
 			native_wfi;

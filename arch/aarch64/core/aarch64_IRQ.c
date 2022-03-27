@@ -18,9 +18,19 @@
 #include <minos/irq.h>
 #include <minos/sched.h>
 
-void irq_c_handler(gp_regs *regs)
+static inline void irq_handler(gp_regs *regs)
 {
 	irq_enter(regs);
 	do_irq_handler();
 	irq_exit(regs);
+}
+
+void irq_from_lower_el(gp_regs *regs)
+{
+	irq_handler(regs);
+}
+
+void irq_from_current_el(gp_regs *regs)
+{
+	irq_handler(regs);
 }

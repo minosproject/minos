@@ -12,10 +12,8 @@ choice
 		bool "bcm2838 SOC"
 	config SOC_AMLOGIC
 		bool "amlogic SOC"
-	config SOC_R8A7795
-		bool "r8a7795 SOC"
-		select IRQCHIP_GICV2
-		select SERIAL_SCIF
+	config SOC_QEMU
+		bool "qemu platform"
 endchoice
 
 source "platform/espressobin/Kconfig"
@@ -23,6 +21,6 @@ source "platform/fvp/Kconfig"
 source "platform/raspberry3/Kconfig"
 source "platform/raspberry4/Kconfig"
 source "platform/amlogic/Kconfig"
-source "platform/r8a7795/Kconfig"
+source "platform/qemu/Kconfig"
 
 endmenu

@@ -44,5 +44,5 @@ void mdelay(uint32_t ms)
 
 void msleep(uint32_t ms)
 {
-	set_task_suspend(ms);
+	task_sleep(ms);
 }

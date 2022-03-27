@@ -17,12 +17,11 @@
 	};
 
 	vms {
-		vm0 {
+		vm1 {
 			device_type = "virtual_machine";
 			vmid = <0>;
 			vm_name = "fvp_linux_host";
 			type = "linux";
-			native_wfi;
 			vcpus = <1>;
 			entry = <0x0 0x80080000>;
 			setup_data = <0x0 0x83e00000>;
@@ -45,6 +44,7 @@
 			vm_name = "fvp_zephyr_vm2";
 			type = "zephyr";
 			vcpus = <1>;
+			disabled;
 			entry = <0x0 0x900003b8>;
 			setup_data = <0x0 0x0>;
 			vcpu_affinity = <3>;

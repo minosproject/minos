@@ -25,7 +25,7 @@
 
 DEFINE_PER_CPU(struct timers, timers);
 
-static void run_timer_softirq(struct softirq_action *h)
+void soft_timer_interrupt(void)
 {
 	struct timer_list *timer;
 	unsigned long expires = ~0, now;
@@ -196,7 +196,6 @@ void init_timer_on_cpu(struct timer_list *timer, int cpu)
 	BUG_ON(!timer);
 
 	preempt_disable();
-	init_list(&timer->entry);
 	timer->entry.next = NULL;
 	timer->expires = 0;
 	timer->function = NULL;
@@ -235,7 +234,7 @@ int del_timer_sync(struct timer_list *timer)
 	 * this timer finish
 	 */
 	while (timers->running_timer == timer)
-		cpu_relax();
+		smp_rmb();
 
 	return del_timer(timer);
 }
@@ -257,6 +256,4 @@ void init_timers(void)
 		timers->running_expires = 0;
 		spin_lock_init(&timers->lock);
 	}
-
-	open_softirq(TIMER_SOFTIRQ, run_timer_softirq);
 }

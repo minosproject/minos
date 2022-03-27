@@ -35,8 +35,8 @@ int iommu_iotlb_flush_all(struct vm *vm)
 	/* TODO: need to hold mm_lock? */
 	ret = iommu->ops->iotlb_flush_all(vm);
 	if (ret)
-		pr_err("vm%d: IOMMU IOTLB flush all failed: %d\n", vm_id(vm),
-		       ret);
+		pr_err("vm%d: IOMMU IOTLB flush all failed: %d\n",
+				vm_id(vm), ret);
 
 	return ret;
 }
@@ -52,7 +52,7 @@ int iommu_assign_node(struct vm *vm, struct device_node *node)
 	if (ret <= 0)
 		return 0;
 
-	stub_node = of_find_node_by_name(hv_node, name);
+	stub_node = of_find_node_by_name(of_root_node, name);
 	if (!stub_node)
 		return -ENOENT;
 
@@ -98,7 +98,7 @@ static void *iommu_ops_init(struct device_node *node, void *arg)
 
 static void of_iommu_init(void)
 {
-	of_iterate_all_node_loop(hv_node, iommu_ops_init, NULL);
+	of_iterate_all_node_loop(of_root_node, iommu_ops_init, NULL);
 }
 
 static int iommu_init(void)

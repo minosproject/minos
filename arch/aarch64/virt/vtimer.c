@@ -24,6 +24,7 @@
 #include <minos/sched.h>
 #include <virt/virq.h>
 #include <virt/os.h>
+#include <asm/aarch64_reg.h>
 
 #define REG_CNTCR		0x000
 #define REG_CNTSR		0x004
@@ -98,9 +99,9 @@ static void vtimer_state_restore(struct vcpu *vcpu, void *context)
 
 	del_timer(&vtimer->timer);
 
-	write_sysreg64(c->offset, CNTVOFF_EL2);
-	write_sysreg64(vtimer->cnt_cval, CNTV_CVAL_EL0);
-	write_sysreg32(vtimer->cnt_ctl, CNTV_CTL_EL0);
+	write_sysreg64(c->offset, ARM64_CNTVOFF_EL2);
+	write_sysreg64(vtimer->cnt_cval, ARM64_CNTV_CVAL_EL0);
+	write_sysreg32(vtimer->cnt_ctl, ARM64_CNTV_CTL_EL0);
 	dsb();
 }
 
@@ -110,12 +111,12 @@ static void vtimer_state_save(struct vcpu *vcpu, void *context)
 	struct vtimer_context *c = (struct vtimer_context *)context;
 	struct vtimer *vtimer = &c->virt_timer;
 
-	dsb();
-	vtimer->cnt_ctl = read_sysreg32(CNTV_CTL_EL0);
+	vtimer->cnt_ctl = read_sysreg32(ARM64_CNTV_CTL_EL0);
 	write_sysreg32(vtimer->cnt_ctl & ~CNT_CTL_ENABLE, CNTV_CTL_EL0);
-	vtimer->cnt_cval = read_sysreg64(CNTV_CVAL_EL0);
+	vtimer->cnt_cval = read_sysreg64(ARM64_CNTV_CVAL_EL0);
+	dsb();
 
-	if (task->stat == TASK_STAT_STOPPED)
+	if (task->stat == TASK_STAT_STOP)
 		return;
 
 	if ((vtimer->cnt_ctl & CNT_CTL_ENABLE) &&
@@ -314,11 +315,11 @@ int virtual_timer_irq_handler(uint32_t irq, void *data)
 	 * the timer
 	 */
 	if (!task_is_vcpu(current)) {
-		write_sysreg32(0, CNTV_CTL_EL0);
+		write_sysreg32(0, ARM64_CNTV_CTL_EL0);
 		return 0;
 	}
 
-	value = read_sysreg32(CNTV_CTL_EL0);
+	value = read_sysreg32(ARM64_CNTV_CTL_EL0);
 	dsb();
 
 	if (!(value & CNT_CTL_ISTATUS)) {
@@ -327,7 +328,7 @@ int virtual_timer_irq_handler(uint32_t irq, void *data)
 	}
 
 	value = value | CNT_CTL_IMASK;
-	write_sysreg32(value, CNTV_CTL_EL0);
+	write_sysreg32(value, ARM64_CNTV_CTL_EL0);
 	dsb();
 
 	return send_virq_to_vcpu(vcpu, vcpu->vm->vtimer_virq);

@@ -35,10 +35,6 @@ config STACK_PAGE_ALIGN
 	help
 	  "the stack for all the task need 4K align"
 
-config MAX_SLAB_BLOCKS
-	int "default SLAB blocks"
-	default 10
-
 config TASK_RUN_TIME
 	int "default task run time in ms"
 	default 100
@@ -78,13 +74,6 @@ config NR_SPI_IRQS
 	help
 	  how many spi irq in system
 
-config OS_REALTIME_CORE0
-	bool "all realtime task will affinity to core 0"
-	default n
-	help
-	  if enable this feature, all the realtime task will
-	  affinity to cpu0
-
 choice
 	prompt "Printf log level"
 	default PRINT_INFO
@@ -108,11 +97,5 @@ config LOG_LEVEL
 	default 2 if PRINT_WARN
 	default 1 if PRINT_ERROR
 	default 4
-
-config LOG_LEVEL_COLORFUL
-	bool "colorful log level"
-	default n
-	help
-	  color the log level to make the log easier to read
 
 endmenu

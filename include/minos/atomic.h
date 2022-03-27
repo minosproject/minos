@@ -1,26 +1,10 @@
 #ifndef _MINOS_ATOMIC_H_
 #define _MINOS_ATOMIC_H_
 
+#include <asm/atomic.h>
+#include <asm/cmpxchg.h>
+
 #define ATOMIC_INIT(v) { (v) }
-
-void __atomic_set(int i, atomic_t *t);
-int __atomic_get(atomic_t *t);
-void atomic_add(int i, atomic_t *t);
-void atomic_sub(int i, atomic_t *t);
-int atomic_add_return(int i, atomic_t *t);
-int atomic_sub_return(int i, atomic_t *t);
-int atomic_add_return_old(int i, atomic_t *t);
-int atomic_sub_return_old(int i, atomic_t *t);
-
-static inline int atomic_read(atomic_t *t)
-{
-	return *(volatile int *)&t->value;
-}
-
-static inline void atomic_set(atomic_t *t, int i)
-{
-	t->value = i;
-}
 
 static inline void atomic_inc(atomic_t *t)
 {

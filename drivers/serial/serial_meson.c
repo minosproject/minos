@@ -44,7 +44,7 @@ struct meson_uart {
 #define AML_UART_RX_RST			BIT(23)
 #define AML_UART_CLR_ERR		BIT(24)
 
-static volatile struct meson_uart *uart = (struct meson_uart *)0xff803000;
+static volatile struct meson_uart *uart = (struct meson_uart *)ptov(0xff803000);
 
 static int meson_serial_init(char *arg)
 {

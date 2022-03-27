@@ -1,9 +1,7 @@
 menu "Device Drivers"
 
 source "drivers/irq-chips/Kconfig"
-source "drivers/iommu/Kconfig"
 source "drivers/serial/Kconfig"
-source "drivers/device-tree/Kconfig"
 
 config DEVICE_TREE
 	bool "device tree libfdt support"

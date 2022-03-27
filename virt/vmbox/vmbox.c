@@ -293,7 +293,7 @@ static int create_vmbox(struct vmbox_info *vinfo)
 		iomem_size = PAGE_BALIGN(vinfo->shmem_size);
 	}
 
-	vmbox->shmem = get_io_pages(PAGE_NR(iomem_size));
+	vmbox->shmem = alloc_shmem(PAGE_NR(iomem_size));
 	if (!vmbox->shmem)
 		panic("no more memory for %s\n", vinfo->type);
 
@@ -381,8 +381,12 @@ static int vmbox_device_attach(struct vmbox_controller *_vc,
 	if (!vdev->vring_virq || !vdev->ipc_virq)
 		return -ENOSPC;
 
+	/*
+	 * set all the vmm area to VM_SHARED, since the host
+	 * will release the memory final.
+	 */
 	va = alloc_free_vmm_area(&vm->mm, vmbox->shmem_size,
-			PAGE_MASK, VM_MAP_SHARED | VM_IO);
+			PAGE_MASK, VM_SHARED | VM_IO);
 	if (!va)
 		return -ENOMEM;
 
@@ -402,7 +406,7 @@ static int vmbox_device_attach(struct vmbox_controller *_vc,
 	 */
 	 _vc->dev_state |= (1 << vdev->devid);
 	 _vc->irq_state |= (1 << VMBOX_CON_INT_TYPE_DEV_ONLINE);
-	wmb();
+	smp_wmb();
 
 	return 0;
 }
@@ -688,38 +692,6 @@ static void vmbox_con_reset(struct vdev *vdev)
 	/* will never called */
 }
 
-static int __of_setup_vmbox_iomem
-(void *dtb, int node, unsigned long iomem, size_t iomem_size)
-{
-	uint32_t tmp[4];
-	uint32_t *args = tmp;
-	int size = 0, size_cells, addr_cells;
-
-	size_cells = fdt_size_cells(dtb, 0);
-	addr_cells = fdt_address_cells(dtb, 0);
-
-	if (addr_cells == 1) {
-		*args++ = cpu_to_fdt32(iomem);
-		size++;
-	} else {
-		*args++ = cpu_to_fdt32(iomem >> 32);
-		*args++ = cpu_to_fdt32(iomem & 0xffffffff);
-		size += 2;
-	}
-
-	if (size_cells == 1) {
-		*args++ = cpu_to_fdt32(iomem_size);
-		size++;
-	} else {
-		*args++ = cpu_to_fdt32(iomem_size >> 32);
-		*args++ = cpu_to_fdt32(iomem_size & 0xffffffff);
-		size += 2;
-	}
-
-	fdt_setprop(dtb, node, "reg", (void *)tmp, size * 4);
-	return 0;
-}
-
 static int __of_setup_vmbox_con_virqs(struct vmbox_controller *vcon,
 		void *dtb, int node)
 {
@@ -761,7 +733,7 @@ static void of_add_vmbox_controller(struct vm *vm)
 
 	fdt_setprop(dtb, node, "compatible", "minos,vmbox", 12);
 
-	__of_setup_vmbox_iomem(dtb, node, (unsigned long)vc->va, PAGE_SIZE);
+	fdt_set_node_reg(dtb, node, (unsigned long)vc->va, PAGE_SIZE);
 	__of_setup_vmbox_con_virqs(vc, dtb, node);
 }
 
@@ -831,7 +803,7 @@ static int __vm_create_vmbox_controller_static(struct vm *vm)
 	if (ret || (irq < 32))
 		return -ENOENT;
 
-	split_vmm_area(&vm->mm, base, size, VM_IO);
+	split_vmm_area(&vm->mm, base, size, VM_GUEST_IO);
 	request_virq(vm, irq, 0);
 
 	vc = zalloc(sizeof(*vc));
@@ -886,7 +858,7 @@ int vmbox_register_platdev(struct vmbox_device *vdev, void *dtb, char *type)
 	}
 
 	fdt_setprop(dtb, node, "compatible", type, strlen(type) + 1);
-	__of_setup_vmbox_iomem(dtb, node, (unsigned long)vdev->iomem,
+	fdt_set_node_reg(dtb, node, (unsigned long)vdev->iomem,
 			vdev->iomem_size);
 	return 0;
 }

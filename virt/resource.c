@@ -86,32 +86,52 @@ static void *create_vm_irqchip_of(struct device_node *node, void *arg)
 
 int parse_vm_info_of(struct device_node *node, struct vmtag *vmtag)
 {
-	/* 64bit virtual machine default */
+	/*
+	 * The setup data address need 2M align, since the memory will
+	 * mapped into hypervisor, and hypervisor may modify it. Currently
+	 * ususally the device tree, and the size can not beyond 2M.
+	 *
+	 * VMID can not be 0.
+	 */
 	memset(vmtag, 0, sizeof(*vmtag));
-	vmtag->flags |= VM_FLAGS_64BIT;
-
 	of_get_u32_array(node, "vmid", &vmtag->vmid, 1);
+	of_get_u64_array(node, "setup_data", (uint64_t *)&vmtag->setup_data, 1);
+	if (!IS_BLOCK_ALIGN(vmtag->setup_data)) {
+		pr_err("setup data address not correct %d 0x%x\n",
+				vmtag->vmid, vmtag->setup_data);
+		return -EINVAL;
+	}
+
 	of_get_string(node, "vm_name", vmtag->name, 32);
 	of_get_string(node, "type", vmtag->os_type, 16);
 	of_get_u32_array(node, "vcpus", (uint32_t *)&vmtag->nr_vcpu, 1);
 	of_get_u64_array(node, "entry", (uint64_t *)&vmtag->entry, 1);
 	of_get_u32_array(node, "vcpu_affinity",
 			vmtag->vcpu_affinity, vmtag->nr_vcpu);
-	of_get_u64_array(node, "setup_data", (uint64_t *)&vmtag->setup_data, 1);
 	of_get_u64_array(node, "load-address", &vmtag->load_address, 1);
-	of_get_string(node, "image-file", vmtag->image_file,
-		      ARRAY_SIZE(vmtag->image_file));
-	of_get_string(node, "dtb-file", vmtag->dtb_file,
-		      ARRAY_SIZE(vmtag->image_file));
+
+	if (of_get_bool(node, "disabled")) {
+		pr_notice("vm%d [%s] disabled in dts\n", vmtag->vmid, vmtag->name);
+		return -EINVAL;
+	}
 
 	if (of_get_bool(node, "vm_32bit"))
-		vmtag->flags &= ~VM_FLAGS_64BIT;
+		vmtag->flags |= VM_FLAGS_32BIT;
 
 	if (of_get_bool(node, "native_wfi"))
 		vmtag->flags |= VM_FLAGS_NATIVE_WFI;
 
 	if (of_get_bool(node, "no_of_resource"))
 		vmtag->flags |= VM_FLAGS_NO_OF_RESOURCE;
+
+	vmtag->kernel_file = of_getprop(node, "kernel_image", NULL);
+	vmtag->dtb_file = of_getprop(node, "dtb_image", NULL);
+	vmtag->initrd_file = of_getprop(node, "initrd_image", NULL);
+
+	/*
+	 * all the VM created by hypervisor directoly is native vm.
+	 */
+	vmtag->flags |= VM_FLAGS_NATIVE;
 
 	return 0;
 }
@@ -236,12 +256,13 @@ static int create_pdev_iomem_of(struct vm *vm, struct device_node *node)
 		/* map the physical memory for vm */
 		pr_info("[VM%d IOMEM] 0x%x->0x%x 0x%x %s\n", vm->vmid,
 				addr, addr, size, node->name);
-		split_vmm_area(&vm->mm, addr, size, VM_IO | VM_MAP_PT);
+		split_vmm_area(&vm->mm, addr, size, VM_GUEST_IO | VM_RW);
 
 		/* virqchip do not map the virtual address */
-		if (node->class != DT_CLASS_VIRQCHIP)
-			create_guest_mapping(&vm->mm, addr,
-					addr, size, VM_IO | VM_MAP_PT);
+		if (node->class != DT_CLASS_VIRQCHIP) {
+			create_guest_mapping(&vm->mm, addr, addr,
+					size, VM_GUEST_IO | VM_RW);
+		}
 	}
 
 	return 0;
@@ -380,9 +401,9 @@ static int create_vm_iomem_common(struct vm *vm, struct device_node *node)
 		paddr = fdt32_to_cpu64(data[2], data[3]);
 		size = fdt32_to_cpu64(data[4], data[5]);
 
-		split_vmm_area(&vm->mm, vaddr, size, VM_IO);
+		split_vmm_area(&vm->mm, vaddr, size, VM_GUEST_IO);
 		create_guest_mapping(&vm->mm, vaddr,
-				paddr, size, VM_IO | VM_MAP_PT);
+				paddr, size, VM_GUEST_IO | VM_RW);
 
 		data += IOMEM_ENTRY_CNT;
 	}

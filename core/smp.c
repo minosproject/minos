@@ -19,6 +19,7 @@
 #include <minos/percpu.h>
 #include <minos/platform.h>
 #include <minos/irq.h>
+#include <asm/cache.h>
 
 #define SMP_CALL_LOCKED		(1 << 0)
 
@@ -110,7 +111,7 @@ int smp_function_call(int cpu, smp_function fn, void *data, int wait)
 	return 0;
 }
 
-static int smp_function_call_handler(uint32_t irq, void *data)
+static irqreturn_t smp_function_call_handler(uint32_t irq, void *data)
 {
 	int i;
 	struct smp_call_data *cd;

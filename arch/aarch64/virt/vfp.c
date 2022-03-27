@@ -26,14 +26,19 @@ struct vfp_context {
 	uint64_t regs[64] __align(16);
 #ifdef CONFIG_VIRT
 	uint32_t fpexc32_el2;
+	uint32_t padding0;
 #endif
 	uint32_t fpsr;
 	uint32_t fpcr;
+	uint32_t cptr;
 };
 
-static void vfp_state_init(struct vcpu *vcpu, void *context)
+static void vfp_state_init(struct vcpu *vcpu, void *c)
 {
+	struct vfp_context *context = (struct vfp_context *)c;
+
 	memset(context, 0, sizeof(struct vfp_context));
+	context->cptr = 0x300000;
 }
 
 static void vfp_state_save(struct vcpu *vcpu, void *context)
@@ -43,8 +48,12 @@ static void vfp_state_save(struct vcpu *vcpu, void *context)
 	if (task_is_32bit(vcpu->task))
 		c->fpexc32_el2 = read_sysreg32(FPEXC32_EL2);
 
-	c->fpsr = read_sysreg32(FPSR);
-	c->fpcr = read_sysreg32(FPCR);
+	/*
+	 * need write CPTR_EL2 first to enable FPEN
+	 */
+	c->cptr = read_sysreg(CPTR_EL2);
+	c->fpsr = read_sysreg(FPSR);
+	c->fpcr = read_sysreg(FPCR);
 
 	asm volatile("stp q0, q1, [%1, #16 * 0]\n\t"
 		     "stp q2, q3, [%1, #16 * 2]\n\t"
@@ -69,6 +78,7 @@ static void vfp_state_restore(struct vcpu *vcpu, void *context)
 {
 	struct vfp_context *c = (struct vfp_context *)context;
 
+	write_sysreg(c->cptr, CPTR_EL2);
 	if (task_is_32bit(vcpu->task))
 		write_sysreg(c->fpexc32_el2, FPEXC32_EL2);
 

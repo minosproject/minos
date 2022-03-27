@@ -14,4 +14,6 @@ obj-$(CONFIG_VWDT_SP805)	+= vwdt.o
 obj-y				+= varm_timer.o
 obj-y				+= debug_console.o
 obj-y				+= vmodule.o
-obj-$(CONFIG_IOMMU)		+= iommu.o
+obj-y				+= iommu.o
+obj-y				+= shmem.o
+obj-y				+= vm_daemon.o

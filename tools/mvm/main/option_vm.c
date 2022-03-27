@@ -174,9 +174,9 @@ static int setup_vm_type(char *arg, char *sub_arg, void *data)
 {
 	struct vm *vm = (struct vm *)data;
 
-	pr_info("os is 64bit\n");
+	pr_info("os is 32bit\n");
+	vm->flags |= VM_FLAGS_32BIT;
 
-	vm->flags |= VM_FLAGS_64BIT;
 	return 0;
 }
 
@@ -226,7 +226,7 @@ DEFINE_OPTION_VM(entry, "entry", 0, setup_vm_entry);
 DEFINE_OPTION_VM(setup_data, "setup", 0, setup_vm_setup_addr);
 DEFINE_OPTION_VM(setup_mem_base,
 		"iomem_base", 0, setup_vm_mem_base);
-DEFINE_OPTION_VM(type, "os-64bit", 0, setup_vm_type);
+DEFINE_OPTION_VM(type, "os-32bit", 0, setup_vm_type);
 DEFINE_OPTION_VM(cmdline, "cmdline", 0, setup_vm_cmdline);
 DEFINE_OPTION_VM(gic, "gic", 0, setup_vm_gic);
 DEFINE_OPTION_VM(wfi, "native_wfi", 0, setup_vm_wfi);

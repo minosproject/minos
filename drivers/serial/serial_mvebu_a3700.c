@@ -9,7 +9,7 @@
 #include <config/config.h>
 #include <minos/console.h>
 
-static void *base = (void *)CONFIG_UART_BASE;
+static void *base = (void *)ptov(CONFIG_UART_BASE);
 
 /*
  * Register offset

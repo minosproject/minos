@@ -37,7 +37,7 @@
 #define BCM283X_MU_LSR_TX_EMPTY		(1 << 5)
 #define BCM283X_MU_LSR_RX_READY		(1 << 0)
 
-static void *serial_base = (void *)CONFIG_UART_BASE;
+static void *serial_base = (void *)ptov(CONFIG_UART_BASE);
 
 static inline void __bcm283x_mu_putc(char c)
 {

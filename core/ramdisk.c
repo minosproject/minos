@@ -15,7 +15,7 @@
  */
 
 #include <minos/minos.h>
-#include <common/hypervisor.h>
+#include <minos/ramdisk.h>
 
 void *ramdisk_start, *ramdisk_end;
 static struct ramdisk_inode *root;
@@ -29,6 +29,10 @@ void set_ramdisk_address(void *start, void *end)
 
 int ramdisk_init(void)
 {
+	/*
+	 * need remap the ramdisk memory space, if it
+	 * is not in the kernel memory space TBD.
+	 */
 	if (!ramdisk_start || !ramdisk_end) {
 		pr_err("ramdisk address is not set\n");
 		return -EINVAL;
@@ -50,12 +54,27 @@ int ramdisk_init(void)
 	return 0;
 }
 
+const char *ramdisk_file_name(struct ramdisk_file *file)
+{
+	return file->inode->f_name;
+}
+
+unsigned long ramdisk_file_size(struct ramdisk_file *file)
+{
+	return file->inode->f_size;
+}
+
+unsigned long ramdisk_file_base(struct ramdisk_file *file)
+{
+	return (unsigned long)ramdisk_start + file->inode->f_offset;
+}
+
 static struct ramdisk_inode *get_file_inode(const char *name)
 {
 	struct ramdisk_inode *inode;
 
 	for (inode = root; inode < root + sb->file_cnt; inode++) {
-		if (strncmp(inode->fname, name, RAMDISK_FNAME_SIZE - 1) == 0)
+		if (strncmp(inode->f_name, name, RAMDISK_FNAME_SIZE - 1) == 0)
 			return inode;
 	}
 

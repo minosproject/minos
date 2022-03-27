@@ -35,7 +35,7 @@ int mutex_accept(mutex_t *mutex)
 	/* if the mutex is avaliable now, lock it */
 	spin_lock_irqsave(&mutex->lock, flags);
 	if (mutex->cnt == OS_MUTEX_AVAILABLE) {
-		mutex->owner = task->pid;
+		mutex->owner = task->tid;
 		mutex->data = task;
 		mutex->cnt = task->prio;
 		ret = 0;
@@ -55,12 +55,10 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 
 	spin_lock(&m->lock);
 	if (m->cnt == OS_MUTEX_AVAILABLE) {
-		m->owner = task->pid;
+		m->owner = task->tid;
 		m->data = (void *)task;
-		m->cnt = task->pid;
+		m->cnt = task->tid;
 
-		/* to be done need furture design */
-		task->lock_event = to_event(m);
 		spin_unlock(&m->lock);
 		return 0;
 	}
@@ -78,7 +76,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	 * finish it work, but there is a big problem, if the
 	 * task need to get two mutex, how to deal with this ?
 	 */
-	event_task_wait(task, to_event(m), TASK_STAT_MUTEX, timeout);
+	event_task_wait(to_event(m), TASK_EVENT_MUTEX, timeout);
 	spin_unlock(&m->lock);
 	
 	sched();
@@ -101,8 +99,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 		break;
 	}
 
-	task->pend_stat = TASK_STAT_PEND_OK;
-	task->wait_event = NULL;
+	event_pend_down(task);
 	
 	return ret;
 }
@@ -118,28 +115,24 @@ int mutex_post(mutex_t *m)
 
 	spin_lock(&m->lock);
 	if (task != (struct task *)m->data) {
-		pr_err("mutex not belong to this task %d\n", task->pid);
+		pr_err("mutex not belong to this task %d\n", task->tid);
 		spin_unlock(&m->lock);
 		return -EINVAL;
 	}
-
-	task->lock_event = NULL;
 
 	/* 
 	 * find the highest prio task to run, if there is
 	 * no task, then set the mutex is available else
 	 * resched
 	 */
-	task = event_highest_task_ready((struct event *)m, NULL,
-			TASK_STAT_MUTEX, TASK_STAT_PEND_OK);
+	task = event_highest_task_ready(to_event(m), NULL,
+			TASK_EVENT_MUTEX, TASK_STAT_PEND_OK);
 	if (task) {
-		m->cnt = task->pid;
+		m->cnt = task->tid;
 		m->data = task;
-		m->owner = task->pid;
-		mb();
+		m->owner = task->tid;
 
 		spin_unlock(&m->lock);
-		sched_task(task);
 
 		return 0;
 	}
@@ -147,7 +140,6 @@ int mutex_post(mutex_t *m)
 	m->cnt = OS_MUTEX_AVAILABLE;
 	m->data = NULL;
 	m->owner = 0;
-	mb();
 
 	spin_unlock(&m->lock);
 

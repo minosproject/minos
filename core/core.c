@@ -21,14 +21,16 @@
 
 void __might_sleep(const char *file, int line, int preempt_offset)
 {
-	WARN_ONCE(current->stat != TASK_STAT_RUNNING,
-			"do not call blocking ops when !TASK_RUNNING; "
-			"state=%d", current->stat);
+	struct task *task = current;
 
-	if (preempt_allowed() && !irq_disabled() && !task_is_idle(current))
+	WARN_ONCE(task->stat != TASK_STAT_RUNNING,
+			"do not call blocking ops when !TASK_RUNNING; "
+			"state=%d", task->stat);
+
+	if (preempt_allowed() && !irq_disabled() && !task_is_idle(task))
 		return;
 
-	pr_err("BUG: sleeping function called from invalid context at %s:%d\n",
-			file, line);
+	pr_err("BUG: sleeping function called from invalid context at %d %s:%d\n",
+			current->ti.preempt_count, file, line);
 	dump_stack(NULL, (unsigned long *)arch_get_sp());
 }

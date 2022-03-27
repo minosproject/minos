@@ -18,7 +18,7 @@
 #include <minos/tty.h>
 #include <virt/vmm.h>
 #include <virt/virq.h>
-#include <common/hypervisor.h>
+#include <uapi/hypervisor.h>
 #include <virt/hypercall.h>
 #include <asm/svccc.h>
 #include <minos/console.h>
@@ -119,7 +119,7 @@ static int dcon_get_resource(struct vm *vm, struct device_node *node,
 
 		request_virq(vm, irq, 0);
 		va = request_vmm_area(&vm->mm, base, 0, size,
-				VM_IO | VM_MAP_PRIVATE);
+				VM_GUEST_SHMEM | VM_RW);
 
 	} else {
 		/*
@@ -128,7 +128,7 @@ static int dcon_get_resource(struct vm *vm, struct device_node *node,
 		 * address in the vmm_area
 		 */
 		va = alloc_free_vmm_area(&vm->mm, DCON_RING_SIZE,
-			PAGE_MASK, VM_IO | VM_MAP_PRIVATE);
+			PAGE_MASK, VM_GUEST_SHMEM | VM_RW);
 		if (!va)
 			return -ENOMEM;
 	}
@@ -193,7 +193,7 @@ static int __init_text create_dconsole(struct vm *vm, struct device_node *node)
 	if (!dcon)
 		goto release_tty;
 
-	ring = get_io_pages(PAGE_NR(DCON_RING_SIZE));
+	ring = alloc_shmem(PAGE_NR(DCON_RING_SIZE));
 	if (!ring)
 		goto release_dcon;
 

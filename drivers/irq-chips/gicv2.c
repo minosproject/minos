@@ -28,7 +28,7 @@
 #include <minos/cpumask.h>
 #include <minos/irq.h>
 #include <minos/of.h>
-#include <minos/mmu.h>
+#include <minos/mm.h>
 
 /*
  * LR register definitions are GIC v2 specific.
@@ -266,6 +266,8 @@ static void __init_text gicv2_cpu_init(void)
 
 	gic_cpu_mask[cpuid] = readl_gicd(GICD_ITARGETSR) & 0xff;
 	pr_debug("gicv2 gic mask of cpu%d: 0x%x\n", cpuid, gic_cpu_mask[cpuid]);
+	if (gic_cpu_mask[cpuid] == 0)
+		gic_cpu_mask[cpuid] = 1 << cpuid;
 
 	/* The first 32 interrupts (PPI and SGI) are banked per-cpu, so
 	 * even though they are controlled with GICD registers, they must
@@ -295,10 +297,12 @@ static void __init_text gicv2_cpu_init(void)
 	dsb();
 }
 
+#ifdef CONFIG_VIRT
 static void __init_text gicv2_hyp_init(void)
 {
 
 }
+#endif
 
 static void __init_text gicv2_dist_init(void)
 {
@@ -309,6 +313,7 @@ static void __init_text gicv2_dist_init(void)
 	int i;
 
 	cpumask = readl_gicd(GICD_ITARGETSR) & 0xff;
+	cpumask = (cpumask == 0) ? (1 << 0) : cpumask;
 	cpumask |= cpumask << 8;
 	cpumask |= cpumask << 16;
 
@@ -368,13 +373,14 @@ static int __init_text gicv2_init(struct device_node *node)
 		array[0], array[1], array[2], array[3],
 		array[4], array[5], array[6], array[7]);
 
-	gicv2_dbase = (void *)array[0];
-	gicv2_cbase = (void *)array[2];
-	gicv2_hbase = (void *)array[4];
-
-	io_remap((vir_addr_t)array[0], (size_t)array[1]);
-	io_remap((vir_addr_t)array[2], (size_t)array[3]);
-	io_remap((vir_addr_t)array[4], (size_t)array[5]);
+	ASSERT((array[0] != 0) && (array[1] != 0))
+	gicv2_dbase = io_remap((virt_addr_t)array[0], (size_t)array[1]);
+	ASSERT((array[2] != 0) && array[3] !=0);
+	gicv2_cbase = io_remap((virt_addr_t)array[2], (size_t)array[3]);
+#ifdef CONFIG_VIRT
+	ASSERT((array[4] != 0) && (array[5] != 0))
+	gicv2_hbase = io_remap((virt_addr_t)array[4], (size_t)array[5]);
+#endif
 
 	if (gicv2_is_aliased((unsigned long)array[2],
 				(unsigned long)array[3])) {
@@ -387,7 +393,10 @@ static int __init_text gicv2_init(struct device_node *node)
 
 	gicv2_dist_init();
 	gicv2_cpu_init();
+
+#ifdef CONFIG_VIRT
 	gicv2_hyp_init();
+#endif
 
 	spin_unlock(&gicv2_lock);
 
@@ -401,10 +410,10 @@ static int __init_text gicv2_init(struct device_node *node)
 static int __init_text gicv2_secondary_init(void)
 {
 	spin_lock(&gicv2_lock);
-
 	gicv2_cpu_init();
+#ifdef CONFIG_VIRT
 	gicv2_hyp_init();
-
+#endif
 	spin_unlock(&gicv2_lock);
 
 	return 0;

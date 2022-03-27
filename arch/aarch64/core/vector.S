@@ -16,32 +16,73 @@
 
 #include <asm/aarch64_common.h>
 #include <config/config.h>
+#include <asm/asm-offset.h>
+#include <asm/aarch64_reg.h>
+#include <minos/task_info.h>
 
-	.section __el2_vectors, "ax"
+	.section __elx_vectors, "ax"
 	.balign 8
 
-	.global __irq_handler
-	.global __sync_handler
-	.global __bad_mode
-	.global __bad_mode_serr
-	.global arch_switch_task_sw
+.macro vfunc name
+	.global \name
+	.type \name "function"
+	.cfi_startproc
+	\name:
+.endm
 
-arg0		.req	x0
-arg1		.req	x1
-arg2		.req	x2
-arg3		.req	x3
-arg4		.req	x4
-arg5		.req	x5
-arg6		.req	x6
-arg7		.req	x7
+.macro vfunc_end name
+	.cfi_endproc
+.endm
 
-cpuid		.req	x23
-ct_addr		.req	x24	/* current task address */
-nt_addr		.req	x25	/* next task address */
-ct		.req	x26	/* current task */
-nt		.req	x27	/* next task */
+// ARM64_TPIDR will store the pcpu data
+// x18 will store the current_task
+.macro PCPU_SAVE_CURRENT_TASK tmp0
+	mrs	\tmp0, ARM64_TPIDR
+	str	x18, [\tmp0, #PCPU_CURRENT_TASK]
+.endm
 
-.macro save_gp_regs
+.macro PCPU_LOAD_CURRENT_TASK
+	mrs	x18, ARM64_TPIDR
+	ldr	x18, [x18, #PCPU_CURRENT_TASK]
+.endm
+
+.macro LOAD_PCPU_STACK, tmp0
+	mrs	\tmp0, ARM64_TPIDR
+	ldr	\tmp0, [\tmp0, #PCPU_STACK_OFFSET]
+	mov	sp, \tmp0
+.endm
+
+.macro __SAVE_GP_REGS
+	stp	x27, x28, [sp, #-16]!
+	stp	x25, x26, [sp, #-16]!
+	stp	x23, x24, [sp, #-16]!
+	stp	x21, x22, [sp, #-16]!
+	stp	x19, x20, [sp, #-16]!
+	stp	x17, x18, [sp, #-16]!
+	stp     x15, x16, [sp, #-16]!
+	stp     x13, x14, [sp, #-16]!
+	stp     x11, x12, [sp, #-16]!
+	stp     x9, x10, [sp, #-16]!
+	stp     x7, x8, [sp, #-16]!
+	stp     x5, x6, [sp, #-16]!
+	stp     x3, x4, [sp, #-16]!
+	stp     x1, x2, [sp, #-16]!
+	str	x0, [sp, #-8]!
+	mrs	x0, SP_EL0
+	str	x0, [sp, #-8]!
+	mrs	x0, ARM64_SPSR
+	str	x0, [sp, #-8]!
+	mrs	x0, ARM64_ELR
+	str	x0, [sp, #-8]!
+	dsb	nsh
+.endm
+
+.macro SAVE_GP_REGS
+	stp	x29, x30, [sp, #-16]!
+	__SAVE_GP_REGS
+.endm
+
+.macro SAVE_GP_REGS_SW
 	stp	x29, x30, [sp, #-16]!
 	stp	x27, x28, [sp, #-16]!
 	stp	x25, x26, [sp, #-16]!
@@ -58,259 +99,144 @@ nt		.req	x27	/* next task */
 	stp     x3, x4, [sp, #-16]!
 	stp     x1, x2, [sp, #-16]!
 	str	x0, [sp, #-8]!
-	mrs	x0, esr_el2
-	str	x0, [sp, #-8]!
-	mrs	x0, spsr_el2
-	str	x0, [sp, #-8]!
-	mrs	x0, elr_el2
-	str	x0, [sp, #-8]!
-	dsb	sy
+
+	mrs	x2, SP_EL0			// SP_EL0
+	str	x2, [sp, #-8]!
+
+	mrs	x2, daif			// pstate
+	mrs	x3, nzcv
+	mov	x4, #ARM64_SPSR_KERNEL
+	orr	x2, x2, x3
+	orr	x2, x2, x4
+	str	x2, [sp, #-8]!
+
+	str	x30, [sp, #-8]!			// pc
+	dsb	nsh
 .endm
 
-	.type __bad_mode "function"
-	.cfi_startproc
-__bad_mode:
-	save_gp_regs
+.macro LOAD_GP_REGS
+	ldr	x0, [sp], #8			// restore task context
+	msr	ARM64_ELR, x0
+	ldr	x0, [sp], #8
+	msr	ARM64_SPSR, x0
+	ldr	x0, [sp], #8
+	msr	SP_EL0, x0
+	ldp     x0, x1, [sp], #16
+	ldp     x2, x3, [sp], #16
+	ldp     x4, x5, [sp], #16
+	ldp     x6, x7, [sp], #16
+	ldp     x8, x9, [sp], #16
+	ldp     x10, x11, [sp], #16
+	ldp     x12, x13, [sp], #16
+	ldp     x14, x15, [sp], #16
+	ldp     x16, x17, [sp], #16
+	ldp     x18, x19, [sp], #16
+	ldp     x20, x21, [sp], #16
+	ldp     x22, x23, [sp], #16
+	ldp     x24, x25, [sp], #16
+	ldp     x26, x27, [sp], #16
+	ldp     x28, x29, [sp], #16
+	ldr	x30, [sp], #8
+	dsb	nsh
+.endm
+
+vfunc __bad_mode
+	__SAVE_GP_REGS
 	mov	x0, sp
+	mov	x1, x29
 	b	bad_mode	/* will never return */
 lb:
 	b	lb
-	.cfi_endproc
+vfunc_end __bad_mode
 
-	.type __bad_mode_serr "function"
-	.cfi_startproc
-__bad_mode_serr:
-	save_gp_regs
-	mov	x0, sp
-	b	bad_mode_serr
-ls:
-	b	ls
-	.cfi_endproc
+vfunc arch_switch_task_sw
+	SAVE_GP_REGS_SW			// x0 is current task x1 is the next task
 
-	.type arch_switch_task_sw "function"
-	.cfi_startproc
-arch_switch_task_sw:
-	stp	x29, x30, [sp, #-16]!	/* save the register to current stack */
-	stp	x27, x28, [sp, #-16]!
-	stp	x25, x26, [sp, #-16]!
-	stp	x23, x24, [sp, #-16]!
-	stp	x21, x22, [sp, #-16]!
-	stp	x19, x20, [sp, #-16]!
-	stp	x17, x18, [sp, #-16]!
-	stp     x15, x16, [sp, #-16]!
-	stp     x13, x14, [sp, #-16]!
-	stp     x11, x12, [sp, #-16]!
-	stp     x9, x10, [sp, #-16]!
-	stp     x7, x8, [sp, #-16]!
-	stp     x5, x6, [sp, #-16]!
-	stp     x3, x4, [sp, #-16]!
-	stp     x1, x2, [sp, #-16]!
-	str	x0, [sp, #-8]!
-	mrs	x0, esr_el2
-	str	x0, [sp, #-8]!
+	mov	x3, sp				// save the current stack to task
+	str	x3, [x0, #TASK_STACK_OFFSET]
 
-	mrs	x0, daif
-	mrs	x1, nzcv
-	mov	x2, #0x9
-	orr	x0, x0, x1
-	orr	x0, x0, x2
-	str	x0, [sp, #-8]!
+	LOAD_PCPU_STACK x2			// load the pcpu stack as temp stack.
 
-	str	x30, [sp, #-8]!
-	dsb	sy
+	bl	switch_to_task			// switch to the new task.
 
-	mrs	cpuid, TPIDR_EL2
+	ldr	x0, [x18, #TASK_STACK_OFFSET]	// load current task's stack
+	mov	sp, x0
 
-	lsl	arg1, cpuid, #3
-	ldr	arg5, =__current_tasks	/* get the next task */
-	add	ct_addr, arg5, arg1
-	ldr	ct, [ct_addr]
+	LOAD_GP_REGS
 
-	ldr	arg5, =__next_tasks
-	add	nt_addr, arg5, arg1
-	ldr	nt, [nt_addr]
-
-	mov	arg2, sp		/* save the current stack to task */
-	str	arg2, [ct]
-
-	mov	arg0, ct
-	mov	arg1, nt
-	ldr	arg2, [nt]		/* load the stack of next stack */
-	mov	sp, arg2
-	dsb	sy
-
-	bl	switch_to_task
-
-	str	nt, [ct_addr]		/* current = next */
-
-	ldr	x0, [sp], #8		/* restore the register */
-	msr	elr_el2, x0
-	ldr	x0, [sp], #8
-	msr	spsr_el2, x0
-	ldr	x0, [sp], #8
-	msr	esr_el2, x0
-	ldp     x0, x1, [sp], #16
-	ldp     x2, x3, [sp], #16
-	ldp     x4, x5, [sp], #16
-	ldp     x6, x7, [sp], #16
-	ldp     x8, x9, [sp], #16
-	ldp     x10, x11, [sp], #16
-	ldp     x12, x13, [sp], #16
-	ldp     x14, x15, [sp], #16
-	ldp     x16, x17, [sp], #16
-	ldp     x18, x19, [sp], #16
-	ldp     x20, x21, [sp], #16
-	ldp     x22, x23, [sp], #16
-	ldp     x24, x25, [sp], #16
-	ldp     x26, x27, [sp], #16
-	ldp     x28, x29, [sp], #16
-	ldr	x30, [sp], #8
-	dsb	sy
 	eret
-	.cfi_endproc
+	isb
+vfunc_end arch_switch_task_sw
 
-	.type __sync_handler "function"
-	.cfi_startproc
-__sync_handler:
-	stp	x29, x30, [sp, #-16]!
-	stp	x27, x28, [sp, #-16]!
-	stp	x25, x26, [sp, #-16]!
-	stp	x23, x24, [sp, #-16]!
-	stp	x21, x22, [sp, #-16]!
-	stp	x19, x20, [sp, #-16]!
-	stp	x17, x18, [sp, #-16]!
-	stp     x15, x16, [sp, #-16]!
-	stp     x13, x14, [sp, #-16]!
-	stp     x11, x12, [sp, #-16]!
-	stp     x9, x10, [sp, #-16]!
-	stp     x7, x8, [sp, #-16]!
-	stp     x5, x6, [sp, #-16]!
-	stp     x3, x4, [sp, #-16]!
-	stp     x1, x2, [sp, #-16]!
-	str	x0, [sp, #-8]!
-	mrs	x0, esr_el2
-	str	x0, [sp, #-8]!
-	mrs	x0, spsr_el2
-	str	x0, [sp, #-8]!
-	mrs	x0, elr_el2
-	str	x0, [sp, #-8]!
-	dsb	sy
+vfunc exception_return
+	LOAD_PCPU_STACK x1			// load percpu stack, need ensure the irq is off.
+
+	bl	exception_return_handler	// check whether need to resched. x18 will the next task.
+
+	ldr	x1, [x18, #TASK_STACK_OFFSET]	// load the running task's stack
+	mov	sp, x1				// change to the new stack address
+
+	ldr	x1, [sp, #8]			// load spsr
+	and	x1, x1, #3
+	cmp	x1, #2				// whether the task will return to user
+	b.eq	__do_exception_return
 
 	mov	x0, sp
-	bl	sync_c_handler			// go to the c handler
+	bl	task_return_to_user
 
-	ldr	x0, [sp], #8
-	msr	elr_el2, x0
-	ldr	x0, [sp], #8
-	msr	spsr_el2, x0
-	ldr	x0, [sp], #8
-	msr	esr_el2, x0
-	ldp     x0, x1, [sp], #16
-	ldp     x2, x3, [sp], #16
-	ldp     x4, x5, [sp], #16
-	ldp     x6, x7, [sp], #16
-	ldp     x8, x9, [sp], #16
-	ldp     x10, x11, [sp], #16
-	ldp     x12, x13, [sp], #16
-	ldp     x14, x15, [sp], #16
-	ldp     x16, x17, [sp], #16
-	ldp     x18, x19, [sp], #16
-	ldp     x20, x21, [sp], #16
-	ldp     x22, x23, [sp], #16
-	ldp     x24, x25, [sp], #16
-	ldp     x26, x27, [sp], #16
-	ldp     x28, x29, [sp], #16
-	ldr	x30, [sp], #8
-	dsb	sy
+__do_exception_return:
+	LOAD_GP_REGS
 	eret
-	.cfi_endproc
+vfunc_end exception_return
 
-	.type __irq_handler "function"
-	.cfi_startproc
-__irq_handler:
-	stp	x29, x30, [sp, #-16]!	/* save the register for current task */
-	stp	x27, x28, [sp, #-16]!
-	stp	x25, x26, [sp, #-16]!
-	stp	x23, x24, [sp, #-16]!
-	stp	x21, x22, [sp, #-16]!
-	stp	x19, x20, [sp, #-16]!
-	stp	x17, x18, [sp, #-16]!
-	stp     x15, x16, [sp, #-16]!
-	stp     x13, x14, [sp, #-16]!
-	stp     x11, x12, [sp, #-16]!
-	stp     x9, x10, [sp, #-16]!
-	stp     x7, x8, [sp, #-16]!
-	stp     x5, x6, [sp, #-16]!
-	stp     x3, x4, [sp, #-16]!
-	stp     x1, x2, [sp, #-16]!
-	str	x0, [sp, #-8]!
-	mrs	x0, esr_el2
-	str	x0, [sp, #-8]!
-	mrs	x0, spsr_el2
-	str	x0, [sp, #-8]!
-	mrs	x0, elr_el2
-	str	x0, [sp, #-8]!
-	dsb	sy
+vfunc __sync_exception_from_current_el
+	SAVE_GP_REGS
 
-	mov	arg0, sp
-	bl	irq_c_handler		/* call the c irq handler */
+	mov	x0, sp
+	str	x0, [x18, #TASK_STACK_OFFSET]
+	bl	sync_exception_from_current_el	// go to the c handler
 
-	mrs	cpuid, TPIDR_EL2
+	b	exception_return
+vfunc_end __sync_exception_from_current_el
 
-	ldr	arg5, =__current_tasks
-	lsl	arg1, cpuid, #3
-	add	ct_addr, arg5, arg1
-	ldr	ct, [ct_addr]
+vfunc __sync_exception_from_lower_el
+	SAVE_GP_REGS
 
-	ldr	arg1, =cpu_irq_stack	/* get the irq stack of the current cpu */
-	add	arg1, arg1, cpuid, lsl #3
-	ldr	arg1, [arg1]
+	PCPU_LOAD_CURRENT_TASK			// x18 will be the current task.
 
-	mov	arg0, sp
-	str	arg0, [ct]		/* store the current task's stack */
+	bl	task_exit_from_user
 
-	mov	sp, arg1
-	mov	arg0, ct
-	bl	irq_return_handler	/* to check whether need switch to a new task */
+	mov	x0, sp
+	bl	sync_exception_from_lower_el	// go to the c handler.
 
-	ldr	arg5, =__next_tasks	/* check whether need to switch to a new task */
-	lsl	arg1, cpuid, #3
-	add	nt_addr, arg5, arg1
-	ldr	nt, [nt_addr]
+	mov	x0, sp
+	bl      task_return_to_user
 
-	ldr	arg2, [ct]		/* load the stack of the current task */
-
-	cmp	ct, nt
-	beq	__switch_to_task
-
-	ldr	arg2, [nt]
-	str	nt, [ct_addr]		/* current task = next task */
-
-__switch_to_task:
-	mov	sp, arg2		/* load the task's stack */
-
-	ldr	x0, [sp], #8
-	msr	elr_el2, x0
-	ldr	x0, [sp], #8
-	msr	spsr_el2, x0
-	ldr	x0, [sp], #8
-	msr	esr_el2, x0
-	ldp     x0, x1, [sp], #16
-	ldp     x2, x3, [sp], #16
-	ldp     x4, x5, [sp], #16
-	ldp     x6, x7, [sp], #16
-	ldp     x8, x9, [sp], #16
-	ldp     x10, x11, [sp], #16
-	ldp     x12, x13, [sp], #16
-	ldp     x14, x15, [sp], #16
-	ldp     x16, x17, [sp], #16
-	ldp     x18, x19, [sp], #16
-	ldp     x20, x21, [sp], #16
-	ldp     x22, x23, [sp], #16
-	ldp     x24, x25, [sp], #16
-	ldp     x26, x27, [sp], #16
-	ldp     x28, x29, [sp], #16
-	ldr	x30, [sp], #8
-	dsb	sy
+	LOAD_GP_REGS
 	eret
-	.cfi_endproc
+vfunc_end __sync_exception_from_lower_el
+
+vfunc __irq_exception_from_lower_el
+	SAVE_GP_REGS
+
+	PCPU_LOAD_CURRENT_TASK			// x18 will store the current task
+
+	mov	x0, sp				// x0 is the gp_regs pass to irq_c_handler
+	str	x0, [x18, #TASK_STACK_OFFSET]	// save the current task's stack to task
+	bl	task_exit_from_user
+
+	mov	x0, sp
+	bl	irq_from_lower_el		// call the c irq handler
+
+	b	exception_return
+vfunc_end __irq_exception_from_lower_el
+
+vfunc __irq_exception_from_current_el
+	SAVE_GP_REGS
+
+	mov	x0, sp
+	str     x0, [x18, #TASK_STACK_OFFSET]	// store the stack in case this task will scheded out.
+	bl	irq_from_current_el		// irq is disabled all the time
+
+	b	exception_return
+vfunc_end __irq_exception_from

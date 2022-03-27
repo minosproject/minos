@@ -83,14 +83,6 @@ int os_create_guest_vm_resource(struct vm *vm)
 	return 0;
 }
 
-void os_vcpu_init(struct vcpu *vcpu)
-{
-	struct os *os = vcpu->vm->os;
-
-	if (os->ops->vcpu_init)
-		os->ops->vcpu_init(vcpu);
-}
-
 void os_vcpu_power_on(struct vcpu *vcpu, unsigned long entry)
 {
 	struct os *os = vcpu->vm->os;

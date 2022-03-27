@@ -10,19 +10,19 @@
 #include <config/config.h>
 #include <virt/vmm.h>
 #include <minos/errno.h>
-#include <common/hypervisor.h>
+#include <uapi/hypervisor.h>
 #include <minos/task.h>
 #include <minos/sched.h>
 
 #define VM_MAX_VCPU		CONFIG_NR_CPUS
 
-#define VMID_HOST		(65535)
 #define VMID_INVALID		(-1)
+#define VMID_HVM		(0)
 
-#define VM_STAT_OFFLINE		(0)
-#define VM_STAT_ONLINE		(1)
-#define VM_STAT_SUSPEND		(2)
-#define VM_STAT_REBOOT		(3)
+#define VM_STAT_OFFLINE	(0)
+#define VM_STAT_ONLINE (1)
+#define VM_STAT_SUSPEND (2)
+#define VM_STAT_REBOOT (3)
 
 #define VCPU_MAX_LOCAL_IRQS		(32)
 #define CONFIG_VCPU_MAX_ACTIVE_IRQS	(16)
@@ -53,24 +53,17 @@ struct vcpu {
 	struct virq_struct *virq_struct;
 
 	struct list_head list;
-	void *sched_data;
 
-	spinlock_t idle_lock;
+	spinlock_t lock;
 
 	struct vmcs *vmcs;
 	int vmcs_irq;
+
+	/*
+	 * context for this vcpu.
+	 */
 	void **context;
-} __align_cache_line;
-
-struct vm_iommu {
-	/* private information for iommu drivers */
-	void *priv;
-
-	const struct iommu_ops *ops;
-
-	/* list of device nodes assigned to this vm */
-	struct list_head nodes;
-};
+} __cache_line_align;
 
 struct vm {
 	int vmid;
@@ -81,8 +74,12 @@ struct vm {
 	void *entry_point;
 	void *setup_data;
 	void *load_address;
-	struct ramdisk_file image_file;
-	struct ramdisk_file dtb_file;
+	int native;
+
+	struct ramdisk_file *kernel_file;
+	struct ramdisk_file *dtb_file;
+	struct ramdisk_file *initrd_file;
+
 	char name[VM_NAME_SIZE];
 	struct vcpu **vcpus;
 	struct list_head vcpu_list;
@@ -124,6 +121,8 @@ extern struct vm *vms[CONFIG_MAX_VM];
 
 #define vm_for_each_vcpu(vm, vcpu)	\
 	for (vcpu = vm->vcpus[0]; vcpu != NULL; vcpu = vcpu->next)
+
+#define current_vcpu (struct vcpu *)current->pdata
 
 static int inline get_vcpu_id(struct vcpu *vcpu)
 {
@@ -173,26 +172,14 @@ struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id);
 struct vcpu *create_idle_vcpu(void);
 int vm_vcpus_init(struct vm *vm);
 
-void vcpu_idle(struct vcpu *vcpu);
-int vcpu_reset(struct vcpu *vcpu);
+int vcpu_idle(struct vcpu *vcpu);
 int vcpu_suspend(struct vcpu *vcpu, gp_regs *c,
 		uint32_t state, unsigned long entry);
 int vcpu_off(struct vcpu *vcpu);
-void vcpu_online(struct vcpu *vcpu);
 int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 		unsigned long entry, unsigned long unsed);
 int vcpu_power_off(struct vcpu *vcpu, int timeout);
-void kick_vcpu(struct vcpu *vcpu, int preempt);
-
-static inline void exit_from_guest(struct vcpu *vcpu, gp_regs *regs)
-{
-	do_hooks((void *)vcpu, (void *)regs, OS_HOOK_EXIT_FROM_GUEST);
-}
-
-static inline void enter_to_guest(struct vcpu *vcpu, gp_regs *regs)
-{
-	do_hooks((void *)vcpu, (void *)regs, OS_HOOK_ENTER_TO_GUEST);
-}
+int kick_vcpu(struct vcpu *vcpu, int preempt);
 
 struct vm *create_vm(struct vmtag *vme);
 int create_guest_vm(struct vmtag *tag);
@@ -204,20 +191,20 @@ int vm_suspend(int vmid);
 
 static inline struct vm *get_vm_by_id(uint32_t vmid)
 {
-	if (unlikely(vmid >= CONFIG_MAX_VM))
-		return NULL;
+//	if (unlikely(vmid >= CONFIG_MAX_VM) || unlikely(vmid == 0))
+//		return NULL;
 
 	return vms[vmid];
 }
 
 static inline int vm_is_hvm(struct vm *vm)
 {
-	return (vm->vmid == 0);
+	return (vm->vmid == 1);
 }
 
-static inline int vm_is_64bit(struct vm *vm)
+static inline int vm_is_32bit(struct vm *vm)
 {
-	return vm->flags & VM_FLAGS_64BIT;
+	return vm->flags & VM_FLAGS_32BIT;
 }
 
 static inline int vm_is_native(struct vm *vm)
@@ -241,5 +228,24 @@ static inline int get_vm_vcpu_online_cnt(struct vm *vm)
 {
 	return atomic_read(&vm->vcpu_online_cnt);
 }
+
+static inline int check_vcpu_state(struct vcpu *vcpu, int state)
+{
+	return (vcpu->task->stat == state);
+}
+
+static inline void set_vm_state(struct vm *vm, int state)
+{
+	vm->state = state;
+	smp_wmb();
+}
+
+static inline int check_vm_state(struct vm *vm, int state)
+{
+	return (vm->state == state);
+}
+
+int send_vm_shutdown_request(struct vm *vm);
+int send_vm_reboot_request(struct vm *vm);
 
 #endif

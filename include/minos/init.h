@@ -42,7 +42,7 @@ typedef int (*init_call)(void);
 #define early_initcall_percpu(fn) 	__define_initcall(fn, 5)
 #define arch_initcall_percpu(fn)	__define_initcall(fn, 6)
 #define subsys_initcall_percpu(fn)	__define_initcall(fn, 7)
-#define module_initcall_percpu(fn)		__define_initcall(fn, 8)
+#define module_initcall_percpu(fn)	__define_initcall(fn, 8)
 #define device_initcall_percpu(fn)	__define_initcall(fn, 9)
 
 void arch_init(void);

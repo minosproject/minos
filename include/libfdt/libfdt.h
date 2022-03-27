@@ -1962,4 +1962,7 @@ static inline uint64_t fdt32_to_cpu64(fdt32_t high, fdt32_t low)
 	return ((uint64_t)fdt32_to_cpu(high) << 32) | fdt32_to_cpu(low);
 }
 
+int fdt_set_node_reg(void *dtb, int node,
+		unsigned long iomem, size_t iomem_size);
+
 #endif /* LIBFDT_H */

@@ -142,7 +142,8 @@
 
 #define EHWPOISON	133	/* Memory page has hardware error */
 
-#define ENOPID		134	/* No such pid or pid error */
-#define EABORT		135	/* pend abort */
+#define EABORT		134	/* Pend abort process is killed */
+
+#define EOTHERSIDECLOSED 135	/* the otherside of this kobject is closed */
 
 #endif

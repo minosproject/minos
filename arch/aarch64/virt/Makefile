@@ -5,3 +5,4 @@ obj-y	+= trap.o
 obj-y	+= vmsa.o
 obj-y	+= vtimer.o
 obj-y	+= vfp.o
+obj-y	+= stage2.o

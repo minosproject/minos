@@ -19,7 +19,7 @@
 #include <asm/io.h>
 #include <minos/irq.h>
 #include <minos/timer.h>
-#include <common/gvm.h>
+#include <uapi/gvm.h>
 #include <minos/time.h>
 #include <virt/resource.h>
 #include <virt/vmcs.h>

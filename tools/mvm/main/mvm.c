@@ -124,7 +124,7 @@ static int create_new_vm(struct vm *vm)
 	pr_notice("        -name       : %s\n", info.name);
 	pr_notice("        -os_type    : %s\n", info.os_type);
 	pr_notice("        -nr_vcpu    : %d\n", info.nr_vcpu);
-	pr_notice("        -bit64      : %d\n", !!(vm->flags & VM_FLAGS_64BIT));
+	pr_notice("        -bit64      : %d\n", !(vm->flags & VM_FLAGS_32BIT));
 	pr_notice("        -mem_size   : 0x%"PRIx64"\n", info.mem_size);
 	pr_notice("        -mem_base  : 0x%"PRIx64"\n", info.mem_base);
 	pr_notice("        -entry      : 0x%"PRIx64"\n", info.entry);

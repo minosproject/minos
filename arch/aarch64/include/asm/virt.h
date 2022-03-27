@@ -1,7 +1,7 @@
 #ifndef __MINOS_AARCH64_VIRT_H__
 #define __MINOS_AARCH64_VIRT_H__
 
-#include <asm/gp_reg.h>
+#include <asm/tcb.h>
 
 struct vcpu;
 
@@ -21,5 +21,11 @@ struct arm_virt_data {
 void set_current_vmid(uint32_t vmid);
 uint32_t get_current_vmid(void);
 struct vcpu *get_vcpu_from_reg(void);
+void arch_set_virq_flag(void);
+void arch_set_vfiq_flag(void);
+void arch_clear_vfiq_flag(void);
+void arch_clear_virq_flag(void);
+
+void arch_vcpu_init(struct vcpu *, void *, void *);
 
 #endif

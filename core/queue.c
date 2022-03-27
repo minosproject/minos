@@ -44,6 +44,7 @@ int queue_init(queue_t *qt, int size, char *name)
 	q->q_size = size;
 
 	event_init(to_event(qt), OS_EVENT_TYPE_Q, (void *)q);
+
 	return 0;
 }
 
@@ -137,7 +138,7 @@ void *queue_pend(queue_t *qt, uint32_t timeout)
 	}
 
 	task = get_current_task();
-	event_task_wait(task, to_event(qt), TASK_STAT_Q, timeout);
+	event_task_wait(to_event(qt), TASK_EVENT_Q, timeout);
 	spin_unlock_irqrestore(&qt->lock, flags);
 
 	sched();
@@ -160,9 +161,8 @@ void *queue_pend(queue_t *qt, uint32_t timeout)
 		break;
 	}
 
-	task->pend_stat = TASK_STAT_PEND_OK;
-	task->wait_event = NULL;
 	task->msg = NULL;
+	event_pend_down(task);
 
 	return pmsg;
 }
@@ -179,7 +179,7 @@ int queue_post_abort(queue_t *qt, int opt)
 		case OS_PEND_OPT_BROADCAST:
 			while (event_has_waiter(to_event(qt))) {
 				task = event_highest_task_ready(to_event(qt),
-						NULL, TASK_STAT_Q,
+						NULL, TASK_EVENT_Q,
 						TASK_STAT_PEND_ABORT);
 				if (task)
 					nbr_tasks++;
@@ -189,7 +189,7 @@ int queue_post_abort(queue_t *qt, int opt)
 		case OS_PEND_OPT_NONE:
 		default:
 			task = event_highest_task_ready(to_event(qt), NULL,
-					TASK_STAT_Q, TASK_STAT_PEND_ABORT);
+					TASK_EVENT_Q, TASK_STAT_PEND_ABORT);
 			if (task)
 				nbr_tasks++;
 			break;
@@ -215,10 +215,9 @@ static int __queue_post(queue_t *qt, void *pmsg, int front)
 
 	spin_lock_irqsave(&qt->lock, flags);
 	task = event_highest_task_ready(to_event(qt), pmsg,
-			TASK_STAT_Q, TASK_STAT_PEND_OK);
+			TASK_EVENT_Q, TASK_STAT_PEND_OK);
 	if (task) {
 		spin_unlock_irqrestore(&qt->lock, flags);
-		sched_task(task);
 		return 0;
 	}
 
@@ -259,13 +258,13 @@ int queue_post_opt(queue_t *qt, int opt, void *pmsg)
 	if (opt & OS_POST_OPT_BROADCAST) {
 		while (event_has_waiter(to_event(qt))) {
 			task = event_highest_task_ready(to_event(qt), pmsg,
-				TASK_STAT_Q, TASK_STAT_PEND_OK);
+				TASK_EVENT_Q, TASK_STAT_PEND_OK);
 			if (task)
 				nr_task++;
 		}
 	} else {
 		task = event_highest_task_ready(to_event(qt), pmsg,
-			TASK_STAT_Q, TASK_STAT_PEND_OK);
+			TASK_EVENT_Q, TASK_STAT_PEND_OK);
 		if (task)
 			nr_task++;
 	}

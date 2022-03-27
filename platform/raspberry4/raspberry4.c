@@ -17,7 +17,6 @@
 #include <minos/minos.h>
 #include <asm/arch.h>
 #include <asm/io.h>
-#include <minos/mmu.h>
 #include <libfdt/libfdt.h>
 #include <minos/of.h>
 #include <device/bcm_irq.h>
@@ -131,14 +130,14 @@ static int raspberry4_setup_hvm(struct vm *vm, void *dtb)
 		 * bit mode, which is different with 64bit
 		 */
 		vdev->read = bcm2838_fake_scu_read;
-		if (vm->flags & VM_FLAGS_64BIT)
-			vdev->write = bcm2838_fake_64bit_scu_write;
-		else
+		if (vm->flags & VM_FLAGS_32BIT)
 			vdev->write = bcm2838_fake_32bit_scu_write;
+		else
+			vdev->write = bcm2838_fake_64bit_scu_write;
 	}
 
 	/* create pcie address mapping for VM0 */
-	create_guest_mapping(&vm->mm, 0x600000000, 0x600000000, 0x4000000, VM_IO);
+	create_guest_mapping(&vm->vs, 0x600000000, 0x600000000, 0x4000000, VM_IO);
 
 	pr_notice("raspberry4 setup vm done\n");
 

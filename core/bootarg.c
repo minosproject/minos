@@ -16,7 +16,7 @@
 
 #include <minos/minos.h>
 #include <minos/bootarg.h>
-#include <minos/bootmem.h>
+#include <minos/mm.h>
 
 struct boot_option {
 	char *name;
@@ -24,6 +24,8 @@ struct boot_option {
 	char *sub_args;
 	struct boot_option *next;
 };
+
+#define CMDLINE_SIZE 511
 
 static struct boot_option *boot_options;
 
@@ -90,7 +92,7 @@ int bootarg_parse_hex32(char *name, uint32_t *v)
 	return __get_boot_option(name, v, __parse_hex32);
 }
 
-int bootarg_parse_hex64(char *name, uint32_t *v)
+int bootarg_parse_hex64(char *name, uint64_t *v)
 {
 	return __get_boot_option(name, v, __parse_hex64);
 }
@@ -115,15 +117,10 @@ static void bootarg_init_one(char *str)
 {
 	struct boot_option *bo;
 
-	/*
-	 * this function will called before mm_init so
-	 * call alloc_boot_mem, the bootarg format is like
-	 * xxx=xxx xxx=xxx xxx=xxx
-	 */
 	if ((*str == 0) || (*str == ' '))
 		return;
 
-	bo = alloc_boot_mem(sizeof(struct boot_option));
+	bo = malloc(sizeof(struct boot_option));
 	if (!bo)
 		panic("no more boot memory for boot argument\n");
 
@@ -135,12 +132,19 @@ static void bootarg_init_one(char *str)
 	boot_options = bo;
 }
 
-int __init_text bootargs_init(const char *str)
+int __init_text bootargs_init(const char *str, int len)
 {
-	char *tmp = (char *)str;
+	char cmdline[CMDLINE_SIZE + 1];
 	char *bootarg;
+	char *tmp = &cmdline[0];
 
 	pr_notice("bootargs: %s\n", str);
+	if (len > CMDLINE_SIZE)
+		pr_warn("cmdline size too long information may lost\n");
+
+	len = len > CMDLINE_SIZE ? CMDLINE_SIZE : len;
+	strncpy(cmdline, str, len);
+	cmdline[len] = 0;
 
 	while ((bootarg = strsep(&tmp, " ")) != NULL)
 		bootarg_init_one(bootarg);

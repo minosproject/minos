@@ -172,10 +172,7 @@ static inline char *console_vsprintf(char *dst, const char *src, int size)
 
 static inline char *memory_vsprintf(char *dst, const char *src, int size)
 {
-	int i;
-
-	for (i = 0; i < size; i++)
-		dst[i] = src[i];
+	memcpy(dst, src, size);
 
 	return (dst + size);
 }

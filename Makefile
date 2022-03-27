@@ -137,7 +137,8 @@ CHECKFLAGS     := -D__minos__ -Dminos -D__STDC__ -Dunix -D__unix__ \
 # Needed to be compatible with the O= option
 MINOSINCLUDE    := \
 		-I$(srctree)/arch/$(SRCARCH)/include \
-		-I$(objtree)/include
+		-I$(srctree)/include \
+		-I$(srctree)/generic/include
 
 MBUILD_AFLAGS   := -D__ASSEMBLY__
 MBUILD_CFLAGS   := -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \

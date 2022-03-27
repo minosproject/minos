@@ -30,8 +30,6 @@
 #define CONFIG_LOG_LEVEL	PRINT_LEVEL_NOTICE
 #endif
 
-extern struct task *__current_tasks[NR_CPUS];
-
 static DEFINE_SPIN_LOCK(print_lock);
 static unsigned int print_level = CONFIG_LOG_LEVEL;
 
@@ -85,7 +83,7 @@ int level_print(int level, char *fmt, ...)
 	char buf[64];
 	char *buffer = buf;
 	unsigned long flags;
-	int pid;
+	int tid = 0;
 	struct task *task;
 
 	if (level > print_level)
@@ -94,11 +92,9 @@ int level_print(int level, char *fmt, ...)
 	preempt_disable();
 
 	cpuid = smp_processor_id();
-	task = __current_tasks[cpuid];
-	if (task && os_is_running())
-		pid = get_task_pid(task);
-	else
-		pid = 999;
+	task = get_current_task();
+	if (task)
+		tid = get_task_tid(task);
 
 	/*
 	 * after to handle the level we change
@@ -114,11 +110,11 @@ int level_print(int level, char *fmt, ...)
 	*buffer++ = (cpuid / 10) + '0';
 	*buffer++ = (cpuid % 10) + '0';
 
-	/* add the task pid to the buffer */
+	/* add the task tid to the buffer */
 	*buffer++ = ' ';
-	*buffer++ = (pid / 100) + '0';
-	*buffer++ = ((pid % 100) / 10) + '0';
-	*buffer++ = (pid % 10) + '0';
+	*buffer++ = (tid / 100) + '0';
+	*buffer++ = ((tid % 100) / 10) + '0';
+	*buffer++ = (tid % 10) + '0';
 
 	*buffer++ = ']';
 	*buffer++ = ' ';
@@ -168,9 +164,14 @@ int printf(char *fmt, ...)
 int puts(char *buf, size_t size)
 {
 	size_t print = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&print_lock, flags);
 
 	while (print < size)
 		console_putc(buf[print++]);
+
+	spin_unlock_irqrestore(&print_lock, flags);
 
 	return size;
 }

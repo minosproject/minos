@@ -25,7 +25,7 @@
 static void default_vcpu_init(struct vcpu *vcpu)
 {
 	if (get_vcpu_id(vcpu) == 0)
-		arch_init_vcpu(vcpu, (void *)vcpu->vm->entry_point, NULL);
+		arch_vcpu_init(vcpu, (void *)vcpu->vm->entry_point, NULL);
 }
 
 static void default_vcpu_power_on(struct vcpu *vcpu, unsigned long entry)

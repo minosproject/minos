@@ -7,7 +7,7 @@
 
 struct vcpu;
 
-#define INVALID_MODULE_ID (0xffff)
+#define INVALID_MODULE_ID (-1)
 
 struct vmodule {
 	char name[32];
@@ -16,7 +16,7 @@ struct vmodule {
 	uint32_t context_size;
 
 	/*
-	 * below member usually used for vcpu vcpu
+	 * below member usually used for vcpu
 	 *
 	 * state_save - save the context when sched out
 	 * state_restore - restore the context when sched in
@@ -41,15 +41,15 @@ typedef int (*vmodule_init_fn)(struct vmodule *);
 
 int vcpu_vmodules_init(struct vcpu *vcpu);
 int vcpu_vmodules_deinit(struct vcpu *vcpu);
-int vcpu_vmodules_reset(struct vcpu *vcpu);
-void *get_vmodule_data_by_id(struct vcpu *vcpu, int id);
-void *get_vmodule_data_by_name(struct vcpu *vcpu, const char *name);
+
+void reset_vcpu_vmodule_state(struct vcpu *vcpu);
 void save_vcpu_vmodule_state(struct vcpu *vcpu);
 void restore_vcpu_vmodule_state(struct vcpu *vcpu);
 void suspend_vcpu_vmodule_state(struct vcpu *vcpu);
 void resume_vcpu_vmodule_state(struct vcpu *vcpu);
 void stop_vcpu_vmodule_state(struct vcpu *vcpu);
-int vmodules_init(void);
+
+void *get_vmodule_data_by_id(struct vcpu *vcpu, int id);
 int register_vcpu_vmodule(const char *name, vmodule_init_fn fn);
 
 #endif

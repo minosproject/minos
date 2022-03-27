@@ -26,6 +26,7 @@
 #include <minos/of.h>
 #include <virt/virq_chip.h>
 #include <device/bcm_irq.h>
+#include <virt/vmm.h>
 
 struct bcm2836_virq {
 	struct vdev vdev;
@@ -585,7 +586,7 @@ static struct virq_chip *bcm2836_virqchip_init(struct vm *vm,
 	if (!bcm2836)
 		return NULL;
 
-	bcm2836->iomem = get_io_page();
+	bcm2836->iomem = alloc_shmem(1);
 	if (!bcm2836->iomem) {
 		free(bcm2836);
 		return NULL;
@@ -622,9 +623,9 @@ static struct virq_chip *bcm2836_virqchip_init(struct vm *vm,
 	 * 0x40000200 - 0x40000300 : bcm2835 inc controller
 	 *
 	 */
-	split_vmm_area(&vm->mm, 0x400000000, 0x1000, VM_IO | VM_MAP_PRIVATE);
+	split_vmm_area(&vm->mm, 0x400000000, 0x1000, VM_GUEST_IO);
 	create_guest_mapping(&vm->mm, BCM2836_INC_BASE, (unsigned long)bcm2836->iomem,
-			PAGE_SIZE, VM_IO | VM_RO);
+			PAGE_SIZE, VM_GUEST_IO | VM_RO);
 
 	vc = alloc_virq_chip();
 	if (!vc)

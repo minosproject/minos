@@ -26,54 +26,25 @@
 #include <minos/platform.h>
 #include <minos/task.h>
 #include <minos/console.h>
+#include <minos/ramdisk.h>
+#include <asm/tcb.h>
+#include <minos/vspace.h>
+#include <minos/mm.h>
 
-extern int el2_stage1_init(void);
-extern int fdt_early_init(void);
-extern int fdt_init(void);
-extern int fdt_spin_table_init(phy_addr_t *smp_holding);
-extern void arm64_task_exit(void);
-extern void boot_main(void);
+#ifdef CONFIG_VIRT
+#define read_esr()	read_esr_el2()
+#else
+#define read_esr()	read_esr_el1()
+#endif
 
-void arch_set_virq_flag(void)
-{
-	uint64_t hcr_el2;
+#ifdef CONFIG_VIRT
+extern void vcpu_context_restore(struct task *task);
+extern void vcpu_context_save(struct task *task);
+#endif
 
-	hcr_el2 = read_sysreg(HCR_EL2);
-	hcr_el2 |= HCR_EL2_VI;
-	write_sysreg(hcr_el2, HCR_EL2);
-	dsb();
-}
-
-void arch_set_vfiq_flag(void)
-{
-	uint64_t hcr_el2;
-
-	hcr_el2 = read_sysreg(HCR_EL2);
-	hcr_el2 |= HCR_EL2_VF;
-	write_sysreg(hcr_el2, HCR_EL2);
-	dsb();
-}
-
-void arch_clear_virq_flag(void)
-{
-	uint64_t hcr_el2;
-
-	hcr_el2 = read_sysreg(HCR_EL2);
-	hcr_el2 &= ~HCR_EL2_VI;
-	hcr_el2 &= ~HCR_EL2_VF;
-	write_sysreg(hcr_el2, HCR_EL2);
-	dsb();
-}
-
-void arch_clear_vfiq_flag(void)
-{
-	uint64_t hcr_el2;
-
-	hcr_el2 = read_sysreg(HCR_EL2);
-	hcr_el2 &= ~HCR_EL2_VF;
-	write_sysreg(hcr_el2, HCR_EL2);
-	dsb();
-}
+#ifdef CONFIG_DEVICE_TREE
+extern void of_parse_host_device_tree(void);
+#endif
 
 void arch_dump_register(gp_regs *regs)
 {
@@ -82,7 +53,7 @@ void arch_dump_register(gp_regs *regs)
 	if (!regs)
 		return;
 
-	spsr = regs->spsr_elx;
+	spsr = regs->pstate;
 	pr_fatal("SPSR:0x%x Mode:%d-%s F:%d I:%d A:%d D:%d NZCV:%x\n",
 			spsr, (spsr & 0x7), (spsr & 0x8) ?
 			"aarch64" : "aarch32", (spsr & (BIT(6))) >> 6,
@@ -109,30 +80,28 @@ void arch_dump_register(gp_regs *regs)
 			regs->x24, regs->x25, regs->x26);
 	pr_fatal("x27:0x%p x28:0x%p x29:0x%p\n",
 			regs->x27, regs->x28, regs->x29);
-	pr_fatal("lr:0x%p esr:0x%p spsr:0x%p\n",
-			regs->lr, regs->esr_elx, regs->spsr_elx);
-	pr_fatal("elr:0x%p\n", regs->elr_elx);
+	pr_fatal("lr:0x%p sp_el0:0x%p spsr:0x%p\n",
+			regs->lr, regs->sp, regs->pstate);
+	pr_fatal("pc:0x%p esr:0x%p\n", regs->pc, read_esr());
 }
 
 void arch_dump_stack(gp_regs *regs, unsigned long *stack)
 {
 	struct task *task = get_current_task();
-	unsigned long stack_base;
 	unsigned long fp, lr = 0;
 
-	if ((task) && !(task_is_idle(task))) {
-		pr_fatal("current task: pid:%d prio:%d name:%s\n",
-				get_task_pid(task), get_task_prio(task),
+	if ((task) && os_is_running()) {
+		pr_fatal("current task: tid:%d prio:%d name:%s\n",
+				get_task_tid(task), get_task_prio(task),
 				task->name);
 	}
 
-	stack_base = current_sp() - sizeof(struct task_info);
 	arch_dump_register(regs);
 
 	if (!stack) {
 		if (regs) {
 			fp = regs->x29;
-			lr = regs->elr_elx;
+			lr = regs->pc;
 		} else {
 			fp = arch_get_fp();
 			lr = arch_get_lr();
@@ -146,8 +115,8 @@ void arch_dump_stack(gp_regs *regs, unsigned long *stack)
 	do {
 		print_symbol(lr);
 
-		if ((fp < (stack_base - TASK_STACK_SIZE))
-				|| (fp >= stack_base))
+		if ((fp < (unsigned long)task->stack_bottom) ||
+				(fp >= (unsigned long)task->stack_top))
 				break;
 
 		lr = *(unsigned long *)(fp + sizeof(unsigned long));
@@ -158,21 +127,45 @@ void arch_dump_stack(gp_regs *regs, unsigned long *stack)
 
 int arch_taken_from_guest(gp_regs *regs)
 {
-	/* TBD */
-	return ((regs->spsr_elx & 0xf) != (AARCH64_SPSR_EL2h));
+	return !!((regs->pstate & 0xf) != (AARCH64_SPSR_EL2h));
 }
 
-void arch_init_task(struct task *task, void *entry, void *arg)
+int arch_is_exit_to_user(struct task *task)
 {
-	gp_regs *regs;
+	gp_regs *regs = (gp_regs *)task->stack_base;
 
-	regs = stack_to_gp_regs(task->stack_origin);
-	memset(regs, 0, sizeof(gp_regs));
-	task->stack_base = task->stack_origin - sizeof(gp_regs);
+	return !!((regs->pstate & 0xf) != (AARCH64_SPSR_EL2h));
+}
 
-	regs->x0 = (uint64_t)arg;
-	regs->elr_elx = (uint64_t)entry;
-	regs->spsr_elx = AARCH64_SPSR_EL2h;
+void arch_task_sched_out(struct task *task)
+{
+	struct cpu_context *c = &task->cpu_context;
+	extern void fpsimd_state_save(struct task *task,
+		struct fpsimd_context *c);
+
+#ifdef CONFIG_VIRT
+	if (task_is_vcpu(task))
+		vcpu_context_save(task);
+#endif
+	fpsimd_state_save(task, &c->fpsimd_state);
+}
+
+void arch_task_sched_in(struct task *task)
+{
+	struct cpu_context *c = &task->cpu_context;
+	extern void fpsimd_state_restore(struct task *task,
+		struct fpsimd_context *c);
+
+#ifdef CONFIG_VIRT
+	if (task_is_vcpu(task))
+		vcpu_context_restore(task);
+#endif
+	fpsimd_state_restore(task, &c->fpsimd_state);
+}
+
+static void aarch64_init_kernel_task(struct task *task, gp_regs *regs)
+{
+	extern void aarch64_task_exit(void);
 
 	/*
 	 * if the task is not a deadloop the task will exist
@@ -184,15 +177,31 @@ void arch_init_task(struct task *task, void *entry, void *arg)
 	 *	}
 	 * then the lr register should store a function to
 	 * handle the task's exist
+	 *
+	 * kernel task will not use fpsimd now, so kernel task
+	 * do not need to save/restore it
 	 */
-	regs->lr = (uint64_t)arm64_task_exit;
+	regs->lr = (uint64_t)aarch64_task_exit;
 
-	/*
-	 * if the CONFIG_VIRT is not enable the x28
-	 * will store the task_info of a task, and
-	 * system will use x28 to get the task info
-	 */
-	regs->x28 = (uint64_t)task->stack_origin;
+#ifdef CONFIG_VIRT
+	regs->pstate = AARCH64_SPSR_EL2h;
+#else
+	regs->pstate = AARCH64_SPSR_EL1h;
+#endif
+}
+
+void arch_init_task(struct task *task, void *entry, void *user_sp, void *arg)
+{
+	gp_regs *regs = stack_to_gp_regs(task->stack_top);
+
+	memset(regs, 0, sizeof(gp_regs));
+	task->stack_base = (void *)regs;
+
+	regs->pc = (uint64_t)entry;
+	regs->sp = (uint64_t)user_sp;
+	regs->x18 = (uint64_t)task;
+
+	aarch64_init_kernel_task(task, regs);
 }
 
 void arch_release_task(struct task *task)
@@ -204,15 +213,26 @@ static int __init_text aarch64_init_percpu(void)
 {
 	uint64_t reg;
 
+	reg = read_CurrentEl();
+	pr_notice("current EL is %d\n", GET_EL(reg));
+
 	/*
 	 * set IMO and FMO let physic irq and fiq taken to
 	 * EL2, without this irq and fiq will not send to
 	 * the cpu
 	 */
+#ifdef CONFIG_VIRT
 	reg = read_sysreg64(HCR_EL2);
-	reg |= HCR_EL2_IMO | HCR_EL2_FMO;
+	reg |= HCR_EL2_IMO | HCR_EL2_FMO | HCR_EL2_AMO;
 	write_sysreg64(reg, HCR_EL2);
+	// write_sysreg64(0x3 << 20, CPACR_EL2);
 	dsb();
+	isb();
+#else
+	write_sysreg64(0x3 << 20, CPACR_EL1);
+	dsb();
+	isb();
+#endif
 
 	return 0;
 }
@@ -220,18 +240,13 @@ arch_initcall_percpu(aarch64_init_percpu);
 
 int arch_early_init(void)
 {
-	uint64_t value = read_sysreg(ID_ISAR5_EL1);
-
-	pr_notice("current EL is 0x%x\n", GET_EL(read_CurrentEl()));
-	pr_notice("ID_ISAR5_EL1: 0x%x\n", value);
-
-#ifdef CONFIG_VIRT
-	if (!IS_IN_EL2())
-		panic("minos must run at EL2 mode\n");
-#endif
-
 #ifdef CONFIG_DEVICE_TREE
-	fdt_early_init();
+	/*
+	 * set up the platform from the dtb file then get the spin
+	 * table information if the platform is using spin table to
+	 * wake up other cores
+	 */
+	of_setup_platform();
 #endif
 	return 0;
 }
@@ -239,45 +254,108 @@ int arch_early_init(void)
 int __arch_init(void)
 {
 #ifdef CONFIG_DEVICE_TREE
-	fdt_init();
+	of_parse_host_device_tree();
 #endif
 	return 0;
+}
+
+uint64_t cpuid_to_affinity(int cpuid)
+{
+	int aff0, aff1;
+
+	if (cpu_has_feature(ARM_FEATURE_MPIDR_SHIFT))  {
+		if (cpuid < CONFIG_NR_CPUS_CLUSTER0)
+			return (cpuid << MPIDR_EL1_AFF1_LSB);
+		else {
+			aff0 = cpuid - CONFIG_NR_CPUS_CLUSTER0;
+			aff1 = 1;
+
+			return (aff1 << MPIDR_EL1_AFF2_LSB) |
+				(aff0 << MPIDR_EL1_AFF1_LSB);
+		}
+	} else {
+		if (cpuid < CONFIG_NR_CPUS_CLUSTER0) {
+			return cpuid;
+		} else {
+			aff0 = cpuid - CONFIG_NR_CPUS_CLUSTER0;
+			aff1 = 1;
+
+			return (aff1 << MPIDR_EL1_AFF1_LSB) + aff0;
+		}
+	}
+}
+
+int affinity_to_cpuid(unsigned long affinity)
+{
+	int aff0, aff1;
+
+	if (cpu_has_feature(ARM_FEATURE_MPIDR_SHIFT))  {
+		aff0 = (affinity >> MPIDR_EL1_AFF1_LSB) & 0xff;
+		aff1 = (affinity >> MPIDR_EL1_AFF2_LSB) & 0xff;
+	} else {
+		aff0 = (affinity >> MPIDR_EL1_AFF0_LSB) & 0xff;
+		aff1 = (affinity >> MPIDR_EL1_AFF1_LSB) & 0xff;
+	}
+
+	return (aff1 * CONFIG_NR_CPUS_CLUSTER0) + aff0;
 }
 
 void arch_smp_init(phy_addr_t *smp_h_addr)
 {
 #ifdef CONFIG_DEVICE_TREE
-	fdt_spin_table_init(smp_h_addr);
+	of_spin_table_init(smp_h_addr);
 #endif
+}
+
+static void *relocate_dtb_address(unsigned long dtb)
+{
+	unsigned long mem_end, relocated_base = dtb;
+	extern unsigned long minos_end;
+	size_t size;
+
+	ASSERT(!fdt_check_header((void *)dtb));
+
+	/*
+	 * DTB image start address should bigger than minos_end, or
+	 * DTB image should included in minos.bin.
+	 */
+	mem_end = BALIGN(ptov(minos_end), 16);
+	size = fdt_totalsize(dtb);
+	if (dtb < minos_end && (dtb + size) > minos_end)
+		panic("minos data overlaped by dtb image\n");
+
+	if (dtb > mem_end) {
+		pr_notice("relocate dtb from 0x%x to 0x%x\n", dtb, mem_end);
+		memmove((void *)mem_end, (void *)dtb, size);
+
+		/*
+		 * call of init again to check and setup the new
+		 * device tree memory address.
+		 */
+		relocated_base = mem_end;
+		minos_end += size;
+	}
+
+	return (void *)relocated_base;
 }
 
 void arch_main(void *dtb)
 {
+	extern void boot_main(void);
 	char *name = NULL;
 
-	pr_notice("Minos dtb address: 0x%x\n", dtb);
-
-	/*
-	 * the dtb file need to store at the end of the os memory
-	 * region and the size can not beyond 2M, also it must
-	 * 4K align, memory management will not protect this area
-	 * so please put the dtb data to a right place
-	 */
-	if (!hv_dtb && !dtb)
-		BUG();
-	else
-		hv_dtb = dtb;
-
+	pr_notice("Starting Minos AARCH64\n");
 #ifdef CONFIG_DTB_LOAD_ADDRESS
-	hv_dtb = (void *)CONFIG_DTB_LOAD_ADDRESS;
+	dtb = (void *)ptov(CONFIG_DTB_LOAD_ADDRESS);
+#else
+	dtb = (void *)ptov(dtb);
 #endif
+	pr_notice("DTB address [0x%x]\n", dtb);
 
-	if (fdt_check_header(hv_dtb)) {
-		pr_err("Bad device tree address: 0x%p\n", hv_dtb);
-		BUG();
-	}
+	dtb = relocate_dtb_address((unsigned long)dtb);
 
-	of_get_console_name(hv_dtb, &name);
+	of_init(dtb);
+	of_get_console_name(&name);
 	console_init(name);
 
 	/*

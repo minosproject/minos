@@ -39,11 +39,6 @@ char *bcmirq_match_table[] = {
 	NULL
 };
 
-char *ipmmu_match_table[] = {
-	"renesas,ipmmu-r8a7795",
-	NULL
-};
-
 char *pl031_match_table[] = {
 	"arm,pl031",
 	NULL

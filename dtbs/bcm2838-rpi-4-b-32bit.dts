@@ -15,7 +15,7 @@
 	chosen {
 		minos,stdout = "bcm283x_mu";
 		extra-memory = <0x40000000 0xbc000000>;
-		bootargs = "bootwait=3 tty=vm0";
+		bootargs = "bootwait=3 tty=vm0 cpu_sched_class_mask=0x0";
 	};
 
 	vms {

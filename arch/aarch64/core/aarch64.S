@@ -18,28 +18,32 @@
 #include <asm/asm_marco.S>
 #include <config/config.h>
 
-	.global get_cpuid
+	.global arch_raw_smp_processor_id
 	.global arch_get_fp
 	.global arch_get_lr
 	.global arch_get_sp
 	.global smc_call
-	.global arm64_task_exit
+	.global hvc_call
+	.global aarch64_task_exit
 
-func get_cpuid
+func arch_raw_smp_processor_id
 	mrs 	x0, MPIDR_EL1
-#ifdef CONFIG_MPIDR_SHIFT
-	ubfx    x1, x0, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
-	ubfx    x2, x0, #MPIDR_EL1_AFF2_LSB, #MPIDR_EL1_AFF_WIDTH
-#else
+	ldr	x4, =(1 << 24)
+	and	x5, x0, x4
+	cbnz	x5, __shift_mpidr
 	ubfx    x1, x0, #MPIDR_EL1_AFF0_LSB, #MPIDR_EL1_AFF_WIDTH
 	ubfx    x2, x0, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
-#endif
+	b	__out
+__shift_mpidr:
+	ubfx    x1, x0, #MPIDR_EL1_AFF1_LSB, #MPIDR_EL1_AFF_WIDTH
+	ubfx    x2, x0, #MPIDR_EL1_AFF2_LSB, #MPIDR_EL1_AFF_WIDTH
+__out:
 	mov	x3, #CONFIG_NR_CPUS_CLUSTER0
 	mul	x2, x2, x3
 	add	x0, x2, x1
 	dsb	sy
 	ret
-endfunc get_cpuid
+endfunc arch_raw_smp_processor_id
 
 func arch_get_fp
 	mov	x0, x29
@@ -64,9 +68,17 @@ func smc_call
 	ret
 endfunc smc_call
 
-func arm64_task_exit
+func hvc_call
+	hvc	#0
+	ldr	x4, [sp]
+	stp	x0, x1, [x4, #0]
+	stp	x2, x3, [x4, #16]
+	ret
+endfunc hvc_call
+
+func aarch64_task_exit
 	mov	x0, x0
 	bl	task_exit
 1:
 	b	1b
-endfunc arm64_task_exit
+endfunc aarch64_task_exit

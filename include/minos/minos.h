@@ -15,6 +15,7 @@
 #include <minos/calltrace.h>
 #include <minos/time.h>
 #include <minos/preempt.h>
+#include <minos/os.h>
 #include <minos/hook.h>
 #include <minos/current.h>
 #include <minos/symbol.h>
@@ -38,7 +39,7 @@ void __might_sleep(const char *file, int line, int preempt_offset);
 
 static inline int taken_from_guest(gp_regs *regs)
 {
-	return arch_taken_from_guest(regs);
+	return arch_is_taken_from_guest(regs);
 }
 
 #define kernel_lock_irqsave(flags)	spin_lock_irqsave(&__kernel_lock, flags)

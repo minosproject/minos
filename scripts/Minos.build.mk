@@ -85,11 +85,11 @@ endif
 
 %.o: %.c $(obj)/Makefile $(srctree)/Makefile
 	$(Q) echo "  CC      $@"
-	$(Q) $(CC) $(CFLAGS) -c $< -o $@
+	$(Q) $(CC) $(CFLAGS) -D__KERNEL__ -c $< -o $@
 
 %.o: %.S $(obj)/Makefile $(srctree)/Makefile
 	$(Q) echo "  CC      $@"
-	$(Q) $(CC) $(CFLAGS) -c $< -o $@
+	$(Q) $(CC) $(CFLAGS) -D__ASSEMBLY__ -c $< -o $@
 
 %.lds: %.lds.S $(obj)/Makefile $(srctree)/Makefile
 	$(Q) echo "  CC      $@"

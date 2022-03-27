@@ -25,6 +25,7 @@
 #include <minos/of.h>
 #include <asm/reg.h>
 #include <minos/platform.h>
+#include <asm/aarch64_reg.h>
 
 enum timer_type {
 	SEC_PHY_TIMER,
@@ -58,13 +59,13 @@ void arch_enable_timer(unsigned long expires)
 	uint64_t deadline;
 
 	if (expires == 0) {
-		write_sysreg32(0, CNTP_CTL_EL0);
+		write_sysreg32(0, ARM64_CNTSIRQ_CTL);
 		return;
 	}
 
 	deadline = ns_to_ticks(expires);
-	write_sysreg64(deadline, CNTP_CVAL_EL0);
-	write_sysreg32(1 << 0, CNTP_CTL_EL0);
+	write_sysreg64(deadline, ARM64_CNTSIRQ_CVAL);
+	write_sysreg32(1 << 0, ARM64_CNTSIRQ_CTL);
 	isb();
 }
 
@@ -105,8 +106,7 @@ static int __init_text timers_arch_init(void)
 	struct device_node *node = NULL;
 
 #ifdef CONFIG_DEVICE_TREE
-	node = of_find_node_by_compatible(hv_node,
-			arm_arch_timer_match_table);
+	node = of_find_node_by_compatible(of_root_node, arm_arch_timer_match_table);
 #endif
 	if (!node) {
 		pr_err("can not find arm-arch-timer\n");
@@ -134,6 +134,8 @@ static int __init_text timers_arch_init(void)
 	}
 
 	boot_tick = read_sysreg64(CNTPCT_EL0);
+	rmb();
+
 	pr_notice("boot ticks is :0x%x\n", boot_tick);
 
 	if (platform->time_init)
@@ -150,16 +152,18 @@ static int __init_text timers_arch_init(void)
 
 static int timer_interrupt_handler(uint32_t irq, void *data)
 {
-	raise_softirq(TIMER_SOFTIRQ);
-	write_sysreg32(0, CNTP_CTL_EL0);
+	extern void soft_timer_interrupt(void);
+
+	write_sysreg32(0, ARM64_CNTSIRQ_CTL);
+	soft_timer_interrupt();
 
 	return 0;
 }
 
 void sched_tick_disable(void)
 {
-	write_sysreg32(0, CNTHP_CTL_EL2);
-	isb();
+	write_sysreg32(0, ARM64_CNTSCHED_CTL);
+	wmb();
 }
 
 void sched_tick_enable(unsigned long exp)
@@ -167,21 +171,21 @@ void sched_tick_enable(unsigned long exp)
 	unsigned long deadline;
 
 	if (exp == 0) {
-		write_sysreg32(0, CNTHP_CTL_EL2);
+		write_sysreg32(0, ARM64_CNTSCHED_CTL);
 		return;
 	}
 
 	deadline = read_sysreg64(CNTPCT_EL0);
 	deadline += ns_to_ticks(exp);
-	write_sysreg64(deadline, CNTHP_CVAL_EL2);
-	write_sysreg32(1 << 0, CNTHP_CTL_EL2);
-	isb();
+	write_sysreg64(deadline, ARM64_CNTSCHED_CVAL);
+	write_sysreg32(1 << 0, ARM64_CNTSCHED_CTL);
+	wmb();
 }
 
 static int sched_timer_handler(uint32_t irq, void *data)
 {
 	/* disable timer to avoid interrupt */
-	write_sysreg32(0, CNTHP_CTL_EL2);
+	write_sysreg32(0, ARM64_CNTSCHED_CTL);
 	wmb();
 
 	(void)sched_tick_handler((unsigned long)data);
@@ -191,7 +195,12 @@ static int sched_timer_handler(uint32_t irq, void *data)
 
 static int __init_text timers_init(void)
 {
+	struct armv8_timer_info *sched_timer_info = NULL;
+	struct armv8_timer_info *soft_timer_info = NULL;
+
+#ifdef CONFIG_VIRT
 	struct armv8_timer_info *info;
+	extern int virtual_timer_irq_handler(uint32_t irq, void *data);
 
 	write_sysreg64(0, CNTVOFF_EL2);
 
@@ -203,28 +212,34 @@ static int __init_text timers_init(void)
 	write_sysreg32(0, CNTHP_CTL_EL2);
 	isb();
 
-	/* used for sched ticks */
-	info = &timer_info[HYP_TIMER];
-	if (info->irq) {
-		request_irq(info->irq, sched_timer_handler,
-			info->flags & 0xf, "hyp timer int", NULL);
-	}
-
-	info = &timer_info[NONSEC_PHY_TIMER];
-	if (info->irq) {
-		request_irq(info->irq, timer_interrupt_handler,
-			info->flags & 0xf, "nonsec timer int", NULL);
-	}
-
-#ifdef CONFIG_VIRT
-	extern int virtual_timer_irq_handler(uint32_t irq, void *data);
-
 	info = &timer_info[VIRT_TIMER];
 	if (info->irq) {
 		request_irq(info->irq, virtual_timer_irq_handler,
 			info->flags & 0xf, "virt timer irq", NULL);
 	}
+
+	sched_timer_info = &timer_info[HYP_TIMER];
+	soft_timer_info = &timer_info[NONSEC_PHY_TIMER];
+#else
+	sched_timer_info = &timer_info[VIRT_TIMER];
+	soft_timer_info = &timer_info[NONSEC_PHY_TIMER];
 #endif
+
+	/* used for sched ticks */
+	if (sched_timer_info && sched_timer_info->irq) {
+		request_irq(sched_timer_info->irq, sched_timer_handler,
+			sched_timer_info->flags & 0xf, "sched_timer_int", NULL);
+	} else {
+		pr_err("can not find sched timer\n");
+	}
+
+	/* used for software timer */
+	if (soft_timer_info && soft_timer_info->irq) {
+		request_irq(soft_timer_info->irq, timer_interrupt_handler,
+			soft_timer_info->flags & 0xf, "software_timer_int", NULL);
+	} else {
+		pr_err("can not find software timer\n");
+	}
 
 	return 0;
 }

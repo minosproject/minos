@@ -10,7 +10,12 @@
 #include <minos/spinlock.h>
 #include <minos/cpumask.h>
 
-#define BAD_IRQ					(1023)
+#define NR_PERCPU_IRQS		(CONFIG_NR_PPI_IRQS + CONFIG_NR_SGI_IRQS)
+#define PERCPU_IRQ_DESC_SIZE	(NR_PERCPU_IRQS * NR_CPUS)
+#define SPI_IRQ_DESC_SIZE	CONFIG_NR_SPI_IRQS
+#define SPI_IRQ_BASE		NR_PERCPU_IRQS
+#define MAX_IRQ_COUNT		(CONFIG_NR_SPI_IRQS + NR_PERCPU_IRQS)
+#define BAD_IRQ			(1023)
 
 #define IRQ_FLAGS_NONE           		(0x00000000)
 #define IRQ_FLAGS_EDGE_RISING    		(0x00000001)
@@ -27,10 +32,16 @@
 
 #define IRQ_FLAGS_MASKED_BIT			(8)
 #define IRQ_FLAGS_MASKED			(BIT(IRQ_FLAGS_MASKED_BIT))
-#define IRQ_FLAGS_VCPU_BIT			(9)
-#define IRQ_FLAGS_VCPU				(BIT(IRQ_FLAGS_VCPU_BIT))
-#define IRQ_FLAGS_PERCPU_BIT			(10)
+#define IRQ_FLAGS_PERCPU_BIT			(9)
 #define IRQ_FLAGS_PERCPU			(BIT(IRQ_FLAGS_PERCPU_BIT))
+
+#define IRQ_FLAGS_VCPU_BIT			(10)
+#define IRQ_FLAGS_VCPU				(BIT(IRQ_FLAGS_VCPU_BIT))
+#define IRQ_FLAGS_USER_BIT			(11)
+#define IRQ_FLAGS_USER				(BIT(IRQ_FLAGS_USER_BIT))
+#define IRQ_FLAGS_RECEIVER_MASK			(IRQ_FLAGS_USER | IRQ_FLAGS_VCPU)
+
+#define IRQ_FLAGS_PENDING_BIT			(12)
 
 typedef enum sgi_mode {
 	SGI_TO_LIST = 0,
@@ -40,6 +51,8 @@ typedef enum sgi_mode {
 
 struct irq_desc;
 struct virq_desc;
+struct kobject;
+struct poll_event_kernel;
 
 typedef int (*irq_handle_t)(uint32_t irq, void *data);
 
@@ -75,6 +88,9 @@ struct irq_desc {
 	spinlock_t lock;
 	unsigned long irq_count;
 	void *pdata;
+	void *owner;
+	struct kobject *kobj;
+	struct poll_event_kernel *poll_event;
 };
 
 #define local_irq_enable() arch_enable_local_irq()
@@ -91,6 +107,8 @@ int request_irq(uint32_t irq, irq_handle_t handler,
 int request_irq_percpu(uint32_t irq, irq_handle_t handler,
 		unsigned long flags, char *name, void *data);
 
+int request_user_irq(uint32_t irq, unsigned long flags, void *pdata);
+
 void send_sgi(uint32_t sgi, int cpu);
 
 void irq_set_affinity(uint32_t irq, int cpu);
@@ -103,6 +121,7 @@ int irq_xlate(struct device_node *node, uint32_t *intspec,
 struct irq_desc *get_irq_desc(uint32_t irq);
 
 void __irq_enable(uint32_t irq, int enable);
+void irq_dir(uint32_t irq);
 
 static inline void irq_unmask(uint32_t irq)
 {

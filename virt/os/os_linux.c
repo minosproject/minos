@@ -29,25 +29,68 @@
 #include <minos/arch.h>
 #include <virt/os.h>
 #include <virt/resource.h>
-#include <common/hypervisor.h>
+#include <uapi/hypervisor.h>
+#include <minos/ramdisk.h>
+#include <asm/cache.h>
 
 static int fdt_setup_other(struct vm *vm)
 {
-	int node;
-	void *dtb = vm->setup_data;
+	return 0;
+}
 
-	/* delete the vms node which no longer use */
-	node = fdt_path_offset(dtb, "/vms");
-	if (node)
-		fdt_del_node(dtb, node);
+static int fdt_setup_romflash(struct vm *vm)
+{
+	void *dtb = (void *)ptov(vm->setup_data);
+	unsigned long addr;
+	struct vmm_area *va;
+	uint32_t size;
+	char name[128];
+	int node;
+
+	if (!vm->initrd_file)
+		return 0;
+
+	/*
+	 * find the best memory region for initrd ramdisk.
+	 */
+	size = ramdisk_file_size(vm->initrd_file);
+	va = alloc_free_vmm_area(&vm->mm, size, PAGE_MASK,
+			VM_IO | __VM_PFNMAP | VM_MAP_PT | VM_RW);
+	if (!va)
+		return -ENOMEM;
+
+	addr = vtop(ramdisk_file_base(vm->initrd_file));
+	if (map_vmm_area(&vm->mm, va, addr)) {
+		pr_err("map ramdisk memory to vm%d failed\n", vm->vmid);
+		release_vmm_area(&vm->mm, va);
+		return -ENOMEM;
+	}
+
+	/*
+	 * add initrd information to the device tree. Here the
+	 * memory region will used as a map_rom in linux system, so
+	 * add a rom device to the dts.
+	 */
+	memset(name, 0, 128);
+	strcpy(name, "of-flash");
+	node = fdt_add_subnode(dtb, 0, name);
+	if (node < 0) {
+		pr_err("failed to add rom flash device to vm%d\n", vm->vmid);
+		unmap_vmm_area(&vm->mm, va);
+		release_vmm_area(&vm->mm, va);
+	}
+
+	fdt_setprop(dtb, node, "compatible", "minos,rom-flash", 17);
+	fdt_set_node_reg(dtb, node, va->start, PAGE_BALIGN(size));
+	fdt_setprop(dtb, node, "linux,mtd-name", "rom", 4);
 
 	return 0;
 }
 
 static int fdt_setup_minos(struct vm *vm)
 {
+	void *dtb = (void *)ptov(vm->setup_data);
 	int node;
-	void *dtb = vm->setup_data;
 
 	node = fdt_path_offset(dtb, "/minos");
 	if (node < 0) {
@@ -67,7 +110,7 @@ static int fdt_setup_vm_virqs(struct vm *vm)
 	size_t size;
 	int vspi_nr = vm->vspi_nr;
 	struct virq_chip *vc = vm->virq_chip;
-	void *dtb = vm->setup_data;
+	void *dtb = (void *)ptov(vm->setup_data);
 
 	node = fdt_path_offset(dtb, "/vm_fake_device");
 	if (node < 0) {
@@ -90,8 +133,10 @@ static int fdt_setup_vm_virqs(struct vm *vm)
 	if (vc && vc->generate_virq) {
 		for (i = 0; i < vspi_nr; i++) {
 			if (!virq_can_request(vm->vcpus[0], i +
-						VM_LOCAL_VIRQ_NR))
+						VM_LOCAL_VIRQ_NR)) {
+				pr_notice("%s %d\n", __func__, i + VM_LOCAL_VIRQ_NR);
 				continue;
+			}
 			size += vc->generate_virq(tmp + size,
 					i + VM_LOCAL_VIRQ_NR);
 		}
@@ -104,7 +149,8 @@ static int fdt_setup_vm_virqs(struct vm *vm)
 			pr_err("fdt set interrupt for minos failed\n");
 	}
 
-	free(tmp);
+	free_pages(tmp);
+
 	return i;
 }
 
@@ -113,12 +159,12 @@ static int fdt_setup_cmdline(struct vm *vm)
 	int node, len, chosen_node;
 	char *new_cmdline;
 	char buf[128];
-	void *dtb = vm->setup_data;
-	extern void *hv_dtb;
+	void *vm_dtb = (void *)ptov(vm->setup_data);
+	void *hv_dtb = dtb_address;
 
-	chosen_node = fdt_path_offset(dtb, "/chosen");
+	chosen_node = fdt_path_offset(vm_dtb, "/chosen");
 	if (chosen_node < 0) {
-		chosen_node = fdt_add_subnode(dtb, 0, "chosen");
+		chosen_node = fdt_add_subnode(vm_dtb, 0, "chosen");
 		if (chosen_node < 0) {
 			pr_err("add chosen node failed for vm%d\n", vm->vmid);
 			return chosen_node;
@@ -145,7 +191,7 @@ static int fdt_setup_cmdline(struct vm *vm)
 	 * do not know why, there may a issue in libfdt or
 	 * other reason
 	 */
-	fdt_setprop(dtb, chosen_node, "bootargs", new_cmdline, len);
+	fdt_setprop(vm_dtb, chosen_node, "bootargs", new_cmdline, len);
 
 	return 0;
 }
@@ -154,7 +200,7 @@ static int fdt_setup_cpu(struct vm *vm)
 {
 	int offset, node, i;
 	char name[16];
-	void *dtb = vm->setup_data;
+	void *dtb = (void *)ptov(vm->setup_data);
 	uint64_t aff_id;
 
 	/*
@@ -189,7 +235,7 @@ static int fdt_setup_memory(struct vm *vm)
 	int size_cell, address_cell;
 	uint32_t *args, *tmp;
 	unsigned long mstart, msize;
-	void *dtb = vm->setup_data;
+	void *dtb = (void *)ptov(vm->setup_data);
 	struct vmm_area *va;
 
 	offset = of_get_node_by_name(dtb, 0, "memory");
@@ -245,14 +291,14 @@ static int fdt_setup_memory(struct vm *vm)
 	}
 
 	fdt_setprop(dtb, offset, "reg", (void *)tmp, size * 4);
-	free(args);
+	free_pages(tmp);
 
 	return 0;
 }
 
 static void fdt_vm_init(struct vm *vm)
 {
-	void *fdt = vm->setup_data;
+	void *fdt = (void *)ptov(vm->setup_data);
 
 	fdt_open_into(fdt, fdt, MAX_DTB_SIZE);
 	if(fdt_check_header(fdt)) {
@@ -274,6 +320,7 @@ static void fdt_vm_init(struct vm *vm)
 	fdt_setup_cmdline(vm);
 	fdt_setup_cpu(vm);
 	fdt_setup_memory(vm);
+	fdt_setup_romflash(vm);
 	fdt_setup_other(vm);
 
 	vmbox_init(vm);
@@ -282,40 +329,41 @@ static void fdt_vm_init(struct vm *vm)
 		platform->setup_hvm(vm, fdt);
 
 	fdt_pack(fdt);
-	flush_dcache_range((unsigned long)fdt, MAX_DTB_SIZE);
 }
 
-static void linux_vcpu_init(struct vcpu *vcpu)
+static inline void __linux_vcpu_startup(struct vcpu *vcpu, unsigned long entry)
 {
 	gp_regs *regs;
 
+	arch_vcpu_init(vcpu, (void *)entry, NULL);
+	regs = (gp_regs *)vcpu->task->stack_base;
+
 	/* fill the dtb address to x0 */
 	if (get_vcpu_id(vcpu) == 0) {
-		arch_init_vcpu(vcpu, (void *)vcpu->vm->entry_point, NULL);
-		regs = (gp_regs *)vcpu->task->stack_base;
-
-		if (task_is_64bit(vcpu->task))
+		if (!task_is_32bit(vcpu->task)) {
 			regs->x0 = (uint64_t)vcpu->vm->setup_data;
-		else {
+		} else {
 			regs->x0 = 0;
 			regs->x1 = 2272;		/* arm vexpress machine type */
 			regs->x2 = (uint64_t)vcpu->vm->setup_data;
 		}
+	} else {
+		regs->x0 = 0;
+		regs->x1 = 0;
+		regs->x2 = 0;
+		regs->x3 = 0;
 	}
+
+}
+
+static void linux_vcpu_startup(struct vcpu *vcpu)
+{
+	__linux_vcpu_startup(vcpu, (unsigned long)vcpu->vm->entry_point);
 }
 
 static void linux_vcpu_power_on(struct vcpu *vcpu, unsigned long entry)
 {
-	gp_regs *regs;
-
-	arch_init_vcpu(vcpu, (void *)entry, NULL);
-	regs = (gp_regs *)vcpu->task->stack_base;
-
-	regs->elr_elx = entry;
-	regs->x0 = 0;
-	regs->x1 = 0;
-	regs->x2 = 0;
-	regs->x3 = 0;
+	__linux_vcpu_startup(vcpu, entry);
 }
 
 static void linux_vm_setup(struct vm *vm)
@@ -326,9 +374,9 @@ static void linux_vm_setup(struct vm *vm)
 static int linux_create_native_vm_resource(struct vm *vm)
 {
 	if (vm->setup_data) {
-		if (of_data(vm->setup_data)) {
+		if (of_data((void *)ptov(vm->setup_data))) {
 			vm->flags |= VM_FLAGS_SETUP_OF;
-			create_vm_resource_of(vm, vm->setup_data);
+			create_vm_resource_of(vm, (void *)ptov(vm->setup_data));
 		}
 	}
 
@@ -345,12 +393,15 @@ static int linux_create_guest_vm_resource(struct vm *vm)
 {
 	phy_addr_t addr;
 
+
+	// fixme need 
+
 	/*
 	 * convert the guest's memory to hypervisor's memory space
 	 * do not need to map again, since all the guest VM's memory
 	 * has been mapped when mm_init()
 	 */
-	addr = translate_vm_address(vm, (unsigned long)vm->setup_data);
+	if (translate_guest_ipa(&vm->mm, (unsigned long)vm->setup_data, &addr));
 	if (!addr)
 		return -ENOMEM;
 
@@ -358,7 +409,7 @@ static int linux_create_guest_vm_resource(struct vm *vm)
 }
 
 struct os_ops linux_os_ops = {
-	.vcpu_init 	= linux_vcpu_init,
+	.vcpu_init 	= linux_vcpu_startup,
 	.vcpu_power_on 	= linux_vcpu_power_on,
 	.vm_setup 	= linux_vm_setup,
 	.create_nvm_res = linux_create_native_vm_resource,

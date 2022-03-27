@@ -32,6 +32,5 @@ endfunc arch_spin_lock
 
 func arch_spin_unlock
 	stlr	wzr, [x0]
-	dmb	ish
 	ret
 endfunc arch_spin_unlock
