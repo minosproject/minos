@@ -133,10 +133,8 @@ static int fdt_setup_vm_virqs(struct vm *vm)
 	if (vc && vc->generate_virq) {
 		for (i = 0; i < vspi_nr; i++) {
 			if (!virq_can_request(vm->vcpus[0], i +
-						VM_LOCAL_VIRQ_NR)) {
-				pr_notice("%s %d\n", __func__, i + VM_LOCAL_VIRQ_NR);
+						VM_LOCAL_VIRQ_NR))
 				continue;
-			}
 			size += vc->generate_virq(tmp + size,
 					i + VM_LOCAL_VIRQ_NR);
 		}
