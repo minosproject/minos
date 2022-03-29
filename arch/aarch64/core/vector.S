@@ -177,8 +177,8 @@ vfunc exception_return
 	mov	sp, x1				// change to the new stack address
 
 	ldr	x1, [sp, #8]			// load spsr
-	and	x1, x1, #3
-	cmp	x1, #2				// whether the task will return to user
+	and	x1, x1, #0x0f
+	cmp	x1, #9				// whether the task will return to user
 	b.eq	__do_exception_return
 
 	mov	x0, sp
