@@ -100,8 +100,6 @@ static void task_init(struct task *task, char *name,
 		TASK_INFO_INIT(&task->ti, task);
 	}
 
-	cpu = (aff == TASK_AFF_ANY) ? 0 : aff;
-
 	task->tid = tid;
 	task->prio = prio;
 	task->pend_stat = 0;
@@ -110,16 +108,10 @@ static void task_init(struct task *task, char *name,
 	task->affinity = aff;
 	task->run_time = TASK_RUN_TIME;
 	spin_lock_init(&task->s_lock);
+	task->stat = TASK_STAT_STOP;
+	task->cpu = -1;
 
-	if ((task->flags & TASK_FLAGS_VCPU) ||
-			(task->flags & TASK_FLAGS_NO_AUTO_START)) {
-		task->stat = TASK_STAT_STOP;
-		task->cpu = -1;
-	} else {
-		task->stat = TASK_STAT_RUNNING;
-		task->cpu = cpu;
-	}
-
+	cpu = (aff == TASK_AFF_ANY) ? 0 : aff;
 	init_timer_on_cpu(&task->delay_timer, cpu);
 	task->delay_timer.function = task_timeout_handler;
 	task->delay_timer.data = (unsigned long)task;
@@ -246,7 +238,10 @@ struct task *__create_task(char *name,
 	if (!(task->flags & TASK_FLAGS_VCPU))
 		arch_init_task(task, (void *)func, 0, task->pdata);
 
-	if (task->stat == TASK_STAT_RUNNING)
+	/*
+	 * start the task if need auto started.
+	 */
+	if (!(task->flags & TASK_FLAGS_NO_AUTO_START))
 		task_ready(task, 0);
 
 	preempt_enable();
@@ -291,10 +286,12 @@ int create_idle_task(void)
 	task_init(task, task_name, NULL, 0, OS_PRIO_IDLE,
 			tid, aff, TASK_FLAGS_IDLE, NULL);
 
-	task->stack_top = (void *)ptov(minos_stack_top) - (aff << CONFIG_TASK_STACK_SHIFT);
+	task->stack_top = (void *)ptov(minos_stack_top) -
+		(aff << CONFIG_TASK_STACK_SHIFT);
 	task->stack_bottom = task->stack_top - CONFIG_TASK_STACK_SIZE;
 
 	task->stat = TASK_STAT_RUNNING;
+	task->cpu = aff;
 	task->run_time = 0;
 
 	pcpu->running_task = task;

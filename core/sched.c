@@ -451,7 +451,7 @@ static int irqwork_handler(uint32_t irq, void *data)
 	 */
 	raw_spin_lock(&pcpu->lock);
 	list_for_each_entry_safe(task, n, &pcpu->new_list, stat_list) {
-		if (task->stat != TASK_STAT_WAKING) {
+		if (task->stat == TASK_STAT_RUNNING) {
 			pr_err("task %s state %d wrong\n",
 				task->name? task->name : "Null", task->stat);
 			continue;
