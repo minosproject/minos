@@ -113,6 +113,8 @@ CONFIG_UART_IO_SIZE=0x1000
 CONFIG_UART_IRQ=33
 # end of Platform Configuration
 
+CONFIG_SHELL=y
+
 #
 # Third Party Library And Module
 #
