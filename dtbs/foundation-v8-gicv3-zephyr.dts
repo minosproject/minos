@@ -9,7 +9,7 @@
 
 	chosen {
 		minos,stdout = "pl011";
-		bootargs = "bootwait=3 tty=vm0";
+		bootargs = "bootwait=3 tty=vm1";
 	};
 
 	aliases {
