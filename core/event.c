@@ -115,21 +115,13 @@ struct task *event_get_waiter(struct event *ev)
 struct task *event_highest_task_ready(struct event *ev, void *msg,
 		uint32_t msk, int pend_stat)
 {
-	int retry;
 	struct task *task;
 
-again:
-	task = event_get_waiter(ev);
-	if (!task)
-		return NULL;
-
-	/*
-	 * try to wake up the task and make sure is not wakeup
-	 * by timeout handler.
-	 */
-	retry = __wake_up(task, TASK_STAT_PEND_OK, msg);
-	if (retry)
-		goto again;
+	do {
+		task = event_get_waiter(ev);
+		if (!task)
+			return NULL;
+	} while (__wake_up(task, TASK_STAT_PEND_OK, msg));
 
 	return task;
 }
@@ -154,7 +146,7 @@ void event_pend_down(struct task *task)
 long wait_event(void)
 {
 	struct task *task = current;
-	long status = TASK_STAT_PEND_OK;
+	long status;
 
 	ASSERT(task->stat == TASK_STAT_WAIT_EVENT);
 	sched();

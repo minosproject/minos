@@ -40,8 +40,7 @@ void soft_timer_interrupt(void)
 	raw_spin_lock(&timers->lock);
 
 	while (!is_list_empty(&timers->active)) {
-		timer = list_first_entry(&timers->active,
-				struct timer_list, entry);
+		timer = list_first_entry(&timers->active, struct timer_list, entry);
 
 		if (timer->expires <= (now + DEFAULT_TIMER_MARGIN)) {	
 			/* 

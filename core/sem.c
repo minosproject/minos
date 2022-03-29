@@ -36,9 +36,9 @@ uint32_t sem_accept(sem_t *sem)
 
 int sem_pend(sem_t *sem, uint32_t timeout)
 {
-	int ret;
+	struct task *task = current;
 	unsigned long flags;
-	struct task *task;
+	int ret;
 
 	might_sleep();
 
@@ -48,8 +48,6 @@ int sem_pend(sem_t *sem, uint32_t timeout)
 		spin_unlock_irqrestore(&sem->lock, flags);
 		return 0;
 	}
-
-	task = get_current_task();
 	event_task_wait(to_event(sem), TASK_EVENT_SEM, timeout);
 	spin_unlock_irqrestore(&sem->lock, flags);
 
@@ -124,14 +122,12 @@ int sem_post(sem_t *sem)
 	spin_lock_irqsave(&sem->lock, flags);
 	task = event_highest_task_ready((struct event *)sem,
 			NULL, TASK_EVENT_SEM, TASK_STAT_PEND_OK);
-	if (task) {
-		spin_unlock_irqrestore(&sem->lock, flags);
-		return 0;
-	}
+	if (task)
+		goto out;
 
 	if (sem->cnt < 65535)
 		sem->cnt++;
-
+out:
 	spin_unlock_irqrestore(&sem->lock, flags);
 
 	return 0;
