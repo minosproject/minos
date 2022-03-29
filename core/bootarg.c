@@ -26,6 +26,7 @@ struct boot_option {
 };
 
 #define CMDLINE_SIZE 511
+static char cmdline[CMDLINE_SIZE + 1];
 
 static struct boot_option *boot_options;
 
@@ -134,12 +135,11 @@ static void bootarg_init_one(char *str)
 
 int __init_text bootargs_init(const char *str, int len)
 {
-	char cmdline[CMDLINE_SIZE + 1];
 	char *bootarg;
 	char *tmp = &cmdline[0];
 
 	pr_notice("bootargs: %s\n", str);
-	if (len > CMDLINE_SIZE)
+	if (len > (CMDLINE_SIZE))
 		pr_warn("cmdline size too long information may lost\n");
 
 	len = len > CMDLINE_SIZE ? CMDLINE_SIZE : len;
