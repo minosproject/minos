@@ -1,6 +1,8 @@
 #ifndef __MINOS_BOOTARG_H__
 #define __MINOS_BOOTARG_H__
 
+#include <minos/types.h>
+
 int bootargs_init(const char *str, int len);
 
 int __get_boot_option(char *name, void *value,

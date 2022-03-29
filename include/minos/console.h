@@ -1,6 +1,8 @@
 #ifndef __MINOS_CONSOLE_H__
 #define __MINOS_CONSOLE_H__
 
+#include <minos/types.h>
+
 struct console {
 	char *name;
 	int (*init)(char *arg);
@@ -19,8 +21,9 @@ struct console {
 void console_init(char *name);
 void console_putc(char ch);
 char console_getc(void);
-void console_char_recv(unsigned char ch);
 void console_puts(char *buf, int len);
-int console_gets(char *buf, int max);
+
+void console_recv(const char *buf, int cnt);
+int console_gets(char *buf, int max, uint32_t timeout);
 
 #endif

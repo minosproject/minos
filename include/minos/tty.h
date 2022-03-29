@@ -2,6 +2,7 @@
 #define __MINOS_TTY_H__
 
 #include <minos/types.h>
+#include <minos/list.h>
 
 struct tty;
 

@@ -1,6 +1,8 @@
 #ifndef _MINOS_PRINT_H_
 #define _MINOS_PRINT_H_
 
+#include <minos/types.h>
+
 #define PRINT_LEVEL_FATAL	0
 #define PRINT_LEVEL_ERROR	1
 #define PRINT_LEVEL_WARN	2
