@@ -14,70 +14,63 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <minos/app.h>
 #include <minos/console.h>
 #include <minos/shell_command.h>
 #include <minos/bootarg.h>
+#include <minos/print.h>
+#include <minos/task.h>
 
 #ifdef CONFIG_VIRT
 #include <virt/virt.h>
 #endif
 
-static int init_task(void *main)
-{
-#ifdef CONFIG_SHELL
-	int i;
-	char *tty = NULL;
-	int skip_vm_boot = 0;
-	uint32_t wait = 0;
-	unsigned long timeout;
-#endif
+static int __skip_vm_boot;
 
-	/*
-	 * first check whether need to stop to start all
-	 * VM automaticly if the shell is enabled, if the
-	 * shell is enabled, provide a debug mode to do some
-	 * debuging for VM
-	 */
-#ifdef CONFIG_SHELL
+static void skip_vm_boot(void)
+{
 #ifdef CONFIG_VIRT
+
+#ifdef CONFIG_SHELL
+	uint32_t wait;
+	char str[8];
+	int i;
+
 	bootarg_parse_uint("bootwait", &wait);
 	if (wait > 0) {
 		printf("\nPress any key to stop vm startup: %d ", wait);
 		for (i = 0; i < wait; i++) {
-			timeout = NOW() + SECONDS(1);
-
 			printf("\b\b%d ", wait - i);
-
-			while (NOW() < timeout) {
-				if (console_getc() > 0) {
-					skip_vm_boot = 1;
-					break;
-				}
-			}
-
-			if (skip_vm_boot)
+			if (console_gets(str, 8, 1000) > 0) {
+				__skip_vm_boot = 1;
 				break;
+			}
 		}
 	}
 
-	if (!skip_vm_boot) {
-		printf("\b\b0 ");
+	if (!__skip_vm_boot) {
+		printf("\b\b ");
 		printf("\n");
-		start_all_vm();
 	}
 #endif
-	if (!skip_vm_boot)
-		bootarg_parse_string("tty", &tty);
 
-	create_realtime_task("shell_task", shell_task,
-			tty, CONFIG_SHELL_TASK_PRIO, 4096, 0);
-#else
-#ifdef CONFIG_VIRT
-	start_all_vm();
+	if (!__skip_vm_boot)
+		start_all_vm();
 #endif
+}
+
+static void start_shell_task(void)
+{
+#ifdef CONFIG_SHELL
+	extern int shell_task(void *data);
+	create_task("shell_task", shell_task,
+			0x2000, OS_PRIO_REALTIME, -1, 0, NULL);
 #endif
+}
+
+int init_task(void *data)
+{
+	skip_vm_boot();
+	start_shell_task();
 
 	return 0;
 }
-DEFINE_TASK("init", init_task, NULL, OS_PRIO_DEFAULT, 4096, 0);

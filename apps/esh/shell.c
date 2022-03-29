@@ -14,11 +14,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <minos/app.h>
 #include <minos/console.h>
 #include <minos/compiler.h>
 #include <minos/shell_command.h>
 #include <minos/tty.h>
+#include <minos/print.h>
+#include <minos/errno.h>
+#include <minos/string.h>
+
 #include "esh.h"
 #include "esh_internal.h"
 
@@ -67,27 +70,28 @@ DEFINE_SHELL_COMMAND(tty, "tty", "tty related command",
 
 int shell_task(void *data)
 {
+	char buf[32];
 	char ch;
+	int i, copy;
 
 	pesh = esh_init();
 	esh_register_command(pesh, esh_excute_command);
 	esh_register_print(pesh, __esh_putc);
 
 	esh_rx(pesh, '\n');
-	while ((ch = console_getc()) > 0)
-		esh_rx(pesh, ch);
+	while (console_gets(buf, 32, 0) != 0);
 
 	if (data && !strncmp(data, "vm", 2)) {
 		printf("\nAttach tty: %s\n", (char *)data);
 		pesh->tty = open_tty(data);
 	}
 
-	while (1) {
-		for (; ;) {
-			ch = console_getc();
+	for (; ;) {
+		copy = console_gets(buf, 32, -1);
+		for (i = 0; i < copy; i++) {
+			ch = buf[i];
 			if (ch <= 0)
-				break;
-
+				continue;
 			if (pesh->tty) {
 				if (ch == 29) { // Ctrl-]
 					shell_detach_tty();
@@ -101,8 +105,6 @@ int shell_task(void *data)
 				esh_rx(pesh, ch);
 			}
 		}
-
-		msleep(10);
 	}
 
 	return 0;

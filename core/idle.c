@@ -23,6 +23,12 @@
 #include <minos/of.h>
 #include <minos/task.h>
 #include <minos/flag.h>
+#include <minos/bootarg.h>
+#include <minos/console.h>
+
+#ifdef CONFIG_VIRT
+extern void start_all_vm(void);
+#endif
 
 void system_reboot(void)
 {
@@ -86,66 +92,17 @@ static void do_pcpu_cleanup_work(struct pcpu *pcpu)
 	}
 }
 
-static int init_task(void *main)
+static int __init_task(void *main)
 {
-#ifdef CONFIG_SHELL
-	int i;
-	char *tty = NULL;
-	int skip_vm_boot = 0;
-	uint32_t wait = 0;
-	unsigned long timeout;
-	extern int shell_task(void *data);
-#endif
-
-	/*
-	 * first check whether need to stop to start all
-	 * VM automaticly if the shell is enabled, if the
-	 * shell is enabled, provide a debug mode to do some
-	 * debuging for VM
-	 */
-#ifdef CONFIG_SHELL
 #ifdef CONFIG_VIRT
-	bootarg_parse_uint("bootwait", &wait);
-	if (wait > 0) {
-		printf("\nPress any key to stop vm startup: %d ", wait);
-		for (i = 0; i < wait; i++) {
-			timeout = NOW() + SECONDS(1);
-
-			printf("\b\b%d ", wait - i);
-
-			while (NOW() < timeout) {
-				if (console_getc() > 0) {
-					skip_vm_boot = 1;
-					break;
-				}
-			}
-
-			if (skip_vm_boot)
-				break;
-		}
-	}
-
-	if (!skip_vm_boot) {
-		printf("\b\b0 ");
-		printf("\n");
-		start_all_vm();
-	}
-#endif
-	if (!skip_vm_boot)
-		bootarg_parse_string("tty", &tty);
-
-	create_task("shell_task", shell_task,
-			tty, CONFIG_SHELL_TASK_PRIO, 4096, 0);
-#else
-#ifdef CONFIG_VIRT
-	extern void start_all_vm(void);
+	printf("\n\nStarting all VMs\n\n");
 	start_all_vm();
+#else
+	printf("\n\nHello Minos\n\n");
 #endif
-#endif
-
 	return 0;
 }
-
+weak_alias(__init_task, init_task);
 
 void cpu_idle(void)
 {
