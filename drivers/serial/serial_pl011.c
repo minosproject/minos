@@ -62,13 +62,29 @@ static int __pl011_init(void *addr, int clock, int baudrate)
 static int pl011_irq_handler(uint32_t irq, void *data)
 {
 	unsigned int int_status;
+	char buf[16];
+	int cnt = 0;
 
+	/*
+	 * only support RX interrupt.
+	 */
 	int_status = ioread32(base + UARTMIS);
-	if (int_status & INT_RX) {
-		iowrite32(INT_RX, base + UARTICR);
-		console_char_recv(ioread32(base + UARTDR) & 0xff);
-		iowrite32(0, base + UARTECR);
+	if (!(int_status & INT_RX))
+		return 0;
+
+	iowrite32(INT_RX, base + UARTICR);
+	while (!(ioread32(base + UARTFR) & PL011_FR_RXFE_FLAG)) {
+		buf[cnt++] = ioread32(base + UARTDR) & 0xff;
+		if (cnt == 16) {
+			console_recv(buf, cnt);
+			cnt = 0;
+		}
 	}
+
+	if (cnt)
+		console_recv(buf, cnt);
+
+	iowrite32(0, base + UARTECR);
 
 	return 0;
 }

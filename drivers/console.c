@@ -19,6 +19,7 @@
 #include <minos/of.h>
 #include <minos/spinlock.h>
 #include <minos/sched.h>
+#include <minos/sem.h>
 
 #define MEM_CONSOLE_SIZE	(2048)
 #define CONSOLE_INBUF_SIZE	(2048)
@@ -28,8 +29,8 @@ static char mem_log_buf[MEM_CONSOLE_SIZE];
 
 static char console_inbuf[CONSOLE_INBUF_SIZE];
 static uint32_t inbuf_ridx, inbuf_widx;
-static DEFINE_SPIN_LOCK(inbuf_lock);
-static struct task *inbuf_task;
+
+static sem_t console_sem;
 
 #define MEM_CONSOLE_IDX(idx)	(idx & (MEM_CONSOLE_SIZE - 1))
 #define BUFIDX(idx)		(idx & (CONSOLE_INBUF_SIZE - 1))
@@ -69,9 +70,10 @@ void console_init(char *name)
 {
 	int index;
 
+	sem_init(&console_sem, 0);
+
 	if (name)
 		console = get_console(name);
-
 	if (console->init)
 		console->init(NULL);
 
@@ -90,19 +92,21 @@ char console_getc(void)
 	return console->getc();
 }
 
-void console_char_recv(unsigned char ch)
+void console_recv(const char *buf, int cnt)
 {
 	uint32_t widx;
+	int i;
 
 	widx = inbuf_widx;
-	console_inbuf[BUFIDX(widx++)] = ch;
-	inbuf_widx = widx;
-	mb();
+	rmb();
 
-	raw_spin_lock(&inbuf_lock);
-	if (inbuf_task)
-		wake_up(inbuf_task);
-	raw_spin_unlock(&inbuf_lock);
+	for (i = 0; i < cnt; i++)
+		console_inbuf[BUFIDX(widx++)] = buf[i];
+
+	wmb();
+	inbuf_widx = widx;
+
+	sem_post(&console_sem);
 }
 
 void console_puts(char *buf, int len)
@@ -110,42 +114,31 @@ void console_puts(char *buf, int len)
 	puts(buf, len);
 }
 
-int console_gets(char *buf, int max)
+int console_gets(char *buf, int max, uint32_t timeout)
 {
 	uint32_t ridx, widx;
 	long i, copy;
-	unsigned long flags;
 
-repeat:
-	ridx = inbuf_ridx;
-	widx = inbuf_widx;
-	mb();
+	do {
+		ridx = inbuf_ridx;
+		widx = inbuf_widx;
+		rmb();
 
-	ASSERT((widx - ridx) <= CONSOLE_INBUF_SIZE);
-	copy = widx - ridx > max ? max : widx - ridx;
-	if (copy == 0) {
-		spin_lock_irqsave(&inbuf_lock, flags);
-		if (inbuf_widx - inbuf_ridx == 0) {
-			__event_task_wait(0, TASK_EVENT_IRQ, -1);
-			inbuf_task = current;
-		}
-		spin_unlock_irqrestore(&inbuf_lock, flags);
-
-		if (inbuf_task) {
-			wait_event();
-			inbuf_task = NULL;
-			if (copy < 0)
-				return copy;
+		ASSERT((widx - ridx) <= CONSOLE_INBUF_SIZE);
+		copy = widx - ridx > max ? max : widx - ridx;
+		if (copy > 0) {
+			for (i = 0; i < copy; i++)
+				buf[i] = console_inbuf[BUFIDX(ridx++)];
+			wmb();
+			inbuf_ridx = ridx;
+			break;
 		}
 
-		goto repeat;
-	}
-
-	for (i = 0; i < copy; i++)
-		buf[i] = console_inbuf[BUFIDX(ridx++)];
-
-	inbuf_ridx = ridx;
-	mb();
+		if (timeout > 0)
+			copy = sem_pend(&console_sem, timeout);
+		else
+			break;
+	} while (copy == 0);
 
 	return copy;
 }
