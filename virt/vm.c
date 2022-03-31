@@ -531,6 +531,30 @@ static int load_vm_image(struct vm *vm)
 	return 0;
 }
 
+static void start_vm(struct vm *vm)
+{
+	struct vcpu *vcpu0;
+
+	if (!vm) {
+		pr_err("no such vm\n");
+		return;
+	}
+
+	if (vm->state == VM_STAT_ONLINE) {
+		pr_err("VM %s already stared\n", vm->name);
+		return;
+	}
+
+	vcpu0 = vm->vcpus[0];
+	if (!vcpu0) {
+		pr_err("VM create with error, vm%d not exist\n", vm->vmid);
+		return;
+	}
+
+	vm->state = VM_STAT_ONLINE;
+	vcpu_online(vcpu0);
+}
+
 int vm_power_up(int vmid)
 {
 	struct vm *vm = get_vm_by_id(vmid);
@@ -544,7 +568,7 @@ int vm_power_up(int vmid)
 	/*
 	 * start the vm now
 	 */
-	start_vm(vmid);
+	start_vm(vm);
 
 	return 0;
 }
@@ -1292,23 +1316,10 @@ int virt_init(void)
 		setup_native_vm(vm);
 		vm_mm_init(vm);
 		load_vm_image(vm);
-		vm->state = VM_STAT_ONLINE;
-
-		/* need after all the task of the vm setup is finished */
 		vm_vcpus_init(vm);
 	}
 
 	return 0;
-}
-
-void start_vm(int vmid)
-{
-	struct vcpu *vcpu = get_vcpu_by_id(vmid, 0);
-
-	if (vcpu)
-		vcpu_online(vcpu);
-	else
-		pr_err("vm create with error, vm%d not exist\n", vmid);
 }
 
 void start_all_vm(void)
@@ -1316,7 +1327,7 @@ void start_all_vm(void)
 	struct vm *vm;
 
 	list_for_each_entry(vm, &vm_list, vm_list)
-		start_vm(vm->vmid);
+		start_vm(vm);
 }
 
 /*
@@ -1331,7 +1342,7 @@ static int vm_command_hdl(int argc, char **argv)
 		if (vmid == 0)
 			start_all_vm();
 		else
-			start_vm(vmid);
+			start_vm(get_vm_by_id(vmid));
 	}
 
 	return 0;
