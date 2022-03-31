@@ -173,8 +173,22 @@ void task_exit_from_user(gp_regs *regs)
 void task_return_to_user(gp_regs *regs)
 {
 	struct task *task = current;
+	unsigned long flags = task->ti.flags;
 
 	ASSERT(current->flags & TASK_FLAGS_VCPU);
+	task->ti.flags &= ~(flags | (__TIF_NEED_STOP | __TIF_NEED_FREEZE));
+	smp_wmb();
+
+	if (flags & __TIF_NEED_STOP)
+		task->stat = TASK_STAT_STOP;
+	else if (flags & __TIF_NEED_FREEZE)
+		task->stat = TASK_STAT_SUSPEND;
+
+	if (task->stat != TASK_STAT_RUNNING) {
+		sched();
+		panic("%s %d: should not be here\n", __func__, __LINE__);
+	}
+
 	if (task->return_to_user)
 		task->return_to_user(task, regs);
 }

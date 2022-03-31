@@ -59,8 +59,7 @@ int system_suspend(void)
 static inline bool pcpu_can_idle(struct pcpu *pcpu)
 {
 	return (pcpu->local_rdy_grp == (1 << OS_PRIO_IDLE)) &&
-			(is_list_empty(&pcpu->stop_list) &&
-			(is_list_empty(&pcpu->die_process)));
+		(is_list_empty(&pcpu->stop_list));
 }
 
 static void do_pcpu_cleanup_work(struct pcpu *pcpu)
@@ -114,7 +113,7 @@ void cpu_idle(void)
 	if (pcpu->pcpu_id == 0) {
 		pr_notice("create init task for system\n");
 		create_task("init", init_task, 0x2000,
-				OS_PRIO_DEFAULT, -1, 0, NULL);
+				OS_PRIO_SYSTEM, -1, 0, NULL);
 	}
 
 	while (1) {
@@ -135,7 +134,6 @@ void cpu_idle(void)
 			local_irq_enable();
 		}
 
-		set_need_resched();
 		sched();
 	}
 }

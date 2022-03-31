@@ -31,8 +31,9 @@
 #define OS_PRIO_DEFAULT_7	7
 
 #define OS_PRIO_REALTIME	OS_PRIO_DEFAULT_0
-#define OS_PRIO_VCPU		OS_PRIO_DEFAULT_3
-#define OS_PRIO_DEFAULT		OS_PRIO_DEFAULT_4
+#define OS_PRIO_SYSTEM		OS_PRIO_DEFAULT_3
+#define OS_PRIO_VCPU		OS_PRIO_DEFAULT_4
+#define OS_PRIO_DEFAULT		OS_PRIO_DEFAULT_5
 #define OS_PRIO_IDLE		OS_PRIO_DEFAULT_7
 #define OS_PRIO_LOWEST		OS_PRIO_IDLE
 
@@ -146,6 +147,7 @@ struct task {
 	 * affinity - the cpu node which the task affinity to
 	 */
 	int cpu;
+	int last_cpu;
 	int affinity;
 	int prio;
 

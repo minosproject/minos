@@ -23,38 +23,33 @@ struct pcpu {
 
 	unsigned long percpu_offset;
 
-	uint32_t nr_pcpu_task;
-
-	int os_is_running;
-
-	spinlock_t lock;
-	struct list_head new_list;
-	struct list_head stop_list;
-
-	struct list_head die_process;
-
-	struct task *running_task;	// current task
-	struct task *idle_task;
-
 	/*
 	 * each pcpu has its local sched list, 8 priority
 	 * local_rdy_grp only use [0 - 8], in these 8
 	 * priority:
 	 * 7 - used for idle task
 	 * 6 - used for vcpu task
+	 *
+	 * only the new_list can be changed by other cpu, the
+	 * lock is for the new_list.
 	 */
-	uint8_t local_rdy_grp;
-	struct list_head ready_list[8];
+	spinlock_t lock;
+	struct list_head new_list;
 
-	/*
-	 * each pcpu will have one kernel task which
-	 * will do some maintenance work for the pcpu
-	 */
-	struct task *kworker;
-	struct flag_grp fg;
+	struct list_head stop_list;
+	struct task *running_task;
+	struct task *idle_task;
+	uint32_t nr_pcpu_task;
+
+	uint8_t local_rdy_grp;
+	uint8_t padding[3];
+	struct list_head ready_list[OS_PRIO_MAX];
+	int tasks_in_prio[OS_PRIO_MAX];
+
+	struct timer_list sched_timer;
+	int os_is_running;
 
 	void *stack;
-
 } __cache_line_align;
 
 extern unsigned long percpu_offset[];

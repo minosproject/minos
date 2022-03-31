@@ -170,6 +170,8 @@ typedef void (*void_func_t)(void);
 
 #define BAD_ADDRESS (-1)
 
+#define OS_PRIO_MAX 8
+
 extern int8_t const ffs_one_table[256];
 
 typedef uint32_t flag_t;

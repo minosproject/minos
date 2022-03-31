@@ -63,7 +63,7 @@ static void start_shell_task(void)
 #ifdef CONFIG_SHELL
 	extern int shell_task(void *data);
 	create_task("shell_task", shell_task,
-			0x2000, OS_PRIO_REALTIME, -1, 0, NULL);
+			0x2000, OS_PRIO_SYSTEM, -1, 0, NULL);
 #endif
 }
 

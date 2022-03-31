@@ -126,11 +126,6 @@ static int detach_timer(struct timers *timers, struct timer_list *timer)
 	return 0;
 }
 
-static inline unsigned long slack_expires(unsigned long expires)
-{
-	return expires;
-}
-
 static int __mod_timer(struct timer_list *timer)
 {
 	unsigned long flags;
@@ -168,7 +163,6 @@ int mod_timer(struct timer_list *timer, unsigned long expires)
 
 	preempt_disable();
 	cpu = smp_processor_id();
-	expires = slack_expires(expires);
 	timer->expires = expires;
 
 	/*
@@ -183,7 +177,6 @@ int mod_timer(struct timer_list *timer, unsigned long expires)
 		timer->timers = &get_per_cpu(timers, cpu);
 		spin_unlock_irqrestore(&timers->lock, flags);
 	}
-
 	__mod_timer(timer);
 	preempt_enable();
 
