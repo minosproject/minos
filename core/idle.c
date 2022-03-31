@@ -25,6 +25,7 @@
 #include <minos/flag.h>
 #include <minos/bootarg.h>
 #include <minos/console.h>
+#include <minos/flag.h>
 
 #ifdef CONFIG_VIRT
 extern void start_all_vm(void);
@@ -62,35 +63,6 @@ static inline bool pcpu_can_idle(struct pcpu *pcpu)
 		(is_list_empty(&pcpu->stop_list));
 }
 
-static void do_pcpu_cleanup_work(struct pcpu *pcpu)
-{
-	extern void release_thread(struct task *task);
-	struct task *task;
-
-	/*
-	 * the race may happen when other task in this pcpu
-	 * call stop(), so need to disable the preempt to avoid
-	 * the idle task preempt by other task here. currently
-	 * the stop list will only write when the task request stop
-	 * so do not need to diable the interrupt.
-	 */
-	for (; ;) {
-		task = NULL;
-		preempt_disable();
-		if (!is_list_empty(&pcpu->stop_list)) {
-			task = list_first_entry(&pcpu->stop_list,
-					struct task, stat_list);
-			list_del(&task->stat_list);
-		}
-		preempt_enable();
-
-		if (!task)
-			break;
-
-		do_release_task(task);
-	}
-}
-
 static int __init_task(void *main)
 {
 #ifdef CONFIG_VIRT
@@ -103,6 +75,66 @@ static int __init_task(void *main)
 }
 weak_alias(__init_task, init_task);
 
+static void pcpu_release_task(struct pcpu *pcpu)
+{
+	unsigned long flags;
+	struct task *task;
+
+	local_irq_save(flags);
+
+	while (!is_list_empty(&pcpu->stop_list)) {
+		task = list_first_entry(&pcpu->stop_list, struct task, stat_list);
+		list_del(&task->stat_list);
+		do_release_task(task);
+	}
+
+	local_irq_restore(flags);
+}
+
+static int kworker_task(void *data)
+{
+	struct pcpu *pcpu = get_pcpu();
+	flag_t flag;
+
+	pcpu->kworker = current;
+	flag_init(&pcpu->kworker_flag, 0);
+
+	for (;;) {
+		flag = flag_pend(&pcpu->kworker_flag, KWORKER_FLAG_MASK,
+				FLAG_WAIT_SET_ANY | FLAG_CONSUME, 0);
+		if (flag == 0) {
+			pr_err("kworker: no event trigger\n");
+			continue;
+		}
+
+		if (flag & KWORKER_TASK_RECYCLE)
+			pcpu_release_task(pcpu);
+	}
+
+	return 0;
+}
+
+static void start_system_task(void)
+{
+	int cpu = smp_processor_id();
+	struct task *task;
+	char name[32];
+
+	pr_notice("create kworker task...\n");
+	sprintf(name, "kworker/%d", cpu);
+	task = create_task(name, kworker_task, 0x2000,
+			OS_PRIO_DEFAULT_1, cpu, 0, NULL);
+	ASSERT(task != NULL);
+
+	if (cpu == 0) {
+		pr_notice("create init task...\n");
+		task = create_task("init", init_task, 0x2000,
+				OS_PRIO_SYSTEM, -1, 0, NULL);
+		if (!task)
+			pr_err("create init task failed\n");
+	}
+}
+
 void cpu_idle(void)
 {
 	struct pcpu *pcpu = get_pcpu();
@@ -110,15 +142,9 @@ void cpu_idle(void)
 	set_os_running();
 	local_irq_enable();
 
-	if (pcpu->pcpu_id == 0) {
-		pr_notice("create init task for system\n");
-		create_task("init", init_task, 0x2000,
-				OS_PRIO_SYSTEM, -1, 0, NULL);
-	}
+	start_system_task();
 
 	while (1) {
-		do_pcpu_cleanup_work(pcpu);
-
 		/*
 		 * need to check whether the pcpu can go to idle
 		 * state to avoid the interrupt happend before wfi

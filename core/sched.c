@@ -22,6 +22,7 @@
 #include <minos/of.h>
 #include <minos/bootarg.h>
 #include <minos/mm.h>
+#include <minos/flag.h>
 
 #ifdef CONFIG_VIRT
 #include <virt/virt.h>
@@ -165,8 +166,10 @@ static struct task *pick_next_task(struct pcpu *pcpu)
 	 */
 	if (!task_is_running(task)) {
 		remove_task_from_ready_list(pcpu, task);
-                if (task->stat == TASK_STAT_STOP)
+                if (task->stat == TASK_STAT_STOP) {
                         list_add_tail(&pcpu->stop_list, &task->stat_list);
+			flag_set(&pcpu->kworker_flag, KWORKER_TASK_RECYCLE);
+		}
 	}
 
 	/*
@@ -264,6 +267,8 @@ static void do_sched(void)
 
 	local_irq_save(flags);
 
+	next = pick_next_task(pcpu);
+
 	/*
 	 * clear the bit of TIF_NEED_RESCHED and
 	 * TIF_DONOT_PREEMPT here.
@@ -271,7 +276,6 @@ static void do_sched(void)
 	clear_bit(TIF_DONOT_PREEMPT, &cur->ti.flags);
 	clear_bit(TIF_NEED_RESCHED, &cur->ti.flags);
 
-	next = pick_next_task(pcpu);
 	if (next == cur) {
 		BUG_ON(cur->stat == TASK_STAT_WAIT_EVENT,
 			"sched: task need sleep\n");
@@ -301,6 +305,17 @@ void sched(void)
 		do_sched();
 		preempt_enable();
 	} while (need_resched());
+}
+
+static inline int sched_allowed(void)
+{
+	return preempt_allowed() && !irq_disabled();
+}
+
+void cond_resched(void)
+{
+	if (need_resched() && sched_allowed())
+		sched();
 }
 
 /*
@@ -457,7 +472,7 @@ int local_sched_init(void)
 	return 0;
 }
 
-int __wake_up(struct task *task, long pend_state, void *data)
+int __wake_up(struct task *task, long pend_state, int event, void *data)
 {
 	unsigned long flags;
 	uint32_t timeout;
@@ -498,9 +513,15 @@ int __wake_up(struct task *task, long pend_state, void *data)
 	 */
 	task->pend_stat = pend_state;
 	task->stat = TASK_STAT_WAKING;
-	task->msg = data;
 	timeout = task->delay;
 	task->delay = 0;
+	if (event == TASK_EVENT_FLAG) {
+		task->flags_rdy = (long)data;
+		task->msg = NULL;
+	} else {
+		task->msg = data;
+		task->flags_rdy = 0;
+	}
 
 	spin_unlock_irqrestore(&task->s_lock, flags);
 

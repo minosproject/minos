@@ -53,6 +53,9 @@
 #define TASK_STAT_SUSPEND 0x04
 #define TASK_STAT_STOP 0x08
 
+#define KWORKER_FLAG_MASK 0xffff
+#define KWORKER_TASK_RECYCLE BIT(0)
+
 enum {
 	TASK_EVENT_NULL = 0,
 
@@ -110,7 +113,6 @@ struct task {
 
 	unsigned long flags;
 
-	struct list_head list;		// link to the event list which event wait.
 	struct list_head proc_list;	// link to the process list, if is a thread.
 	struct list_head stat_list;	// link to the sched list used for sched.
 
@@ -141,7 +143,7 @@ struct task {
 	struct list_head event_list;
 
 	struct flag_node *flag_node;	// used for the flag event.
-	int flags_rdy;
+	long flags_rdy;
 
 	/*
 	 * affinity - the cpu node which the task affinity to

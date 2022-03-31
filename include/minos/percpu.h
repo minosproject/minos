@@ -21,6 +21,8 @@ struct pcpu {
 	int pcpu_id;
 	volatile int state;
 
+	void *stack;
+
 	unsigned long percpu_offset;
 
 	/*
@@ -49,7 +51,8 @@ struct pcpu {
 	struct timer_list sched_timer;
 	int os_is_running;
 
-	void *stack;
+	struct task *kworker;
+	struct flag_grp kworker_flag;
 } __cache_line_align;
 
 extern unsigned long percpu_offset[];

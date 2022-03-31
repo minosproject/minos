@@ -257,13 +257,13 @@ void free_pages(void *addr)
 {
 	struct page *page;
 
-	ASSERT(IS_PAGE_ALIGN(addr));
+	ASSERT(IS_PAGE_ALIGN(addr) || (addr != NULL));
 	spin_lock(&mm_lock);
 	page = find_used_page(addr);
 	if (page)
 		__free_page(page);
 	else
-		pr_err("%s: release wrong page 0x%x\n", addr);
+		pr_err("%s: free wrong page 0x%x\n", __func__, addr);
 	spin_unlock(&mm_lock);
 }
 

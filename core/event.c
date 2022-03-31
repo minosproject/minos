@@ -121,7 +121,7 @@ struct task *event_highest_task_ready(struct event *ev, void *msg,
 		task = event_get_waiter(ev);
 		if (!task)
 			return NULL;
-	} while (__wake_up(task, TASK_STAT_PEND_OK, msg));
+	} while (__wake_up(task, TASK_STAT_PEND_OK, ev->type, msg));
 
 	return task;
 }
