@@ -7,8 +7,6 @@
 #include <minos/preempt.h>
 #include <minos/flag.h>
 
-#define PCPU_IDLE_F_TASKS_RELEASE	(1 << 0)
-
 typedef enum {
 	PCPU_STATE_OFFLINE	= 0x0,
 	PCPU_STATE_RUNNING,
@@ -18,7 +16,7 @@ typedef enum {
 struct task;
 
 struct pcpu {
-	int pcpu_id;
+	int pcpu_id;		// fixed place, do not change.
 	volatile int state;
 
 	void *stack;

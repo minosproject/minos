@@ -7,14 +7,15 @@
 
 #include <minos/types.h>
 #include <minos/atomic.h>
+#include <asm/asm_current.h>
 
 #ifdef CONFIG_SMP
 
 void arch_ticket_lock(spinlock_t *lock);
 void arch_ticket_unlock(spinlock_t *lock);
 
-#define DEFINE_SPIN_LOCK(name)	\
-	spinlock_t name = {	\
+#define DEFINE_SPIN_LOCK(name)		\
+	spinlock_t name = {		\
 		.current_ticket = 0,	\
 		.next_ticket = 0,	\
 	}
