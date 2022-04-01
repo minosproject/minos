@@ -227,6 +227,9 @@ void switch_to_task(struct task *cur, struct task *next)
 	 */
 	if ((cur->state == TASK_STATE_WAIT_EVENT) && (cur->delay > 0))
 		mod_timer(&cur->delay_timer, now + MILLISECS(cur->delay));
+	else if (cur->state == TASK_STATE_RUNNING)
+		cur->state = TASK_STATE_READY;
+
 	cur->last_cpu = cur->cpu;
 	cur->run_time = CONFIG_TASK_RUN_TIME;
 	smp_wmb();
