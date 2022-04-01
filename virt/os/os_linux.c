@@ -371,6 +371,11 @@ static void linux_vm_setup(struct vm *vm)
 
 static int linux_create_native_vm_resource(struct vm *vm)
 {
+	if (vm->flags & VM_FLAGS_NATIVE) {
+		if (vm->kernel_file && vm->dtb_file && vm->initrd_file)
+			vm->flags |= VM_FLAGS_CAN_RESET;
+	}
+
 	if (vm->setup_data) {
 		if (of_data((void *)ptov(vm->setup_data))) {
 			vm->flags |= VM_FLAGS_SETUP_OF;
