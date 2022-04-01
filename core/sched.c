@@ -508,7 +508,7 @@ int __wake_up(struct task *task, long pend_state, int event, void *data)
 	if (task->state != TASK_STATE_WAIT_EVENT) {
 		spin_unlock_irqrestore(&task->s_lock, flags);
 		preempt_enable();
-		return 0;
+		return -EPERM;
 	}
 
 	/*
