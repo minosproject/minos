@@ -51,23 +51,8 @@ static inline struct virq_desc *get_virq_desc(struct vcpu *vcpu, uint32_t virq)
 static void inline virq_kick_vcpu(struct vcpu *vcpu,
 		struct virq_desc *desc)
 {
-	int preempt = virq_is_hw(desc);
-
-	/*
-	 * if the virq is not hardware virq, when the native
-	 * wfi is enabled for the target vcpu, the target vcpu
-	 * may not receive the virq immediately, and may wait
-	 * last physical irq come, then this pcpu can wakeup
-	 * from the WFI mode, so here need to send a phyical
-	 * irq to the target pcpu.
-	 */
-	if (!virq_is_hw(desc) && (vcpu->vm->flags & VM_FLAGS_NATIVE_WFI) &&
-			(current->affinity != vcpu_affinity(vcpu)))
-		preempt = 1;
-	else
-		preempt = virq_is_hw(desc);
-
-	kick_vcpu(vcpu, preempt);
+	kick_vcpu(vcpu, virq_is_hw(desc) ?
+			VCPU_KICK_REASON_HIRQ: VCPU_KICK_REASON_VIRQ);
 }
 
 static int inline __send_virq(struct vcpu *vcpu, struct virq_desc *desc)
@@ -111,30 +96,26 @@ out:
 static int send_virq(struct vcpu *vcpu, struct virq_desc *desc)
 {
 	struct vm *vm = vcpu->vm;
-	int ret;
+	int ret, state = vm->state;
 
-	/* do not send irq to vm if not online or suspend state */
-	// if (check_vcpu_state(vcpu, VCPU_STATE_STOP)) {
-	//	pr_warn("send virq failed vcpu is stoped\n");
-	//	return -EINVAL;
-	// }
-
-	if (check_vm_state(vm, VM_STATE_OFFLINE) ||
-			check_vm_state(vm, VM_STATE_REBOOT)) {
-		pr_warn("send virq fail, vm is offline or rebooting\n");
-		return -EINVAL;
+	/*
+	 * Only check the VM's state here, the vcpu's state will check
+	 * in kick_vcpu and return_to_user.
+	 */
+	if ((state == VM_STATE_OFFLINE) || (state == VM_STATE_REBOOT)) {
+		pr_warn("VM %s is offline or reboot drop virq %d\n",
+				vm->name, desc->vno);
+		return -EPERM;
 	}
 
 	/*
-	 * check the state of the vcpu, if the vm is in suspend state
+	 * check the state of the vm, if the vm is in suspend state
 	 * and the irq can not wake up the vm, just return. Otherwise
 	 * need to kick the vcpu, kick_vcpu can wakeup the system.
 	 */
-	if (vm->state == VM_STATE_SUSPEND) {
-		if (!virq_can_wakeup(desc)) {
-			pr_warn("send virq failed vm is suspend\n");
-			return -EAGAIN;
-		}
+	if ((vm->state == VM_STATE_SUSPEND) && !virq_can_wakeup(desc)) {
+		pr_warn("VM %s is suspend drop virq %d\n", vm->name, desc->vno);
+		return -EAGAIN;
 	}
 
 	ret = __send_virq(vcpu, desc);

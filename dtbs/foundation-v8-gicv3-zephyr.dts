@@ -21,7 +21,6 @@
 			device_type = "virtual_machine";
 			vm_name = "fvp_linux_host";
 			host_vm;
-			native_wfi;
 			vmid = <1>;
 			type = "linux";
 			vcpus = <1>;

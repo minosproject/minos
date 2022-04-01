@@ -351,7 +351,6 @@ static inline void __linux_vcpu_startup(struct vcpu *vcpu, unsigned long entry)
 		regs->x2 = 0;
 		regs->x3 = 0;
 	}
-
 }
 
 static void linux_vcpu_startup(struct vcpu *vcpu)

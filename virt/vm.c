@@ -57,7 +57,8 @@ DEFINE_SPIN_LOCK(affinity_lock);
 
 static void vcpu_online(struct vcpu *vcpu)
 {
-	ASSERT(check_vcpu_state(vcpu, TASK_STATE_STOP));
+	ASSERT(check_vcpu_state(vcpu, VCPU_STATE_STOP));
+	set_vcpu_state(vcpu, VCPU_STATE_RUNNING);
 	task_ready(vcpu->task, 0);
 	atomic_inc(&vcpu->vm->vcpu_online_cnt);
 }
@@ -134,17 +135,16 @@ int vcpu_idle(struct vcpu *vcpu)
 	unsigned long flags;
 	int idle = 1;
 
-	return -EBUSY;
-
 	if (!vcpu_can_idle(vcpu))
 		return -EBUSY;
 
 	spin_lock_irqsave(&vcpu->lock, flags);
-	if (vcpu_can_idle(vcpu)) {
+	if (!vcpu_can_idle(vcpu)) {
 		idle = 0;
 		goto out;
 	}
 
+	set_vcpu_state(vcpu, VCPU_STATE_SUSPEND);
 	__event_task_wait(0, TASK_EVENT_ANY, 0);
 out:
 	spin_unlock_irqrestore(&vcpu->lock, flags);
@@ -152,6 +152,7 @@ out:
 		return -EBUSY;
 
 	idle = wait_event();
+	set_vcpu_state(vcpu, VCPU_STATE_RUNNING);
 
 	return idle;
 }
@@ -169,6 +170,7 @@ int vcpu_suspend(struct vcpu *vcpu, gp_regs *c,
 
 int vcpu_off(struct vcpu *vcpu)
 {
+	set_vcpu_state(vcpu, VCPU_STATE_STOP);
 	task_need_freeze(vcpu->task);
 
 	return 0;
@@ -211,34 +213,79 @@ struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id)
 	return get_vcpu_in_vm(vm, vcpu_id);
 }
 
-int kick_vcpu(struct vcpu *vcpu, int preempt)
+static inline void kick_by_hirq(struct vcpu *vcpu, int mode, int ret)
 {
+	/*
+	 * ret < 0 means the task do not need to wake up and in ready state.
+	 * if task is in ready state, or the task is running in guest mode
+	 * then need send a physical irq to the target irq.
+	 */
+	if ((mode == IN_GUEST_MODE) || (mode == OUTSIDE_ROOT_MODE) || (ret < 0))
+		pcpu_resched(vcpu_affinity(vcpu));
+}
+
+static inline void kick_by_virq(struct vcpu *vcpu, int mode, int ret)
+{
+	/*
+	 * if the virq is not hardware virq, when the native
+	 * wfi is enabled for the target vcpu, the target vcpu
+	 * may not receive the virq immediately, and may wait
+	 * last physical irq come, then this pcpu can wakeup
+	 * from the WFI mode, so here need to send a phyical
+	 * irq to the target pcpu. Native WFI VCPU will always
+	 * in running mode in EL1.
+	 */
+	if ((vcpu->vm->flags & VM_FLAGS_NATIVE_WFI))
+		pcpu_resched(vcpu_affinity(vcpu));
+}
+
+int kick_vcpu(struct vcpu *vcpu, int reason)
+{
+	int vcpu_mode, ret = 0;
+	int same_cpu;
 	unsigned long flags;
-	int wakeup = 1;
-	int ret = 0;
+
+	vcpu_mode = vcpu->mode;
+	smp_rmb();
+	same_cpu = (smp_processor_id() == vcpu_affinity(vcpu));
 
 	/*
+	 * 1 - whether need to wake up the task.
+	 * 2 - whether need to send a resched irq.
+	 *
 	 * if the vcpu is in stop state, only the BootCPU
 	 * can wake up it. this will be another path.
 	 */
 	spin_lock_irqsave(&vcpu->lock, flags);
-	if (vcpu->task->state == TASK_STATE_STOP) {
-		pr_err("%s vcpu is in stop mode\n", __func__);
-		wakeup = 0;
-		goto out;
-	}
-
-	ret = wake_up(vcpu->task);
-	if (ret)
-		pr_err("%s wake up vcpu failed %d\n", ret);
-out:
+	if (check_vcpu_state(vcpu, VCPU_STATE_SUSPEND))
+		ret = wake_up(vcpu->task);
+	else
+		ret = 1;
 	spin_unlock_irqrestore(&vcpu->lock, flags);
 
-	if (!wakeup)
-		return 0;
+	/*
+	 * 0   - wakeup successfuly
+	 * 1   - do not need wake up task
+	 * < 0 - wake up failed
+	 */
+	if (same_cpu) {
+		cond_resched();
+		return ret;
+	}
 
-	if (preempt && (current->affinity != vcpu_affinity(vcpu)))
-		pcpu_resched(vcpu_affinity(vcpu));
+	switch (reason) {
+	case VCPU_KICK_REASON_VIRQ:
+		kick_by_virq(vcpu, vcpu_mode, ret);
+		break;
+	case VCPU_KICK_REASON_HIRQ:
+		kick_by_hirq(vcpu, vcpu_mode, ret);
+		break;
+	default:
+		/*
+		 * do nothing ?
+		 */
+		break;
+	}
 
 	return ret;
 }
@@ -289,14 +336,28 @@ free_vcpu:
 
 static void vcpu_return_to_user(struct task *task, gp_regs *regs)
 {
-	do_hooks((struct vcpu *)task->pdata,
-			(void *)regs, OS_HOOK_ENTER_TO_GUEST);
+	struct vcpu *vcpu = (struct vcpu *)task->pdata;
+
+	vcpu->mode = OUTSIDE_ROOT_MODE;
+	smp_wmb();
+
+	do_hooks(vcpu, (void *)regs, OS_HOOK_ENTER_TO_GUEST);
+
+	vcpu->mode = IN_ROOT_MODE;
+	smp_wmb();
 }
 
 static void vcpu_exit_from_user(struct task *task, gp_regs *regs)
 {
-	do_hooks((struct vcpu *)task->pdata,
-			(void *)regs, OS_HOOK_EXIT_FROM_GUEST);
+	struct vcpu *vcpu = (struct vcpu *)task->pdata;
+
+	vcpu->mode = OUTSIDE_GUEST_MODE;
+	smp_wmb();
+
+	do_hooks(vcpu, (void *)regs, OS_HOOK_EXIT_FROM_GUEST);
+
+	vcpu->mode = IN_ROOT_MODE;
+	smp_wmb();
 }
 
 static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
@@ -326,6 +387,8 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 	vcpu->task = task;
 	vcpu->vcpu_id = vcpu_id;
 	vcpu->vm = vm;
+	vcpu->state = VCPU_STATE_STOP;
+	vcpu->mode = IN_ROOT_MODE;
 
 	if (vm->flags & VM_FLAGS_32BIT)
 		task->flags |= TASK_FLAGS_32BIT;
@@ -343,7 +406,7 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 	return vcpu;
 }
 
-static void vcpu_reset(struct vcpu *vcpu)
+void vcpu_reset(struct vcpu *vcpu)
 {
 	reset_vcpu_vmodule_state(vcpu);
 	vcpu_virq_struct_reset(vcpu);
@@ -357,21 +420,24 @@ static void vcpu_power_off_call(void *data)
 		set_need_resched();
 }
 
-void vcpu_enter_poweroff(struct vcpu *vcpu, int suspend)
+void vcpu_enter_poweroff(struct vcpu *vcpu)
 {
 	struct task *task = vcpu->task;
+	int skip = 0;
 	unsigned long flags;
 
 	spin_lock_irqsave(&vcpu->lock, flags);
-	if (suspend)
-		task_need_freeze(task);
-	else
-		task_need_stop(task);
-	if (task->state == TASK_STATE_WAIT_EVENT)
-		wake_up_abort(task);
+	if (check_vcpu_state(vcpu, VCPU_STATE_STOP)) {
+		skip = 1;
+		goto out;
+	}
+	set_vcpu_state(vcpu, VCPU_STATE_STOP);
+	task_need_freeze(task);
+	wake_up_abort(task);
+out:
 	spin_unlock_irqrestore(&vcpu->lock, flags);
 
-	if (vcpu_affinity(vcpu) != smp_processor_id()) {
+	if ((vcpu_affinity(vcpu) != smp_processor_id()) && !skip) {
 		pr_debug("call vcpu_power_off_call for vcpu-%s\n",
 				vcpu->task->name);
 		smp_function_call(vcpu->task->affinity,
@@ -573,32 +639,8 @@ int vm_power_up(int vmid)
 	return 0;
 }
 
-static int wait_vcpu_in_state(struct vcpu *vcpu, int state, uint32_t timeout)
-{
-	int i;
-
-	if (vcpu == current_vcpu)
-		return 0;
-
-	timeout = (timeout == 0) ? -1 : timeout;
-	pr_notice("wait 0x%x ms for vcpu ready\n", timeout);
-
-	/*
-	 * if the target vcpu is on the same physical pcpu, need
-	 * call sched() to let it has time to run.
-	 */
-	for (i = 0; i < timeout / 10; i++) {
-		if (check_vcpu_state(vcpu, state))
-			return 0;
-		msleep(10);
-	}
-
-	return -ETIMEDOUT;
-}
-
 static int __vm_power_off(struct vm *vm, void *args, int byself)
 {
-	int ret = 0;
 	struct vcpu *vcpu;
 
 	/*
@@ -611,13 +653,7 @@ static int __vm_power_off(struct vm *vm, void *args, int byself)
 
 	set_vm_state(vm, VM_STATE_OFFLINE);
 	vm_for_each_vcpu(vm, vcpu)
-		vcpu_enter_poweroff(vcpu, 0);
-
-	vm_for_each_vcpu(vm, vcpu) {
-		ret = wait_vcpu_in_state(vcpu, TASK_STATE_STOP, 1000);
-		if (ret)
-			pr_err("wait vcpu stop failed %d\n", ret);
-	}
+		vcpu_enter_poweroff(vcpu);
 
 	/*
 	 * the vcpu has been set to TIF_NEED_STOP, so when return
@@ -693,6 +729,7 @@ int create_guest_vm(struct vmtag __guest *tag)
 		return ret;
 
 	vmtag.vmid = 0;
+	vmtag.flags |= VM_FLAGS_CAN_RESET;
 	vm = create_vm(&vmtag);
 	if (!vm)
 		return -ENOMEM;
@@ -708,9 +745,7 @@ int create_guest_vm(struct vmtag __guest *tag)
 
 static int __vm_reset(struct vm *vm, void *args, int byself)
 {
-	struct vdev *vdev;
 	struct vcpu *vcpu;
-	int ret;
 
 	pr_notice("reset vm-%d by %s\n",
 			vm->vmid, byself ? "itself" : "mvm");
@@ -728,30 +763,7 @@ static int __vm_reset(struct vm *vm, void *args, int byself)
 
 	set_vm_state(vm, VM_STATE_REBOOT);
 	vm_for_each_vcpu(vm, vcpu)
-		vcpu_enter_poweroff(vcpu, 1);
-
-	vm_for_each_vcpu(vm, vcpu) {
-		if (vcpu == current_vcpu)
-			continue;
-
-		ret = wait_vcpu_in_state(vcpu, TASK_STATE_SUSPEND, 1000);
-		if (ret) {
-			pr_err("vm-%d vcpu-%d power off failed\n",
-					vm->vmid, vcpu->vcpu_id);
-			return ret;
-		}
-	}
-
-	vm_for_each_vcpu(vm, vcpu)
-		vcpu_reset(vcpu);
-
-	/* reset the vdev for this vm */
-	list_for_each_entry(vdev, &vm->vdev_list, list) {
-		if (vdev->reset)
-			vdev->reset(vdev);
-	}
-
-	vm_virq_reset(vm);
+		vcpu_enter_poweroff(vcpu);
 
 	if (!vm_is_native(vm) && byself) {
 		pr_notice("send REBOOT request to mvm\n");

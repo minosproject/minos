@@ -26,8 +26,9 @@
 
 #define VCPU_NAME_SIZE		(64)
 
-#define VCPU_SCHED_REASON_HIRQ	0x0
-#define VCPU_SCHED_REASON_VIRQ	0x1
+#define VCPU_KICK_REASON_NONE 0x0
+#define VCPU_KICK_REASON_HIRQ 0x1
+#define VCPU_KICK_REASON_VIRQ 0x2
 
 struct os;
 struct vm;
@@ -37,11 +38,25 @@ struct virq_chip;
 extern struct list_head vm_list;
 extern struct list_head mem_list;
 
+#define VCPU_STATE_RUNNING 0x00
+#define VCPU_STATE_SUSPEND 0x01
+#define VCPU_STATE_STOP 0x2
+
+enum {
+	IN_GUEST_MODE,
+	OUTSIDE_GUEST_MODE,
+	IN_ROOT_MODE,
+	OUTSIDE_ROOT_MODE,
+};
+
 struct vcpu {
 	uint32_t vcpu_id;
 	struct vm *vm;
 	struct task *task;
 	struct vcpu *next;
+
+	volatile int state;
+	volatile int mode;
 
 	/*
 	 * member to record the irq list which the
@@ -229,7 +244,13 @@ static inline int get_vm_vcpu_online_cnt(struct vm *vm)
 
 static inline int check_vcpu_state(struct vcpu *vcpu, int state)
 {
-	return 1;
+	return (vcpu->state == state);
+}
+
+static inline void set_vcpu_state(struct vcpu *vcpu, int state)
+{
+	vcpu->state = state;
+	smp_wmb();
 }
 
 static inline void set_vm_state(struct vm *vm, int state)
@@ -245,5 +266,7 @@ static inline int check_vm_state(struct vm *vm, int state)
 
 int send_vm_shutdown_request(struct vm *vm);
 int send_vm_reboot_request(struct vm *vm);
+
+void vcpu_reset(struct vcpu *vcpu);
 
 #endif

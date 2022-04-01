@@ -148,7 +148,6 @@ long wait_event(void)
 	struct task *task = current;
 	long status;
 
-	ASSERT(task->state == TASK_STATE_WAIT_EVENT);
 	sched();
 
 	status = task->pend_state;

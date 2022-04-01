@@ -491,16 +491,58 @@ int local_sched_init(void)
 	return 0;
 }
 
-int __wake_up(struct task *task, long pend_state, int event, void *data)
+static int wake_up_interrupted(struct task *task,
+		long pend_state, int event, void *data)
+{
+	unsigned long flags;
+
+	ASSERT(pend_state != TASK_STATE_PEND_TO);
+
+	if (task->state != TASK_STATE_WAIT_EVENT)
+		return -EINVAL;
+
+	/*
+	 * the interrup occurs when task try to wait_event. in
+	 * addition:
+	 * 1 - the interrupt is happended in the same cpu.
+	 * 2 - will not the delay timer, since the delay time
+	 *     has not been set already.
+	 * 3 - the state must TASK_STATE_WAIT_EVENT
+	 * 4 - task has not been in sched routine.
+	 */
+	spin_lock_irqsave(&task->s_lock, flags);
+	if (task->state != TASK_STATE_WAIT_EVENT) {
+		spin_unlock_irqrestore(&task->s_lock, flags);
+		return -EINVAL;
+	}
+
+	task->ti.flags |= __TIF_WAIT_INTERRUPTED;
+
+	/*
+	 * here this cpu got this task, and can set the new
+	 * state to running and run it again.
+	 */
+	task->pend_state = pend_state;
+	task->state = TASK_STATE_RUNNING;
+	task->delay = 0;
+	if (event == TASK_EVENT_FLAG) {
+		task->flags_rdy = (long)data;
+		task->msg = NULL;
+	} else {
+		task->msg = data;
+		task->flags_rdy = 0;
+	}
+	spin_unlock_irqrestore(&task->s_lock, flags);
+
+	return 0;
+}
+
+static int wake_up_common(struct task *task, long pend_state, int event, void *data)
 {
 	unsigned long flags;
 	uint32_t timeout;
 
-	if (task == current)
-		return 0;
-
 	preempt_disable();
-
 	spin_lock_irqsave(&task->s_lock, flags);
 
 	/*
@@ -558,4 +600,12 @@ int __wake_up(struct task *task, long pend_state, int event, void *data)
 	preempt_enable();
 
 	return 0;
+}
+
+int __wake_up(struct task *task, long pend_state, int event, void *data)
+{
+	if (task == current)
+		return wake_up_interrupted(task, pend_state, event, data);
+	else
+		return wake_up_common(task, pend_state, event, data);
 }
