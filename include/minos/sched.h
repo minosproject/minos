@@ -23,37 +23,28 @@ void irq_exit(gp_regs *regs);
 void cpus_resched(void);
 int task_ready(struct task *task, int preempt);
 
+void __might_sleep(const char *file, int line, int preempt_offset);
+
 int __wake_up(struct task *task, long pend_state, int type, void *data);
 
 static inline int wake_up(struct task *task)
 {
-	return __wake_up(task, TASK_STAT_PEND_OK, 0, NULL);
+	return __wake_up(task, TASK_STATE_PEND_OK, 0, NULL);
 }
 
 static inline int wake_up_timeout(struct task *task)
 {
-	return __wake_up(task, TASK_STAT_PEND_TO, 0, NULL);
+	return __wake_up(task, TASK_STATE_PEND_TO, 0, NULL);
 }
 
 static inline int wake_up_abort(struct task *task)
 {
-	return __wake_up(task, TASK_STAT_PEND_ABORT, 0, NULL);
+	return __wake_up(task, TASK_STATE_PEND_ABORT, 0, NULL);
 }
 
-/*
- * set current running task's state do not need to obtain
- * a lock, when need to wakeup the task, below state the state
- * can be changed:
- * 1 - running -> wait_event
- * 2 - wait_event -> running (waked up by event)
- * 3 - new -> running
- * 4 - running -> stopped
- */
-#define set_current_state(state, to) 		\
-	do {			 		\
-		current->stat = (state); 	\
-		current->delay = (to);		\
-		smp_mb();			\
+#define might_sleep() \
+	do { \
+		__might_sleep(__FILE__, __LINE__, 0); \
 	} while (0)
 
 #endif

@@ -116,7 +116,7 @@ static void vtimer_state_save(struct vcpu *vcpu, void *context)
 	vtimer->cnt_cval = read_sysreg64(ARM64_CNTV_CVAL_EL0);
 	dsb();
 
-	if (task->stat == TASK_STAT_STOP)
+	if (task->state == TASK_STATE_STOP)
 		return;
 
 	if ((vtimer->cnt_ctl & CNT_CTL_ENABLE) &&

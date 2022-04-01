@@ -16,10 +16,10 @@
 
 #define VM_MAX_VCPU CONFIG_NR_CPUS
 
-#define VM_STAT_OFFLINE	(0)
-#define VM_STAT_ONLINE (1)
-#define VM_STAT_SUSPEND (2)
-#define VM_STAT_REBOOT (3)
+#define VM_STATE_OFFLINE (0)
+#define VM_STATE_ONLINE (1)
+#define VM_STATE_SUSPEND (2)
+#define VM_STATE_REBOOT (3)
 
 #define VCPU_MAX_LOCAL_IRQS		(32)
 #define CONFIG_VCPU_MAX_ACTIVE_IRQS	(16)
@@ -229,7 +229,7 @@ static inline int get_vm_vcpu_online_cnt(struct vm *vm)
 
 static inline int check_vcpu_state(struct vcpu *vcpu, int state)
 {
-	return (vcpu->task->stat == state);
+	return 1;
 }
 
 static inline void set_vm_state(struct vm *vm, int state)

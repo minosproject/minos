@@ -126,7 +126,7 @@ static void flag_task_ready(struct flag_node *node, flag_t flags)
 {
 	struct task *task = node->task;
 
-	__wake_up(task, TASK_STAT_PEND_OK, TASK_EVENT_FLAG,
+	__wake_up(task, TASK_STATE_PEND_OK, TASK_EVENT_FLAG,
 			(void *)(unsigned long)flags);
 }
 
@@ -208,8 +208,8 @@ flag_t flag_pend(struct flag_grp *grp, flag_t flags,
 	/*
 	 * wait timeout or the releated event happened
 	 */
-	if (task->pend_stat != TASK_STAT_PEND_OK) {
-		task->pend_stat = TASK_STAT_PEND_OK;
+	if (task->pend_state != TASK_STATE_PEND_OK) {
+		task->pend_state = TASK_STATE_PEND_OK;
 		list_del(&node.list);
 		flags_rdy = 0;
 	} else {

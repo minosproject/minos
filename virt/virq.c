@@ -114,13 +114,13 @@ static int send_virq(struct vcpu *vcpu, struct virq_desc *desc)
 	int ret;
 
 	/* do not send irq to vm if not online or suspend state */
-	if (check_vcpu_state(vcpu, TASK_STAT_STOP)) {
-		pr_warn("send virq failed vcpu is stoped\n");
-		return -EINVAL;
-	}
+	// if (check_vcpu_state(vcpu, VCPU_STATE_STOP)) {
+	//	pr_warn("send virq failed vcpu is stoped\n");
+	//	return -EINVAL;
+	// }
 
-	if (check_vm_state(vm, VM_STAT_OFFLINE) ||
-			check_vm_state(vm, VM_STAT_REBOOT)) {
+	if (check_vm_state(vm, VM_STATE_OFFLINE) ||
+			check_vm_state(vm, VM_STATE_REBOOT)) {
 		pr_warn("send virq fail, vm is offline or rebooting\n");
 		return -EINVAL;
 	}
@@ -130,7 +130,7 @@ static int send_virq(struct vcpu *vcpu, struct virq_desc *desc)
 	 * and the irq can not wake up the vm, just return. Otherwise
 	 * need to kick the vcpu, kick_vcpu can wakeup the system.
 	 */
-	if (vm->state == VM_STAT_SUSPEND) {
+	if (vm->state == VM_STATE_SUSPEND) {
 		if (!virq_can_wakeup(desc)) {
 			pr_warn("send virq failed vm is suspend\n");
 			return -EAGAIN;

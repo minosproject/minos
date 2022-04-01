@@ -39,14 +39,30 @@ extern struct task *os_task_table[OS_NR_TASKS];
 			panic("sched is disabled %s %d\n", __func__, __LINE__);	\
 	} while (0)
 
+void __might_sleep(const char *file, int line, int preempt_offset)
+{
+	struct task *task = current;
+
+	WARN_ONCE(task->state != TASK_STATE_RUNNING,
+			"do not call blocking ops when !TASK_RUNNING; "
+			"state=%d", task->state);
+
+	if (preempt_allowed() && !irq_disabled() && !task_is_idle(task))
+		return;
+
+	pr_err("BUG: sleeping function called from invalid context at %d %s:%d\n",
+			current->ti.preempt_count, file, line);
+	dump_stack(NULL, (unsigned long *)arch_get_sp());
+}
+
 static inline void add_task_to_ready_list(struct pcpu *pcpu,
 		struct task *task, int preempt)
 {
-	ASSERT(task->stat_list.next == NULL);
+	ASSERT(task->state_list.next == NULL);
 	if (preempt)
-		list_add(&pcpu->ready_list[task->prio], &task->stat_list);
+		list_add(&pcpu->ready_list[task->prio], &task->state_list);
 	else
-		list_add_tail(&pcpu->ready_list[task->prio], &task->stat_list);
+		list_add_tail(&pcpu->ready_list[task->prio], &task->state_list);
 	pcpu->tasks_in_prio[task->prio]++;
 	pcpu->local_rdy_grp |= BIT(task->prio);
 	wmb();
@@ -57,8 +73,8 @@ static inline void add_task_to_ready_list(struct pcpu *pcpu,
 
 static inline void remove_task_from_ready_list(struct pcpu *pcpu, struct task *task)
 {
-	ASSERT(task->stat_list.next != NULL);
-	list_del(&task->stat_list);
+	ASSERT(task->state_list.next != NULL);
+	list_del(&task->state_list);
 	pcpu->tasks_in_prio[task->prio]--;
 	if (is_list_empty(&pcpu->ready_list[task->prio]))
 		pcpu->local_rdy_grp &= ~BIT(task->prio);
@@ -100,9 +116,9 @@ static inline void smp_percpu_task_ready(struct pcpu *pcpu,
 	if (preempt)
 		task_set_resched(task);
 
-	ASSERT(task->stat_list.next == NULL);
+	ASSERT(task->state_list.next == NULL);
 	spin_lock_irqsave(&pcpu->lock, flags);
-	list_add_tail(&pcpu->new_list, &task->stat_list);
+	list_add_tail(&pcpu->new_list, &task->state_list);
 	spin_unlock_irqrestore(&pcpu->lock, flags);
 
 	pcpu_irqwork(pcpu->pcpu_id);
@@ -147,7 +163,7 @@ void task_sleep(uint32_t delay)
 	 */
 	do_not_preempt();
 	task->delay = delay;
-	task->stat = TASK_STAT_WAIT_EVENT;
+	task->state = TASK_STATE_WAIT_EVENT;
 	task->wait_type = TASK_EVENT_TIMER;
 
 	sched();
@@ -166,8 +182,8 @@ static struct task *pick_next_task(struct pcpu *pcpu)
 	 */
 	if (!task_is_running(task)) {
 		remove_task_from_ready_list(pcpu, task);
-                if (task->stat == TASK_STAT_STOP) {
-                        list_add_tail(&pcpu->stop_list, &task->stat_list);
+                if (task->state == TASK_STATE_STOP) {
+                        list_add_tail(&pcpu->stop_list, &task->state_list);
 			flag_set(&pcpu->kworker_flag, KWORKER_TASK_RECYCLE);
 		}
 	}
@@ -184,9 +200,9 @@ static struct task *pick_next_task(struct pcpu *pcpu)
 	 * task to the end of the ready list.
 	 */
 	ASSERT(!is_list_empty(head));
-	task = list_first_entry(head, struct task, stat_list);
-	list_del(&task->stat_list);
-	list_add_tail(head, &task->stat_list);
+	task = list_first_entry(head, struct task, state_list);
+	list_del(&task->state_list);
+	list_add_tail(head, &task->state_list);
 
 	return task;
 }
@@ -202,14 +218,14 @@ void switch_to_task(struct task *cur, struct task *next)
 	now = NOW();
 
 	/* 
-	 * check the current task's stat and do some action
+	 * check the current task's state and do some action
 	 * to it, check whether it suspend time is set or not
 	 *
 	 * if the task is ready state, adjust the run time of
 	 * this task. If the task need to wait some event, and
 	 * need request a timeout timer then need setup the timer.
 	 */
-	if ((cur->stat == TASK_STAT_WAIT_EVENT) && (cur->delay > 0))
+	if ((cur->state == TASK_STATE_WAIT_EVENT) && (cur->delay > 0))
 		mod_timer(&cur->delay_timer, now + MILLISECS(cur->delay));
 	cur->last_cpu = cur->cpu;
 	cur->run_time = CONFIG_TASK_RUN_TIME;
@@ -225,7 +241,7 @@ void switch_to_task(struct task *cur, struct task *next)
 	/*
 	 * change the current task to next task.
 	 */
-	next->stat = TASK_STAT_RUNNING;
+	next->state = TASK_STATE_RUNNING;
 	set_current_task(next);
 	pcpu->running_task = next;
 
@@ -277,7 +293,7 @@ static void do_sched(void)
 	clear_bit(TIF_NEED_RESCHED, &cur->ti.flags);
 
 	if (next == cur) {
-		BUG_ON(cur->stat == TASK_STAT_WAIT_EVENT,
+		BUG_ON(cur->state == TASK_STATE_WAIT_EVENT,
 			"sched: task need sleep\n");
 		goto out;
 	}
@@ -357,7 +373,7 @@ static void task_run_again(struct pcpu *pcpu, struct task *task)
 
 void task_exit(int errno)
 {
-	set_current_stat(TASK_STAT_STOP);
+	set_current_state(TASK_STATE_STOP, 0);
 	sched();
 }
 
@@ -404,15 +420,15 @@ static int irqwork_handler(uint32_t irq, void *data)
 	 * set to ready state again
 	 */
 	raw_spin_lock(&pcpu->lock);
-	list_for_each_entry_safe(task, n, &pcpu->new_list, stat_list) {
+	list_for_each_entry_safe(task, n, &pcpu->new_list, state_list) {
 		/*
 		 * remove it from the new_next.
 		 */
-		list_del(&task->stat_list);
+		list_del(&task->state_list);
 
-		if (task->stat == TASK_STAT_RUNNING) {
+		if (task->state == TASK_STATE_RUNNING) {
 			pr_err("task %s state %d wrong\n",
-				task->name? task->name : "Null", task->stat);
+				task->name? task->name : "Null", task->state);
 			continue;
 		}
 
@@ -486,10 +502,10 @@ int __wake_up(struct task *task, long pend_state, int event, void *data)
 
 	/*
 	 * task already waked up, if the stat is set to
-	 * TASK_STAT_WAIT_EVENT, it means that the task will
+	 * TASK_STATE_WAIT_EVENT, it means that the task will
 	 * call sched() to sleep or wait something happen.
 	 */
-	if (task->stat != TASK_STAT_WAIT_EVENT) {
+	if (task->state != TASK_STATE_WAIT_EVENT) {
 		spin_unlock_irqrestore(&task->s_lock, flags);
 		preempt_enable();
 		return 0;
@@ -511,8 +527,8 @@ int __wake_up(struct task *task, long pend_state, int event, void *data)
 	 * here this cpu got this task, and can set the new
 	 * state to running and run it again.
 	 */
-	task->pend_stat = pend_state;
-	task->stat = TASK_STAT_WAKING;
+	task->pend_state = pend_state;
+	task->state = TASK_STATE_WAKING;
 	timeout = task->delay;
 	task->delay = 0;
 	if (event == TASK_EVENT_FLAG) {
@@ -529,7 +545,7 @@ int __wake_up(struct task *task, long pend_state, int event, void *data)
 	 * here it means that this task has not been timeout, so can
 	 * delete the timer for this task.
 	 */
-	if (timeout && (task->pend_stat != TASK_STAT_PEND_TO))
+	if (timeout && (task->pend_state != TASK_STATE_PEND_TO))
 		del_timer_sync(&task->delay_timer);
 
 	/*

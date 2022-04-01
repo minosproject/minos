@@ -102,13 +102,13 @@ static void task_init(struct task *task, char *name,
 
 	task->tid = tid;
 	task->prio = prio;
-	task->pend_stat = 0;
+	task->pend_state = 0;
 	task->flags = opt;
 	task->pdata = arg;
 	task->affinity = aff;
 	task->run_time = TASK_RUN_TIME;
 	spin_lock_init(&task->s_lock);
-	task->stat = TASK_STAT_STOP;
+	task->state = TASK_STATE_STOP;
 	task->cpu = -1;
 
 	cpu = (aff == TASK_AFF_ANY) ? 0 : aff;
@@ -180,11 +180,11 @@ void task_return_to_user(gp_regs *regs)
 	smp_wmb();
 
 	if (flags & __TIF_NEED_STOP)
-		task->stat = TASK_STAT_STOP;
+		task->state = TASK_STATE_STOP;
 	else if (flags & __TIF_NEED_FREEZE)
-		task->stat = TASK_STAT_SUSPEND;
+		task->state = TASK_STATE_SUSPEND;
 
-	if (task->stat != TASK_STAT_RUNNING) {
+	if (task->state != TASK_STATE_RUNNING) {
 		sched();
 		panic("%s %d: should not be here\n", __func__, __LINE__);
 	}
@@ -304,7 +304,7 @@ int create_idle_task(void)
 		(aff << CONFIG_TASK_STACK_SHIFT);
 	task->stack_bottom = task->stack_top - CONFIG_TASK_STACK_SIZE;
 
-	task->stat = TASK_STAT_RUNNING;
+	task->state = TASK_STATE_RUNNING;
 	task->cpu = aff;
 	task->run_time = 0;
 
@@ -314,7 +314,7 @@ int create_idle_task(void)
 	/* call the hooks for the idle task */
 	task_create_hook(task);
 
-	list_add_tail(&pcpu->ready_list[task->prio], &task->stat_list);
+	list_add_tail(&pcpu->ready_list[task->prio], &task->state_list);
 	pcpu->local_rdy_grp |= BIT(task->prio);
 	pcpu->idle_task = task;
 

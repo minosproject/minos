@@ -60,10 +60,10 @@ void __event_task_wait(unsigned long token, int mode, uint32_t to)
 	 */
 	do_not_preempt();
 
-	task->stat = TASK_STAT_WAIT_EVENT;
+	task->state = TASK_STATE_WAIT_EVENT;
 	smp_wmb();
 
-	task->pend_stat = TASK_STAT_PEND_OK;
+	task->pend_state = TASK_STATE_PEND_OK;
 	task->wait_type = mode;
 	task->delay = (to == -1 ? 0 : to);
 	task->wait_event = token;
@@ -113,7 +113,7 @@ struct task *event_get_waiter(struct event *ev)
 }
 
 struct task *event_highest_task_ready(struct event *ev, void *msg,
-		uint32_t msk, int pend_stat)
+		uint32_t msk, int pend_state)
 {
 	struct task *task;
 
@@ -121,7 +121,7 @@ struct task *event_highest_task_ready(struct event *ev, void *msg,
 		task = event_get_waiter(ev);
 		if (!task)
 			return NULL;
-	} while (__wake_up(task, TASK_STAT_PEND_OK, ev->type, msg));
+	} while (__wake_up(task, TASK_STATE_PEND_OK, ev->type, msg));
 
 	return task;
 }
@@ -138,7 +138,7 @@ void event_del_always(struct event *ev)
 
 void event_pend_down(struct task *task)
 {
-	task->pend_stat = TASK_STAT_PEND_OK;
+	task->pend_state = TASK_STATE_PEND_OK;
 	task->wait_event = (unsigned long)NULL;
 	task->wait_type = 0;
 }
@@ -148,11 +148,11 @@ long wait_event(void)
 	struct task *task = current;
 	long status;
 
-	ASSERT(task->stat == TASK_STAT_WAIT_EVENT);
+	ASSERT(task->state == TASK_STATE_WAIT_EVENT);
 	sched();
 
-	status = task->pend_stat;
-	task->pend_stat = TASK_STAT_PEND_OK;
+	status = task->pend_state;
+	task->pend_state = TASK_STATE_PEND_OK;
 
 	return status;
 }

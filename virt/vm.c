@@ -57,7 +57,7 @@ DEFINE_SPIN_LOCK(affinity_lock);
 
 static void vcpu_online(struct vcpu *vcpu)
 {
-	ASSERT(check_vcpu_state(vcpu, TASK_STAT_STOP));
+	ASSERT(check_vcpu_state(vcpu, TASK_STATE_STOP));
 	task_ready(vcpu->task, 0);
 	atomic_inc(&vcpu->vm->vcpu_online_cnt);
 }
@@ -98,7 +98,7 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 		return -ENOENT;
 	}
 
-	if (check_vcpu_state(vcpu, TASK_STAT_STOP)) {
+	if (check_vcpu_state(vcpu, TASK_STATE_STOP)) {
 		pr_notice("vcpu-%d of vm-%d power on from vm suspend 0x%p\n",
 				vcpu->vcpu_id, vcpu->vm->vmid, entry);
 		os_vcpu_power_on(vcpu, ULONG(entry));
@@ -222,7 +222,7 @@ int kick_vcpu(struct vcpu *vcpu, int preempt)
 	 * can wake up it. this will be another path.
 	 */
 	spin_lock_irqsave(&vcpu->lock, flags);
-	if (vcpu->task->stat == TASK_STAT_STOP) {
+	if (vcpu->task->state == TASK_STATE_STOP) {
 		pr_err("%s vcpu is in stop mode\n", __func__);
 		wakeup = 0;
 		goto out;
@@ -367,7 +367,7 @@ void vcpu_enter_poweroff(struct vcpu *vcpu, int suspend)
 		task_need_freeze(task);
 	else
 		task_need_stop(task);
-	if (task->stat == TASK_STAT_WAIT_EVENT)
+	if (task->state == TASK_STATE_WAIT_EVENT)
 		wake_up_abort(task);
 	spin_unlock_irqrestore(&vcpu->lock, flags);
 
@@ -540,7 +540,7 @@ static void start_vm(struct vm *vm)
 		return;
 	}
 
-	if (vm->state == VM_STAT_ONLINE) {
+	if (vm->state == VM_STATE_ONLINE) {
 		pr_err("VM %s already stared\n", vm->name);
 		return;
 	}
@@ -551,7 +551,7 @@ static void start_vm(struct vm *vm)
 		return;
 	}
 
-	vm->state = VM_STAT_ONLINE;
+	vm->state = VM_STATE_ONLINE;
 	vcpu_online(vcpu0);
 }
 
@@ -563,7 +563,7 @@ int vm_power_up(int vmid)
 		return -ENOENT;
 
 	vm_vcpus_init(vm);
-	vm->state = VM_STAT_ONLINE;
+	vm->state = VM_STATE_ONLINE;
 
 	/*
 	 * start the vm now
@@ -609,12 +609,12 @@ static int __vm_power_off(struct vm *vm, void *args, int byself)
 	pr_notice("power off vm-%d by %s\n", vm->vmid,
 			byself ? "itself" : "mvm");
 
-	set_vm_state(vm, VM_STAT_OFFLINE);
+	set_vm_state(vm, VM_STATE_OFFLINE);
 	vm_for_each_vcpu(vm, vcpu)
 		vcpu_enter_poweroff(vcpu, 0);
 
 	vm_for_each_vcpu(vm, vcpu) {
-		ret = wait_vcpu_in_state(vcpu, TASK_STAT_STOP, 1000);
+		ret = wait_vcpu_in_state(vcpu, TASK_STATE_STOP, 1000);
 		if (ret)
 			pr_err("wait vcpu stop failed %d\n", ret);
 	}
@@ -726,7 +726,7 @@ static int __vm_reset(struct vm *vm, void *args, int byself)
 	if (args == NULL)
 		byself = 1;
 
-	set_vm_state(vm, VM_STAT_REBOOT);
+	set_vm_state(vm, VM_STATE_REBOOT);
 	vm_for_each_vcpu(vm, vcpu)
 		vcpu_enter_poweroff(vcpu, 1);
 
@@ -734,7 +734,7 @@ static int __vm_reset(struct vm *vm, void *args, int byself)
 		if (vcpu == current_vcpu)
 			continue;
 
-		ret = wait_vcpu_in_state(vcpu, TASK_STAT_SUSPEND, 1000);
+		ret = wait_vcpu_in_state(vcpu, TASK_STATE_SUSPEND, 1000);
 		if (ret) {
 			pr_err("vm-%d vcpu-%d power off failed\n",
 					vm->vmid, vcpu->vcpu_id);
@@ -814,7 +814,7 @@ static int __vm_suspend(struct vm *vm)
 		if (vcpu == current_vcpu)
 			continue;
 
-		if (!check_vcpu_state(vcpu, TASK_STAT_STOP)) {
+		if (!check_vcpu_state(vcpu, TASK_STATE_STOP)) {
 			pr_err("vcpu-%d is not suspend vm suspend fail\n",
 					get_vcpu_id(vcpu));
 			return -EINVAL;
@@ -827,7 +827,7 @@ static int __vm_suspend(struct vm *vm)
 		suspend_vcpu_vmodule_state(vcpu);
 	}
 
-	vm->state = VM_STAT_SUSPEND;
+	vm->state = VM_STATE_SUSPEND;
 	smp_mb();
 
 	do_hooks((void *)vm, NULL, OS_HOOK_SUSPEND_VM);
@@ -848,7 +848,7 @@ static int __vm_suspend(struct vm *vm)
 	/*
 	 * vm is resumed
 	 */
-	vm->state = VM_STAT_ONLINE;
+	vm->state = VM_STATE_ONLINE;
 	smp_wmb();
 
 	vm_resume(vm);
@@ -1088,7 +1088,7 @@ static struct vm *__create_vm(struct vmtag *vme)
 	vm->setup_data = (void *)vme->setup_data;
 	vm->load_address =
 		(void *)(vme->load_address ? vme->load_address : vme->entry);
-	vm->state = VM_STAT_OFFLINE;
+	vm->state = VM_STATE_OFFLINE;
 	init_list(&vm->vdev_list);
 	memcpy(vm->vcpu_affinity, vme->vcpu_affinity,
 			sizeof(uint32_t) * VM_MAX_VCPU);

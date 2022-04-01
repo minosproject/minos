@@ -47,11 +47,11 @@
 #define TASK_AFF_ANY		(-1)
 #define TASK_NAME_SIZE		(32)
 
-#define TASK_STAT_RUNNING 0x00
-#define TASK_STAT_WAIT_EVENT 0x01
-#define TASK_STAT_WAKING 0x02
-#define TASK_STAT_SUSPEND 0x04
-#define TASK_STAT_STOP 0x08
+#define TASK_STATE_RUNNING 0x00
+#define TASK_STATE_WAIT_EVENT 0x01
+#define TASK_STATE_WAKING 0x02
+#define TASK_STATE_SUSPEND 0x04
+#define TASK_STATE_STOP 0x08
 
 #define KWORKER_FLAG_MASK 0xffff
 #define KWORKER_TASK_RECYCLE BIT(0)
@@ -74,9 +74,9 @@ enum {
 	TASK_EVENT_ANY,
 };
 
-#define TASK_STAT_PEND_OK       0u  /* Pending status OK, not pending, or pending complete */
-#define TASK_STAT_PEND_TO       1u  /* Pending timed out */
-#define TASK_STAT_PEND_ABORT    2u  /* Pending aborted */
+#define TASK_STATE_PEND_OK       0u  /* Pending status OK, not pending, or pending complete */
+#define TASK_STATE_PEND_TO       1u  /* Pending timed out */
+#define TASK_STATE_PEND_ABORT    2u  /* Pending aborted */
 
 #define KWORKER_FLAG_MASK	0xffff
 #define KWORKER_TASK_RECYCLE	BIT(0)
@@ -114,7 +114,7 @@ struct task {
 	unsigned long flags;
 
 	struct list_head proc_list;	// link to the process list, if is a thread.
-	struct list_head stat_list;	// link to the sched list used for sched.
+	struct list_head state_list;	// link to the sched list used for sched.
 
 	uint32_t delay;
 	struct timer_list delay_timer;
@@ -129,12 +129,12 @@ struct task {
 	 * the spinlock will use to protect the below member
 	 * which may modified by different cpu at the same
 	 * time:
-	 * 1 - stat
-	 * 2 - pend_stat
+	 * 1 - state
+	 * 2 - pend_state
 	 */
 	spinlock_t s_lock;
-	int stat;
-	long pend_stat;
+	int state;
+	long pend_state;
 	long request;
 
 	int wait_type;			// which event is task waitting for.

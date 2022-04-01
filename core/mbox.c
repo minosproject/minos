@@ -61,16 +61,16 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 
 	sched();
 
-	switch (task->pend_stat) {
-	case TASK_STAT_PEND_OK:
+	switch (task->pend_state) {
+	case TASK_STATE_PEND_OK:
 		pmsg = task->msg;
 		break;
 
-	case TASK_STAT_PEND_ABORT:
+	case TASK_STATE_PEND_ABORT:
 		pmsg = NULL;
 		break;
 	
-	case TASK_STAT_PEND_TO:
+	case TASK_STATE_PEND_TO:
 	default:
 		pmsg = NULL;
 		spin_lock_irqsave(&m->lock, flags);
@@ -96,7 +96,7 @@ int mbox_post(mbox_t *m, void *pmsg)
 
 	spin_lock_irqsave(&m->lock, flags);
 	task = event_highest_task_ready((struct event *)m, pmsg,
-				TASK_EVENT_MBOX, TASK_STAT_PEND_OK);
+				TASK_EVENT_MBOX, TASK_STATE_PEND_OK);
 	if (task) {
 		spin_unlock_irqrestore(&m->lock, flags);
 		return 0;
@@ -134,14 +134,14 @@ int mbox_post_opt(mbox_t *m, void *pmsg, int opt)
 		while (event_has_waiter(to_event(m))) {
 			task = event_highest_task_ready((struct event *)m,
 					pmsg, TASK_EVENT_MBOX,
-					TASK_STAT_PEND_OK);
+					TASK_STATE_PEND_OK);
 			if (task)
 				nr_tasks++;
 		}
 	} else {
 		task = event_highest_task_ready((struct event *)m,
 				pmsg, TASK_EVENT_MBOX,
-				TASK_STAT_PEND_OK);
+				TASK_STATE_PEND_OK);
 		if (task)
 			nr_tasks++;
 	}

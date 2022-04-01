@@ -83,8 +83,8 @@ static void pcpu_release_task(struct pcpu *pcpu)
 	local_irq_save(flags);
 
 	while (!is_list_empty(&pcpu->stop_list)) {
-		task = list_first_entry(&pcpu->stop_list, struct task, stat_list);
-		list_del(&task->stat_list);
+		task = list_first_entry(&pcpu->stop_list, struct task, state_list);
+		list_del(&task->state_list);
 		do_release_task(task);
 	}
 

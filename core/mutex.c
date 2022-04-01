@@ -81,16 +81,16 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	
 	sched();
 
-	switch (task->pend_stat) {
-	case TASK_STAT_PEND_OK:
+	switch (task->pend_state) {
+	case TASK_STATE_PEND_OK:
 		ret = 0;
 		break;
 
-	case TASK_STAT_PEND_ABORT:
+	case TASK_STATE_PEND_ABORT:
 		ret = -EABORT;
 		break;
 	
-	case TASK_STAT_PEND_TO:
+	case TASK_STATE_PEND_TO:
 	default:
 		ret = -ETIMEDOUT;
 		spin_lock_irqsave(&m->lock, flags);
@@ -126,7 +126,7 @@ int mutex_post(mutex_t *m)
 	 * resched
 	 */
 	task = event_highest_task_ready(to_event(m), NULL,
-			TASK_EVENT_MUTEX, TASK_STAT_PEND_OK);
+			TASK_EVENT_MUTEX, TASK_STATE_PEND_OK);
 	if (task) {
 		m->cnt = task->tid;
 		m->data = task;

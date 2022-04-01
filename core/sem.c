@@ -53,14 +53,14 @@ int sem_pend(sem_t *sem, uint32_t timeout)
 
 	sched();
 
-	switch (task->pend_stat) {
-	case TASK_STAT_PEND_OK:
+	switch (task->pend_state) {
+	case TASK_STATE_PEND_OK:
 		ret = 0;
 		break;
-	case TASK_STAT_PEND_ABORT:
+	case TASK_STATE_PEND_ABORT:
 		ret = -EABORT;
 		break;
-	case TASK_STAT_PEND_TO:
+	case TASK_STATE_PEND_TO:
 	default:
 		ret = -ETIMEDOUT;
 		spin_lock_irqsave(&sem->lock, flags);
@@ -88,7 +88,7 @@ int sem_pend_abort(sem_t *sem, int opt)
 		case OS_PEND_OPT_BROADCAST:
 			while (event_has_waiter((struct event *)sem)) {
 				task = event_highest_task_ready((struct event *)sem,
-					NULL, TASK_EVENT_SEM, TASK_STAT_PEND_ABORT);
+					NULL, TASK_EVENT_SEM, TASK_STATE_PEND_ABORT);
 				if (task)
 					nbr_tasks++;
 			}
@@ -96,7 +96,7 @@ int sem_pend_abort(sem_t *sem, int opt)
 		case OS_PEND_OPT_NONE:
 		default:
 			task = event_highest_task_ready((struct event *)sem,
-				NULL, TASK_EVENT_SEM, TASK_STAT_PEND_OK);
+				NULL, TASK_EVENT_SEM, TASK_STATE_PEND_OK);
 			if (task)
 				nbr_tasks++;
 			break;
@@ -121,7 +121,7 @@ int sem_post(sem_t *sem)
 
 	spin_lock_irqsave(&sem->lock, flags);
 	task = event_highest_task_ready((struct event *)sem,
-			NULL, TASK_EVENT_SEM, TASK_STAT_PEND_OK);
+			NULL, TASK_EVENT_SEM, TASK_STATE_PEND_OK);
 	if (task)
 		goto out;
 

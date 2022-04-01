@@ -1,7 +1,6 @@
 obj-y += bitmap.o
 obj-y += bootarg.o
 obj-y += calltrace.o
-obj-y += core.o
 obj-y += delay.o
 obj-y += event.o
 obj-y += find_bit.o

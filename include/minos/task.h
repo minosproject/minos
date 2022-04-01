@@ -31,12 +31,12 @@ static inline uint8_t get_task_prio(struct task *task)
 
 static inline int task_is_suspend(struct task *task)
 {
-	return !!(task->stat & TASK_STAT_WAIT_EVENT);
+	return !!(task->state & TASK_STATE_WAIT_EVENT);
 }
 
 static inline int task_is_running(struct task *task)
 {
-	return (task->stat == TASK_STAT_RUNNING);
+	return (task->state == TASK_STATE_RUNNING);
 }
 
 static inline int task_is_vcpu(struct task *task)
@@ -81,18 +81,28 @@ static inline int is_task_need_stop(struct task *task)
 	return !!(task->ti.flags & (__TIF_NEED_FREEZE | __TIF_NEED_STOP));
 }
 
-static inline void set_current_stat(int stat)
-{
-	current->stat = stat;
-	smp_wmb();
-}
+#define task_state_pend_ok(status)	\
+	((status) == TASK_STATE_PEND_OK)
+#define task_state_pend_timeout(status)	\
+	((status) == TASK_STATE_PEND_TO)
+#define task_state_pend_abort(status)	\
+	((status) == TASK_STATE_PEND_ABORT)
 
-#define task_stat_pend_ok(status)	\
-	((status) == TASK_STAT_PEND_OK)
-#define task_stat_pend_timeout(status)	\
-	((status) == TASK_STAT_PEND_TO)
-#define task_stat_pend_abort(status)	\
-	((status) == TASK_STAT_PEND_ABORT)
+/*
+ * set current running task's state do not need to obtain
+ * a lock, when need to wakeup the task, below state the state
+ * can be changed:
+ * 1 - running -> wait_event
+ * 2 - wait_event -> running (waked up by event)
+ * 3 - new -> running
+ * 4 - running -> stopped
+ */
+#define set_current_state(_state, to) 		\
+	do {			 		\
+		current->state = (_state); 	\
+		current->delay = (to);		\
+		smp_mb();			\
+	} while (0)
 
 void do_release_task(struct task *task);
 
