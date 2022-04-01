@@ -397,6 +397,7 @@ static void memory_init(void)
 static void memory_region_init(void)
 {
 	unsigned long end = minos_start + CONFIG_MINOS_RAM_SIZE;
+	extern void set_ramdisk_address(void *start, void *end);
 	struct memory_region *re;
 
 #ifdef CONFIG_DEVICE_TREE
@@ -415,6 +416,12 @@ static void memory_region_init(void)
 			pr_err("invalid memory region [0x%x ---> 0x%x]",
 					re->phy_base, re->phy_base + re->size);
 			BUG();
+		}
+
+		if (memory_region_type(re) == MEMORY_REGION_TYPE_RAMDISK) {
+			pr_notice("set ramdisk address 0x%lx 0x%lx\n", re->phy_base, re->size);
+			set_ramdisk_address((void *)re->phy_base,
+					(void *)(re->phy_base + re->size));
 		}
 	}
 }

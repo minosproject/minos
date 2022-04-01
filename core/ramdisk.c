@@ -16,6 +16,7 @@
 
 #include <minos/minos.h>
 #include <minos/ramdisk.h>
+#include <minos/mm.h>
 
 void *ramdisk_start, *ramdisk_end;
 static struct ramdisk_inode *root;
@@ -37,6 +38,15 @@ int ramdisk_init(void)
 		pr_err("ramdisk address is not set\n");
 		return -EINVAL;
 	}
+
+	if (create_host_mapping(ptov(ramdisk_start), (unsigned long)ramdisk_start,
+				ramdisk_end - ramdisk_start, VM_RO)) {
+		pr_err("unable map ramdisk memory\n");
+		return -ENOMEM;
+	}
+
+	ramdisk_start = (void *)ptov(ramdisk_start);
+	ramdisk_end = (void *)ptov(ramdisk_end);
 
 	if (strncmp(ramdisk_start, RAMDISK_MAGIC, RAMDISK_MAGIC_SIZE) != 0) {
 		pr_err("bad ramdisk format\n");

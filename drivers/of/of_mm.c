@@ -153,7 +153,6 @@ static void __fdt_parse_kernel_mem(void)
 
 static void __fdt_parse_ramdisk_mem(void)
 {
-	extern void set_ramdisk_address(void *start, void *end);
 	const fdt32_t *data;
 	uint64_t start, end;
 	int node, len;
@@ -177,7 +176,6 @@ static void __fdt_parse_ramdisk_mem(void)
 		return;
 	}
 
-	set_ramdisk_address((void *)ptov(start), (void *)ptov(end));
 	split_memory_region(start, PAGE_BALIGN(end - start),
 			MEMORY_REGION_F_RAMDISK);
 }
