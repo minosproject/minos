@@ -69,7 +69,7 @@ int sem_pend(sem_t *sem, uint32_t timeout)
 		break;
 	}
 
-	event_pend_down(task);
+	event_pend_down();
 
 	return ret;
 }
@@ -88,7 +88,7 @@ int sem_pend_abort(sem_t *sem, int opt)
 		case OS_PEND_OPT_BROADCAST:
 			while (event_has_waiter((struct event *)sem)) {
 				task = event_highest_task_ready((struct event *)sem,
-					NULL, TASK_EVENT_SEM, TASK_STATE_PEND_ABORT);
+					NULL, TASK_STATE_PEND_ABORT);
 				if (task)
 					nbr_tasks++;
 			}
@@ -96,7 +96,7 @@ int sem_pend_abort(sem_t *sem, int opt)
 		case OS_PEND_OPT_NONE:
 		default:
 			task = event_highest_task_ready((struct event *)sem,
-				NULL, TASK_EVENT_SEM, TASK_STATE_PEND_OK);
+				NULL, TASK_STATE_PEND_OK);
 			if (task)
 				nbr_tasks++;
 			break;
@@ -121,7 +121,7 @@ int sem_post(sem_t *sem)
 
 	spin_lock_irqsave(&sem->lock, flags);
 	task = event_highest_task_ready((struct event *)sem,
-			NULL, TASK_EVENT_SEM, TASK_STATE_PEND_OK);
+			NULL, TASK_STATE_PEND_OK);
 	if (task)
 		goto out;
 

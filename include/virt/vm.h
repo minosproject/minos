@@ -13,6 +13,7 @@
 #include <uapi/hypervisor.h>
 #include <minos/task.h>
 #include <minos/sched.h>
+#include <minos/event.h>
 
 #define VM_MAX_VCPU CONFIG_NR_CPUS
 
@@ -38,9 +39,10 @@ struct virq_chip;
 extern struct list_head vm_list;
 extern struct list_head mem_list;
 
-#define VCPU_STATE_RUNNING 0x00
-#define VCPU_STATE_SUSPEND 0x01
-#define VCPU_STATE_STOP 0x2
+#define VCPU_STATE_RUNNING TASK_STATE_RUNNING
+#define VCPU_STATE_IDLE TASK_STATE_WAIT_EVENT
+#define VCPU_STATE_STOP TASK_STATE_STOP
+#define VCPU_STATE_SUSPEND TASK_STATE_SUSPEND
 
 enum {
 	IN_GUEST_MODE,
@@ -55,7 +57,6 @@ struct vcpu {
 	struct task *task;
 	struct vcpu *next;
 
-	volatile int state;
 	volatile int mode;
 
 	/*
@@ -66,7 +67,7 @@ struct vcpu {
 
 	struct list_head list;
 
-	spinlock_t lock;
+	struct event vcpu_event;
 
 	struct vmcs *vmcs;
 	int vmcs_irq;
@@ -103,8 +104,6 @@ struct vm {
 	unsigned long time_offset;
 
 	struct list_head vdev_list;
-
-	atomic_t vcpu_online_cnt;
 
 	uint32_t vspi_nr;
 	int virq_same_page;
@@ -237,20 +236,9 @@ int request_vm_virqs(struct vm *vm, int base, int nr);
 
 void arch_init_vcpu(struct vcpu *vcpu, void *entry, void *arg);
 
-static inline int get_vm_vcpu_online_cnt(struct vm *vm)
-{
-	return atomic_read(&vm->vcpu_online_cnt);
-}
-
 static inline int check_vcpu_state(struct vcpu *vcpu, int state)
 {
-	return (vcpu->state == state);
-}
-
-static inline void set_vcpu_state(struct vcpu *vcpu, int state)
-{
-	vcpu->state = state;
-	smp_wmb();
+	return (vcpu->task->state == state);
 }
 
 static inline void set_vm_state(struct vm *vm, int state)

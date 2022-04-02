@@ -21,24 +21,6 @@
 #include <minos/mm.h>
 #include <minos/smp.h>
 
-static atomic_t event_token = { 1 };
-static atomic_t event_token_gen = { 0 };
-
-uint32_t new_event_token(void)
-{
-	uint32_t value;
-
-	while (1) {
-		value = (uint32_t)atomic_inc_return_old(&event_token);
-		if (value == 0)
-			atomic_inc(&event_token_gen);
-		else
-			break;
-	}
-
-	return value;
-}
-
 void event_init(struct event *event, int type, void *pdata)
 {
 	event->type = type;
@@ -47,9 +29,21 @@ void event_init(struct event *event, int type, void *pdata)
 	event->data = pdata;
 }
 
-void __event_task_wait(unsigned long token, int mode, uint32_t to)
+void event_task_wait(void *ev, int mode, uint32_t to)
 {
 	struct task *task = current;
+	struct event *event;
+
+	/*
+	 * the process of flag is different with other IPC
+	 * method
+	 */
+	if (mode == TASK_EVENT_FLAG) {
+		task->flag_node = ev;
+	} else {
+		event = (struct event *)ev;
+		list_add_tail(&event->wait_list, &task->event_list);
+	}
 
 	/*
 	 * after __event_task_wait, the process will call sched()
@@ -66,26 +60,6 @@ void __event_task_wait(unsigned long token, int mode, uint32_t to)
 	task->pend_state = TASK_STATE_PEND_OK;
 	task->wait_type = mode;
 	task->delay = (to == -1 ? 0 : to);
-	task->wait_event = token;
-}
-
-void event_task_wait(void *ev, int mode, uint32_t to)
-{
-	struct task *task = get_current_task();
-	struct event *event;
-
-	/*
-	 * the process of flag is different with other IPC
-	 * method
-	 */
-	if (mode == TASK_EVENT_FLAG) {
-		task->flag_node = ev;
-	} else {
-		event = (struct event *)ev;
-		list_add_tail(&event->wait_list, &task->event_list);
-	}
-
-	__event_task_wait((unsigned long)ev, mode, to);
 }
 
 int event_task_remove(struct task *task, struct event *ev)
@@ -112,16 +86,20 @@ struct task *event_get_waiter(struct event *ev)
 	return task;
 }
 
-struct task *event_highest_task_ready(struct event *ev, void *msg,
-		uint32_t msk, int pend_state)
+struct task *event_highest_task_ready(struct event *ev, void *msg, int pend_state)
 {
 	struct task *task;
+	int ret;
 
 	do {
 		task = event_get_waiter(ev);
 		if (!task)
 			return NULL;
-	} while (__wake_up(task, TASK_STATE_PEND_OK, ev->type, msg));
+
+		ret = __wake_up(task, TASK_STATE_PEND_OK, ev->type, msg);
+		if (ret)
+			pr_warn("task state may not correct %d\n", task->name);
+	} while (ret);
 
 	return task;
 }
@@ -136,17 +114,25 @@ void event_del_always(struct event *ev)
 	}
 }
 
-void event_pend_down(struct task *task)
+void event_pend_down(void)
 {
+	struct task *task = current;
+
 	task->pend_state = TASK_STATE_PEND_OK;
 	task->wait_event = (unsigned long)NULL;
 	task->wait_type = 0;
+	task->msg = NULL;
 }
 
-long wait_event(void)
+long wait_timeout(struct event *ev, uint32_t timeout)
 {
 	struct task *task = current;
+	unsigned long flags;
 	long status;
+
+	spin_lock_irqsave(&ev->lock, flags);
+	event_task_wait(0, TASK_EVENT_ANY, timeout);
+	spin_unlock_irqrestore(&ev->lock, flags);
 
 	sched();
 
@@ -156,15 +142,14 @@ long wait_event(void)
 	return status;
 }
 
-long wait_event_locked(int ev, uint32_t timeout, spinlock_t *lock)
+long wake(struct event *ev)
 {
-	long status;
+	struct task *task;
+	unsigned long flags;
 
-	__event_task_wait(new_event_token(), ev, timeout);
+	spin_lock_irqsave(&ev->lock, flags);
+	task = event_highest_task_ready(ev, NULL, TASK_STATE_PEND_OK);
+	spin_unlock_irqrestore(&ev->lock, flags);
 
-	if (lock) spin_unlock(lock);
-	status = wait_event();
-	if (lock) spin_lock(lock);
-
-	return status;
+	return task ? 0 : -ENOENT;
 }

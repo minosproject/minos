@@ -7,9 +7,17 @@ typedef struct event mutex_t;
 
 #define OS_MUTEX_AVAILABLE	0xffff
 
-#define DEFINE_MUTEX(name)	\
-	mutex_t name = {	\
-		.type = 0xff,	\
+#define DEFINE_MUTEX(name)			\
+	mutex_t name = {			\
+		.type = OS_EVENT_TYPE_MUTEX,	\
+		.owner = 0,			\
+		.cnt = 0,			\
+		.data = NULL,			\
+		.lock = {0, 0},			\
+		.wait_list = {			\
+			.prev = &wait_list,	\
+			.next = &wait_list,	\
+		}				\
 	}
 
 mutex_t *mutex_create(char *name);

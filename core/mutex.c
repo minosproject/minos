@@ -53,7 +53,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 
 	might_sleep();
 
-	spin_lock(&m->lock);
+	spin_lock_irqsave(&m->lock, flags);
 	if (m->cnt == OS_MUTEX_AVAILABLE) {
 		m->owner = task->tid;
 		m->data = (void *)task;
@@ -62,7 +62,6 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 		spin_unlock(&m->lock);
 		return 0;
 	}
-
 
 	/*
 	 * priority inversion - only check the realtime task
@@ -77,7 +76,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	 * task need to get two mutex, how to deal with this ?
 	 */
 	event_task_wait(to_event(m), TASK_EVENT_MUTEX, timeout);
-	spin_unlock(&m->lock);
+	spin_unlock_irqrestore(&m->lock, flags);
 	
 	sched();
 
@@ -99,7 +98,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 		break;
 	}
 
-	event_pend_down(task);
+	event_pend_down();
 	
 	return ret;
 }
@@ -125,8 +124,7 @@ int mutex_post(mutex_t *m)
 	 * no task, then set the mutex is available else
 	 * resched
 	 */
-	task = event_highest_task_ready(to_event(m), NULL,
-			TASK_EVENT_MUTEX, TASK_STATE_PEND_OK);
+	task = event_highest_task_ready(to_event(m), NULL, TASK_STATE_PEND_OK);
 	if (task) {
 		m->cnt = task->tid;
 		m->data = task;

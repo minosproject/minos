@@ -58,9 +58,7 @@ DEFINE_SPIN_LOCK(affinity_lock);
 static void vcpu_online(struct vcpu *vcpu)
 {
 	ASSERT(check_vcpu_state(vcpu, VCPU_STATE_STOP));
-	set_vcpu_state(vcpu, VCPU_STATE_RUNNING);
 	task_ready(vcpu->task, 0);
-	atomic_inc(&vcpu->vm->vcpu_online_cnt);
 }
 
 static int inline affinity_to_vcpuid(struct vm *vm, unsigned long affinity)
@@ -132,29 +130,8 @@ int vcpu_can_idle(struct vcpu *vcpu)
 
 int vcpu_idle(struct vcpu *vcpu)
 {
-	unsigned long flags;
-	int idle = 1;
-
-	if (!vcpu_can_idle(vcpu))
-		return -EBUSY;
-
-	spin_lock_irqsave(&vcpu->lock, flags);
-	if (!vcpu_can_idle(vcpu)) {
-		idle = 0;
-		goto out;
-	}
-
-	set_vcpu_state(vcpu, VCPU_STATE_SUSPEND);
-	__event_task_wait(0, TASK_EVENT_ANY, 0);
-out:
-	spin_unlock_irqrestore(&vcpu->lock, flags);
-	if (!idle)
-		return -EBUSY;
-
-	idle = wait_event();
-	set_vcpu_state(vcpu, VCPU_STATE_RUNNING);
-
-	return idle;
+	return wait_on(&vcpu->vcpu_event,
+			vcpu_can_idle(vcpu), 0);
 }
 
 int vcpu_suspend(struct vcpu *vcpu, gp_regs *c,
@@ -170,9 +147,7 @@ int vcpu_suspend(struct vcpu *vcpu, gp_regs *c,
 
 int vcpu_off(struct vcpu *vcpu)
 {
-	set_vcpu_state(vcpu, VCPU_STATE_STOP);
 	task_need_freeze(vcpu->task);
-
 	return 0;
 }
 
@@ -243,7 +218,6 @@ int kick_vcpu(struct vcpu *vcpu, int reason)
 {
 	int vcpu_mode, ret = 0;
 	int same_cpu;
-	unsigned long flags;
 
 	vcpu_mode = vcpu->mode;
 	smp_rmb();
@@ -256,17 +230,14 @@ int kick_vcpu(struct vcpu *vcpu, int reason)
 	 * if the vcpu is in stop state, only the BootCPU
 	 * can wake up it. this will be another path.
 	 */
-	spin_lock_irqsave(&vcpu->lock, flags);
-	if (check_vcpu_state(vcpu, VCPU_STATE_SUSPEND))
-		ret = wake_up(vcpu->task);
-	else
-		ret = 1;
-	spin_unlock_irqrestore(&vcpu->lock, flags);
+	ret = wake(&vcpu->vcpu_event);
 
 	/*
 	 * 0   - wakeup successfuly
 	 * 1   - do not need wake up task
 	 * < 0 - wake up failed
+	 * if on the same cpu, just call cond_resched to
+	 * see whether need preempt this task.
 	 */
 	if (same_cpu) {
 		cond_resched();
@@ -387,7 +358,6 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 	vcpu->task = task;
 	vcpu->vcpu_id = vcpu_id;
 	vcpu->vm = vm;
-	vcpu->state = VCPU_STATE_STOP;
 	vcpu->mode = IN_ROOT_MODE;
 
 	if (vm->flags & VM_FLAGS_32BIT)
@@ -397,7 +367,7 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 
 	vcpu_virq_struct_init(vcpu);
 	vm->vcpus[vcpu_id] = vcpu;
-	spin_lock_init(&vcpu->lock);
+	event_init(&vcpu->vcpu_event, OS_EVENT_TYPE_NORMAL, NULL);
 
 	vcpu->next = NULL;
 	if (vcpu_id != 0)
@@ -424,18 +394,12 @@ void vcpu_enter_poweroff(struct vcpu *vcpu)
 {
 	struct task *task = vcpu->task;
 	int skip = 0;
-	unsigned long flags;
 
-	spin_lock_irqsave(&vcpu->lock, flags);
-	if (check_vcpu_state(vcpu, VCPU_STATE_STOP)) {
-		skip = 1;
-		goto out;
-	}
-	set_vcpu_state(vcpu, VCPU_STATE_STOP);
+	if (check_vcpu_state(vcpu, VCPU_STATE_STOP))
+		return;
+
 	task_need_freeze(task);
 	wake_up_abort(task);
-out:
-	spin_unlock_irqrestore(&vcpu->lock, flags);
 
 	if ((vcpu_affinity(vcpu) != smp_processor_id()) && !skip) {
 		pr_debug("call vcpu_power_off_call for vcpu-%s\n",
