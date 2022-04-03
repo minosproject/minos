@@ -29,6 +29,7 @@
 
 #define spin_lock_irqsave(l, flags) 		\
 	do { 					\
+		preempt_disable();		\
 		flags = arch_save_irqflags(); 	\
 		arch_disable_local_irq(); 	\
 		raw_spin_lock(l); 		\
@@ -37,12 +38,14 @@
 #define spin_trylock_irqsave(l, flags)		\
 ({						\
 	int ret;				\
-						\
+	preempt_disable();			\
 	flags = arch_save_irqflags();		\
 	arch_disable_local_irq();		\
 	ret = raw_spin_trylock(l);		\
-	if (!ret)				\
+	if (!ret) {				\
 		arch_restore_irqflags(flags);	\
+		preempt_enable();		\
+	}					\
 	ret;					\
 })
 
@@ -50,6 +53,7 @@
 	do {					\
 		raw_spin_unlock(l);		\
 		arch_restore_irqflags(flags);	\
+		preempt_enable();		\
 	} while (0)
 #else
 #define spin_lock(l) 			preempt_disable()
