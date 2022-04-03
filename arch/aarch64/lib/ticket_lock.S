@@ -18,6 +18,7 @@
 
 	.global arch_ticket_lock
 	.global arch_ticket_unlock
+	.global arch_ticket_trylock
 
 func arch_ticket_lock
 	prfm    pstl1keep, [x0]
@@ -42,6 +43,28 @@ loop2:
 out:
 	ret
 endfunc arch_ticket_lock
+
+func arch_ticket_trylock
+	prfm    pstl1keep, [x0]
+	add	x4, x0, #4
+
+	mov	w3, #0
+	ldaxr	w1, [x0]
+	ldar	w2, [x4]
+	cmp	w1, w2
+	b.ne	fail_trylock
+
+	add	w2, w2, #1
+	stlxr   w3, w2, [x4]
+	cbnz	w3, fail_trylock
+	mov	w3, #1
+
+	/* need double check ? */
+
+fail_trylock:
+	mov	w0, w3
+	ret
+endfunc arch_ticket_trylock
 
 func arch_ticket_unlock
 	ldar	w1, [x0]

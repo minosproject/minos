@@ -496,11 +496,8 @@ static int wake_up_interrupted(struct task *task,
 {
 	unsigned long flags;
 
-	ASSERT(pend_state != TASK_STATE_PEND_TO);
-
 	if (task->state != TASK_STATE_WAIT_EVENT)
 		return -EINVAL;
-
 	/*
 	 * the interrup occurs when task try to wait_event. in
 	 * addition:
@@ -509,8 +506,16 @@ static int wake_up_interrupted(struct task *task,
 	 *     has not been set already.
 	 * 3 - the state must TASK_STATE_WAIT_EVENT
 	 * 4 - task has not been in sched routine.
+	 *
+	 * meanwhile, other cpu may already in the wake up function
+	 * try to wake up the task, then need check this suitation
+	 * since other cpu while check cpu == -1, this will lead
+	 * to dead lock if use spin_lock function. So here use
+	 * spin_trylock instead.
 	 */
-	spin_lock_irqsave(&task->s_lock, flags);
+	if (!spin_trylock_irqsave(&task->s_lock, flags))
+		return -EBUSY;
+
 	if (task->state != TASK_STATE_WAIT_EVENT) {
 		spin_unlock_irqrestore(&task->s_lock, flags);
 		return -EINVAL;
