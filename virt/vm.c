@@ -130,7 +130,7 @@ int vcpu_can_idle(struct vcpu *vcpu)
 
 int vcpu_idle(struct vcpu *vcpu)
 {
-	return wait_on(&vcpu->vcpu_event,
+	return wait_event(&vcpu->vcpu_event,
 			vcpu_can_idle(vcpu), 0);
 }
 

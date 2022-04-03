@@ -48,15 +48,9 @@ static inline int event_has_waiter(struct event *ev)
 	return (!is_list_empty(&ev->wait_list));
 }
 
-long wait_timeout(struct event *ev, uint32_t timeout);
 long wake(struct event *ev);
 
-static long inline wait(struct event *ev)
-{
-	return wait_timeout(ev, 0);
-}
-
-#define wait_on(ev, condition, _timeout)		\
+#define wait_event(ev, condition, _timeout)		\
 ({							\
 	__label__ __out;				\
 	__label__ __out1;				\

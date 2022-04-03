@@ -124,24 +124,6 @@ void event_pend_down(void)
 	task->msg = NULL;
 }
 
-long wait_timeout(struct event *ev, uint32_t timeout)
-{
-	struct task *task = current;
-	unsigned long flags;
-	long status;
-
-	spin_lock_irqsave(&ev->lock, flags);
-	event_task_wait(0, TASK_EVENT_ANY, timeout);
-	spin_unlock_irqrestore(&ev->lock, flags);
-
-	sched();
-
-	status = task->pend_state;
-	task->pend_state = TASK_STATE_PEND_OK;
-
-	return status;
-}
-
 long wake(struct event *ev)
 {
 	struct task *task;
