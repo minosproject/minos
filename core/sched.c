@@ -156,15 +156,18 @@ int task_ready(struct task *task, int preempt)
 void task_sleep(uint32_t delay)
 {
 	struct task *task = current;
+	unsigned long flags;
 
 	/*
 	 * task sleep will wait for the sleep timer expired
 	 * or the event happend
 	 */
+	local_irq_save(flags);
 	do_not_preempt();
 	task->delay = delay;
 	task->state = TASK_STATE_WAIT_EVENT;
 	task->wait_type = TASK_EVENT_TIMER;
+	local_irq_restore(flags);
 
 	sched();
 }
