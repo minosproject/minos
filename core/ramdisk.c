@@ -21,6 +21,7 @@
 void *ramdisk_start, *ramdisk_end;
 static struct ramdisk_inode *root;
 static struct ramdisk_sb *sb;
+static void *ramdisk_data;
 
 void set_ramdisk_address(void *start, void *end)
 {
@@ -36,6 +37,11 @@ int ramdisk_init(void)
 	 */
 	if (!ramdisk_start || !ramdisk_end) {
 		pr_err("ramdisk address is not set\n");
+		return -EINVAL;
+	}
+
+	if (!IS_PAGE_ALIGN(ramdisk_start)) {
+		pr_err("ramdisk start address need PAGE align\n");
 		return -EINVAL;
 	}
 
@@ -60,6 +66,7 @@ int ramdisk_init(void)
 	 */
 	sb = ramdisk_start + RAMDISK_MAGIC_SIZE;
 	root = ramdisk_start + sb->inode_offset;
+	ramdisk_data = ramdisk_start + sb->data_offset;
 
 	return 0;
 }
@@ -76,7 +83,7 @@ unsigned long ramdisk_file_size(struct ramdisk_file *file)
 
 unsigned long ramdisk_file_base(struct ramdisk_file *file)
 {
-	return (unsigned long)ramdisk_start + file->inode->f_offset;
+	return (unsigned long)ramdisk_data + file->inode->f_offset;
 }
 
 static struct ramdisk_inode *get_file_inode(const char *name)
@@ -100,7 +107,7 @@ int ramdisk_read(struct ramdisk_file *file, void *buf,
 	if ((offset + size) > file->inode->f_size)
 		return -EINVAL;
 
-	memcpy(buf, ramdisk_start + file->inode->f_offset + offset, size);
+	memcpy(buf, ramdisk_data + file->inode->f_offset + offset, size);
 	return 0;
 }
 
