@@ -23,7 +23,7 @@ struct ramdisk_sb {
 	uint32_t file_cnt;
 	uint32_t block_size;	// reserved
 	uint64_t inode_offset;
-	uint64_t data_base;	// reserved
+	uint64_t data_offset;	// reserved
 };
 
 struct ramdisk_file {

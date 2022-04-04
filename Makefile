@@ -187,7 +187,7 @@ MBUILD_IMAGE 	:= minos.bin
 MBUILD_IMAGE_ELF := minos.elf
 MBUILD_IMAGE_SYMBOLS := allsymbols.o
 
-all: include/config/config.h $(version_h) $(offset_h) minos
+all: include/config/config.h $(version_h) $(offset_h) minos mkrmd mvm
 
 minos-dirs	:= $(patsubst %/,%,$(filter %/, $(core-y) $(external-y) $(drivers-y) $(libs-y)))
 
@@ -314,6 +314,10 @@ mvm :
 	$(Q) echo "Build Minos userspace tools for Virtual Machine"
 	$(Q) cd tools/mvm && make BUILD=$(BUILD)
 
+mkrmd:
+	$(Q) echo "Build mkrmd tools to generate ramdisk"
+	$(Q) cd tools/mkrmd && make
+
 clean: $(clean-dirs)
 	$(Q) echo "  CLEAN   all .o .*.d *.dtb built-in.o"
 	$(Q) echo "  CLEAN   allsymbols.o allsymbols.S linkmap.txt minos.s .tmp.minos.elf .tmp.minos.symbols minos.bin minos.elf"
@@ -321,6 +325,10 @@ clean: $(clean-dirs)
 	$(Q) cd tools/mvm && make clean
 	$(Q) rm -rf $(offset_h)
 	$(Q) rm -rf $(offset_s)
+	$(Q) echo "  CLEAN   mvm..."
+	$(Q) cd tools/mvm && make clean
+	$(Q) echo "  CLEAN   mkrmd..."
+	$(Q) cd tools/mkrmd && make clean
 
 distclean: clean
 	$(Q) echo "  CLEAN   .config include/config"
