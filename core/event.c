@@ -46,17 +46,14 @@ void event_task_wait(void *ev, int mode, uint32_t to)
 	}
 
 	/*
-	 * after __event_task_wait, the process will call sched()
+	 * after event_task_wait, the process will call sched()
 	 * by itself, before sched() is called, the task can not
 	 * be sched out, since at the same time another thread
 	 * may wake up this process, which may case dead lock
 	 * with current design.
 	 */
 	do_not_preempt();
-
 	task->state = TASK_STATE_WAIT_EVENT;
-	smp_wmb();
-
 	task->pend_state = TASK_STATE_PEND_OK;
 	task->wait_type = mode;
 	task->delay = (to == -1 ? 0 : to);

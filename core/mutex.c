@@ -25,40 +25,37 @@
 
 int mutex_accept(mutex_t *mutex)
 {
+	struct task *task = current;
 	int ret = -EBUSY;
-	unsigned long flags;
-	struct task *task = get_current_task();
 
-	if (invalid_mutex(mutex))
-		return -EPERM;
-
-	/* if the mutex is avaliable now, lock it */
-	spin_lock_irqsave(&mutex->lock, flags);
+	spin_lock(&mutex->lock);
 	if (mutex->cnt == OS_MUTEX_AVAILABLE) {
 		mutex->owner = task->tid;
 		mutex->data = task;
 		mutex->cnt = task->prio;
 		ret = 0;
 	}
-	spin_unlock_irqrestore(&mutex->lock, flags);
+	spin_unlock(&mutex->lock);
 
 	return ret;
 }
 
 int mutex_pend(mutex_t *m, uint32_t timeout)
 {
+	struct task *task = current;
 	int ret;
-	unsigned long flags = 0;
-	struct task *task = get_current_task();
 
 	might_sleep();
 
-	spin_lock_irqsave(&m->lock, flags);
+	/*
+	 * mutex_pend and mutex_post can not be used in interrupt
+	 * context.
+	 */
+	spin_lock(&m->lock);
 	if (m->cnt == OS_MUTEX_AVAILABLE) {
 		m->owner = task->tid;
 		m->data = (void *)task;
 		m->cnt = task->tid;
-
 		spin_unlock(&m->lock);
 		return 0;
 	}
@@ -76,7 +73,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	 * task need to get two mutex, how to deal with this ?
 	 */
 	event_task_wait(to_event(m), TASK_EVENT_MUTEX, timeout);
-	spin_unlock_irqrestore(&m->lock, flags);
+	spin_unlock(&m->lock);
 	
 	sched();
 
@@ -88,13 +85,13 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 	case TASK_STATE_PEND_ABORT:
 		ret = -EABORT;
 		break;
-	
+
 	case TASK_STATE_PEND_TO:
-	default:
 		ret = -ETIMEDOUT;
-		spin_lock_irqsave(&m->lock, flags);
+	default:
+		spin_lock(&m->lock);
 		event_task_remove(task, (struct event *)m);
-		spin_unlock_irqrestore(&m->lock, flags);
+		spin_unlock(&m->lock);
 		break;
 	}
 
@@ -105,19 +102,12 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 
 int mutex_post(mutex_t *m)
 {
-	struct task *task = get_current_task();
+	struct task *task = current;
 
-	if (in_interrupt()) {
-		pr_err("can not call this in interrupt\n");
-		return -EPERM;
-	}
+	might_sleep();
+	ASSERT(m->owner == task->tid);
 
 	spin_lock(&m->lock);
-	if (task != (struct task *)m->data) {
-		pr_err("mutex not belong to this task %d\n", task->tid);
-		spin_unlock(&m->lock);
-		return -EINVAL;
-	}
 
 	/* 
 	 * find the highest prio task to run, if there is
@@ -129,7 +119,6 @@ int mutex_post(mutex_t *m)
 		m->cnt = task->tid;
 		m->data = task;
 		m->owner = task->tid;
-
 		spin_unlock(&m->lock);
 
 		return 0;

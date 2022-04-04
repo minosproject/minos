@@ -11,7 +11,7 @@ typedef struct event mutex_t;
 	mutex_t name = {			\
 		.type = OS_EVENT_TYPE_MUTEX,	\
 		.owner = 0,			\
-		.cnt = 0,			\
+		.cnt = OS_MUTEX_AVAILABLE,	\
 		.data = NULL,			\
 		.lock = {0, 0},			\
 		.wait_list = {			\
