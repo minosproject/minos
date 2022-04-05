@@ -2,15 +2,13 @@
 
 http://minosproject.org
 
-Microkernel RTOS with Virtualization and SMP support for ARMv8-A
+Flexible Virtualization Solution for Embedded System
 
 ## What is Minos
 
-Minos is a real-time priority-based microkernel RTOS with virtualization support for ARMv8-A that provides the trusted reliability and performance for embedded system while also allowing multiple operating systems to safely co-exist on the same System on Chip (SoC). 
+Minos is a flexible virtualization solution for embedded system, which can provide the trusted reliability and performance for embedded system while also allowing multiple operating systems to safely co-exist on the same System on Chip (SoC).
 
 Minos defines a device hypervisor reference stack and an architecture for running multiple software subsystems, managed securely, on a consolidated system by means of a virtual machine manager. Minos can be used as a Type 1 reference hypervisor stack, running directly on the bare-metal hardware, and is suitable for a variety of IoT and embedded device solutions. Minos addresses the gap that currently exists between datacenter hypervisors, and hard partitioning hypervisors. The hypervisor architecture partitions the system into different functional domains, with carefully selected guest OS sharing optimizations for IoT and embedded devices.
-
-Minos is also designed as a real-time priority-based microkernel RTOS that support SMP, currently support ARMv8-A, But can be easily ported to other platforms and architectures like Cortex-M MCU.
 
 #### Supported hardware
 
@@ -19,8 +17,6 @@ Minos is also designed as a real-time priority-based microkernel RTOS that suppo
 - [x] Raspberry 4
 - [x] Khadas VIM3
 - [x] Renesas R-Car r8a7795
-
-Minos can be easily ported to other armv8-a based platform.
 
 #### Supported OSes
 
