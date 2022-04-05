@@ -114,7 +114,7 @@ struct task {
 
 	unsigned long flags;
 
-	struct list_head proc_list;	// link to the process list, if is a thread.
+	struct list_head task_list;	// link to the task list, if is a thread.
 	struct list_head state_list;	// link to the sched list used for sched.
 
 	uint32_t delay;

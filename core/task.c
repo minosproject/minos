@@ -23,6 +23,7 @@
 static DEFINE_SPIN_LOCK(tid_lock);
 static DECLARE_BITMAP(tid_map, OS_NR_TASKS);
 struct task *os_task_table[OS_NR_TASKS];
+static LIST_HEAD(task_list);
 
 /* idle task needed be static defined */
 struct task idle_tasks[NR_CPUS];
@@ -69,6 +70,7 @@ static int tid_early_init(void)
 	 * tid is reserved for system use.
 	 */
 	set_bit(0, tid_map);
+
 	return 0;
 }
 early_initcall(tid_early_init);
@@ -319,6 +321,20 @@ int create_idle_task(void)
 	pcpu->idle_task = task;
 
 	return 0;
+}
+
+void os_for_all_task(void (*hdl)(struct task *task))
+{
+        struct task *task;
+	int idx;
+
+	// get the tid_lock ?
+	for_each_set_bit(idx, tid_map, OS_NR_TASKS) {
+		task = os_task_table[idx];
+		if (!task)
+			continue;
+		hdl(task);
+	}
 }
 
 /*

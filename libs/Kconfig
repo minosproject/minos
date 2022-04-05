@@ -1,5 +1,5 @@
 menu "System libary config"
 
-source "libsys/shell_command/Kconfig"
+source "libs/shell_command/Kconfig"
 
 endmenu

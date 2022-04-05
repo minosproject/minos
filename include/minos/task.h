@@ -116,4 +116,8 @@ struct task *create_task(char *name,
 
 struct task *create_vcpu_task(char *name, task_func_t func, int aff,
 		unsigned long flags, void *vcpu);
+
+void os_for_all_task(void (*hdl)(struct task *task));
+
 #endif
+

@@ -168,9 +168,9 @@ export RCS_TAR_IGNORE := --exclude SCCS --exclude BitKeeper --exclude .svn \
 PHONY += all
 _all: all
 
-core-y		:= core/ apps/ libsys/
+core-y		:= core/ apps/ libs/
 drivers-y	:= drivers/ platform/
-external-y	:= external/
+external-y	:=
 libs-y		:=
 
 -include .config
@@ -311,11 +311,11 @@ dtbs: FORCE
 	$(Q) $(MAKE) $(build)=$@
 
 mvm :
-	$(Q) echo "Build Minos userspace tools for Virtual Machine"
+	$(Q) echo "\nBuild Minos userspace tools for Virtual Machine"
 	$(Q) cd tools/mvm && make BUILD=$(BUILD)
 
 mkrmd:
-	$(Q) echo "Build mkrmd tools to generate ramdisk"
+	$(Q) echo "\nBuild mkrmd tools to generate ramdisk"
 	$(Q) cd tools/mkrmd && make
 
 clean: $(clean-dirs)

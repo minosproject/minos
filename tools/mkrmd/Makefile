@@ -6,7 +6,7 @@ CFLAGS := -Wall -g -D_XOPEN_SOURCE -D_GNU_SOURCE \
 	-Wno-format-security -I../../generic/include -MD -MP
 
 mkrmd: mkrmd.c
-	@ echo "        Building mkrmd ..."
+	@ echo "  Building mkrmd ..."
 	@ gcc mkrmd.c -o mkrmd $(CFLAGS)
 
 .PHONY: clean
