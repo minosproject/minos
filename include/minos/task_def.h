@@ -57,24 +57,6 @@
 #define KWORKER_FLAG_MASK 0xffff
 #define KWORKER_TASK_RECYCLE BIT(0)
 
-enum {
-	TASK_EVENT_NULL = 0,
-
-	TASK_EVENT_IRQ,
-	TASK_EVENT_VIRQ,
-
-	TASK_EVENT_MBOX,
-	TASK_EVENT_Q,
-	TASK_EVENT_MUTEX,
-	TASK_EVENT_FLAG,
-	TASK_EVENT_SEM,
-	TASK_EVENT_TIMER,
-
-	TASK_EVENT_STARTUP,
-
-	TASK_EVENT_ANY,
-};
-
 #define TASK_STATE_PEND_OK       0u  /* Pending status OK, not pending, or pending complete */
 #define TASK_STATE_PEND_TO       1u  /* Pending timed out */
 #define TASK_STATE_PEND_ABORT    2u  /* Pending aborted */

@@ -56,7 +56,7 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 
 	/* no mbox message need to suspend the task */
 	task = get_current_task();
-	event_task_wait(to_event(m), TASK_EVENT_MBOX, timeout);
+	__wait_event(TO_EVENT(m), OS_EVENT_TYPE_MBOX, timeout);
 	spin_unlock_irqrestore(&m->lock, flags);
 
 	sched();
@@ -74,7 +74,7 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 	default:
 		pmsg = NULL;
 		spin_lock_irqsave(&m->lock, flags);
-		event_task_remove(task, (struct event *)m);
+		remove_event_waiter(TO_EVENT(m), task);
 		spin_unlock_irqrestore(&m->lock, flags);
 		break;
 	}
@@ -85,42 +85,10 @@ void *mbox_pend(mbox_t *m, uint32_t timeout)
 	return pmsg;	
 }
 
-int mbox_post(mbox_t *m, void *pmsg)
+static int __mbox_post_opt(mbox_t *m, void *pmsg, int pend_state, int opt)
 {
-	int ret = 0;
 	unsigned long flags;
-	struct task *task;
-
-	if (!pmsg)
-		return -EINVAL;
-
-	spin_lock_irqsave(&m->lock, flags);
-	task = event_highest_task_ready((struct event *)m,
-			pmsg, TASK_STATE_PEND_OK);
-	if (task) {
-		spin_unlock_irqrestore(&m->lock, flags);
-		return 0;
-	}
-
-	if (m->data != NULL) {
-		pr_warn("mbox is full\n");
-		ret = -ENOSPC;
-	} else {
-		m->data = pmsg;
-		ret = 0;
-	}
-
-	spin_unlock_irqrestore(&m->lock, flags);
-
-	return ret;
-}
-
-int mbox_post_opt(mbox_t *m, void *pmsg, int opt)
-{
 	int ret = 0;
-	unsigned long flags;
-	int nr_tasks = 0;
-	struct task *task;
 
 	if (!pmsg)
 		return -EINVAL;
@@ -130,35 +98,29 @@ int mbox_post_opt(mbox_t *m, void *pmsg, int opt)
 	 * all the waitting task
 	 */
 	spin_lock_irqsave(&m->lock, flags);
-	if (opt & OS_POST_OPT_BROADCAST) {
-		while (event_has_waiter(to_event(m))) {
-			task = event_highest_task_ready((struct event *)m,
-					pmsg, TASK_STATE_PEND_OK);
-			if (task)
-				nr_tasks++;
-		}
-	} else {
-		task = event_highest_task_ready((struct event *)m,
-				pmsg, TASK_STATE_PEND_OK);
-		if (task)
-			nr_tasks++;
+	ret = wake_up_event_waiter(TO_EVENT(m), pmsg, pend_state, opt);
+	if (!ret) {
+		if (m->data != NULL)
+			ret = -ENOSPC;
+		else
+			m->data = pmsg;
 	}
-
-	if (nr_tasks) {
-		spin_unlock_irqrestore(&m->lock, flags);
-		cpus_resched();
-		return 0;
-	}
-
-	if (m->data != NULL) {
-		pr_warn("mbox is full\n");
-		ret = -ENOSPC;
-	} else {
-		m->data = pmsg;
-		ret = 0;
-	}
-
 	spin_unlock_irqrestore(&m->lock, flags);
 
+	if (ret)
+		cond_resched();
+
 	return ret;
+}
+
+int mobox_post_abort(mbox_t *m)
+{
+	return __mbox_post_opt(m, NULL, TASK_STATE_PEND_ABORT,
+			OS_EVENT_OPT_BROADCAST);
+}
+
+int mbox_post(mbox_t *m, void *pmsg)
+{
+	return __mbox_post_opt(m, pmsg, TASK_STATE_PEND_OK,
+			OS_EVENT_OPT_NONE);
 }

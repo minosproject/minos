@@ -166,7 +166,7 @@ void task_sleep(uint32_t delay)
 	do_not_preempt();
 	task->delay = delay;
 	task->state = TASK_STATE_WAIT_EVENT;
-	task->wait_type = TASK_EVENT_TIMER;
+	task->wait_type = OS_EVENT_TYPE_TIMER;
 	local_irq_restore(flags);
 
 	sched();
@@ -338,23 +338,6 @@ void cond_resched(void)
 {
 	if (need_resched() && sched_allowed())
 		sched();
-}
-
-/*
- * notify all the cpu to do a resched if need
- */
-void cpus_resched(void)
-{
-	int cpuid, cpu;
-	unsigned long flags;
-
-	local_irq_save(flags);
-	cpuid = smp_processor_id();
-	for_each_online_cpu(cpu) {
-		if (cpu != cpuid)
-			pcpu_resched(cpu);
-	}
-	local_irq_restore(flags);
 }
 
 void irq_enter(gp_regs *regs)
@@ -537,7 +520,7 @@ static int wake_up_interrupted(struct task *task,
 	task->pend_state = pend_state;
 	task->state = TASK_STATE_RUNNING;
 	task->delay = 0;
-	if (event == TASK_EVENT_FLAG) {
+	if (event == OS_EVENT_TYPE_FLAG) {
 		task->flags_rdy = (long)data;
 		task->msg = NULL;
 	} else {
@@ -588,7 +571,7 @@ static int wake_up_common(struct task *task, long pend_state, int event, void *d
 	task->state = TASK_STATE_WAKING;
 	timeout = task->delay;
 	task->delay = 0;
-	if (event == TASK_EVENT_FLAG) {
+	if (event == OS_EVENT_TYPE_FLAG) {
 		task->flags_rdy = (long)data;
 		task->msg = NULL;
 	} else {

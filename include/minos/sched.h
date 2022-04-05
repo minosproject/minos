@@ -20,7 +20,6 @@ void pcpu_irqwork(int pcpu_id);
 void task_sleep(uint32_t ms);
 void irq_enter(gp_regs *regs);
 void irq_exit(gp_regs *regs);
-void cpus_resched(void);
 int task_ready(struct task *task, int preempt);
 
 void __might_sleep(const char *file, int line, int preempt_offset);

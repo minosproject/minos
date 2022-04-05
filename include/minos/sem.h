@@ -17,7 +17,7 @@ int sem_post(sem_t *sem);
 
 static void inline sem_init(sem_t *sem, uint32_t cnt)
 {
-	event_init(to_event(sem), OS_EVENT_TYPE_SEM, NULL);
+	event_init(TO_EVENT(sem), OS_EVENT_TYPE_SEM, NULL);
 	sem->cnt = cnt;
 }
 

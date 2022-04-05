@@ -48,7 +48,7 @@ int sem_pend(sem_t *sem, uint32_t timeout)
 		spin_unlock_irqrestore(&sem->lock, flags);
 		return 0;
 	}
-	event_task_wait(to_event(sem), TASK_EVENT_SEM, timeout);
+	__wait_event(TO_EVENT(sem), OS_EVENT_TYPE_SEM, timeout);
 	spin_unlock_irqrestore(&sem->lock, flags);
 
 	sched();
@@ -61,10 +61,10 @@ int sem_pend(sem_t *sem, uint32_t timeout)
 		ret = -EABORT;
 		break;
 	case TASK_STATE_PEND_TO:
-	default:
 		ret = -ETIMEDOUT;
+	default:
 		spin_lock_irqsave(&sem->lock, flags);
-		event_task_remove(task, to_event(sem));
+		remove_event_waiter(TO_EVENT(sem), task);
 		spin_unlock_irqrestore(&sem->lock, flags);
 		break;
 	}
@@ -74,61 +74,38 @@ int sem_pend(sem_t *sem, uint32_t timeout)
 	return ret;
 }
 
-int sem_pend_abort(sem_t *sem, int opt)
+static int sem_post_opt(sem_t *sem, int pend_state, int opt)
 {
-	int nbr_tasks = 0;
 	unsigned long flags;
-	struct task *task;
-
-	might_sleep();
+	int ret;
 
 	spin_lock_irqsave(&sem->lock, flags);
-	if (event_has_waiter((struct event *)sem)) {
-		switch (opt) {
-		case OS_PEND_OPT_BROADCAST:
-			while (event_has_waiter((struct event *)sem)) {
-				task = event_highest_task_ready((struct event *)sem,
-					NULL, TASK_STATE_PEND_ABORT);
-				if (task)
-					nbr_tasks++;
-			}
-			break;
-		case OS_PEND_OPT_NONE:
-		default:
-			task = event_highest_task_ready((struct event *)sem,
-				NULL, TASK_STATE_PEND_OK);
-			if (task)
-				nbr_tasks++;
-			break;
-		}
-
-		if (nbr_tasks) {
-			spin_unlock_irqrestore(&sem->lock, flags);
-			cpus_resched();
-			return nbr_tasks;
-		}
+	ret = wake_up_event_waiter(TO_EVENT(sem), NULL, pend_state, opt);
+	if (pend_state != TASK_STATE_PEND_ABORT) {
+		if (!ret && (sem->cnt < INT_MAX))
+			sem->cnt++;
+		else
+			ret = -EOVERFLOW;
 	}
-
 	spin_unlock_irqrestore(&sem->lock, flags);
 
-	return 0;
+	if (ret > 0)
+		cond_resched();
+
+	return ret;
+}
+
+/*
+ * the sem is broken, wake up all the waiter.
+ */
+int sem_pend_abort(sem_t *sem, int opt)
+{
+	return sem_post_opt(sem, TASK_STATE_PEND_ABORT,
+			OS_EVENT_OPT_BROADCAST);
 }
 
 int sem_post(sem_t *sem)
 {
-	unsigned long flags;
-	struct task *task;
-
-	spin_lock_irqsave(&sem->lock, flags);
-	task = event_highest_task_ready((struct event *)sem,
-			NULL, TASK_STATE_PEND_OK);
-	if (task)
-		goto out;
-
-	if (sem->cnt < 65535)
-		sem->cnt++;
-out:
-	spin_unlock_irqrestore(&sem->lock, flags);
-
-	return 0;
+	return sem_post_opt(sem, TASK_STATE_PEND_OK,
+			OS_EVENT_OPT_NONE);
 }

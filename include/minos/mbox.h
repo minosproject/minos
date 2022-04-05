@@ -18,7 +18,7 @@ int mbox_is_pending(mbox_t *m);
 
 static void inline mbox_init(mbox_t *mbox, void *pmsg)
 {
-	event_init(to_event(mbox), OS_EVENT_TYPE_MBOX, pmsg);
+	event_init(TO_EVENT(mbox), OS_EVENT_TYPE_MBOX, pmsg);
 }
 
 #endif

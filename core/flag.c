@@ -126,7 +126,7 @@ static void flag_task_ready(struct flag_node *node, flag_t flags)
 {
 	struct task *task = node->task;
 
-	__wake_up(task, TASK_STATE_PEND_OK, TASK_EVENT_FLAG,
+	__wake_up(task, TASK_STATE_PEND_OK, OS_EVENT_TYPE_FLAG,
 			(void *)(unsigned long)flags);
 }
 
@@ -142,7 +142,7 @@ static void flag_block(struct flag_grp *grp, struct flag_node *pnode,
 	pnode->flag_grp = grp;
 	list_add_tail(&grp->wait_list, &pnode->list);
 
-	event_task_wait(pnode, TASK_EVENT_FLAG, timeout);
+	__wait_event(pnode, OS_EVENT_TYPE_FLAG, timeout);
 }
 
 flag_t flag_pend(struct flag_grp *grp, flag_t flags,

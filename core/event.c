@@ -29,7 +29,7 @@ void event_init(struct event *event, int type, void *pdata)
 	event->data = pdata;
 }
 
-void event_task_wait(void *ev, int mode, uint32_t to)
+void __wait_event(void *ev, int mode, uint32_t to)
 {
 	struct task *task = current;
 	struct event *event;
@@ -38,7 +38,7 @@ void event_task_wait(void *ev, int mode, uint32_t to)
 	 * the process of flag is different with other IPC
 	 * method
 	 */
-	if (mode == TASK_EVENT_FLAG) {
+	if (mode == OS_EVENT_TYPE_FLAG) {
 		task->flag_node = ev;
 	} else {
 		event = (struct event *)ev;
@@ -59,56 +59,52 @@ void event_task_wait(void *ev, int mode, uint32_t to)
 	task->delay = (to == -1 ? 0 : to);
 }
 
-int event_task_remove(struct task *task, struct event *ev)
+int remove_event_waiter(struct event *ev, struct task *task)
 {
-	/* if task has already timeout or deleted */
-	if (task->event_list.next != NULL) {
+	if (task->event_list.next == NULL) {
+		return -ENOENT;
+	} else {
 		list_del(&task->event_list);
 		task->event_list.next = NULL;
-	}
 
-	return 0;
+		return 0;
+	}
 }
 
-struct task *event_get_waiter(struct event *ev)
+static struct task *get_event_waiter(struct event *ev)
 {
-	struct task *task;
-
 	if (is_list_empty(&ev->wait_list))
 		return NULL;
-
-	task = list_first_entry(&ev->wait_list, struct task, event_list);
-	event_task_remove(task, ev);
-
-	return task;
+	else
+		return list_first_entry(&ev->wait_list, struct task, event_list);
 }
 
-struct task *event_highest_task_ready(struct event *ev, void *msg, int pend_state)
+/*
+ * num - the number need to wake ? <= 0 means, wakeup all.
+ * will return the number of task which have been wake.
+ */
+int __wake_up_event_waiter(struct event *ev, void *msg,
+		int pend_state, int opt)
 {
 	struct task *task;
-	int ret;
+	int ret, cnt = 0, num;
+
+	num = opt & OS_EVENT_OPT_BROADCAST ? 0 : 1;
 
 	do {
-		task = event_get_waiter(ev);
+		task = get_event_waiter(ev);
 		if (!task)
-			return NULL;
+			break;
 
-		ret = __wake_up(task, TASK_STATE_PEND_OK, ev->type, msg);
-		if (ret)
-			pr_warn("task state may not correct %d\n", task->name);
-	} while (ret);
+		ret = __wake_up(task, pend_state, ev->type, msg);
+		if (ret == 0) {
+			cnt++;
+			if (cnt == num)
+				break;
+		}
+	} while (1);
 
-	return task;
-}
-
-void event_del_always(struct event *ev)
-{
-	struct task *task, *n;
-
-	list_for_each_entry_safe(task, n, &ev->wait_list, event_list) {
-		event_task_remove(task, ev);
-		wake_up_abort(task);
-	}
+	return cnt;
 }
 
 void event_pend_down(void)
@@ -123,12 +119,12 @@ void event_pend_down(void)
 
 long wake(struct event *ev)
 {
-	struct task *task;
 	unsigned long flags;
+	int ret;
 
 	spin_lock_irqsave(&ev->lock, flags);
-	task = event_highest_task_ready(ev, NULL, TASK_STATE_PEND_OK);
+	ret = wake_up_event_waiter(ev, NULL, TASK_STATE_PEND_OK, 0);
 	spin_unlock_irqrestore(&ev->lock, flags);
 
-	return task ? 0 : -ENOENT;
+	return ret;
 }

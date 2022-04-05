@@ -20,9 +20,6 @@
 #include <minos/mutex.h>
 #include <minos/sched.h>
 
-#define invalid_mutex(mutex)	\
-	((mutex == NULL) && (mutex->type != OS_EVENT_TYPE_MUTEX))
-
 int mutex_accept(mutex_t *mutex)
 {
 	struct task *task = current;
@@ -32,7 +29,7 @@ int mutex_accept(mutex_t *mutex)
 	if (mutex->cnt == OS_MUTEX_AVAILABLE) {
 		mutex->owner = task->tid;
 		mutex->data = task;
-		mutex->cnt = task->prio;
+		mutex->cnt = task->tid;
 		ret = 0;
 	}
 	spin_unlock(&mutex->lock);
@@ -60,19 +57,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 		return 0;
 	}
 
-	/*
-	 * priority inversion - only check the realtime task
-	 *
-	 * check the current task's prio to see whether the
-	 * current task's prio is lower than mutex's owner, if
-	 * yes, need to increase the owner's prio
-	 *
-	 * on smp it not easy to deal with the priority, then
-	 * just lock the cpu until the task(own the mutex) has
-	 * finish it work, but there is a big problem, if the
-	 * task need to get two mutex, how to deal with this ?
-	 */
-	event_task_wait(to_event(m), TASK_EVENT_MUTEX, timeout);
+	__wait_event(TO_EVENT(m), OS_EVENT_TYPE_MUTEX, timeout);
 	spin_unlock(&m->lock);
 	
 	sched();
@@ -90,7 +75,7 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 		ret = -ETIMEDOUT;
 	default:
 		spin_lock(&m->lock);
-		event_task_remove(task, (struct event *)m);
+		remove_event_waiter(TO_EVENT(m), task);
 		spin_unlock(&m->lock);
 		break;
 	}
@@ -103,18 +88,17 @@ int mutex_pend(mutex_t *m, uint32_t timeout)
 int mutex_post(mutex_t *m)
 {
 	struct task *task = current;
+	int ret;
 
-	might_sleep();
 	ASSERT(m->owner == task->tid);
-
-	spin_lock(&m->lock);
 
 	/* 
 	 * find the highest prio task to run, if there is
 	 * no task, then set the mutex is available else
 	 * resched
 	 */
-	task = event_highest_task_ready(to_event(m), NULL, TASK_STATE_PEND_OK);
+	spin_lock(&m->lock);
+	ret = wake_up_event_waiter(m, NULL, TASK_STATE_PEND_OK, 0);
 	if (task) {
 		m->cnt = task->tid;
 		m->data = task;
@@ -130,5 +114,5 @@ int mutex_post(mutex_t *m)
 
 	spin_unlock(&m->lock);
 
-	return 0;
+	return ret;
 }
