@@ -187,7 +187,7 @@ MBUILD_IMAGE 	:= minos.bin
 MBUILD_IMAGE_ELF := minos.elf
 MBUILD_IMAGE_SYMBOLS := allsymbols.o
 
-all: include/config/config.h $(version_h) $(offset_h) minos mkrmd mvm
+all: include/config/config.h $(version_h) $(offset_h) minos dtbs
 
 minos-dirs	:= $(patsubst %/,%,$(filter %/, $(core-y) $(external-y) $(drivers-y) $(libs-y)))
 
