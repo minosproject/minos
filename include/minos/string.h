@@ -6,8 +6,10 @@
 
 long absolute(long num);
 long num_to_str(char *buf, unsigned long num, int bdho);
-long itoa(char *buf, long num);
-long uitoa(char *buf, unsigned long num);
+long itoa(char *buf, int num);
+long ltoa(char *buf, long num);
+long uitoa(char *buf, unsigned int num);
+long ultoa(char *buf, unsigned long num);
 long hextoa(char *buf, unsigned long num);
 long octtoa(char *buf, unsigned long num);
 long bintoa(char *buf, unsigned long num);

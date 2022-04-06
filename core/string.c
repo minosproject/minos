@@ -28,6 +28,7 @@
 #define PRINTF_MASK		(0xff)
 #define PRINTF_UNSIGNED		0X0100
 #define PRINTF_SIGNED		0x0200
+#define PRINTF_LONG		0x0400
 
 typedef char *(*vsprintf_t)(char *dst, const char *src, int size);
 
@@ -73,25 +74,35 @@ long num_to_str(char *buf, unsigned long num, int b)
 	return res;
 }
 
-long itoa(char *buf, long num)
+#define xxxtoa(buf, num)		\
+({					\
+	int tmp = 0;			\
+					\
+	if ((num) < 0) {		\
+		num = ~num + 1;		\
+		*buf++ = '-';		\
+		tmp = 1;		\
+	}				\
+					\
+	tmp + num_to_str(buf, num, 10);	\
+})
+
+long ltoa(char *buf, long num)
 {
-	int len = 0;
-	int tmp = 0;
-
-	if (buf == NULL)
-		return -1;
-
-	if (num < 0) {
-		num = absolute(num);
-		*buf++ = '-';
-		tmp = 1;
-	}
-	len = num_to_str(buf, num, 10);
-
-	return len + tmp;
+	return xxxtoa(buf, num);
 }
 
-long uitoa(char *buf, unsigned long num)
+long itoa(char *buf, int num)
+{
+	return xxxtoa(buf, num);
+}
+
+long ultoa(char *buf, unsigned long num)
+{
+	return num_to_str(buf, num, 10);
+}
+
+long uitoa(char *buf, unsigned int num)
 {
 	return num_to_str(buf, num, 10);
 }
@@ -137,10 +148,17 @@ int numbric(char *buf, unsigned long num, int flag)
 
 	switch (flag & PRINTF_MASK) {
 	case PRINTF_DEC:
-		if (flag &PRINTF_SIGNED)
-			len = itoa(buf, (signed long)num);
-		else
-			len = uitoa(buf, num);
+		if (flag & PRINTF_SIGNED) {
+			if (flag & PRINTF_LONG)
+				len = ltoa(buf, (long)num);
+			else
+				len = itoa(buf, (int)num);
+		} else {
+			if (flag & PRINTF_LONG)
+				len = ultoa(buf, num);
+			else
+				len = uitoa(buf, (unsigned int)num);
+		}
 		break;
 	case PRINTF_HEX:
 		len = hextoa(buf, num);
@@ -177,27 +195,25 @@ static inline char *memory_vsprintf(char *dst, const char *src, int size)
 	return (dst + size);
 }
 
-#define PRINT_ALIGN_CHAR(str, index, align, len)			\
-	do {								\
-		if (align && (align > len)) {				\
-			for (index = 0; index < (align - len); index++)	\
-				str = vst(str, " ", 1);			\
-		}							\
-	} while (0)
+#define PRINT_ALIGN_CHAR(str, align, len)				\
+({									\
+ 	int index;							\
+	if (align && (align > len)) {					\
+		for (index = 0; index < (align - len); index++)		\
+			str = vst(str, " ", 1);				\
+	}								\
+})
 
 int vsprintf(char *buf, const char *fmt, va_list arg)
 {
-	char *str, *tmp;
+	char *str = buf, *tmp;
 	int len, ch, align, i;
 	char num_buf[96];		// 96 is enough for number
 	unsigned long unumber;
 	int flag = 0;
 	vsprintf_t vst;
 
-	if (buf == NULL)
-		vst = console_vsprintf;
-	else
-		vst = memory_vsprintf;
+	vst = (buf == NULL) ? console_vsprintf : memory_vsprintf;
 
 	for (str = buf; *fmt; fmt++) {
 		align = 0;
@@ -214,6 +230,28 @@ int vsprintf(char *buf, const char *fmt, va_list arg)
 		}
 
 		switch (*fmt) {
+		case 'l':
+			/*
+			 * only support %ld %lx or %3ld %3lx style.
+			 */
+			fmt++;
+			ch = *fmt;
+			if ((ch != 'd') && (ch != 'x')) {
+				i = 0;
+				num_buf[i++] = '%';
+				if (align)
+					num_buf[i++]= align + '0';
+				num_buf[i++] = 'l';
+				num_buf[i++] = ch;
+				str = vst(str, num_buf, i);
+				continue;
+			} else {
+				if (ch == 'd')
+					flag |= PRINTF_LONG | PRINTF_DEC;
+				else
+					flag |= PRINTF_LONG | PRINTF_HEX;
+				break;
+			}
 		case 'd':
 			flag |= PRINTF_DEC | PRINTF_SIGNED;
 			break;
@@ -229,11 +267,11 @@ int vsprintf(char *buf, const char *fmt, va_list arg)
 			break;
 		case 's':
 			len = strlen(tmp = va_arg(arg, char *));
-			PRINT_ALIGN_CHAR(str, i, align, len);
+			PRINT_ALIGN_CHAR(str, align, len);
 			str = vst(str, (const char *)tmp, len);
 			continue;
 		case 'c':
-			PRINT_ALIGN_CHAR(str, i, align, 1);
+			PRINT_ALIGN_CHAR(str, align, 1);
 			ch = (char)(va_arg(arg, int));
 			str = vst(str, (const char *)&ch, 1);
 			continue;
@@ -260,7 +298,7 @@ int vsprintf(char *buf, const char *fmt, va_list arg)
 
 		unumber = va_arg(arg, unsigned long);
 		len = numbric(num_buf, unumber, flag);
-		PRINT_ALIGN_CHAR(str, i, align, len);
+		PRINT_ALIGN_CHAR(str, align, len);
 		str = vst(str, num_buf, len);
 
 		flag = 0;
