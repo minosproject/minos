@@ -136,15 +136,8 @@ static void handle_vm_request(struct vm_request *vs)
 int vm_daemon_main(void *data)
 {
 	struct vm_request *vs;
-	int ret;
 
 	pr_notice("start VM daemon\n");
-
-	ret = queue_init(&vm_request_queue, VM_SIGNAL_QUEUE_SIZE, NULL);
-	if (ret) {
-		pr_err("unable to init VM request queue\n");
-		return ret;
-	}
 
 	for (;;) {
 		vs = queue_pend(&vm_request_queue, -1);
@@ -156,4 +149,13 @@ int vm_daemon_main(void *data)
 		handle_vm_request(vs);
 		free(vs);
 	}
+}
+
+void vm_daemon_init(void)
+{
+	queue_init(&vm_request_queue, VM_SIGNAL_QUEUE_SIZE, NULL);
+
+	if (!create_task("vm-daemon", vm_daemon_main,
+				0x2000, OS_PRIO_SYSTEM, -1, 0, NULL))
+		pr_err("create vm-daemon task failed\n");
 }

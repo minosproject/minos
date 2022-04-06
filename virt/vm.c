@@ -395,10 +395,14 @@ void vcpu_enter_poweroff(struct vcpu *vcpu)
 	struct task *task = vcpu->task;
 	int skip = 0;
 
-	if (check_vcpu_state(vcpu, VCPU_STATE_STOP))
+	if (check_vcpu_state(vcpu, VCPU_STATE_STOP) ||
+			check_vcpu_state(vcpu, VCPU_STATE_SUSPEND))
 		return;
 
 	task_need_freeze(task);
+	if (vcpu->task == current)
+		return;
+
 	wake_up_abort(task);
 
 	if ((vcpu_affinity(vcpu) != smp_processor_id()) && !skip) {
@@ -616,8 +620,11 @@ static int __vm_power_off(struct vm *vm, void *args, int byself)
 			byself ? "itself" : "mvm");
 
 	set_vm_state(vm, VM_STATE_OFFLINE);
-	vm_for_each_vcpu(vm, vcpu)
+	vm_for_each_vcpu(vm, vcpu) {
+		if (vcpu == current_vcpu)
+			continue;
 		vcpu_enter_poweroff(vcpu);
+	}
 
 	/*
 	 * the vcpu has been set to TIF_NEED_STOP, so when return
@@ -884,7 +891,7 @@ static void setup_native_vm(struct vm *vm)
 		size = ramdisk_file_size(vm->dtb_file);
 		ret = create_host_mapping(ULONG(setup_addr), ULONG(vm->setup_data),
 				MAX_DTB_SIZE, VM_NORMAL | VM_HUGE);
-		ASSERT(ret != 0);
+		ASSERT(ret == 0);
 
 		ret = ramdisk_read(vm->dtb_file, setup_addr, size, 0);
 		ASSERT(ret == 0);
@@ -902,7 +909,7 @@ static void setup_native_vm(struct vm *vm)
 	 */
 	size = fdt_totalsize(setup_addr);
 	flush_dcache_range(ULONG(setup_addr), PAGE_BALIGN(size));
-	destroy_host_mapping(ULONG(setup_addr), PAGE_BALIGN(size));
+	destroy_host_mapping(ULONG(setup_addr), MAX_DTB_SIZE);
 }
 
 void destroy_vm(struct vm *vm)
@@ -1252,6 +1259,7 @@ static int of_create_vmboxs(void)
 int virt_init(void)
 {
 	extern void vmm_init(void);
+	extern void vm_daemon_init(void);
 	struct vm *vm;
 
 	/*
@@ -1259,6 +1267,8 @@ int virt_init(void)
 	 */
 	set_bit(0, vmid_bitmap);
 	vmm_init();
+
+	vm_daemon_init();
 
 	parse_and_create_vms();
 

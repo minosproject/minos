@@ -172,6 +172,21 @@ void task_sleep(uint32_t delay)
 	sched();
 }
 
+void task_suspend(void)
+{
+	struct task *task = current;
+	unsigned long flags;
+
+	local_irq_save(flags);
+	do_not_preempt();
+	task->delay = 0;
+	task->state = TASK_STATE_SUSPEND;
+	task->wait_type = 0;
+	local_irq_restore(flags);
+
+	sched();
+}
+
 static struct task *pick_next_task(struct pcpu *pcpu)
 {
 	struct list_head *head;
@@ -393,11 +408,6 @@ void exception_return_handler(void)
 	switch_to_task(task, next);
 }
 
-int sched_init(void)
-{
-	return 0;
-}
-
 static int irqwork_handler(uint32_t irq, void *data)
 {
 	struct pcpu *pcpu = get_pcpu();
@@ -452,17 +462,6 @@ int local_sched_init(void)
 {
 	struct pcpu *pcpu = get_pcpu();
 
-	init_list(&pcpu->new_list);
-	init_list(&pcpu->stop_list);
-	init_list(&pcpu->ready_list[0]);
-	init_list(&pcpu->ready_list[1]);
-	init_list(&pcpu->ready_list[2]);
-	init_list(&pcpu->ready_list[3]);
-	init_list(&pcpu->ready_list[4]);
-	init_list(&pcpu->ready_list[5]);
-	init_list(&pcpu->ready_list[6]);
-	init_list(&pcpu->ready_list[7]);
-
 	init_timer(&pcpu->sched_timer);
 	pcpu->sched_timer.cpu = pcpu->pcpu_id;
 	pcpu->sched_timer.function = sched_tick_handler;
@@ -474,6 +473,30 @@ int local_sched_init(void)
 			0, "resched handler", NULL);
 	request_irq(CONFIG_MINOS_IRQWORK_IRQ, irqwork_handler,
 			0, "irqwork handler", NULL);
+	return 0;
+}
+
+static void pcpu_sched_init(struct pcpu *pcpu)
+{
+	init_list(&pcpu->new_list);
+	init_list(&pcpu->stop_list);
+	init_list(&pcpu->ready_list[0]);
+	init_list(&pcpu->ready_list[1]);
+	init_list(&pcpu->ready_list[2]);
+	init_list(&pcpu->ready_list[3]);
+	init_list(&pcpu->ready_list[4]);
+	init_list(&pcpu->ready_list[5]);
+	init_list(&pcpu->ready_list[6]);
+	init_list(&pcpu->ready_list[7]);
+}
+
+int sched_init(void)
+{
+	int i;
+
+	for (i = 0; i < NR_CPUS; i++)
+		pcpu_sched_init(&pcpus[i]);
+
 	return 0;
 }
 

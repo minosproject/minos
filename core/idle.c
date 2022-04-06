@@ -139,12 +139,16 @@ void cpu_idle(void)
 {
 	struct pcpu *pcpu = get_pcpu();
 
+	start_system_task();
+
 	set_os_running();
 	local_irq_enable();
 
-	start_system_task();
+	pcpu_irqwork(pcpu->pcpu_id);
 
 	while (1) {
+		sched();
+
 		/*
 		 * need to check whether the pcpu can go to idle
 		 * state to avoid the interrupt happend before wfi
@@ -159,7 +163,5 @@ void cpu_idle(void)
 			}
 			local_irq_enable();
 		}
-
-		sched();
 	}
 }

@@ -55,6 +55,8 @@ struct pcpu {
 
 extern unsigned long percpu_offset[];
 
+extern struct pcpu pcpus[NR_CPUS];
+
 void percpu_init(int cpuid);
 
 static inline int smp_processor_id(void)
