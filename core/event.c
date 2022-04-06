@@ -71,12 +71,17 @@ int remove_event_waiter(struct event *ev, struct task *task)
 	}
 }
 
-static struct task *get_event_waiter(struct event *ev)
+static inline struct task *get_event_waiter(struct event *ev)
 {
+	struct task *task;
+
 	if (is_list_empty(&ev->wait_list))
 		return NULL;
-	else
-		return list_first_entry(&ev->wait_list, struct task, event_list);
+
+	task = list_first_entry(&ev->wait_list, struct task, event_list);
+	list_del(&task->event_list);
+
+	return task;
 }
 
 /*
@@ -97,11 +102,11 @@ int __wake_up_event_waiter(struct event *ev, void *msg,
 			break;
 
 		ret = __wake_up(task, pend_state, ev->type, msg);
-		if (ret == 0) {
-			cnt++;
-			if (cnt == num)
-				break;
-		}
+		if (ret)
+			continue;
+
+		if (++cnt == num)
+			break;
 	} while (1);
 
 	return cnt;
