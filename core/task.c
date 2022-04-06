@@ -61,6 +61,8 @@ static int request_tid(int tid)
 static void release_tid(int tid)
 {
 	ASSERT((tid < OS_NR_TASKS) && (tid > 0));
+	os_task_table[tid] = NULL;
+	smp_wmb();
 	clear_bit(tid, tid_map);
 }
 
@@ -117,6 +119,8 @@ static void task_init(struct task *task, char *name,
 	init_timer_on_cpu(&task->delay_timer, cpu);
 	task->delay_timer.function = task_timeout_handler;
 	task->delay_timer.data = (unsigned long)task;
+
+	os_task_table[tid] =  task;
 
 	if (name)
 		strncpy(task->name, name, MIN(strlen(name), TASK_NAME_SIZE));
@@ -297,7 +301,7 @@ int create_idle_task(void)
 	task = get_cpu_var(idle_task);
 	BUG_ON(!request_tid(tid), "tid is wrong for idle task cpu%d\n", tid);
 
-	sprintf(task_name, "idle@%d", aff);
+	sprintf(task_name, "idle/%d", aff);
 
 	task_init(task, task_name, NULL, 0, OS_PRIO_IDLE,
 			tid, aff, TASK_FLAGS_IDLE, NULL);

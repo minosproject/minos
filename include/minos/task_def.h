@@ -86,12 +86,6 @@ struct task {
 	void *stack_top;
 	void *stack_bottom;
 
-	/*
-	 * pid - process id
-	 * tid - task id
-	 * hid - handle id
-	 */
-	int pid;
 	int tid;
 
 	unsigned long flags;

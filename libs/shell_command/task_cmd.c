@@ -19,7 +19,7 @@
 
 static void dump_task_info(struct task *task)
 {
-	printf("%4d %3d %s\n", task->pid, task->affinity, task->name);
+	printf("%4d %3d %s\n", task->tid, task->cpu, task->name);
 }
 
 static int ps_cmd(int argc, char **argv)
