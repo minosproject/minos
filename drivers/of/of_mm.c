@@ -161,12 +161,12 @@ static void __fdt_parse_ramdisk_mem(void)
 	if (node <= 0)
 		return;
 
-	data = fdt_getprop(dtb_address, node, "minos,initrd-start", &len);
+	data = fdt_getprop(dtb_address, node, "minos,ramdisk-start", &len);
 	if (!data || (len == 0))
 		return;
 	start = fdt32_to_cpu64(data[0], data[1]);
 
-	data = fdt_getprop(dtb_address, node, "minos,initrd-end", &len);
+	data = fdt_getprop(dtb_address, node, "minos,ramdisk-end", &len);
 	if (!data || (len == 0))
 		return;
 	end = fdt32_to_cpu64(data[0], data[1]);

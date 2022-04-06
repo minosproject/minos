@@ -408,14 +408,13 @@ static void memory_region_init(void)
 	 * not overlap with host memory region.
 	 */
 	list_for_each_entry(re, &mem_list, list) {
-		if (memory_region_type(re) != MEMORY_REGION_TYPE_KERNEL)
-			continue;
-
-		if ((re->phy_base >= minos_start) &&
-				((re->phy_base + re->size) < end)) {
-			pr_err("invalid memory region [0x%x ---> 0x%x]",
-					re->phy_base, re->phy_base + re->size);
-			BUG();
+		if (memory_region_type(re) == MEMORY_REGION_TYPE_KERNEL) {
+			if ((re->phy_base >= minos_start) &&
+					((re->phy_base + re->size) < end)) {
+				pr_err("invalid memory region [0x%x ---> 0x%x]",
+						re->phy_base, re->phy_base + re->size);
+				BUG();
+			}
 		}
 
 		if (memory_region_type(re) == MEMORY_REGION_TYPE_RAMDISK) {

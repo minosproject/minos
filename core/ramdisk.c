@@ -31,6 +31,9 @@ void set_ramdisk_address(void *start, void *end)
 
 int ramdisk_init(void)
 {
+	unsigned long start = ptov(ramdisk_start);
+	size_t size = ramdisk_end - ramdisk_start;
+
 	/*
 	 * need remap the ramdisk memory space, if it
 	 * is not in the kernel memory space TBD.
@@ -45,16 +48,13 @@ int ramdisk_init(void)
 		return -EINVAL;
 	}
 
-	if (create_host_mapping(ptov(ramdisk_start), (unsigned long)ramdisk_start,
-				ramdisk_end - ramdisk_start, VM_RO)) {
+	if (create_host_mapping(start, (unsigned long)ramdisk_start, size, VM_RO)) {
 		pr_err("unable map ramdisk memory\n");
 		return -ENOMEM;
 	}
 
-	ramdisk_start = (void *)ptov(ramdisk_start);
-	ramdisk_end = (void *)ptov(ramdisk_end);
-
 	if (strncmp(ramdisk_start, RAMDISK_MAGIC, RAMDISK_MAGIC_SIZE) != 0) {
+		destroy_host_mapping(start, size);
 		pr_err("bad ramdisk format\n");
 		return -EBADF;
 	}
@@ -64,6 +64,9 @@ int ramdisk_init(void)
 	 * information, inclue the superblock and the
 	 * root inode
 	 */
+	ramdisk_start = (void *)ptov(ramdisk_start);
+	ramdisk_end = (void *)ptov(ramdisk_end);
+
 	sb = ramdisk_start + RAMDISK_MAGIC_SIZE;
 	root = ramdisk_start + sb->inode_offset;
 	ramdisk_data = ramdisk_start + sb->data_offset;

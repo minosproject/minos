@@ -126,13 +126,17 @@ static inline void *__of_getprop(void *dtb, int node,
 		char *attr, int *len)
 {
 	const void *data;
+	int length;
 
 	if (!dtb || node <= 0 || !attr)
 		return NULL;
 
-	data = fdt_getprop(dtb, node, attr, len);
-	if (!data || (*len <= 0))
+	data = fdt_getprop(dtb, node, attr, &length);
+	if (!data || (length <= 0))
 		return NULL;
+
+	if (len)
+		*len = length;
 
 	return (void *)data;
 }
