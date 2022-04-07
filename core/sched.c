@@ -338,9 +338,7 @@ void sched(void)
 	 * need call sched_yield not sched
 	 */
 	do {
-		preempt_disable();
 		do_sched();
-		preempt_enable();
 	} while (need_resched());
 }
 
