@@ -408,7 +408,7 @@ static void memory_region_init(void)
 	 * not overlap with host memory region.
 	 */
 	list_for_each_entry(re, &mem_list, list) {
-		if (memory_region_type(re) == MEMORY_REGION_TYPE_KERNEL) {
+		if (re->type == MEMORY_REGION_TYPE_KERNEL) {
 			if ((re->phy_base >= minos_start) &&
 					((re->phy_base + re->size) < end)) {
 				pr_err("invalid memory region [0x%x ---> 0x%x]",
@@ -417,8 +417,9 @@ static void memory_region_init(void)
 			}
 		}
 
-		if (memory_region_type(re) == MEMORY_REGION_TYPE_RAMDISK) {
-			pr_notice("set ramdisk address 0x%lx 0x%lx\n", re->phy_base, re->size);
+		if (re->type == MEMORY_REGION_TYPE_RAMDISK) {
+			pr_notice("set ramdisk address 0x%lx 0x%lx\n",
+					re->phy_base, re->size);
 			set_ramdisk_address((void *)re->phy_base,
 					(void *)(re->phy_base + re->size));
 		}

@@ -798,6 +798,52 @@ static void vmm_area_init(struct mm_struct *mm, int bit64)
 	create_free_vmm_area(mm, base, size, 0);
 }
 
+static inline int check_vm_address(struct vm *vm, unsigned long addr)
+{
+	struct vmm_area *va;
+
+	list_for_each_entry(va, &vm->mm.vmm_area_used, list) {
+		if ((addr >= va->start) && (addr < va->end))
+			return 0;
+	}
+
+	return 1;
+}
+
+static int vm_memory_init(struct vm *vm)
+{
+	struct memory_region *region;
+	struct vmm_area *va;
+	int ret = 0;
+
+	if (!vm_is_native(vm))
+		return 0;
+
+	/*
+	 * find the memory region which belongs to this
+	 * VM and register to this VM.
+	 */
+	for_each_memory_region(region) {
+		if (region->vmid != vm->vmid)
+			continue;
+
+		va = split_vmm_area(&vm->mm, region->phy_base,
+				region->size, VM_NATIVE_NORMAL);
+		if (!va)
+			return -EINVAL;
+	}
+
+	/*
+	 * check whether the entry address, setup_data address and load
+	 * address are in the valid memory region.
+	 */
+	ret = check_vm_address(vm, (unsigned long)vm->load_address);
+	ret += check_vm_address(vm, (unsigned long)vm->entry_point);
+	ret += check_vm_address(vm, (unsigned long)vm->setup_data);
+
+	return ret;
+}
+
 int vm_mm_struct_init(struct vm *vm)
 {
 	struct mm_struct *mm = &vm->mm;
@@ -815,7 +861,10 @@ int vm_mm_struct_init(struct vm *vm)
 
 	vmm_area_init(mm, !vm_is_32bit(vm));
 
-	return 0;
+	/*
+	 * attch the memory region to the native vm.
+	 */
+	return vm_memory_init(vm);
 }
 
 int vm_mm_init(struct vm *vm)
@@ -975,7 +1024,7 @@ void vmm_init(void)
 {
 	struct memory_region *region;
 	struct block_section *bs;
-	int type, size;
+	int size;
 
 	ASSERT(!is_list_empty(&mem_list));
 
@@ -984,8 +1033,7 @@ void vmm_init(void)
 	 * memory. The guest memory will allocated as block.
 	 */
 	list_for_each_entry(region, &mem_list, list) {
-		type = memory_region_type(region);
-		if (type != MEMORY_REGION_TYPE_NORMAL)
+		if (region->type != MEMORY_REGION_TYPE_NORMAL)
 			continue;
 
 		/*

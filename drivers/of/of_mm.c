@@ -67,7 +67,7 @@ static int __fdt_parse_memory_info(int node, char *attr)
 		}
 
 		len -= size_cell + address_cell;
-		add_memory_region(base, size, MEMORY_REGION_F_NORMAL);
+		add_memory_region(base, size, MEMORY_REGION_TYPE_NORMAL, 0);
 	}
 
 	return 0;
@@ -83,8 +83,8 @@ static void __fdt_parse_memreserve(void)
 	 * memory space
 	 */
 	if (CONFIG_MINOS_ENTRY_ADDRESS != minos_start) {
-		split_memory_region(minos_start, CONFIG_MINOS_ENTRY_ADDRESS - minos_start,
-				MEMORY_REGION_F_RSV);
+		size = CONFIG_MINOS_ENTRY_ADDRESS - minos_start;
+		split_memory_region(minos_start, size, MEMORY_REGION_TYPE_RSV, 1);
 	}
 
 	count = fdt_num_mem_rsv(dtb_address);
@@ -98,7 +98,7 @@ static void __fdt_parse_memreserve(void)
 
 		pr_notice("find rev memory - id: %d addr: 0x%x size: 0x%x\n",
 				i, address, size);
-		split_memory_region(address, size, MEMORY_REGION_F_RSV);
+		split_memory_region(address, size, MEMORY_REGION_TYPE_RSV, 0);
 	}
 }
 
@@ -111,6 +111,7 @@ static void __fdt_parse_vm_mem(void)
 	uint64_t array[2 * 10];
 	phy_addr_t base;
 	size_t size;
+	int vmid;
 
 	node = fdt_path_offset(dtb_address, "/vms");
 	if (node <= 0) {
@@ -120,10 +121,10 @@ static void __fdt_parse_vm_mem(void)
 
 	fdt_for_each_subnode(child, dtb_address, node) {
 		type = (char *)fdt_getprop(dtb_address, child, "device_type", &len);
-		if (!type)
+		if (!type || (strcmp(type, "virtual_machine") != 0))
 			continue;
-		if (strcmp(type, "virtual_machine") != 0)
-			continue;
+
+		__of_get_u32_array(dtb_address, child, "vmid", (uint32_t *)&vmid, 1);
 
 		/*
 		 * get the memory information for the vm, each vm will
@@ -140,7 +141,7 @@ static void __fdt_parse_vm_mem(void)
 		for (i = 0; i < len; i += 2 ) {
 			base = (phy_addr_t)array[i];
 			size = (size_t)array[i + 1];
-			split_memory_region(base, size, MEMORY_REGION_F_VM);
+			split_memory_region(base, size, MEMORY_REGION_TYPE_VM, vmid);
 		}
 	}
 }
@@ -148,7 +149,8 @@ static void __fdt_parse_vm_mem(void)
 
 static void __fdt_parse_kernel_mem(void)
 {
-	split_memory_region(minos_start, CONFIG_MINOS_RAM_SIZE, MEMORY_REGION_F_KERNEL);
+	split_memory_region(minos_start, CONFIG_MINOS_RAM_SIZE,
+			MEMORY_REGION_TYPE_KERNEL, 0);
 }
 
 static void __fdt_parse_ramdisk_mem(void)
@@ -177,7 +179,7 @@ static void __fdt_parse_ramdisk_mem(void)
 	}
 
 	split_memory_region(start, PAGE_BALIGN(end - start),
-			MEMORY_REGION_F_RAMDISK);
+			MEMORY_REGION_TYPE_RAMDISK, 0);
 }
 
 int of_parse_memory_info(void)

@@ -19,6 +19,7 @@
 #include <minos/sched.h>
 #include <asm/psci.h>
 #include <virt/vm.h>
+#include <virt/vm_pm.h>
 
 static int std_smc_handler(gp_regs *c,
 		uint32_t id, unsigned long *args)
@@ -70,11 +71,13 @@ static int std_smc_handler(gp_regs *c,
 
 	case PSCI_0_2_FN_SYSTEM_OFF:
 		/* request reset by it self */
-		vm_power_off(get_vmid(get_current_vcpu()), NULL, 1);
+		vm_power_off(get_vmid(get_current_vcpu()), NULL,
+				VM_PM_ACTION_BY_SELF);
 		break;
 
 	case PSCI_0_2_FN_SYSTEM_RESET:
-		vm_reset(get_vmid(get_current_vcpu()), NULL, 1);
+		vm_reset(get_vmid(get_current_vcpu()), NULL,
+				VM_PM_ACTION_BY_SELF);
 		break;
 
 	case PSCI_1_0_FN_SYSTEM_SUSPEND:

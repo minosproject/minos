@@ -17,3 +17,6 @@ obj-y				+= vmodule.o
 obj-y				+= iommu.o
 obj-y				+= shmem.o
 obj-y				+= vm_daemon.o
+obj-y				+= vm_reboot.o
+obj-y				+= vm_shutdown.o
+obj-y				+= vm_suspend.o

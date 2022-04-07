@@ -23,6 +23,7 @@
 #include <virt/virtio.h>
 #include <virt/vmcs.h>
 #include <virt/os.h>
+#include <virt/vm_pm.h>
 
 static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 {
@@ -46,7 +47,7 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 		break;
 
 	case HVC_VM_RESTART:
-		vmid = vm_reset((int)args[0], NULL, 0);
+		vmid = vm_reset((int)args[0], NULL, VM_PM_ACTION_BY_MVM);
 		HVC_RET1(c, vmid);
 		break;
 
@@ -56,7 +57,7 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 		break;
 
 	case HVC_VM_POWER_DOWN:
-		vmid = vm_power_off((int)args[0], NULL, 0);
+		vmid = vm_power_off((int)args[0], NULL, VM_PM_ACTION_BY_MVM);
 		HVC_RET1(c, vmid);
 		break;
 

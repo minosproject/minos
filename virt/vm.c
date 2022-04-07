@@ -39,11 +39,11 @@
 #include <virt/iommu.h>
 #include <asm/cache.h>
 
-struct vm *vms[CONFIG_MAX_VM];
-static int total_vms = 0;
-LIST_HEAD(vm_list);
-
 static struct vm *host_vm;
+
+struct vm *vms[CONFIG_MAX_VM];
+int total_vms = 0;
+LIST_HEAD(vm_list);
 
 static DEFINE_SPIN_LOCK(vms_lock);
 static DECLARE_BITMAP(vmid_bitmap, CONFIG_MAX_VM);
@@ -55,9 +55,15 @@ DEFINE_SPIN_LOCK(affinity_lock);
 
 #define VM_NR_CPUS_CLUSTER 256
 
+static inline int vcpu_is_offline(struct vcpu *vcpu)
+{
+	return check_vcpu_state(vcpu, VCPU_STATE_STOP) ||
+		check_vcpu_state(vcpu, VCPU_STATE_SUSPEND);
+}
+
 static void vcpu_online(struct vcpu *vcpu)
 {
-	ASSERT(check_vcpu_state(vcpu, VCPU_STATE_STOP));
+	ASSERT(vcpu_is_offline(vcpu));
 	task_ready(vcpu->task, 0);
 }
 
@@ -97,13 +103,13 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 		return -ENOENT;
 	}
 
-	if (check_vcpu_state(vcpu, TASK_STATE_STOP)) {
-		pr_notice("vcpu-%d of vm-%d power on from vm suspend 0x%p\n",
+	if (vcpu_is_offline(vcpu)) {
+		pr_notice("vcpu-%d of vm-%d power on 0x%p\n",
 				vcpu->vcpu_id, vcpu->vm->vmid, entry);
 		os_vcpu_power_on(vcpu, ULONG(entry));
 		vcpu_online(vcpu);
 	} else {
-		pr_err("vcpu_power_on : invalid vcpu state\n");
+		pr_err("vcpu_power_on : invalid vcpu state %d\n");
 		return -EINVAL;
 	}
 
@@ -120,7 +126,7 @@ void vcpu_context_restore(struct task *task)
 	restore_vcpu_vmodule_state(task_to_vcpu(task));
 }
 
-int vcpu_can_idle(struct vcpu *vcpu)
+static int vcpu_can_idle(struct vcpu *vcpu)
 {
 	if (vcpu_has_irq(vcpu))
 		return 0;
@@ -376,12 +382,6 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 	return vcpu;
 }
 
-void vcpu_reset(struct vcpu *vcpu)
-{
-	reset_vcpu_vmodule_state(vcpu);
-	vcpu_virq_struct_reset(vcpu);
-}
-
 static void vcpu_power_off_call(void *data)
 {
 	struct vcpu *vcpu = (struct vcpu *)data;
@@ -393,7 +393,6 @@ static void vcpu_power_off_call(void *data)
 void vcpu_enter_poweroff(struct vcpu *vcpu)
 {
 	struct task *task = vcpu->task;
-	int skip = 0;
 
 	if (check_vcpu_state(vcpu, VCPU_STATE_STOP) ||
 			check_vcpu_state(vcpu, VCPU_STATE_SUSPEND))
@@ -405,7 +404,7 @@ void vcpu_enter_poweroff(struct vcpu *vcpu)
 
 	wake_up_abort(task);
 
-	if ((vcpu_affinity(vcpu) != smp_processor_id()) && !skip) {
+	if ((vcpu_affinity(vcpu) != smp_processor_id())) {
 		pr_debug("call vcpu_power_off_call for vcpu-%s\n",
 				vcpu->task->name);
 		smp_function_call(vcpu->task->affinity,
@@ -607,52 +606,6 @@ int vm_power_up(int vmid)
 	return 0;
 }
 
-static int __vm_power_off(struct vm *vm, void *args, int byself)
-{
-	struct vcpu *vcpu;
-
-	/*
-	 * natvie VM do not support powered off by other.
-	 */
-	ASSERT(!byself && !vm_is_native(vm));
-
-	pr_notice("power off vm-%d by %s\n", vm->vmid,
-			byself ? "itself" : "mvm");
-
-	set_vm_state(vm, VM_STATE_OFFLINE);
-	vm_for_each_vcpu(vm, vcpu) {
-		if (vcpu == current_vcpu)
-			continue;
-		vcpu_enter_poweroff(vcpu);
-	}
-
-	/*
-	 * the vcpu has been set to TIF_NEED_STOP, so when return
-	 * to guest, the task will be killed by kernel.
-	 */
-	if (!vm_is_native(vm) && byself) {
-		pr_notice("send SHUTDOWN request to mvm\n");
-		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
-				VMTRAP_REASON_SHUTDOWN, 0, NULL);
-	} else {
-		pr_notice("send SHUTDOWN request to VM daemon\n");
-		send_vm_shutdown_request(vm);
-	}
-
-	return 0;
-}
-
-int vm_power_off(int vmid, void *arg, int byself)
-{
-	struct vm *vm = NULL;
-
-	vm = get_vm_by_id(vmid);
-	if (!vm)
-		return -EINVAL;
-
-	return __vm_power_off(vm, arg, byself);
-}
-
 static int guest_mm_init(struct vm *vm, uint64_t base, uint64_t size)
 {
 	if (split_vmm_area(&vm->mm, base, size, VM_GUEST_NORMAL) == NULL) {
@@ -701,7 +654,7 @@ int create_guest_vm(struct vmtag __guest *tag)
 
 	vmtag.vmid = 0;
 	vmtag.flags |= VM_FLAGS_CAN_RESET;
-	vm = create_vm(&vmtag);
+	vm = create_vm(&vmtag, NULL);
 	if (!vm)
 		return -ENOMEM;
 
@@ -712,141 +665,6 @@ int create_guest_vm(struct vmtag __guest *tag)
 	}
 
 	return vm->vmid;
-}
-
-static int __vm_reset(struct vm *vm, void *args, int byself)
-{
-	struct vcpu *vcpu;
-
-	pr_notice("reset vm-%d by %s\n",
-			vm->vmid, byself ? "itself" : "mvm");
-	if (vm_is_native(vm) && !(vm->flags & VM_FLAGS_CAN_RESET)) {
-		pr_err("vm%d do not support reset\n", vm->vmid);
-		return -EPERM;
-	}
-
-	/*
-	 * if the args is NULL, then this reset is requested by
-	 * iteself, otherwise the reset is called by vm0
-	 */
-	if (args == NULL)
-		byself = 1;
-
-	set_vm_state(vm, VM_STATE_REBOOT);
-	vm_for_each_vcpu(vm, vcpu)
-		vcpu_enter_poweroff(vcpu);
-
-	if (!vm_is_native(vm) && byself) {
-		pr_notice("send REBOOT request to mvm\n");
-		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
-				VMTRAP_REASON_REBOOT, 0, NULL);
-	} else {
-		pr_notice("send REBOOT request to VM daemon\n");
-		send_vm_reboot_request(vm);
-	}
-
-	return 0;
-}
-
-int vm_reset(int vmid, void *args, int byself)
-{
-	struct vm *vm;
-
-	vm = get_vm_by_id(vmid);
-	if (!vm)
-		return -ENOENT;
-
-	return __vm_reset(vm, args, byself);
-}
-
-static int vm_resume(struct vm *vm)
-{
-	struct vcpu *vcpu;
-
-	pr_notice("vm-%d resumed\n", vm->vmid);
-
-	vm_for_each_vcpu(vm, vcpu) {
-		if (get_vcpu_id(vcpu) == 0)
-			continue;
-
-		resume_vcpu_vmodule_state(vcpu);
-	}
-
-	do_hooks((void *)vm, NULL, OS_HOOK_RESUME_VM);
-
-	if (!vm_is_native(vm)) {
-		pr_notice("send VM RESUME request to mvm\n");
-		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
-				VMTRAP_REASON_VM_RESUMED, 0, NULL);
-	}
-
-	return 0;
-}
-
-static int __vm_suspend(struct vm *vm)
-{
-	struct vcpu *vcpu;
-
-	pr_notice("suspend vm-%d\n", vm->vmid);
-	if (get_vcpu_id(current_vcpu) != 0) {
-		pr_err("vm suspend can only called by vcpu0\n");
-		return -EPERM;
-	}
-
-	vm_for_each_vcpu(vm, vcpu) {
-		if (vcpu == current_vcpu)
-			continue;
-
-		if (!check_vcpu_state(vcpu, TASK_STATE_STOP)) {
-			pr_err("vcpu-%d is not suspend vm suspend fail\n",
-					get_vcpu_id(vcpu));
-			return -EINVAL;
-		}
-
-		/*
-		 * other VCPU will powered up by vcpu0 again when
-		 * it is suspended.
-		 */
-		suspend_vcpu_vmodule_state(vcpu);
-	}
-
-	vm->state = VM_STATE_SUSPEND;
-	smp_mb();
-
-	do_hooks((void *)vm, NULL, OS_HOOK_SUSPEND_VM);
-
-	if (!vm_is_native(vm)) {
-		pr_notice("send VM SUSPEND request to mvm\n");
-		trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
-				VMTRAP_REASON_VM_SUSPEND, 0, NULL);
-	}
-
-	/*
-	 * vcpu0 will set to WAIT_EVENT state, so the interrupt
-	 * can wakeup it, other VCPU will set to STOP state. Only
-	 * can be wake up by vcpu0.
-	 */
-	vcpu_idle(current_vcpu);
-
-	/*
-	 * vm is resumed
-	 */
-	vm->state = VM_STATE_ONLINE;
-	smp_wmb();
-
-	vm_resume(vm);
-
-	return 0;
-}
-
-int vm_suspend(int vmid)
-{
-	struct vm *vm = get_vm_by_id(vmid);
-
-	if (vm == NULL)
-		return -EINVAL;
-
-	return __vm_suspend(vm);
 }
 
 static void do_setup_native_vm(struct vm *vm)
@@ -863,10 +681,14 @@ static void do_setup_native_vm(struct vm *vm)
 	 *
 	 * first map the dtb address to the hypervisor, here
 	 * map these native VM's memory as read only
+	 *
+	 * just do these step only when the VM has not been
+	 * online.
 	 */
-	os_create_native_vm_resource(vm);
-
-	create_vmbox_controller(vm);
+	if (!vm->has_init) {
+		os_create_native_vm_resource(vm);
+		create_vmbox_controller(vm);
+	}
 
 	os_setup_vm(vm);
 
@@ -1082,8 +904,8 @@ static struct vm *__create_vm(struct vmtag *vme)
 	 */
 	vm_open_ramdisk_file(vm, vme);
 
-	vms[vme->vmid] = vm;
 	spin_lock(&vms_lock);
+	vms[vme->vmid] = vm;
 	list_add_tail(&vm_list, &vm->vm_list);
 	total_vms++;
 	spin_unlock(&vms_lock);
@@ -1093,7 +915,7 @@ static struct vm *__create_vm(struct vmtag *vme)
 	return vm;
 }
 
-struct vm *create_vm(struct vmtag *vme)
+struct vm *create_vm(struct vmtag *vme, struct device_node *node)
 {
 	int ret = 0;
 	struct vm *vm;
@@ -1111,6 +933,8 @@ struct vm *create_vm(struct vmtag *vme)
 	vm = __create_vm(vme);
 	if (!vm)
 		return NULL;
+
+	vm->dev_node = node;
 
 	ret = vm_mm_struct_init(vm);
 	if (ret) {
@@ -1162,16 +986,12 @@ static inline const char *get_vm_type(struct vm *vm)
 
 static void *create_native_vm_of(struct device_node *node, void *arg)
 {
-	int ret, i;
-	struct vm *vm;
 	struct vmtag vmtag;
-	uint64_t meminfo[2 * VM_MAX_MEM_REGIONS];
 
 	if (node->class != DT_CLASS_VM)
 		return NULL;
 
-	ret = parse_vm_info_of(node, &vmtag);
-	if (ret)
+	if (parse_vm_info_of(node, &vmtag))
 		return NULL;
 
 	pr_notice("**** create new vm ****\n");
@@ -1193,36 +1013,7 @@ static void *create_native_vm_of(struct device_node *node, void *arg)
 			vmtag.vcpu_affinity[4], vmtag.vcpu_affinity[5],
 			vmtag.vcpu_affinity[6], vmtag.vcpu_affinity[7]);
 
-	vm = create_vm(&vmtag);
-	if (!vm) {
-		pr_err("create vm-%d failed\n", vmtag.vmid);
-		return NULL;
-	}
-
-	vm->dev_node = node;
-
-	/* parse the memory information of the vm from dtb */
-	ret = of_get_u64_array(node, "memory", meminfo, 2 * VM_MAX_MEM_REGIONS);
-	if ((ret <= 0) || ((ret % 2) != 0)) {
-		pr_err("get wrong memory information for vm-%d", vmtag.vmid);
-		destroy_vm(vm);
-
-		return NULL;
-	}
-
-	ret = ret / 2;
-
-	for (i = 0; i < ret; i ++) {
-		pr_notice("VM%d MEM [0x%x 0x%x]\n", vm->vmid,
-				meminfo[i * 2], meminfo[i * 2 + 1]);
-		split_vmm_area(&vm->mm, meminfo[i * 2],
-				meminfo[i * 2 + 1], VM_NATIVE_NORMAL);
-	}
-
-	pr_notice("create vm%d [%s %s] done\n", vm->vmid,
-			vm->name, get_vm_type(vm));
-
-	return vm;
+	return create_vm(&vmtag, node);
 }
 
 static void parse_and_create_vms(void)
@@ -1254,6 +1045,23 @@ static int of_create_vmboxs(void)
 	}
 
 	return 0;
+}
+
+static void setup_vm(struct vm *vm)
+{
+	os_vm_init(vm);
+	setup_native_vm(vm);
+	load_vm_image(vm);
+	vm_vcpus_init(vm);
+
+	if (!vm->has_init)
+		vm_mm_init(vm);
+}
+
+void setup_and_start_vm(struct vm *vm)
+{
+	setup_vm(vm);
+	start_vm(vm);
 }
 
 int virt_init(void)
@@ -1292,17 +1100,8 @@ int virt_init(void)
 	 * for the vm
 	 */
 	for_each_vm(vm) {
-		/*
-		 * - map the vm's memory
-		 * - create the vcpu for vm's each vcpu
-		 * - init the vmodule state for each vcpu
-		 * - prepare the vcpu for bootup
-		 */
-		os_vm_init(vm);
-		setup_native_vm(vm);
-		vm_mm_init(vm);
-		load_vm_image(vm);
-		vm_vcpus_init(vm);
+		setup_vm(vm);
+		vm->has_init = 1;
 	}
 
 	return 0;

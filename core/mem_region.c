@@ -20,9 +20,9 @@
 
 #define MAX_MEMORY_REGION 16
 
-LIST_HEAD(mem_list);
 static struct memory_region memory_regions[MAX_MEMORY_REGION];
 static int current_region_id;
+LIST_HEAD(mem_list);
 
 struct memory_region *alloc_memory_region(void)
 {
@@ -30,13 +30,13 @@ struct memory_region *alloc_memory_region(void)
 	return &memory_regions[current_region_id++];
 }
 
-int add_memory_region(uint64_t base, uint64_t size, uint32_t flags)
+int add_memory_region(uint64_t base, uint64_t size, int type, int vmid)
 {
 	phy_addr_t r_base, r_end;
 	size_t r_size;
 	struct memory_region *region;
 
-	if (size == 0)
+	if ((size == 0) || (type >= MEMORY_REGION_TYPE_MAX))
 		return -EINVAL;
 
 	/*
@@ -58,27 +58,27 @@ int add_memory_region(uint64_t base, uint64_t size, uint32_t flags)
 	region = alloc_memory_region();
 	region->phy_base = base;
 	region->size = size;
-	region->flags = flags;
-
-	pr_info("ADD   MEM: 0x%p [0x%p] 0x%x\n", region->phy_base,
-			region->size, region->flags);
+	region->type = type;
+	region->vmid = vmid;
 
 	init_list(&region->list);
 	list_add_tail(&mem_list, &region->list);
+	pr_info("ADD   MEM: 0x%p [0x%p] 0x%x\n", region->phy_base,
+			region->size, region->type);
 
 	return 0;
 }
 
-int split_memory_region(phy_addr_t base, size_t size, uint32_t flags)
+int split_memory_region(uint64_t base, size_t size, int type, int vmid)
 {
 	phy_addr_t start, end;
 	phy_addr_t new_end = base + size;
 	struct memory_region *region, *n, *tmp;
 
-	pr_info("SPLIT MEM: 0x%p [0x%p] 0x%x\n", base, size, flags);
-
-	if ((size == 0))
+	if ((size == 0) || (type >= MEMORY_REGION_TYPE_MAX))
 		return -EINVAL;
+
+	pr_info("SPLIT MEM: 0x%p [0x%p] 0x%x\n", base, size, type);
 
 	/*
 	 * delete the memory for host, these region
@@ -93,7 +93,7 @@ int split_memory_region(phy_addr_t base, size_t size, uint32_t flags)
 
 		/* just delete this region from the list */
 		if ((base == start) && (new_end == end)) {
-			region->flags = flags;
+			region->type = type;
 			return 0;
 		} else if ((base == start) && (new_end < end)) {
 			region->phy_base = new_end;
@@ -103,8 +103,10 @@ int split_memory_region(phy_addr_t base, size_t size, uint32_t flags)
 			n = alloc_memory_region();
 			n->phy_base = new_end;
 			n->size = end - new_end;
-			n->flags = region->flags;
+			n->type = region->type;
+			n->vmid = region->vmid;
 			list_add_tail(&mem_list, &n->list);
+
 			region->size = base - start;
 		} else if ((base > start) && (end == new_end)) {
 			region->size = region->size - size;
@@ -118,7 +120,8 @@ int split_memory_region(phy_addr_t base, size_t size, uint32_t flags)
 		tmp = alloc_memory_region();
 		tmp->phy_base = base;
 		tmp->size = size;
-		tmp->flags = flags;
+		tmp->type = type;
+		tmp->vmid = vmid;
 		list_add_tail(&mem_list, &tmp->list);
 
 		return 0;
@@ -129,17 +132,12 @@ int split_memory_region(phy_addr_t base, size_t size, uint32_t flags)
 	return 0;
 }
 
-int memory_region_type(struct memory_region *region)
-{
-	return ffs_one_table[region->flags & 0xff];
-}
-
 void dump_memory_info(void)
 {
-	int type;
-	char *name;
 	struct memory_region *region;
-	char *mem_attr[MEMORY_REGION_TYPE_MAX + 1] = {
+	char vm[8];
+
+	char *mem_attr[MEMORY_REGION_TYPE_MAX] = {
 		"Normal",
 		"DMA",
 		"RSV",
@@ -147,18 +145,13 @@ void dump_memory_info(void)
 		"DTB",
 		"Kernel",
 		"RamDisk",
-		"Unknown"
 	};
 
 	list_for_each_entry(region, &mem_list, list) {
-		type = memory_region_type(region);
-		if (type >= MEMORY_REGION_TYPE_MAX)
-			name = mem_attr[MEMORY_REGION_TYPE_MAX];
-		else
-			name = mem_attr[type];
-
-		pr_notice("MEM: 0x%p ---> 0x%p [0x%p] %s\n", region->phy_base,
+		sprintf(vm, "VM%d", region->vmid);
+		pr_notice("MEM: 0x%p -> 0x%p [0x%p] %s/%s\n", region->phy_base,
 				region->phy_base + region->size,
-				region->size, name);
+				region->size, mem_attr[region->type],
+				region->vmid == 0 ? "Host" : vm);
 	}
 }

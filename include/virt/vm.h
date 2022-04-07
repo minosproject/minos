@@ -35,6 +35,7 @@ struct os;
 struct vm;
 struct virq_struct;
 struct virq_chip;
+struct device_node;
 
 extern struct list_head vm_list;
 extern struct list_head mem_list;
@@ -82,6 +83,7 @@ struct vm {
 	int vmid;
 	uint32_t vcpu_nr;
 	int state;
+	int has_init;
 	unsigned long flags;
 	uint32_t vcpu_affinity[VM_MAX_VCPU];
 	void *entry_point;
@@ -126,6 +128,7 @@ struct vm {
 #define vm_name(vm)	devnode_name(vm->dev_node)
 
 extern struct vm *vms[CONFIG_MAX_VM];
+extern int total_vms;
 
 #define for_each_vm(vm)	\
 	list_for_each_entry(vm, &vm_list, vm_list)
@@ -192,7 +195,7 @@ int vcpu_power_on(struct vcpu *caller, unsigned long affinity,
 int vcpu_power_off(struct vcpu *vcpu, int timeout);
 int kick_vcpu(struct vcpu *vcpu, int preempt);
 
-struct vm *create_vm(struct vmtag *vme);
+struct vm *create_vm(struct vmtag *vme, struct device_node *node);
 int create_guest_vm(struct vmtag *tag);
 void destroy_vm(struct vm *vm);
 int vm_power_up(int vmid);
@@ -255,6 +258,8 @@ static inline int check_vm_state(struct vm *vm, int state)
 int send_vm_shutdown_request(struct vm *vm);
 int send_vm_reboot_request(struct vm *vm);
 
-void vcpu_reset(struct vcpu *vcpu);
+void vcpu_enter_poweroff(struct vcpu *vcpu);
+
+void setup_and_start_vm(struct vm *vm);
 
 #endif

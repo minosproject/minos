@@ -428,9 +428,17 @@ int vcpu_has_irq(struct vcpu *vcpu)
 
 void vcpu_virq_struct_reset(struct vcpu *vcpu)
 {
-	int i;
-	struct virq_desc *desc;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
+	struct virq_desc *desc, *tmp;
+	int i;
+
+	list_for_each_entry_safe(desc, tmp,
+			&virq_struct->pending_list, list)
+		list_del(&desc->list);
+
+	list_for_each_entry_safe(desc, tmp,
+			&virq_struct->active_list, list)
+		list_del(&desc->list);
 
 	virq_struct->active_count = 0;
 	spin_lock_init(&virq_struct->lock);
@@ -691,8 +699,8 @@ static int virq_create_vm(void *item, void *args)
 
 void vm_virq_reset(struct vm *vm)
 {
-	int i;
 	struct virq_desc *desc;
+	int i;
 
 	/* reset the all the spi virq for the vm */
 	for ( i = 0; i < vm->vspi_nr; i++) {
