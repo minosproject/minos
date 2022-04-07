@@ -496,16 +496,12 @@ static void dump_vmm_areas(struct mm_struct *mm)
 	struct vmm_area *va;
 
 	pr_debug("***** free vmm areas *****\n");
-	list_for_each_entry(va, &mm->vmm_area_free, list) {
-		pr_debug("vmm_area: start:0x%p ---> 0x%p 0x%p\n",
-				va->start, va->end, va->size);
-	}
+	list_for_each_entry(va, &mm->vmm_area_free, list)
+		pr_debug("[VA] 0x%p->0x%p\n", va->start, va->end);
 
 	pr_debug("***** used vmm areas *****\n");
-	list_for_each_entry(va, &mm->vmm_area_used, list) {
-		pr_debug("vmm_area: start:0x%p ---> 0x%p 0x%p\n",
-				va->start, va->end, va->size);
-	}
+	list_for_each_entry(va, &mm->vmm_area_used, list)
+		pr_debug("[VA] 0x%p->0x%p\n", va->start, va->end);
 }
 
 static void release_vmm_area_in_vm0(struct vm *vm)
@@ -878,21 +874,20 @@ int vm_mm_init(struct vm *vm)
 
 	/* just mapping the physical memory for native VM */
 	list_for_each_entry(va, &mm->vmm_area_used, list) {
-		if (!(va->flags & VM_NORMAL))
+		if (!(va->flags & __VM_NORMAL))
 			continue;
 
 		ret = map_vmm_area(mm, va, va->start);
 		if (ret) {
-			pr_err("build mem ma failed for vm-%d 0x%p 0x%p\n",
+			pr_err("map mem failed for vm-%d 0x%p 0x%p\n",
 				vm->vmid, va->start, va->size);
+			return ret;
 		}
 	}
 
 	/*
 	 * make sure that all the free vmm_area are PAGE aligned
-	 * when caculated the end address need to plus 1, in the
-	 * future, need to define the marco to caculate the size
-	 * and the end_base of vmm_area
+	 * when caculated the end address need to plus 1.
 	 */
 	list_for_each_entry_safe(va, n, &mm->vmm_area_free, list) {
 		base = BALIGN(va->start, PAGE_SIZE);
@@ -909,10 +904,10 @@ int vm_mm_init(struct vm *vm)
 
 		end -= 1;
 
-		if ((base != va->start) || (va->end != end) ||
-				(size != va->size)) {
-			pr_debug("adjust vmm_area: 0x%p->0x%p 0x%p->0x%p 0x%x->0x%x\n",
-					va->start, base, va->end, end, va->size, size);
+		if ((base != va->start) || (va->end != end) || (size != va->size)) {
+			pr_debug("adjust vmm_area: [0x%p->0x%p] to [0x%p->0x%p]\n",
+					va->start, va->start + va->size,
+					base, base +size);
 			va->start = base;
 			va->end = end;
 			va->size = size;

@@ -28,11 +28,6 @@ static void default_vcpu_init(struct vcpu *vcpu)
 		arch_vcpu_init(vcpu, (void *)vcpu->vm->entry_point, NULL);
 }
 
-static void default_vcpu_power_on(struct vcpu *vcpu, unsigned long entry)
-{
-
-}
-
 static void default_vm_setup(struct vm *vm)
 {
 	vmbox_init(vm);
@@ -50,7 +45,6 @@ static int default_create_native_vm_resource(struct vm *vm)
 
 struct os_ops default_os_ops = {
 	.vcpu_init	= default_vcpu_init,
-	.vcpu_power_on	= default_vcpu_power_on,
 	.vm_setup	= default_vm_setup,
 	.create_gvm_res = default_create_guest_vm_resource,
 	.create_nvm_res = default_create_native_vm_resource,

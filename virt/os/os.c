@@ -21,6 +21,38 @@
 
 static struct os *oses[OS_TYPE_MAX];
 
+static void default_vm_init(struct vm *vm)
+{
+	pr_warn("vm [%s] using %s\n", vm->name, __func__);
+}
+
+static void default_vcpu_init(struct vcpu *vcpu)
+{
+	pr_warn("vm [%s] using %s\n", vcpu->vm->name, __func__);
+}
+
+static void default_vcpu_power_on(struct vcpu *vcpu, unsigned long entry)
+{
+	pr_warn("vm [%s] using %s\n", vcpu->vm->name, __func__);
+}
+
+static void default_vm_setup(struct vm *vm)
+{
+	pr_warn("vm [%s] using %s\n", vm->name, __func__);
+}
+
+static int default_create_gvm_res(struct vm *vm)
+{
+	pr_warn("vm [%s] using %s\n", vm->name, __func__);
+	return 0;
+}
+
+static int default_create_nvm_res(struct vm *vm)
+{
+	pr_warn("vm [%s] using %s\n", vm->name, __func__);
+	return 0;
+}
+
 int register_os(char *name, int type, struct os_ops *ops)
 {
 	struct os *os;
@@ -33,6 +65,19 @@ int register_os(char *name, int type, struct os_ops *ops)
 	os = (struct os *)zalloc(sizeof(struct os));
 	if (!os)
 		return -ENOMEM;
+
+	if (!ops->vm_init)
+		ops->vm_init = default_vm_init;
+	if (!ops->vcpu_init)
+		ops->vcpu_init = default_vcpu_init;
+	if (!ops->vcpu_power_on)
+		ops->vcpu_power_on = default_vcpu_power_on;
+	if (!ops->vm_setup)
+		ops->vm_setup = default_vm_setup;
+	if (!ops->create_gvm_res)
+		ops->create_gvm_res = default_create_gvm_res;
+	if (!ops->create_nvm_res)
+		ops->create_nvm_res = default_create_nvm_res;
 
 	os->type = type;
 	os->ops = ops;
@@ -63,36 +108,26 @@ out:
 
 void os_setup_vm(struct vm *vm)
 {
-	if (vm->os->ops->vm_setup)
-		vm->os->ops->vm_setup(vm);
+	vm->os->ops->vm_setup(vm);
 }
 
 int os_create_native_vm_resource(struct vm *vm)
 {
-	if (vm->os->ops->create_nvm_res)
-		return vm->os->ops->create_nvm_res(vm);
-
-	return 0;
+	return vm->os->ops->create_nvm_res(vm);
 }
 
 int os_create_guest_vm_resource(struct vm *vm)
 {
-	if (vm->os->ops->create_gvm_res)
-		return vm->os->ops->create_gvm_res(vm);
-
-	return 0;
+	return vm->os->ops->create_gvm_res(vm);
 }
 
 void os_vcpu_power_on(struct vcpu *vcpu, unsigned long entry)
 {
 	struct os *os = vcpu->vm->os;
-
-	if (os->ops->vcpu_power_on)
-		os->ops->vcpu_power_on(vcpu, entry);
+	os->ops->vcpu_power_on(vcpu, entry);
 }
 
 void os_vm_init(struct vm *vm)
 {
-	if (vm->os->ops->vm_init)
-		vm->os->ops->vm_init(vm);
+	vm->os->ops->vm_init(vm);
 }

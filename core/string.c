@@ -304,6 +304,9 @@ int vsprintf(char *buf, const char *fmt, va_list arg)
 		flag = 0;
 	}
 
+	/*
+	 * terminated with 0
+	 */
 	ch = 0;
 	vst(str, (const char *)&ch, 1);
 

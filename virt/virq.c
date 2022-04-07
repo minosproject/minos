@@ -426,36 +426,6 @@ int vcpu_has_irq(struct vcpu *vcpu)
 	return !(pend && active);
 }
 
-void vcpu_virq_struct_reset(struct vcpu *vcpu)
-{
-	struct virq_struct *virq_struct = vcpu->virq_struct;
-	struct virq_desc *desc, *tmp;
-	int i;
-
-	list_for_each_entry_safe(desc, tmp,
-			&virq_struct->pending_list, list)
-		list_del(&desc->list);
-
-	list_for_each_entry_safe(desc, tmp,
-			&virq_struct->active_list, list)
-		list_del(&desc->list);
-
-	virq_struct->active_count = 0;
-	spin_lock_init(&virq_struct->lock);
-	init_list(&virq_struct->pending_list);
-	init_list(&virq_struct->active_list);
-	virq_struct->pending_virq = 0;
-	virq_struct->pending_hirq = 0;
-
-	for (i = 0; i < VM_LOCAL_VIRQ_NR; i++) {
-		desc = &virq_struct->local_desc[i];
-		desc->id = VIRQ_INVALID_ID;
-		desc->list.next = NULL;
-		desc->state = VIRQ_STATE_INACTIVE;
-		virq_clear_pending(desc);
-	}
-}
-
 static void update_virq_cap(struct virq_desc *desc, unsigned long flags)
 {
 	if (flags & VIRQF_CAN_WAKEUP)
@@ -473,9 +443,9 @@ static void update_virq_cap(struct virq_desc *desc, unsigned long flags)
 
 void vcpu_virq_struct_init(struct vcpu *vcpu)
 {
-	int i;
-	struct virq_desc *desc;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
+	struct virq_desc *desc;
+	int i;
 
 	virq_struct->active_count = 0;
 	spin_lock_init(&virq_struct->lock);
@@ -503,14 +473,29 @@ void vcpu_virq_struct_init(struct vcpu *vcpu)
 	}
 }
 
+void vcpu_virq_struct_reset(struct vcpu *vcpu)
+{
+	struct virq_struct *virq_struct = vcpu->virq_struct;
+	struct virq_desc *desc, *tmp;
+
+	list_for_each_entry_safe(desc, tmp,
+			&virq_struct->pending_list, list)
+		list_del(&desc->list);
+
+	list_for_each_entry_safe(desc, tmp,
+			&virq_struct->active_list, list)
+		list_del(&desc->list);
+
+	vcpu_virq_struct_init(vcpu);
+}
+
 static int __request_virq(struct vcpu *vcpu, struct virq_desc *desc,
 			uint32_t virq, uint32_t hwirq, unsigned long flags)
 {
-	if (desc->vno && (desc->vno != virq))
+	if (desc->vno && (desc->vno != virq)) {
 		pr_warn("virq-%d may has been requested\n", virq);
-
-	pr_debug("vm-%d request virq %d --> hwirq %d\n",
-			get_vmid(vcpu), virq, hwirq);
+		return -EBUSY;
+	}
 
 	desc->vno = virq;
 	desc->hno = hwirq;
@@ -547,9 +532,6 @@ int request_virq_affinity(struct vm *vm, uint32_t virq, uint32_t hwirq,
 	struct vcpu *vcpu;
 	struct virq_desc *desc;
 
-	if (!vm)
-		return -EINVAL;
-
 	vcpu = get_vcpu_in_vm(vm, affinity);
 	if (!vcpu) {
 		pr_err("request virq fail no vcpu-%d in vm-%d\n",
@@ -566,21 +548,20 @@ int request_virq_affinity(struct vm *vm, uint32_t virq, uint32_t hwirq,
 	return __request_virq(vcpu, desc, virq, hwirq, flags);
 }
 
+static inline int vm_max_virq_line(struct vm *vm)
+{
+	return (vm_is_host_vm(vm) ? MAX_HVM_VIRQ : MAX_GVM_VIRQ);
+}
+
 int request_hw_virq(struct vm *vm, uint32_t virq, uint32_t hwirq,
 			unsigned long flags)
 {
-	int max;
-
-	if (vm_is_host_vm(vm))
-		max = MAX_HVM_VIRQ;
-	else
-		max = MAX_GVM_VIRQ;
-	if (virq >= max) {
+	if (virq >= vm_max_virq_line(vm)) {
 		pr_err("invaild virq-%d for vm-%d\n", virq, vm->vmid);
 		return -EINVAL;
+	} else {
+		return request_virq_affinity(vm, virq, hwirq, 0, flags);
 	}
-
-	return request_virq_affinity(vm, virq, hwirq, 0, flags);
 }
 
 int request_virq(struct vm *vm, uint32_t virq, unsigned long flags)

@@ -57,6 +57,12 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 		else
 			cpu_relax();
 		mb();
+
+		if (is_task_need_stop(current)) {
+			local_irq_restore(flags);
+			pr_err("vcpu need stop, exit %s\n", __func__);
+			return -EABORT;
+		}
 	}
 
 	vmcs->trap_type = type;
@@ -102,6 +108,12 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 				sched();
 			else
 				cpu_relax();
+
+			if (is_task_need_stop(current)) {
+				local_irq_restore(flags);
+				pr_err("vcpu need stop, exit %s\n", __func__);
+				return -EABORT;
+			}
 		}
 
 		if (result)
@@ -112,8 +124,6 @@ int __vcpu_trap(uint32_t type, uint32_t reason, unsigned long data,
 	}
 
 	local_irq_restore(flags);
-
-	smp_mb();
 
 	return vmcs->trap_ret;
 }

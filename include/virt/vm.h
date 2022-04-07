@@ -66,8 +66,6 @@ struct vcpu {
 	 */
 	struct virq_struct *virq_struct;
 
-	struct list_head list;
-
 	struct event vcpu_event;
 
 	struct vmcs *vmcs;
@@ -83,13 +81,13 @@ struct vm {
 	int vmid;
 	uint32_t vcpu_nr;
 	int state;
-	int has_init;
 	unsigned long flags;
 	uint32_t vcpu_affinity[VM_MAX_VCPU];
 	void *entry_point;
 	void *setup_data;
 	void *load_address;
 	int native;
+	int ready;
 
 	struct ramdisk_file *kernel_file;
 	struct ramdisk_file *dtb_file;

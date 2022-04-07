@@ -371,8 +371,8 @@ static int create_vm_virqchip_common(struct vm *vm, struct device_node *node)
 	return 0;
 }
 
-static int inline
-create_vm_vtimer_common(struct vm *vm, struct device_node *node)
+static int inline create_vm_vtimer_common(struct vm *vm,
+		struct device_node *node)
 {
 	of_get_u32_array(node, "vtimer_irq", &vm->vtimer_virq, 1);
 	if ((vm->vtimer_virq > 31) || (vm->vtimer_virq < 16))

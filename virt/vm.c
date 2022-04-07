@@ -286,7 +286,9 @@ static void inline release_vcpu(struct vcpu *vcpu)
 	if (vcpu->vmcs_irq >= 0)
 		release_hvm_virq(vcpu->vmcs_irq);
 
-	free(vcpu->virq_struct);
+	if (vcpu->virq_struct)
+		free(vcpu->virq_struct);
+
 	free(vcpu);
 }
 
@@ -320,8 +322,8 @@ static void vcpu_return_to_user(struct task *task, gp_regs *regs)
 
 	do_hooks(vcpu, (void *)regs, OS_HOOK_ENTER_TO_GUEST);
 
-	vcpu->mode = IN_ROOT_MODE;
 	smp_wmb();
+	vcpu->mode = IN_GUEST_MODE;
 }
 
 static void vcpu_exit_from_user(struct task *task, gp_regs *regs)
@@ -333,8 +335,8 @@ static void vcpu_exit_from_user(struct task *task, gp_regs *regs)
 
 	do_hooks(vcpu, (void *)regs, OS_HOOK_EXIT_FROM_GUEST);
 
-	vcpu->mode = IN_ROOT_MODE;
 	smp_wmb();
+	vcpu->mode = IN_ROOT_MODE;
 }
 
 static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
@@ -368,8 +370,6 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 
 	if (vm->flags & VM_FLAGS_32BIT)
 		task->flags |= TASK_FLAGS_32BIT;
-
-	init_list(&vcpu->list);
 
 	vcpu_virq_struct_init(vcpu);
 	vm->vcpus[vcpu_id] = vcpu;
@@ -628,11 +628,12 @@ int create_vm_mmap(int vmid,  unsigned long offset,
 	struct vmm_area *va;
 
 	va = vm_mmap(vm, offset, size);
-	if (!va)
-		return -EINVAL;
+	if (va) {
+		*addr = va->start;
+		return 0;
+	}
 
-	*addr = va->start;
-	return 0;
+	return -EINVAL;
 }
 
 int create_guest_vm(struct vmtag __guest *tag)
@@ -685,14 +686,36 @@ static void do_setup_native_vm(struct vm *vm)
 	 * just do these step only when the VM has not been
 	 * online.
 	 */
-	if (!vm->has_init) {
-		os_create_native_vm_resource(vm);
-		create_vmbox_controller(vm);
+	os_setup_vm(vm);
+	do_hooks(vm, NULL, OS_HOOK_SETUP_VM);
+}
+
+static int create_vm_resource(struct vm *vm)
+{
+	int ret;
+
+	/*
+	 * do not need to create the resource again, when reboot
+	 * or shutdown.
+	 */
+	if (vm->ready)
+		return 0;
+
+	if (vm_is_native(vm)) {
+		ret = os_create_native_vm_resource(vm);
+		if (ret)
+			return ret;
+		ret = create_vmbox_controller(vm);
+	} else {
+		ret = os_create_guest_vm_resource(vm);
 	}
 
-	os_setup_vm(vm);
+	/*
+	 * mark the vm to ready state.
+	 */
+	vm->ready = 1;
 
-	do_hooks(vm, NULL, OS_HOOK_SETUP_VM);
+	return ret;
 }
 
 static void setup_native_vm(struct vm *vm)
@@ -723,6 +746,7 @@ static void setup_native_vm(struct vm *vm)
 		ASSERT(ret == 0);
 	}
 
+	create_vm_resource(vm);
 	do_setup_native_vm(vm);
 
 	/*
@@ -793,8 +817,8 @@ int vm_vcpus_init(struct vm *vm)
 
 	vm_for_each_vcpu(vm, vcpu) {
 		pr_notice("vm-%d vcpu-%d affnity to pcpu-%d\n",
-				vm->vmid, vcpu->vcpu_id, vcpu_affinity(vcpu));
-
+				vm->vmid, vcpu->vcpu_id,
+				vcpu_affinity(vcpu));
 		/*
 		 * init the vcpu context here.
 		 */
@@ -806,7 +830,6 @@ int vm_vcpus_init(struct vm *vm)
 		}
 	}
 
-	/* some task will excuted after this function */
 	vm_for_each_vcpu(vm, vcpu) {
 		do_hooks(vcpu, NULL, OS_HOOK_VCPU_INIT);
 		os_vcpu_power_on(vcpu, (unsigned long)vm->entry_point);
@@ -828,7 +851,6 @@ static int create_vcpus(struct vm *vm)
 				vcpu = vm->vcpus[j];
 				if (!vcpu)
 					continue;
-
 				release_vcpu(vcpu);
 			}
 
@@ -1053,9 +1075,6 @@ static void setup_vm(struct vm *vm)
 	setup_native_vm(vm);
 	load_vm_image(vm);
 	vm_vcpus_init(vm);
-
-	if (!vm->has_init)
-		vm_mm_init(vm);
 }
 
 void setup_and_start_vm(struct vm *vm)
@@ -1101,7 +1120,7 @@ int virt_init(void)
 	 */
 	for_each_vm(vm) {
 		setup_vm(vm);
-		vm->has_init = 1;
+		vm_mm_init(vm);
 	}
 
 	return 0;

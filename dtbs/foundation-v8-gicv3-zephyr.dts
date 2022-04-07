@@ -10,6 +10,8 @@
 	chosen {
 		minos,stdout = "pl011";
 		bootargs = "bootwait=3 tty=vm1";
+		minos,ramdisk-start = <0x0 0xc4000000>;
+		minos,ramdisk-end = <0x0 0xc4969000>;
 	};
 
 	aliases {
@@ -23,7 +25,9 @@
 			host_vm;
 			vmid = <1>;
 			type = "linux";
-			vcpus = <1>;
+			vcpus = <2>;
+			kernel_image = "Image";
+			dtb_image = "fvp_linux.dtb";
 			entry = <0x0 0x80080000>;
 			setup_data = <0x0 0x83e00000>;
 			vcpu_affinity = <0 1 2 3>;
