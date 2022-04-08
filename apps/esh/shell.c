@@ -21,6 +21,7 @@
 #include <minos/print.h>
 #include <minos/errno.h>
 #include <minos/string.h>
+#include <minos/bootarg.h>
 
 #include "esh.h"
 #include "esh_internal.h"
@@ -73,6 +74,7 @@ int shell_task(void *data)
 	char buf[32];
 	char ch;
 	int i, copy;
+	char *tty = NULL;
 
 	pesh = esh_init();
 	esh_register_command(pesh, esh_excute_command);
@@ -81,9 +83,10 @@ int shell_task(void *data)
 	esh_rx(pesh, '\n');
 	while (console_gets(buf, 32, 0) != 0);
 
-	if (data && !strncmp(data, "vm", 2)) {
-		printf("\nAttach tty: %s\n", (char *)data);
-		pesh->tty = open_tty(data);
+	i = bootarg_parse_string("tty", &tty);
+	if (!i && tty && !strncmp(tty, "vm", 2)) {
+		printf("\nAttach tty: %s\n", tty);
+		pesh->tty = open_tty(tty);
 	}
 
 	for (; ;) {
@@ -93,7 +96,10 @@ int shell_task(void *data)
 			if (ch <= 0)
 				continue;
 			if (pesh->tty) {
-				if (ch == 29) { // Ctrl-]
+				/*
+				 * use Ctrl-\ to exit the vm tty
+				 */
+				if (ch == 28) {
 					shell_detach_tty();
 					esh_rx(pesh, '\n');
 				} else {
