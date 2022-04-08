@@ -234,9 +234,8 @@ static struct page *find_used_page(void *addr)
 			if (prev)
 				prev->next = head->next;
 			else
-				used_page_head = NULL;
+				used_page_head = head->next;
 			head->next = NULL;
-
 			return head;
 		}
 
