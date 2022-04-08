@@ -29,6 +29,11 @@
 #define VM_FLAGS_SETUP_OTHER		(1 << 19)
 #define VM_FLAGS_SETUP_MASK		(0xf0000)
 
+#define VM_FLAGS_SKIP_CREATE_RES	(1 << 20)
+#define VM_FLAGS_SKIP_MM_INIT		(1 << 21)
+#define VM_FLAGS_BIT_SKIP_CREATE_RES	20
+#define VM_FLAGS_BIT_SKIP_MM_INIT	21
+
 struct vmtag {
 	uint32_t vmid;
 	char name[VM_NAME_SIZE];

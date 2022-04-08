@@ -663,7 +663,7 @@ static int create_vm_resource(struct vm *vm)
 	 * do not need to create the resource again, when reboot
 	 * or shutdown.
 	 */
-	if (vm->res_ready)
+	if (test_and_set_bit(VM_FLAGS_BIT_SKIP_CREATE_RES, &vm->flags))
 		return 0;
 
 	if (vm_is_native(vm)) {
@@ -674,11 +674,6 @@ static int create_vm_resource(struct vm *vm)
 	} else {
 		ret = os_create_guest_vm_resource(vm);
 	}
-
-	/*
-	 * mark the vm to ready state.
-	 */
-	vm->res_ready = 1;
 
 	return ret;
 }

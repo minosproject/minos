@@ -870,7 +870,7 @@ int vm_mm_init(struct vm *vm)
 	struct vmm_area *va, *n;
 	struct mm_struct *mm = &vm->mm;
 
-	if (vm->mm_ready)
+	if (test_and_set_bit(VM_FLAGS_BIT_SKIP_MM_INIT, &vm->flags))
 		return 0;
 
 	dump_vmm_areas(&vm->mm);
@@ -916,8 +916,6 @@ int vm_mm_init(struct vm *vm)
 			va->size = size;
 		}
 	}
-
-	vm->mm_ready = 0;
 
 	return 0;
 }

@@ -87,8 +87,6 @@ struct vm {
 	void *setup_data;
 	void *load_address;
 	int native;
-	int res_ready;
-	int mm_ready;
 
 	struct ramdisk_file *kernel_file;
 	struct ramdisk_file *dtb_file;
