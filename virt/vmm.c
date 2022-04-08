@@ -870,6 +870,9 @@ int vm_mm_init(struct vm *vm)
 	struct vmm_area *va, *n;
 	struct mm_struct *mm = &vm->mm;
 
+	if (vm->mm_ready)
+		return 0;
+
 	dump_vmm_areas(&vm->mm);
 
 	/* just mapping the physical memory for native VM */
@@ -913,6 +916,8 @@ int vm_mm_init(struct vm *vm)
 			va->size = size;
 		}
 	}
+
+	vm->mm_ready = 0;
 
 	return 0;
 }

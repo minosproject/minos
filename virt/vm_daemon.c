@@ -60,90 +60,14 @@ int send_vm_reboot_request(struct vm *vm)
 	return send_vm_request(vm, VM_REBOOT);
 }
 
-static int wait_vcpu_in_state(struct vcpu *vcpu, int state, uint32_t timeout)
-{
-	int i;
-
-	timeout = (timeout == 0) ? -1 : timeout;
-	pr_notice("wait %d ms for vcpu%d in %s goto state %d\n",
-			timeout, vcpu->vcpu_id, vcpu->vm->name, state);
-
-	/*
-	 * if the target vcpu is on the same physical pcpu, need
-	 * call sched() to let it has time to run.
-	 */
-	for (i = 0; i < timeout / 10; i++) {
-		if (vcpu->task->state == state)
-			return 0;
-
-		msleep(10);
-	}
-
-	return -ETIMEDOUT;
-}
-
-static inline int wait_vm_in_state(struct vm *vm, int state)
-{
-	struct vcpu *vcpu;
-
-	vm_for_each_vcpu(vm, vcpu) {
-		if (wait_vcpu_in_state(vcpu, TASK_STATE_SUSPEND, 1000)) {
-			pr_err("vm-%d vcpu-%d power off failed\n",
-					vm->vmid, vcpu->vcpu_id);
-			return -EBUSY;
-		}
-	}
-
-	pr_notice("all vcpu in %s has been suspend\n", vm->name);
-
-	return 0;
-}
-
 static void handle_vm_reboot(struct vm *vm)
 {
-	struct vm *gvm;
-	int i;
-
-	if (wait_vm_in_state(vm, TASK_STATE_SUSPEND))
-		return;
-
-	/*
-	 * if reboot the host vm, need to kill all the guest
-	 * vm in system if has. here shutdown all the guest
-	 * vm.
-	 */
-	if (vm_is_host_vm(vm)) {
-		for (i = 1; i < CONFIG_MAX_VM; i++) {
-			gvm = vms[i];
-			if (!gvm || vm_is_native(gvm))
-				continue;
-
-			vm_power_off(gvm->vmid, NULL, VM_PM_ACTION_BY_HOST);
-			pr_notice("waitting vm%d %s shutdown\n", vm->vmid, vm->name);
-
-			/*
-			 * do a hardware reset ?
-			 */
-			if (wait_vm_in_state(vm, TASK_STATE_SUSPEND))
-				return;
-
-			destroy_vm(vm);
-		}
-	}
-
-	native_vm_reboot(vm);
+	reboot_native_vm(vm);
 }
 
 static void handle_vm_shutdown(struct vm *vm)
 {
-	if (wait_vm_in_state(vm, TASK_STATE_SUSPEND)) {
-		pr_warn("vm %s shutdown failed\n", vm->name);
-		return;
-	}
-
-	/*
-	 * do nothing here waitting for power on again.
-	 */
+	shutdown_native_vm(vm);
 }
 
 static void handle_vm_request(struct vm_request *vs)

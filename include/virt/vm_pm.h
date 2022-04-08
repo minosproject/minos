@@ -8,10 +8,11 @@
 #define VM_PM_ACTION_BY_HOST (1 << 2)
 #define VM_PM_FLAGS_DESTROY (1 << 8)
 
-int vm_power_off(int vmid, void *arg, int byself);
-
 int vm_reset(int vmid, void *args, int byself);
-int native_vm_reboot(struct vm *vm);
+int reboot_native_vm(struct vm *vm);
+
+int vm_power_off(int vmid, void *arg, int byself);
+int shutdown_native_vm(struct vm *vm);
 
 int vm_suspend(int vmid);
 
@@ -39,5 +40,10 @@ static inline char *pm_action_caller(int flags)
 	else
 		return "host";
 }
+
+int send_vm_shutdown_request(struct vm *vm);
+int send_vm_reboot_request(struct vm *vm);
+
+int power_up_guest_vm(int vmid);
 
 #endif

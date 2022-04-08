@@ -87,7 +87,8 @@ struct vm {
 	void *setup_data;
 	void *load_address;
 	int native;
-	int ready;
+	int res_ready;
+	int mm_ready;
 
 	struct ramdisk_file *kernel_file;
 	struct ramdisk_file *dtb_file;
@@ -196,10 +197,6 @@ int kick_vcpu(struct vcpu *vcpu, int preempt);
 struct vm *create_vm(struct vmtag *vme, struct device_node *node);
 int create_guest_vm(struct vmtag *tag);
 void destroy_vm(struct vm *vm);
-int vm_power_up(int vmid);
-int vm_reset(int vmid, void *args, int byself);
-int vm_power_off(int vmid, void *arg, int byself);
-int vm_suspend(int vmid);
 
 struct vm *get_host_vm(void);
 
@@ -253,11 +250,8 @@ static inline int check_vm_state(struct vm *vm, int state)
 	return (vm->state == state);
 }
 
-int send_vm_shutdown_request(struct vm *vm);
-int send_vm_reboot_request(struct vm *vm);
+int start_native_vm(struct vm *vm);
 
-void vcpu_enter_poweroff(struct vcpu *vcpu);
-
-void setup_and_start_vm(struct vm *vm);
+int start_guest_vm(struct vm *vm);
 
 #endif

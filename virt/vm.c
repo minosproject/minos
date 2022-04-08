@@ -382,36 +382,6 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 	return vcpu;
 }
 
-static void vcpu_power_off_call(void *data)
-{
-	struct vcpu *vcpu = (struct vcpu *)data;
-	
-	if (current != vcpu->task)
-		set_need_resched();
-}
-
-void vcpu_enter_poweroff(struct vcpu *vcpu)
-{
-	struct task *task = vcpu->task;
-
-	if (check_vcpu_state(vcpu, VCPU_STATE_STOP) ||
-			check_vcpu_state(vcpu, VCPU_STATE_SUSPEND))
-		return;
-
-	task_need_freeze(task);
-	if (vcpu->task == current)
-		return;
-
-	wake_up_abort(task);
-
-	if ((vcpu_affinity(vcpu) != smp_processor_id())) {
-		pr_debug("call vcpu_power_off_call for vcpu-%s\n",
-				vcpu->task->name);
-		smp_function_call(vcpu->task->affinity,
-				vcpu_power_off_call, (void *)vcpu, 0);
-	}
-}
-
 static int alloc_new_vmid(void)
 {
 	int vmid, start = total_vms;
@@ -564,46 +534,41 @@ static int load_vm_image(struct vm *vm)
 	return 0;
 }
 
-static void start_vm(struct vm *vm)
+static int do_start_vm(struct vm *vm)
 {
 	struct vcpu *vcpu0;
 
 	if (!vm) {
 		pr_err("no such vm\n");
-		return;
+		return -ENOENT;
 	}
 
 	if (vm->state == VM_STATE_ONLINE) {
 		pr_err("VM %s already stared\n", vm->name);
-		return;
+		return -EINVAL;
 	}
 
 	vcpu0 = vm->vcpus[0];
 	if (!vcpu0) {
 		pr_err("VM create with error, vm%d not exist\n", vm->vmid);
-		return;
+		return -ENOENT;
 	}
 
 	vm->state = VM_STATE_ONLINE;
 	vcpu_online(vcpu0);
+
+	return 0;
 }
 
-int vm_power_up(int vmid)
+int start_guest_vm(struct vm *vm)
 {
-	struct vm *vm = get_vm_by_id(vmid);
-
-	if (vm == NULL)
-		return -ENOENT;
-
 	vm_vcpus_init(vm);
 	vm->state = VM_STATE_ONLINE;
 
 	/*
 	 * start the vm now
 	 */
-	start_vm(vm);
-
-	return 0;
+	return do_start_vm(vm);
 }
 
 static int guest_mm_init(struct vm *vm, uint64_t base, uint64_t size)
@@ -698,7 +663,7 @@ static int create_vm_resource(struct vm *vm)
 	 * do not need to create the resource again, when reboot
 	 * or shutdown.
 	 */
-	if (vm->ready)
+	if (vm->res_ready)
 		return 0;
 
 	if (vm_is_native(vm)) {
@@ -713,12 +678,12 @@ static int create_vm_resource(struct vm *vm)
 	/*
 	 * mark the vm to ready state.
 	 */
-	vm->ready = 1;
+	vm->res_ready = 1;
 
 	return ret;
 }
 
-static void setup_native_vm(struct vm *vm)
+static void __setup_native_vm(struct vm *vm)
 {
 	void *setup_addr = (void *)ptov(vm->setup_data);
 	size_t size;
@@ -1069,18 +1034,24 @@ static int of_create_vmboxs(void)
 	return 0;
 }
 
-static void setup_vm(struct vm *vm)
+static void setup_native_vm(struct vm *vm)
 {
 	os_vm_init(vm);
-	setup_native_vm(vm);
+	__setup_native_vm(vm);
 	load_vm_image(vm);
+	vm_mm_init(vm);
 	vm_vcpus_init(vm);
 }
 
-void setup_and_start_vm(struct vm *vm)
+int start_native_vm(struct vm *vm)
 {
-	setup_vm(vm);
-	start_vm(vm);
+	if (!vm_is_native(vm)) {
+		pr_err("can not start guest vm by host\n");
+		return -EPERM;
+	}
+
+	setup_native_vm(vm);
+	return do_start_vm(vm);
 }
 
 int virt_init(void)
@@ -1113,16 +1084,6 @@ int virt_init(void)
 	of_create_vmboxs();
 #endif
 
-	/*
-	 * parsing all the memory/irq and resource
-	 * from the setup data and create the resource
-	 * for the vm
-	 */
-	for_each_vm(vm) {
-		setup_vm(vm);
-		vm_mm_init(vm);
-	}
-
 	return 0;
 }
 
@@ -1131,7 +1092,7 @@ void start_all_vm(void)
 	struct vm *vm;
 
 	list_for_each_entry(vm, &vm_list, vm_list)
-		start_vm(vm);
+		start_native_vm(vm);
 }
 
 /*
@@ -1146,7 +1107,7 @@ static int vm_command_hdl(int argc, char **argv)
 		if (vmid == 0)
 			start_all_vm();
 		else
-			start_vm(get_vm_by_id(vmid));
+			start_native_vm(get_vm_by_id(vmid));
 	}
 
 	return 0;
