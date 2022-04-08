@@ -538,24 +538,11 @@ static int do_start_vm(struct vm *vm)
 {
 	struct vcpu *vcpu0;
 
-	if (!vm) {
-		pr_err("no such vm\n");
-		return -ENOENT;
-	}
-
-	if (vm->state == VM_STATE_ONLINE) {
-		pr_err("VM %s already stared\n", vm->name);
-		return -EINVAL;
-	}
-
 	vcpu0 = vm->vcpus[0];
 	if (!vcpu0) {
 		pr_err("VM create with error, vm%d not exist\n", vm->vmid);
 		return -ENOENT;
 	}
-
-	vm->state = VM_STATE_ONLINE;
-	smp_wmb();
 
 	vcpu_online(vcpu0);
 
@@ -564,8 +551,21 @@ static int do_start_vm(struct vm *vm)
 
 int start_guest_vm(struct vm *vm)
 {
+	int state;
+
+	if (!vm) {
+		pr_err("no such guest vm\n");
+		return -ENOENT;
+	}
+
+	state = cmpxchg(&vm->state, VM_STATE_OFFLINE,
+			VM_STATE_ONLINE);
+	if (state != VM_STATE_OFFLINE) {
+		pr_err("VM %s already stared\n", vm->name);
+		return -EINVAL;
+	}
+
 	vm_vcpus_init(vm);
-	vm->state = VM_STATE_ONLINE;
 
 	/*
 	 * start the vm now
@@ -1042,12 +1042,27 @@ static void setup_native_vm(struct vm *vm)
 
 int start_native_vm(struct vm *vm)
 {
+	int state;
+
+	if (!vm) {
+		pr_err("no such vm\n");
+		return -ENOENT;
+	}
+
+	state = cmpxchg(&vm->state, VM_STATE_OFFLINE,
+			VM_STATE_ONLINE);
+	if (state != VM_STATE_OFFLINE) {
+		pr_err("VM %s already stared\n", vm->name);
+		return -EINVAL;
+	}
+
 	if (!vm_is_native(vm)) {
 		pr_err("can not start guest vm by host\n");
 		return -EPERM;
 	}
 
 	setup_native_vm(vm);
+
 	return do_start_vm(vm);
 }
 

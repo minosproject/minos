@@ -102,7 +102,7 @@ static int send_virq(struct vcpu *vcpu, struct virq_desc *desc)
 	 * Only check the VM's state here, the vcpu's state will check
 	 * in kick_vcpu and return_to_user.
 	 */
-	if ((state == VM_STATE_OFFLINE) || (state == VM_STATE_REBOOT)) {
+	if ((state != VM_STATE_ONLINE) && (state != VM_STATE_SUSPEND)) {
 		pr_warn("VM %s is offline or reboot drop virq %d\n",
 				vm->name, desc->vno);
 		return -EPERM;

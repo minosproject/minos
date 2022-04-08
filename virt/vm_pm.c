@@ -167,6 +167,14 @@ int reboot_native_vm(struct vm *vm)
 		shutdown_all_guest_vm();
 
 	__native_vm_reset(vm);
+
+	vm->state = VM_STATE_OFFLINE;
+	wmb();
+
+	/*
+	 * do not need to set the VM state to reboot to avoid
+	 * race with other task.
+	 */
 	start_native_vm(vm);
 
 	return 0;
@@ -190,6 +198,7 @@ static inline int native_vm_reset(struct vm *vm, int flags)
 static inline int guest_vm_reset(struct vm *vm, int flags)
 {
 	pr_notice("send REBOOT request to mvm\n");
+	vm->state = VM_STATE_OFFLINE;
 	return trap_vcpu_nonblock(VMTRAP_TYPE_COMMON,
 			VMTRAP_REASON_REBOOT, 0, NULL);
 }
@@ -199,7 +208,7 @@ static int __vm_reset(struct vm *vm, void *args, int flags)
 	struct vcpu *vcpu;
 	int old_state;
 
-	old_state = cmpxchg(&vm->state, VM_STATE_ONLINE, VM_STATE_REBOOT);
+	old_state = cmpxchg(&vm->state, VM_STATE_ONLINE, VM_STATE_FREEZEING);
 	if (old_state != VM_STATE_ONLINE) {
 		pr_err("vm is not online, under state %d\n", old_state);
 		return -EBUSY;
@@ -247,6 +256,7 @@ int shutdown_native_vm(struct vm *vm)
 		shutdown_all_guest_vm();
 
 	__native_vm_reset(vm);
+	vm->state = VM_STATE_OFFLINE;
 
 	return 0;
 }
@@ -262,6 +272,7 @@ static int __shutdown_native_vm(struct vm *vm, int flags)
 
 static int __shutdown_guest_vm(struct vm *vm, int flags)
 {
+	vm->state = VM_STATE_OFFLINE;
 	if (!pm_action_by_self(flags))
 		return 0;
 
@@ -275,8 +286,7 @@ static int __vm_power_off(struct vm *vm, void *args, int flags)
 	struct vcpu *vcpu;
 	int old_state;
 
-	old_state = cmpxchg(&vm->state,
-			VM_STATE_ONLINE, VM_STATE_OFFLINE);
+	old_state = cmpxchg(&vm->state, VM_STATE_ONLINE, VM_STATE_FREEZEING);
 	if (old_state != VM_STATE_ONLINE) {
 		pr_err("vm is not online, under state %d\n", old_state);
 		return -EBUSY;
