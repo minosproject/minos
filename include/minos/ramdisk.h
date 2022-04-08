@@ -1,7 +1,7 @@
 #ifndef __MINOS_RAMDISK_H__
 #define __MINOS_RAMDISK_H__
 
-#include <uapi/ramdisk.h>
+#include <generic/ramdisk.h>
 
 extern void *ramdisk_start, *ramdisk_end;
 

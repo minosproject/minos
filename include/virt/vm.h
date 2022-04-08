@@ -10,7 +10,7 @@
 #include <config/config.h>
 #include <virt/vmm.h>
 #include <minos/errno.h>
-#include <uapi/hypervisor.h>
+#include <generic/hypervisor.h>
 #include <minos/task.h>
 #include <minos/sched.h>
 #include <minos/event.h>

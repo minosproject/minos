@@ -31,7 +31,7 @@
 #include <minos/pm.h>
 #include <minos/of.h>
 #include <virt/resource.h>
-#include <uapi/gvm.h>
+#include <generic/gvm.h>
 #include <virt/vmbox.h>
 #include <minos/shell_command.h>
 #include <virt/virt.h>

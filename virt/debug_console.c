@@ -18,7 +18,7 @@
 #include <minos/tty.h>
 #include <virt/vmm.h>
 #include <virt/virq.h>
-#include <uapi/hypervisor.h>
+#include <generic/hypervisor.h>
 #include <virt/hypercall.h>
 #include <asm/svccc.h>
 #include <minos/console.h>

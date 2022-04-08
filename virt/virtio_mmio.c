@@ -23,7 +23,7 @@
 #include <minos/sched.h>
 #include <virt/vdev.h>
 #include <virt/virq.h>
-#include <uapi/virtio_mmio.h>
+#include <generic/virtio_mmio.h>
 #include <virt/resource.h>
 #include <virt/vmcs.h>
 #include <minos/of.h>

@@ -29,7 +29,7 @@
 #include <minos/arch.h>
 #include <virt/os.h>
 #include <virt/resource.h>
-#include <uapi/hypervisor.h>
+#include <generic/hypervisor.h>
 #include <minos/ramdisk.h>
 #include <asm/cache.h>
 

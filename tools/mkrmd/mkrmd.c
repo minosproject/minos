@@ -24,7 +24,7 @@
 #include <errno.h>
 #include <string.h>
 
-#include <uapi/ramdisk.h>
+#include <generic/ramdisk.h>
 
 #define MODE_NULL 0x0
 #define MODE_DIR 0x1
