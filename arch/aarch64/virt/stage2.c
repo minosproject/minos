@@ -355,6 +355,11 @@ static int stage2_map_pmd_range(struct mm_struct *vs, pmd_t *pmdp, unsigned long
 			attr = stage2_pmd_attr(physical, flags);
 			stage2_set_pmd(pmd, attr);
 		} else {
+			if (old_pmd && ((old_pmd & 0x03) == S2_DES_BLOCK)) {
+				pr_err("stage2: vaddr 0x%x has mapped as huge page\n", start);
+				return -EINVAL;
+			}
+
 			if (stage2_pmd_none(old_pmd)) {
 				ptep = (pte_t *)stage2_get_free_page(flags);
 				if (!ptep)
