@@ -648,8 +648,6 @@ static void gicv3_write_lr(int lr, uint64_t val)
 	default:
 		return;
 	}
-
-	isb();
 }
 
 static int gicv3_send_virq(struct vcpu *vcpu, struct virq_desc *virq)
@@ -713,7 +711,7 @@ static int gicv3_get_virq_state(struct vcpu *vcpu, struct virq_desc *virq)
 		return 0;
 
 	value = gicv3_read_lr(virq->id);
-	isb();
+	rmb();
 	value = (value >> 62) & 0x03;
 
 	return ((int)value);

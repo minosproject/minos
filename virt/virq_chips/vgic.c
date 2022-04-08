@@ -88,7 +88,6 @@ __do_send_virq:
 		virqchip_send_virq(vcpu, virq);
 		virq->state = VIRQ_STATE_PENDING;
 		virq_clear_pending(virq);
-		dsb();
 		list_del(&virq->list);
 		list_add_tail(&virq_struct->active_list, &virq->list);
 	}

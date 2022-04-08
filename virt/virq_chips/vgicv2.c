@@ -487,7 +487,7 @@ int gicv2_get_virq_state(struct vcpu *vcpu, struct virq_desc *virq)
 		return 0;
 
 	value = readl_gich(GICH_LR + virq->id * 4);
-	isb();
+	rmb();
 	value = (value >> 28) & 0x3;
 
 	return value;
@@ -520,7 +520,6 @@ static int gicv2_send_virq(struct vcpu *vcpu, struct virq_desc *virq)
 	gich_lr->hw = !!virq_is_hw(virq);
 
 	writel_gich(val, GICH_LR + virq->id * 4);
-	isb();
 
 	return 0;
 }
@@ -538,7 +537,6 @@ static int gicv2_update_virq(struct vcpu *vcpu,
 
 	case VIRQ_ACTION_CLEAR:
 		writel_gich(0, GICH_LR + desc->id * 4);
-		isb();
 		break;
 	}
 
@@ -661,7 +659,6 @@ static void gicv2_state_restore(struct vcpu *vcpu, void *context)
 	writel_gich(c->apr, GICH_APR);
 	writel_gich(c->vmcr, GICH_VMCR);
 	writel_gich(c->hcr, GICH_HCR);
-	isb();
 }
 
 static void gicv2_state_init(struct vcpu *vcpu, void *context)
@@ -686,7 +683,6 @@ static void gicv2_state_save(struct vcpu *vcpu, void *context)
 	c->apr = readl_gich(GICH_APR);
 	c->hcr = readl_gich(GICH_HCR);
 	writel_gich(0, GICH_HCR);
-	isb();
 }
 
 static void gicv2_state_resume(struct vcpu *vcpu, void *context)
