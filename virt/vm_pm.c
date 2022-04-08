@@ -197,8 +197,14 @@ static inline int guest_vm_reset(struct vm *vm, int flags)
 static int __vm_reset(struct vm *vm, void *args, int flags)
 {
 	struct vcpu *vcpu;
+	int old_state;
 
-	set_vm_state(vm, VM_STATE_REBOOT);
+	old_state = cmpxchg(&vm->state, VM_STATE_ONLINE, VM_STATE_REBOOT);
+	if (old_state != VM_STATE_ONLINE) {
+		pr_err("vm is not online, under state %d\n", old_state);
+		return -EBUSY;
+	}
+
 	vm_for_each_vcpu(vm, vcpu)
 		vcpu_enter_poweroff(vcpu);
 
@@ -267,11 +273,18 @@ static int __shutdown_guest_vm(struct vm *vm, int flags)
 static int __vm_power_off(struct vm *vm, void *args, int flags)
 {
 	struct vcpu *vcpu;
+	int old_state;
+
+	old_state = cmpxchg(&vm->state,
+			VM_STATE_ONLINE, VM_STATE_OFFLINE);
+	if (old_state != VM_STATE_ONLINE) {
+		pr_err("vm is not online, under state %d\n", old_state);
+		return -EBUSY;
+	}
 
 	if (!vm_is_native(vm))
 		flags |= VM_PM_FLAGS_DESTROY;
 
-	set_vm_state(vm, VM_STATE_OFFLINE);
 	vm_for_each_vcpu(vm, vcpu)
 		vcpu_enter_poweroff(vcpu);
 

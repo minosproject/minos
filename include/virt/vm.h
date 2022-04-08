@@ -237,12 +237,6 @@ static inline int check_vcpu_state(struct vcpu *vcpu, int state)
 	return (vcpu->task->state == state);
 }
 
-static inline void set_vm_state(struct vm *vm, int state)
-{
-	vm->state = state;
-	smp_wmb();
-}
-
 static inline int check_vm_state(struct vm *vm, int state)
 {
 	return (vm->state == state);

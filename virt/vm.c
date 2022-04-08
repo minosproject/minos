@@ -555,6 +555,8 @@ static int do_start_vm(struct vm *vm)
 	}
 
 	vm->state = VM_STATE_ONLINE;
+	smp_wmb();
+
 	vcpu_online(vcpu0);
 
 	return 0;
