@@ -35,7 +35,7 @@
 #include <minos/virtio.h>
 #include <minos/io.h>
 #include <minos/barrier.h>
-#include <common/gvm.h>
+#include <generic/gvm.h>
 
 static int virtio_devices_nr = VM_MAX_VIRTIO_DEVICES;
 static uint64_t virtio_iomem_base = VM_VIRTIO_IOMEM_BASE;

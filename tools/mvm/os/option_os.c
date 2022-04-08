@@ -7,7 +7,7 @@
 
 #include <minos/vm.h>
 #include <minos/option.h>
-#include <common/hypervisor.h>
+#include <generic/hypervisor.h>
 #include <minos/os.h>
 
 /*

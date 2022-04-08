@@ -36,7 +36,7 @@
 #include <minos/list.h>
 #include <sys/mman.h>
 #include <libfdt/libfdt.h>
-#include <common/gvm.h>
+#include <generic/gvm.h>
 #include <minos/option.h>
 
 static int vdev_irq_base = GVM_IRQ_BASE;

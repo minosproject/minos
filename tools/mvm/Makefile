@@ -26,7 +26,7 @@ TARGET := mvm
 CCFLAG := -Wall -D_XOPEN_SOURCE -D_GNU_SOURCE -march=armv8-a \
 	-Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing \
 	-fno-common -Werror-implicit-function-declaration \
-	-Wno-format-security -I$(PWD)/include
+	-Wno-format-security -I$(PWD)/include -I$(PWD)/../../generic/include
 
 ifeq ($(ARCH), aarch32)
 CCFLAG += -D__AARCH32__

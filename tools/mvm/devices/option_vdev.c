@@ -7,7 +7,7 @@
 
 #include <minos/vm.h>
 #include <minos/option.h>
-#include <common/hypervisor.h>
+#include <generic/hypervisor.h>
 #include <minos/vdev.h>
 
 static int setup_vm_vdev(char *arg, char *sub_arg, void *data)

@@ -48,7 +48,7 @@
 #include <minos/bootimage.h>
 #include <libfdt/libfdt.h>
 #include <minos/vdev.h>
-#include <common/gvm.h>
+#include <generic/gvm.h>
 
 static int fdt_set_gicv2(void *dtb, int node)
 {

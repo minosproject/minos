@@ -36,7 +36,7 @@
 #include <minos/list.h>
 #include <sys/mman.h>
 #include <libfdt/libfdt.h>
-#include <common/gvm.h>
+#include <generic/gvm.h>
 #include <errno.h>
 
 #define T7001_S3C_UART_BASE	0x20a0c0000

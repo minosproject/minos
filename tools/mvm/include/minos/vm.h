@@ -11,7 +11,7 @@
 #include <minos/debug.h>
 #include <minos/list.h>
 #include <minos/os.h>
-#include <common/hypervisor.h>
+#include <generic/hypervisor.h>
 
 struct vm;
 

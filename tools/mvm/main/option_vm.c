@@ -34,7 +34,7 @@
 
 #include <minos/vm.h>
 #include <minos/option.h>
-#include <common/hypervisor.h>
+#include <generic/hypervisor.h>
 
 static int setup_vm_mem_size(char *arg, char *sub_arg, void *data)
 {
