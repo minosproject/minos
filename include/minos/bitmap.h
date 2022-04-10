@@ -108,7 +108,7 @@ static inline void bitmap_fill(unsigned long *dst, int nbits)
 #define FFS_TABLE_NR_BITS	64
 
 struct ffs_table {
-	uint8_t grp;
+	long grp;
 	uint8_t bits[8];
 };
 

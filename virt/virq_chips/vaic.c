@@ -122,6 +122,7 @@ static int aic_update_virq(struct vcpu *vcpu,
 static int aic_enter_to_guest(struct vcpu *vcpu, void *data)
 {
 	int fiq = 0;
+#if 0
 	struct virq_desc *virq, *n;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
 
@@ -142,6 +143,7 @@ static int aic_enter_to_guest(struct vcpu *vcpu, void *data)
 			fiq = 1;
 		break;
 	}
+#endif
 
 	return fiq;
 }

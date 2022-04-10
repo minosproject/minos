@@ -105,7 +105,6 @@ struct vm {
 	struct list_head vdev_list;
 
 	uint32_t vspi_nr;
-	int virq_same_page;
 	struct virq_desc *vspi_desc;
 	unsigned long *vspi_map;
 	struct virq_chip *virq_chip;

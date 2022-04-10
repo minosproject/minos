@@ -35,7 +35,7 @@ static DEFINE_SPIN_LOCK(hvm_irq_lock);
 	} while (0)
 
 
-static inline struct virq_desc *get_virq_desc(struct vcpu *vcpu, uint32_t virq)
+struct virq_desc *get_virq_desc(struct vcpu *vcpu, uint32_t virq)
 {
 	struct vm *vm = vcpu->vm;
 
@@ -57,38 +57,22 @@ static void inline virq_kick_vcpu(struct vcpu *vcpu,
 
 static int inline __send_virq(struct vcpu *vcpu, struct virq_desc *desc)
 {
-	unsigned long flags;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
-
-	spin_lock_irqsave(&virq_struct->lock, flags);
 
 	/*
 	 * if the virq is already at the pending state, do
 	 * nothing, other case need to send it to the vcpu
 	 * if the virq is in offline state, send it to vcpu
-	 * directly
-	 */
-	if (virq_is_pending(desc))
-		goto out;
-
-	virq_set_pending(desc);
-
-	/*
+	 * directly.
+	 *
 	 * SGI need set the irq source.
 	 */
+	if (test_and_set_bit(desc->vno, virq_struct->pending_bitmap))
+		return 0;
+
+	atomic_inc(&virq_struct->pending_virq);
 	if (desc->vno < VM_SGI_VIRQ_NR)
 		desc->src = get_vcpu_id(get_current_vcpu());
-	/*
-	 * if desc->list.next is not NULL, the virq is in
-	 * actvie or pending list do not change it
-	 */
-	if (desc->list.next == NULL) {
-		list_add_tail(&virq_struct->pending_list, &desc->list);
-		virq_struct->active_count++;
-	}
-
-out:
-	spin_unlock_irqrestore(&virq_struct->lock, flags);
 
 	return 0;
 }
@@ -97,6 +81,9 @@ static int send_virq(struct vcpu *vcpu, struct virq_desc *desc)
 {
 	struct vm *vm = vcpu->vm;
 	int ret, state = vm->state;
+
+	if (!vcpu || !desc)
+		return -EINVAL;
 
 	/*
 	 * Only check the VM's state here, the vcpu's state will check
@@ -146,11 +133,6 @@ static int guest_irq_handler(uint32_t irq, void *data)
 		vcpu = get_current_vcpu();
 	else
 		vcpu = get_vcpu_by_id(desc->vmid, desc->vcpu_id);
-
-	if (!vcpu) {
-		pr_err("%s: Can not get the vcpu for irq:%d\n", irq);
-		return -ENOENT;
-	}
 
 	return send_virq(vcpu, desc);
 }
@@ -210,6 +192,20 @@ int virq_can_request(struct vcpu *vcpu, uint32_t virq)
 	return !virq_is_requested(desc);
 }
 
+int virq_need_export(struct vcpu *vcpu, uint32_t virq)
+{
+	struct virq_desc *desc;
+
+	desc = get_virq_desc(vcpu, virq);
+	if (!desc)
+		return 0;
+
+	if (desc->flags & VIRQS_NEED_EXPORT)
+		return 1;
+
+	return !virq_is_requested(desc);
+}
+
 int virq_set_type(struct vcpu *vcpu, uint32_t virq, int value)
 {
 	struct virq_desc *desc;
@@ -262,11 +258,8 @@ int virq_enable(struct vcpu *vcpu, uint32_t virq)
 		return -ENOENT;
 
 	virq_set_enable(desc);
-
-	if (virq > VM_LOCAL_VIRQ_NR) {
-		if (virq_is_hw(desc))
-			irq_unmask(desc->hno);
-	}
+	if ((virq > VM_LOCAL_VIRQ_NR) && virq_is_hw(desc))
+		irq_unmask(desc->hno);
 
 	return 0;
 }
@@ -278,8 +271,8 @@ int virq_set_fiq(struct vcpu *vcpu, uint32_t virq)
 	desc = get_virq_desc(vcpu, virq);
 	if (!desc)
 		return -ENOENT;
-
 	__virq_set_fiq(desc);
+
 	return 0;
 }
 
@@ -292,28 +285,20 @@ int virq_disable(struct vcpu *vcpu, uint32_t virq)
 		return -ENOENT;
 
 	virq_clear_enable(desc);
-
-	if (virq > VM_LOCAL_VIRQ_NR) {
-		if (virq_is_hw(desc))
-			irq_mask(desc->hno);
-	}
+	if ((virq > VM_LOCAL_VIRQ_NR) || virq_is_hw(desc))
+		irq_mask(desc->hno);
 
 	return 0;
 }
 
 int send_virq_to_vcpu(struct vcpu *vcpu, uint32_t virq)
 {
-	struct virq_desc *desc;
-
-	desc = get_virq_desc(vcpu, virq);
-
-	return send_virq(vcpu, desc);
+	return send_virq(vcpu, get_virq_desc(vcpu, virq));
 }
 
 int send_virq_to_vm(struct vm *vm, uint32_t virq)
 {
 	struct virq_desc *desc;
-	struct vcpu *vcpu;
 
 	/*
 	 * only can send SPI virq in this function
@@ -327,16 +312,18 @@ int send_virq_to_vm(struct vm *vm, uint32_t virq)
 	if (!desc)
 		return -ENOENT;
 
+	if (!virq_is_enabled(desc)) {
+		pr_err("virq%d for %s is not enabled, drop it\n",
+				virq, vm->name);
+		return -EAGAIN;
+	}
+
 	if (virq_is_hw(desc)) {
 		pr_err("can not send hw irq in here %d\n", virq);
 		return -EPERM;
 	}
 
-	vcpu = get_vcpu_in_vm(vm, desc->vcpu_id);
-	if (!vcpu)
-		return -ENOENT;
-
-	return send_virq(vcpu, desc);
+	return send_virq(get_vcpu_in_vm(vm, desc->vcpu_id), desc);
 }
 
 void send_vsgi(struct vcpu *sender, uint32_t sgi, cpumask_t *cpumask)
@@ -355,9 +342,8 @@ void send_vsgi(struct vcpu *sender, uint32_t sgi, cpumask_t *cpumask)
 
 void clear_pending_virq(struct vcpu *vcpu, uint32_t irq)
 {
-	unsigned long flags;
-	struct virq_desc *desc;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
+	struct virq_desc *desc;
 
 	desc = get_virq_desc(vcpu, irq);
 	if ((!desc) || (desc->state != VIRQ_STATE_ACTIVE))
@@ -372,70 +358,54 @@ void clear_pending_virq(struct vcpu *vcpu, uint32_t irq)
 	 * of add it to the tail of the pending list
 	 *
 	 */
-	spin_lock_irqsave(&virq_struct->lock, flags);
-	if (desc->list.next != NULL) {
-		list_del(&desc->list);
-		desc->list.next = NULL;
-	}
-
-	if (virq_is_pending(desc)) {
-		list_add_tail(&virq_struct->pending_list, &desc->list);
-		desc->state = VIRQ_STATE_PENDING;
-		goto out;
-	}
-
+	clear_bit(irq, virq_struct->active_bitmap);
 	desc->state = VIRQ_STATE_INACTIVE;
-out:
 	virqchip_update_virq(vcpu, desc, VIRQ_ACTION_CLEAR);
-	spin_unlock_irqrestore(&virq_struct->lock, flags);
 }
 
 uint32_t get_pending_virq(struct vcpu *vcpu)
 {
-	unsigned long flags;
-	struct virq_desc *desc;
 	struct virq_struct *virq_struct = vcpu->virq_struct;
+	int total_irq = vm_irq_count(vcpu->vm);
+	struct virq_desc *desc;
+	int bit;
 
-	spin_lock_irqsave(&virq_struct->lock, flags);
-	if (is_list_empty(&virq_struct->pending_list)) {
-		spin_unlock_irqrestore(&virq_struct->lock, flags);
-		return BAD_IRQ;
+	for_each_set_bit(bit, virq_struct->pending_bitmap, total_irq) {
+		if (test_bit(bit, virq_struct->active_bitmap))
+			continue;
+
+		desc = get_virq_desc(vcpu, bit);
+		desc->state = VIRQ_STATE_ACTIVE;
+		atomic_dec(&virq_struct->pending_virq);
+		clear_bit(bit, virq_struct->pending_bitmap);
+
+		set_bit(bit, virq_struct->active_bitmap);
+		virq_struct->active_virq++;
+
+		return bit;
 	}
 
-	/* get the pending virq and delete it from pending list */
-	desc = list_first_entry(&virq_struct->pending_list,
-			struct virq_desc, list);
-	list_del(&desc->list);
-	list_add_tail(&virq_struct->active_list, &desc->list);
-	desc->state = VIRQ_STATE_ACTIVE;
-	virq_clear_pending(desc);
-
-	spin_unlock_irqrestore(&virq_struct->lock, flags);
-
-	return desc->vno;
+	return BAD_IRQ;
 }
 
 int vcpu_has_irq(struct vcpu *vcpu)
 {
 	struct virq_struct *vs = vcpu->virq_struct;
+	int total = vm_irq_count(vcpu->vm);
 	int pend, active;
 
-	pend = is_list_empty(&vs->pending_list);
-	active = is_list_empty(&vs->active_list);
+	pend = find_first_bit(vs->pending_bitmap, total);
+	active = find_first_bit(vs->active_bitmap, total);
 
-	return !(pend && active);
+	return (pend < total) || (active < total);
 }
 
 static void update_virq_cap(struct virq_desc *desc, unsigned long flags)
 {
-	if (flags & VIRQF_CAN_WAKEUP)
-		virq_set_wakeup(desc);
+	desc->flags |= flags;
 
-	if (flags & VIRQF_ENABLE) {
-		virq_set_enable(desc);
-		if (virq_is_hw(desc))
-			irq_unmask(desc->hno);
-	}
+	if ((flags & VIRQF_ENABLE) && virq_is_hw(desc))
+		irq_unmask(desc->hno);
 
 	if (flags & VIRQF_FIQ)
 		__virq_set_fiq(desc);
@@ -447,12 +417,8 @@ void vcpu_virq_struct_init(struct vcpu *vcpu)
 	struct virq_desc *desc;
 	int i;
 
-	virq_struct->active_count = 0;
-	spin_lock_init(&virq_struct->lock);
-	init_list(&virq_struct->pending_list);
-	init_list(&virq_struct->active_list);
-	virq_struct->pending_virq = 0;
-	virq_struct->pending_hirq = 0;
+	virq_struct->active_virq = 0;
+	atomic_set(0, &virq_struct->pending_virq);
 
 	memset(&virq_struct->local_desc, 0,
 		sizeof(struct virq_desc) * VM_LOCAL_VIRQ_NR);
@@ -468,31 +434,24 @@ void vcpu_virq_struct_init(struct vcpu *vcpu)
 		desc->vno = i;
 		desc->hno = 0;
 		desc->id = VIRQ_INVALID_ID;
-		desc->list.next = NULL;
 		desc->state = VIRQ_STATE_INACTIVE;
 	}
 }
 
 void vcpu_virq_struct_reset(struct vcpu *vcpu)
 {
-	struct virq_struct *virq_struct = vcpu->virq_struct;
-	struct virq_desc *desc, *tmp;
+	struct virq_struct *vs = vcpu->virq_struct;
 
-	list_for_each_entry_safe(desc, tmp,
-			&virq_struct->pending_list, list)
-		list_del(&desc->list);
-
-	list_for_each_entry_safe(desc, tmp,
-			&virq_struct->active_list, list)
-		list_del(&desc->list);
-
+	memset(vs->pending_bitmap, 0, BITMAP_SIZE(vcpu->vm->vspi_nr));
+	memset(vs->active_bitmap, 0, BITMAP_SIZE(vcpu->vm->vspi_nr));
 	vcpu_virq_struct_init(vcpu);
 }
 
 static int __request_virq(struct vcpu *vcpu, struct virq_desc *desc,
 			uint32_t virq, uint32_t hwirq, unsigned long flags)
 {
-	if (desc->vno && (desc->vno != virq)) {
+	if (test_and_set_bit(VIRQS_REQUESTED_BIT,
+				(unsigned long *)&desc->flags)) {
 		pr_warn("virq-%d may has been requested\n", virq);
 		return -EBUSY;
 	}
@@ -503,9 +462,9 @@ static int __request_virq(struct vcpu *vcpu, struct virq_desc *desc,
 	desc->pr = 0xa0;
 	desc->vmid = get_vmid(vcpu);
 	desc->id = VIRQ_INVALID_ID;
-	desc->list.next = NULL;
 	desc->state = VIRQ_STATE_INACTIVE;
-	virq_clear_enable(desc);
+
+	/* mask the bits in spi_irq_bitmap, if it is a SPI */
 	if (virq >= VM_LOCAL_VIRQ_NR)
 		set_bit(VIRQ_SPI_OFFSET(virq), vcpu->vm->vspi_map);
 
@@ -517,11 +476,11 @@ static int __request_virq(struct vcpu *vcpu, struct virq_desc *desc,
 		request_irq(hwirq, guest_irq_handler, IRQ_FLAGS_VCPU,
 				vcpu->task->name, (void *)desc);
 		irq_mask(desc->hno);
-	} else
+	} else {
 		virq_clear_hw(desc);
+	}
 
 	update_virq_cap(desc, flags);
-	desc->flags |= VIRQS_REQUESTED;
 
 	return 0;
 }
@@ -608,14 +567,11 @@ int alloc_vm_virq(struct vm *vm)
 	int count = vm->vspi_nr;
 
 	HVM_IRQ_LOCK(vm);
-
 	virq = find_next_zero_bit_loop(vm->vspi_map, count, 0);
-	if (virq >= count)
+	if (virq < count)
+		request_virq(vm, virq + VM_LOCAL_VIRQ_NR, VIRQF_NEED_EXPORT);
+	else
 		virq = -1;
-
-	if (virq >= 0)
-		request_virq(vm, virq + VM_LOCAL_VIRQ_NR, VIRQF_ENABLE);
-
 	HVM_IRQ_UNLOCK(vm);
 
 	return (virq >= 0 ? virq + VM_LOCAL_VIRQ_NR : -1);
@@ -630,50 +586,56 @@ void release_vm_virq(struct vm *vm, int virq)
 		return;
 
 	HVM_IRQ_LOCK(vm);
-
 	desc = &vm->vspi_desc[virq];
 	memset(desc, 0, sizeof(struct virq_desc));
 	clear_bit(virq, vm->vspi_map);
-
 	HVM_IRQ_UNLOCK(vm);
 }
 
 static int virq_create_vm(void *item, void *args)
 {
-	uint32_t vspi_nr;
-	uint32_t size, tmp, map_size;
+	uint32_t size, vdesc_size, vdesc_bitmap_size, status_bitmap_size;
 	struct vm *vm = (struct vm *)item;
+	struct virq_struct *vs;
+	void *base;
+	int i;
 
-	if (vm->vmid == 0)
-		vspi_nr = HVM_SPI_VIRQ_NR;
-	else
-		vspi_nr = GVM_SPI_VIRQ_NR;
+	/*
+	 * Total size:
+	 * 1 - sizeof(struct virq_desc) * vspi_nr
+	 * 3 - vitmap_size(spi_nr)
+	 * 2 - vcpu_nr * bitmap_size * (SGI + PPI + SPI) * 2
+	 */
+	vm->vspi_nr = vm_max_virq_line(vm);
+	vdesc_size = sizeof(struct virq_desc) * vm->vspi_nr;
+	vdesc_size = BALIGN(vdesc_size, sizeof(unsigned long));
+	vdesc_bitmap_size = BITMAP_SIZE(vm->vspi_nr);
+	status_bitmap_size = BITMAP_SIZE(vm->vspi_nr + VM_LOCAL_VIRQ_NR);
 
-	tmp = sizeof(struct virq_desc) * vspi_nr;
-	tmp = BALIGN(tmp, sizeof(unsigned long));
-	size = PAGE_BALIGN(tmp);
-	vm->virq_same_page = 0;
-	vm->vspi_desc = get_free_pages(PAGE_NR(size));
-	if (!vm->vspi_desc)
+	size = vdesc_size + vdesc_bitmap_size +
+		(status_bitmap_size * vm->vcpu_nr * 2);
+	size = PAGE_BALIGN(size);
+
+	pr_notice("allocate 0x%x bytes for virq struct\n", size);
+	base = get_free_pages(PAGE_NR(size));
+	if (!base) {
+		pr_err("no more page for virq struct\n");
 		return -ENOMEM;
-
-	map_size = BITS_TO_LONGS(vspi_nr) * sizeof(unsigned long);
-
-	if ((size - tmp) >= map_size) {
-		vm->vspi_map = (unsigned long *)
-			((unsigned long)vm->vspi_desc + tmp);
-		vm->virq_same_page = 1;
-	} else {
-		vm->vspi_map = malloc(BITS_TO_LONGS(vspi_nr) *
-				sizeof(unsigned long));
-		if (!vm->vspi_map)
-			return -ENOMEM;
 	}
 
-	memset(vm->vspi_desc, 0, tmp);
-	memset(vm->vspi_map, 0, BITS_TO_LONGS(vspi_nr) *
-			sizeof(unsigned long));
-	vm->vspi_nr = vspi_nr;
+	memset(base, 0, size);
+	vm->vspi_desc = (struct virq_desc *)base;
+	vm->vspi_map = (unsigned long *)(base + vdesc_size);
+
+	base = base + vdesc_size + vdesc_bitmap_size;
+	for (i = 0; i < vm->vcpu_nr; i++) {
+		vs = vm->vcpus[i]->virq_struct;
+		ASSERT(vs != NULL);
+		vs->pending_bitmap = base;
+		base += status_bitmap_size;
+		vs->active_bitmap = base;
+		base += status_bitmap_size;
+	}
 
 	return 0;
 }
@@ -687,12 +649,10 @@ void vm_virq_reset(struct vm *vm)
 	for ( i = 0; i < vm->vspi_nr; i++) {
 		desc = &vm->vspi_desc[i];
 		virq_clear_enable(desc);
-		virq_clear_pending(desc);
 		desc->pr = 0xa0;
 		desc->type = 0x0;
 		desc->id = VIRQ_INVALID_ID;
 		desc->state = VIRQ_STATE_INACTIVE;
-		desc->list.next = NULL;
 
 		if (virq_is_hw(desc))
 			irq_mask(desc->hno);
@@ -715,11 +675,8 @@ static int virq_destroy_vm(void *item, void *data)
 				irq_mask(desc->hno);
 		}
 
-		free(vm->vspi_desc);
+		free_pages(vm->vspi_desc);
 	}
-
-	if (!vm->virq_same_page)
-		free(vm->vspi_map);
 
 	return 0;
 }

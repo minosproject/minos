@@ -132,8 +132,8 @@ static int fdt_setup_vm_virqs(struct vm *vm)
 
 	if (vc && vc->generate_virq) {
 		for (i = 0; i < vspi_nr; i++) {
-			if (!virq_can_request(vm->vcpus[0], i +
-						VM_LOCAL_VIRQ_NR))
+			if (!virq_need_export(vm->vcpus[0],
+					i + VM_LOCAL_VIRQ_NR))
 				continue;
 			size += vc->generate_virq(tmp + size,
 					i + VM_LOCAL_VIRQ_NR);
@@ -309,7 +309,7 @@ static void fdt_vm_init(struct vm *vm)
 
 	/*
 	 * current need to export all the irq number
-	 * int the VM, if one device need to request
+	 * to the VM, if one device need to request
 	 * the virq dynmaic, TO BE FIXED
 	 */
 	if (vm_is_native(vm))

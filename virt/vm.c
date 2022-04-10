@@ -500,7 +500,11 @@ int request_vm_virqs(struct vm *vm, int base, int nr)
 		return -EINVAL;
 
 	while (nr > 0) {
-		request_virq(vm, base, 0);
+		if (request_virq(vm, base, 0)) {
+			pr_err("request virq %d in GVM %s failed\n",
+					base, vm->name);
+			return -ENOENT;
+		}
 		base++;
 		nr--;
 	}

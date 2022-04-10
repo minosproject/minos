@@ -25,59 +25,43 @@
 
 static int virqchip_enter_to_guest(void *item, void *data)
 {
-	unsigned long flags;
-	int fiq = 0, no_pending, no_active;
 	struct vcpu *vcpu = (struct vcpu *)item;
-	struct virq_struct *virq_struct = vcpu->virq_struct;
 	struct virq_chip *vc = vcpu->vm->virq_chip;
+	int flags;
 
 	if (!vc)
 		return -ENOENT;
 
 	/*
-	 * if there is no pending virq for this vcpu
-	 * clear the virq state in HCR_EL2 then just return
-	 * else inject the virq
+	 * if the flags is 0, then means there is no irq inject
+	 * to the vcpu, if there are FIQs inject, the bit 31 will
+	 * set, and other bit indicate how many irq has been injected.
 	 */
-	spin_lock_irqsave(&virq_struct->lock, flags);
-
-	no_pending = is_list_empty(&virq_struct->pending_list);
-	no_active = is_list_empty(&virq_struct->active_list);
-
-	if (no_pending && no_active) {
+	flags = vc->enter_to_guest(vcpu, vc->inc_pdata);
+	if (flags == 0) {
 		if (!(vc->flags & VIRQCHIP_F_HW_VIRT))
 			arch_clear_virq_flag();
-	} else if (!no_pending) {
-		if (vc && vc->enter_to_guest)
-			fiq = vc->enter_to_guest(vcpu, vc->inc_pdata);
-
+	} else {
 		if (!(vc->flags & VIRQCHIP_F_HW_VIRT)) {
-			if (fiq)
+			if (flags & FIQ_HAS_INJECT)
 				arch_set_vfiq_flag();
 			else
 				arch_set_virq_flag();
 		}
 	}
 
-	spin_unlock_irqrestore(&virq_struct->lock, flags);
-
 	return 0;
 }
 
 static int virqchip_exit_from_guest(void *item, void *data)
 {
-	unsigned long flags;
 	struct vcpu *vcpu = (struct vcpu *)item;
-	struct virq_struct *virq_struct = vcpu->virq_struct;
 	struct virq_chip *vc = vcpu->vm->virq_chip;
 
-	if (vc && vc->exit_from_guest) {
-		spin_lock_irqsave(&virq_struct->lock, flags);
-		vc->exit_from_guest(vcpu, vc->inc_pdata);
-		spin_unlock_irqrestore(&virq_struct->lock, flags);
-	}
-
-	return 0;
+	if (vc && vc->exit_from_guest)
+		return vc->exit_from_guest(vcpu, vc->inc_pdata);
+	else
+		return 0;
 }
 
 struct virq_chip *alloc_virq_chip(void)
@@ -120,10 +104,9 @@ int virqchip_get_virq_state(struct vcpu *vcpu, struct virq_desc *virq)
 
 static int __init_text virqchip_init(void)
 {
-	register_hook(virqchip_enter_to_guest,
-			OS_HOOK_ENTER_TO_GUEST);
-	register_hook(virqchip_exit_from_guest,
-			OS_HOOK_EXIT_FROM_GUEST);
+	register_hook(virqchip_enter_to_guest, OS_HOOK_ENTER_TO_GUEST);
+	register_hook(virqchip_exit_from_guest, OS_HOOK_EXIT_FROM_GUEST);
+
 	return 0;
 }
 subsys_initcall(virqchip_init);
