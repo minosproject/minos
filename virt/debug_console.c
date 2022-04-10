@@ -120,7 +120,6 @@ static int dcon_get_resource(struct vm *vm, struct device_node *node,
 		request_virq(vm, irq, 0);
 		va = request_vmm_area(&vm->mm, base, 0, size,
 				VM_GUEST_SHMEM | VM_RW);
-
 	} else {
 		/*
 		 * since the debug console is only for native vm which
@@ -172,7 +171,7 @@ static int dcon_init(struct vm *vm, struct device_node *node,
 	return 0;
 }
 
-static int __init_text create_dconsole(struct vm *vm, struct device_node *node)
+static int create_dconsole(struct vm *vm, struct device_node *node)
 {
 	void *ring;
 	struct tty *tty;
@@ -240,8 +239,8 @@ static void dcon_write(struct vm_debug_console *dcon)
 	while (ridx != widx)
 		console_putc(ring->buf[VM_RING_IDX(ridx++, ring->size)]);
 
-	ring->ridx = ring->widx;
 	mb();
+	ring->ridx = ring->widx;
 }
 
 static int dcon_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)

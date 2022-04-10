@@ -21,7 +21,7 @@
 static LIST_HEAD(tty_list);
 static DEFINE_SPIN_LOCK(tty_lock);
 
-struct tty *alloc_tty(char *name, uint32_t id, unsigned long flags)
+struct tty *alloc_tty(char *name, uint32_t id, int flags)
 {
 	struct tty *tty;
 

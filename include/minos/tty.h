@@ -19,13 +19,13 @@ struct tty {
 	char name[TTY_NAME_SIZE];
 	uint32_t id;
 	int open;
-	unsigned long flags;
+	int flags;
 	struct tty_ops *ops;
 	void *pdata;
 	struct list_head list;
 };
 
-struct tty *alloc_tty(char *name, uint32_t id, unsigned long flags);
+struct tty *alloc_tty(char *name, uint32_t id, int flags);
 int register_tty(struct tty *tty);
 int release_tty(struct tty *tty);
 void close_tty(struct tty *tty);
