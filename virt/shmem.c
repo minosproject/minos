@@ -108,6 +108,8 @@ static void *__alloc_shmem(struct shmem_block *sb, int pages, int flags)
 	shmem->next = shmem_head;
 	shmem_head = shmem;
 
+	bitmap_set(sb->bitmap, bits, pages);
+
 	return (void *)ptov(addr);
 }
 

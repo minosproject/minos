@@ -394,20 +394,28 @@ static int linux_create_native_vm_resource(struct vm *vm)
 static int linux_create_guest_vm_resource(struct vm *vm)
 {
 	phy_addr_t addr;
+	int ret;
 
+	ret = translate_guest_ipa(&vm->mm, (unsigned long)vm->setup_data, &addr);
+	if (ret) {
+		pr_err("translate 0x%p in vm%d failed\n",
+				vm->setup_data, vm->vmid);
+		return -EFAULT;
+	}
 
-	// fixme need 
+	ret = create_host_mapping(ptov(addr), addr, MAX_DTB_SIZE,
+			VM_NORMAL | VM_RW | VM_HUGE);
+	if (ret) {
+		pr_err("map guest setup data failed\n");
+		return ret;
+	}
 
-	/*
-	 * convert the guest's memory to hypervisor's memory space
-	 * do not need to map again, since all the guest VM's memory
-	 * has been mapped when mm_init()
-	 */
-	if (translate_guest_ipa(&vm->mm, (unsigned long)vm->setup_data, &addr));
-	if (!addr)
-		return -ENOMEM;
+	ret = create_vm_resource_of(vm, (void *)addr);
 
-	return create_vm_resource_of(vm, (void *)addr);
+	flush_dcache_range(ptov(addr), MAX_DTB_SIZE);
+	destroy_host_mapping(ptov(addr), MAX_DTB_SIZE);
+
+	return ret;
 }
 
 struct os_ops linux_os_ops = {

@@ -400,7 +400,7 @@ static int __virtio_vdev_init(struct vdev *vdev,
 		return -ENOENT;
 	}
 
-	pr_debug("vdev : irq-%d hpa-0x%p gva-0x%"PRIx64"\n", vdev->gvm_irq,
+	pr_debug("vdev : irq-%d hpa-%p gva-0x%"PRIx64"\n", vdev->gvm_irq,
 			vdev->iomem, vdev->guest_iomem);
 
 	if (rs > VIRTQUEUE_MAX_SIZE)

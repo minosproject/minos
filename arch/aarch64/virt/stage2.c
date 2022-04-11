@@ -430,8 +430,8 @@ static inline int stage2_ipa_to_pa(struct mm_struct *vs,
 		return -EFAULT;
 
 	if (stage2_pmd_huge(*pmdp)) {
-		phy = ((*pmdp) & S2_PHYSICAL_MASK) + pmd_offset;
-		return -EFAULT;
+		*pa = ((*pmdp) & S2_PHYSICAL_MASK) + pmd_offset;
+		return 0;
 	}
 
 	ptep = stage2_pte_offset(ptov(stage2_pte_table_addr(*pmdp)), va);

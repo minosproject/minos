@@ -60,10 +60,10 @@ int vm_shutdown(struct vm *vm);
 void *vm_vcpu_thread(void *data);
 
 #ifdef __ANDROID__
-#define DEV_MVM0	"/dev/mvm0"
+#define DEV_MVM_HOST	"/dev/mvm-host"
 #define DEV_MVM_PATH	"/dev/mvm"
 #else
-#define DEV_MVM0	"/dev/mvm/mvm0"
+#define DEV_MVM_HOST	"/dev/mvm/mvm-host"
 #define DEV_MVM_PATH	"/dev/mvm/mvm"
 #endif
 
@@ -82,25 +82,38 @@ void *map_vm_memory(struct vm *vm)
 		vm->map_size = vm->mem_size;
 	}
 
+	/*
+	 * vm->map_start - guest's memory base.
+	 * vm->map_size  - guest's memory size.
+	 *
+	 * IOCTL_VM_MMAP will let hyprvisor allocate the memory
+	 * for guest, and map the physical memory to the guest's
+	 * memory range (vm->map_start with length vm->map_size).
+	 * Meanwhile this ioctl will return the IPA of the host vm which
+	 * these physical memory mapped at. Then mvm process can
+	 * via the IPA to read/write guest's memory.
+	 */
 	args[0] = vm->map_start;
 	args[1] = vm->map_size;
-
 	if (ioctl(vm->vm_fd, IOCTL_VM_MMAP, args)) {
 		pr_err("mmap memory failed 0x%"PRIx64" 0x%"PRIx64"\n",
 				vm->mem_start, vm->mem_size);
 		return NULL;
 	}
 
+	/*
+	 * map the guest's memory to the mvm's memory space.
+	 */
 	addr = mmap64(NULL, (size_t)vm->map_size, PROT_READ | PROT_WRITE,
-			MAP_SHARED, vm->vm_fd, vm->map_start);
+			vm->vm_fd, vm->map_start);
 	if (addr == (void *)-1) {
-		pr_err("mmap vm memory failed 0x%lx\n", (unsigned long)addr);
+		pr_err("allocate vma range for vm-%d failed\n", vm->vmid);
 		return NULL;
 	}
 
-	pr_notice("vm-%d 0x%"PRIx64"@0x%"PRIx64" mmap to 0x%lx\n",
-			vm->vmid, vm->map_start, vm->map_size,
-			(unsigned long)addr);
+	pr_notice("vm-%d [0x%"PRIx64" 0x%"PRIx64"] mmap to [0x%lx 0x%lx]\n",
+			vm->vmid, vm->map_start, vm->map_start + vm->map_size,
+			(unsigned long)addr, (unsigned long)addr + vm->map_start);
 
 	return addr;
 }
@@ -365,7 +378,7 @@ static int create_and_init_vm(struct vm *vm)
 	char path[32];
 	int retry;
 
-	vm->vm0_fd = open(DEV_MVM0, O_RDWR | O_NONBLOCK);
+	vm->vm0_fd = open(DEV_MVM_HOST, O_RDWR | O_NONBLOCK);
 	if (vm->vm0_fd <= 0) {
 		pr_err("open VM0 file fail %d\n", vm->vm0_fd);
 		return -EIO;
@@ -397,8 +410,8 @@ static void vmcs_ack(struct vmcs *vmcs)
 	if (vmcs->guest_index == vmcs->host_index)
 		return;
 
-	vmcs->guest_index++;
 	wmb();
+	vmcs->guest_index++;
 }
 
 static int vcpu_handle_mmio(struct vm *vm, int trap_reason,
@@ -757,7 +770,7 @@ static int mvm_main(void)
 
 	/*
 	 * map a fix region for this vm, need to call ioctl
-	 * to informe hypervisor to map the really physical
+	 * to inform hypervisor to map the really physical
 	 * memory
 	 */
 	vm->mmap = map_vm_memory(vm);
