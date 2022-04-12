@@ -779,14 +779,14 @@ static void vmm_area_init(struct mm_struct *mm, int bit64)
 	 * 32bit - TBD (with LPAE)
 	 */
 	if (bit64) {
-		base = 0x0;
+		base = 0x1000;
 		size = (1UL << 40);
 	} else {
 #ifdef CONFIG_VM_LPAE
-		base = 0x0;
+		base = 0x1000;
 		size = 0x100000000;
 #else
-		base = 0x0;
+		base = 0x1000;
 		size = 0x100000000;
 #endif
 	}
