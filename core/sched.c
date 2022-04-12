@@ -244,7 +244,8 @@ void switch_to_task(struct task *cur, struct task *next)
 	 * need request a timeout timer then need setup the timer.
 	 */
 	if ((cur->state == TASK_STATE_WAIT_EVENT) && (cur->delay > 0))
-		mod_timer(&cur->delay_timer, now + MILLISECS(cur->delay));
+		mod_timer(&cur->delay_timer,
+				now + MILLISECS(cur->delay));
 	else if (cur->state == TASK_STATE_RUNNING)
 		cur->state = TASK_STATE_READY;
 
@@ -278,7 +279,8 @@ void switch_to_task(struct task *cur, struct task *next)
 	 * 1, need enable the sched timer.
 	 */
 	if (pcpu->tasks_in_prio[next->prio] > 1)
-		mod_timer(&pcpu->sched_timer, now + next->run_time);
+		mod_timer(&pcpu->sched_timer,
+			now + MILLISECS(next->run_time));
 
 	smp_wmb();
 }
@@ -369,8 +371,16 @@ static void task_run_again(struct pcpu *pcpu, struct task *task)
 {
 	unsigned long now = NOW();
 
+	/*
+	 * enable the sched timer if there are more than one
+	 * ready task on the same prio.
+	 */
 	task->ti.flags &= ~__TIF_TICK_EXHAUST;
 	task->start_ns = now;
+
+	if ((pcpu->tasks_in_prio[task->prio] > 1) &&
+			(pcpu->sched_timer.entry.next == NULL))
+		mod_timer(&pcpu->sched_timer, now + MILLISECS(task->delay));
 }
 
 void task_exit(int errno)
