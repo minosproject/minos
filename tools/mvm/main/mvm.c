@@ -181,16 +181,20 @@ static void vm_release_vcpu(struct vcpu *vcpu)
 	free(vcpu);
 }
 
-static int destroy_vm(struct vm *vm)
+static void destroy_vm(void)
 {
+	struct vm *vm = mvm_vm;
 	int i;
 	int vmfd;
 
-	mvm_vm = NULL;
 	mvm_free_options();
 
-	if (!vm)
-		return -EINVAL;
+	/*
+	 * lock ? TBD
+	 */
+	mvm_vm = NULL;
+	if (vm == NULL)
+		return;
 
 	vmfd = vm->vm_fd;
 
@@ -249,8 +253,6 @@ static int destroy_vm(struct vm *vm)
 		pr_info("close vm fd\n");
 		close(vmfd);
 	}
-
-	return 0;
 }
 
 static void signal_handler(int signum)
@@ -560,7 +562,7 @@ static int __vm_shutdown(struct vm *vm)
 	pr_notice("vm-%d shutdown exit mvm\n", vm->vmid);
 	pr_notice("***************************\n");
 
-	destroy_vm(vm);
+	destroy_vm();
 	exit(0);
 }
 
@@ -800,8 +802,7 @@ static int mvm_main(void)
 		return 0;
 
 error_out:
-	mvm_vm = NULL;
-	destroy_vm(vm);
+	destroy_vm();
 	return ret;
 
 error_option:
