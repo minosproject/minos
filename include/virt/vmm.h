@@ -52,8 +52,6 @@ struct mm_struct {
 	struct list_head vmm_area_used;
 };
 
-
-
 int vm_mm_init(struct vm *vm);
 int vm_mm_struct_init(struct vm *vm);
 

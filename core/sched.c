@@ -293,7 +293,6 @@ static void sched_tick_handler(unsigned long data)
 	 * mark this task has used its running ticket, and the sched
 	 * timer is off.
 	 */
-	ASSERT(task_is_running(task));
 	set_bit(TIF_TICK_EXHAUST, &task->ti.flags);
 	set_need_resched();
 }
