@@ -71,16 +71,19 @@ void arch_enable_timer(unsigned long expires)
 
 unsigned long get_sys_ticks(void)
 {
+	isb();
 	return read_sysreg64(CNTPCT_EL0);
 }
 
 unsigned long get_current_time(void)
 {
+	isb();
 	return ticks_to_ns(read_sysreg64(CNTPCT_EL0) - boot_tick);
 }
 
 unsigned long get_sys_time(void)
 {
+	isb();
 	return ticks_to_ns(read_sysreg64(CNTPCT_EL0));
 }
 
