@@ -16,10 +16,19 @@
 
 #include <minos/task.h>
 #include <minos/shell_command.h>
+#include <virt/vm.h>
 
 static void dump_task_info(struct task *task)
 {
-	printf("%4d %3d %s\n", task->tid, task->cpu, task->name);
+	char vm_str[8] = {0};
+	struct vcpu *vcpu;
+
+	if (task_is_vcpu(task)) {
+		vcpu = (struct vcpu *)task->pdata;
+		sprintf(vm_str, "vm-%d/", vcpu->vm->vmid);
+	}
+
+	printf("%4d %3d %s%s\n", task->tid, task->cpu, vm_str, task->name);
 }
 
 static int ps_cmd(int argc, char **argv)
