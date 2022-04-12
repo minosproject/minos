@@ -17,6 +17,7 @@
 #include <minos/minos.h>
 #include <minos/mm.h>
 #include <virt/vmm.h>
+#include <virt/vm.h>
 #include <asm/tlb.h>
 #include <asm/cache.h>
 #include "stage2.h"
@@ -56,6 +57,35 @@ static void inline stage2_pmd_clear(pmd_t *pmdp)
 	WRITE_ONCE(*pmdp, 0);
 	__dsb(ishst);
 	isb();
+}
+
+static void inline flush_all_tlb_mm(struct mm_struct *mm)
+{
+	struct vm *vm = container_of(mm, struct vm, mm);
+	uint64_t vttbr = vtop(mm->pgdp) | ((uint64_t)vm->vmid << 48);
+	unsigned long flags;
+	uint64_t old_vttbr;
+
+	local_irq_save(flags);
+
+	/*
+	 * switch to the target VM's VTTBR to VTTBR_EL2, make sure
+	 * use the correct vmid.
+	 */
+	old_vttbr = read_sysreg(VTTBR_EL2);
+	write_sysreg(vttbr, VTTBR_EL2);
+
+	/*
+	 * flush all the tlb with the vmid.
+	 */
+	flush_all_tlb_guest();
+
+	/*
+	 * restore the origin vttbr.
+	 */
+	write_sysreg(old_vttbr, VTTBR_EL2);
+
+	local_irq_restore(flags);
 }
 
 static void *stage2_get_free_page(unsigned long flags)
@@ -294,7 +324,7 @@ static int stage2_unmap_pud_range(struct mm_struct *vs, unsigned long addr, unsi
 		}
 	} while (pud++, addr = next, addr != end);
 
-	flush_all_tlb_guest();
+	flush_all_tlb_mm(vs);
 
 	return 0;
 }
