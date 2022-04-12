@@ -42,7 +42,7 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 		break;
 
 	case HVC_VM_DESTORY:
-		destroy_vm(vm);
+		destroy_guest_vm(vm);
 		HVC_RET1(c, 0);
 		break;
 

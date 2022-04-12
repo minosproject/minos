@@ -57,8 +57,7 @@ DEFINE_SPIN_LOCK(affinity_lock);
 
 static inline int vcpu_is_offline(struct vcpu *vcpu)
 {
-	return check_vcpu_state(vcpu, VCPU_STATE_STOP) ||
-		check_vcpu_state(vcpu, VCPU_STATE_SUSPEND);
+	return check_vcpu_state(vcpu, VCPU_STATE_SUSPEND);
 }
 
 static void vcpu_online(struct vcpu *vcpu)
@@ -128,6 +127,12 @@ void vcpu_context_restore(struct task *task)
 
 static int vcpu_can_idle(struct vcpu *vcpu)
 {
+	if (vcpu->vm->state != VM_STATE_ONLINE)
+		return 0;
+
+	if (is_task_need_stop(vcpu->task))
+		return 0;
+
 	if (vcpu_has_irq(vcpu))
 		return 0;
 
@@ -136,8 +141,7 @@ static int vcpu_can_idle(struct vcpu *vcpu)
 
 int vcpu_idle(struct vcpu *vcpu)
 {
-	return wait_event(&vcpu->vcpu_event,
-			vcpu_can_idle(vcpu), 0);
+	return wait_event(&vcpu->vcpu_event, vcpu_can_idle(vcpu), 0);
 }
 
 int vcpu_suspend(struct vcpu *vcpu, gp_regs *c,

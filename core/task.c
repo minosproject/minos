@@ -112,7 +112,7 @@ static void task_init(struct task *task, char *name,
 	task->affinity = aff;
 	task->run_time = TASK_RUN_TIME;
 	spin_lock_init(&task->s_lock);
-	task->state = TASK_STATE_STOP;
+	task->state = TASK_STATE_SUSPEND;
 	task->cpu = -1;
 
 	cpu = (aff == TASK_AFF_ANY) ? 0 : aff;
@@ -381,7 +381,6 @@ struct task *create_vcpu_task(char *name, task_func_t func, int aff,
 		unsigned long flags, void *vcpu)
 {
 #define VCPU_TASK_FLAG (TASK_FLAGS_VCPU | TASK_FLAGS_NO_AUTO_START)
-
         return create_task(name, func, TASK_STACK_SIZE, OS_PRIO_VCPU, aff,
 			flags | VCPU_TASK_FLAG, vcpu);
 }

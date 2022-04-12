@@ -50,7 +50,11 @@ void vcpu_enter_poweroff(struct vcpu *vcpu)
 	if (vcpu->task == current)
 		return;
 
-	wake_up_abort(task);
+	/*
+	 * wake up the vcpu if need, the vcpu may in vcpu_idle
+	 * routine.
+	 */
+	wake(&vcpu->vcpu_event);
 
 	if ((vcpu_affinity(vcpu) != smp_processor_id())) {
 		pr_debug("call vcpu_power_off_call for vcpu-%s\n",
@@ -75,7 +79,6 @@ static int wait_vcpu_in_state(struct vcpu *vcpu, int state, uint32_t timeout)
 	for (i = 0; i < timeout / 10; i++) {
 		if (vcpu->task->state == state)
 			return 0;
-
 		msleep(10);
 	}
 
@@ -272,7 +275,6 @@ static int __shutdown_native_vm(struct vm *vm, int flags)
 
 static int __shutdown_guest_vm(struct vm *vm, int flags)
 {
-	vm->state = VM_STATE_OFFLINE;
 	if (!pm_action_by_self(flags))
 		return 0;
 
@@ -289,11 +291,13 @@ static int __vm_power_off(struct vm *vm, void *args, int flags)
 	old_state = cmpxchg(&vm->state, VM_STATE_ONLINE, VM_STATE_FREEZEING);
 	if (old_state != VM_STATE_ONLINE) {
 		pr_err("vm is not online, under state %d\n", old_state);
-		return -EBUSY;
+		return 0;
 	}
 
-	if (!vm_is_native(vm))
-		flags |= VM_PM_FLAGS_DESTROY;
+	if (vm_is_native(vm))
+		__shutdown_native_vm(vm, flags);
+	else
+		__shutdown_guest_vm(vm, flags);
 
 	vm_for_each_vcpu(vm, vcpu)
 		vcpu_enter_poweroff(vcpu);
@@ -302,10 +306,17 @@ static int __vm_power_off(struct vm *vm, void *args, int flags)
 	 * the vcpu has been set to TIF_NEED_STOP, so when return
 	 * to guest, the task will be killed by kernel.
 	 */
-	if (vm_is_native(vm))
-		return __shutdown_native_vm(vm, flags);
-	else
-		return __shutdown_guest_vm(vm, flags);
+	smp_wmb();
+	vm->state = VM_STATE_OFFLINE;
+
+	return 0;
+}
+
+void destroy_guest_vm(struct vm *vm)
+{
+	__vm_power_off(vm, NULL, VM_PM_ACTION_BY_MVM);
+	wait_vm_in_state(vm, VCPU_STATE_SUSPEND);
+	destroy_vm(vm);
 }
 
 int vm_power_off(int vmid, void *arg, int flags)

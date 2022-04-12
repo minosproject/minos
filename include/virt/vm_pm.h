@@ -46,4 +46,6 @@ int send_vm_reboot_request(struct vm *vm);
 
 int power_up_guest_vm(int vmid);
 
+void destroy_guest_vm(struct vm *vm);
+
 #endif
