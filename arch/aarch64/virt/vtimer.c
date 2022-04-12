@@ -89,6 +89,13 @@ static void virt_timer_expire_function(unsigned long data)
 {
 	struct vtimer *vtimer = (struct vtimer *)data;
 
+	/*
+	 * linux timer driver will check the status bit to check
+	 * whether the timer has trigger the interrupt, here set
+	 * this bit, otherwise, linux timer dirver may not work
+	 * correctly.
+	 */
+	vtimer->cnt_ctl |= CNT_CTL_ISTATUS;
 	send_virq_to_vcpu(vtimer->vcpu, vtimer->virq);
 }
 
