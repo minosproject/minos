@@ -62,7 +62,6 @@ struct vmtag {
 #define IOCTL_CREATE_VM			0xf000
 #define IOCTL_DESTROY_VM		0xf001
 #define IOCTL_RESTART_VM		0xf002
-#define IOCTL_POWER_DOWN_VM		0xf003
 #define IOCTL_POWER_UP_VM		0xf004
 #define IOCTL_VM_MMAP			0xf005
 #define IOCTL_VM_UNMAP			0xf006
@@ -70,7 +69,6 @@ struct vmtag {
 #define IOCTL_SEND_VIRQ			0xf008
 #define IOCTL_CREATE_VMCS		0xf00a
 #define IOCTL_CREATE_VMCS_IRQ		0xf00b
-#define IOCTL_UNREGISTER_VCPU		0xf00c
 #define IOCTL_VIRTIO_MMIO_INIT		0xf00d
 #define IOCTL_VIRTIO_MMIO_DEINIT	0xf00e
 #define IOCTL_REQUEST_VIRQ		0xf00f

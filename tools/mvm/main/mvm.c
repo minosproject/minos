@@ -105,7 +105,7 @@ void *map_vm_memory(struct vm *vm)
 	 * map the guest's memory to the mvm's memory space.
 	 */
 	addr = mmap64(NULL, (size_t)vm->map_size, PROT_READ | PROT_WRITE,
-			vm->vm_fd, vm->map_start);
+			MAP_PRIVATE, vm->vm_fd, vm->map_start);
 	if (addr == (void *)-1) {
 		pr_err("allocate vma range for vm-%d failed\n", vm->vmid);
 		return NULL;
@@ -174,21 +174,25 @@ static void vm_release_vcpu(struct vcpu *vcpu)
 		vcpu->epoll_fd = -1;
 	}
 
-	if (vcpu->vcpu_irq)
-		ioctl(vcpu->vm->vm_fd, IOCTL_UNREGISTER_VCPU, vcpu->vcpu_irq);
-
+	/*
+	 * do not need call unregister vcpu here, since kernel
+	 * module will remove the vcpu event auto.
+	 */
 	free(vcpu);
 }
 
 static int destroy_vm(struct vm *vm)
 {
 	int i;
+	int vmfd;
 
 	mvm_vm = NULL;
 	mvm_free_options();
 
 	if (!vm)
 		return -EINVAL;
+
+	vmfd = vm->vm_fd;
 
 	if (vm->vcpus) {
 		for (i = 0; i < vm->nr_vcpus; i++) {
@@ -208,11 +212,6 @@ static int destroy_vm(struct vm *vm)
 	if (vm->vm0_fd) {
 		pr_info("close vm0 fd\n");
 		close(vm->vm0_fd);
-	}
-
-	if (vm->vm_fd > 0) {
-		pr_info("close vm fd\n");
-		close(vm->vm_fd);
 	}
 
 	if (vm->image_fd > 0) {
@@ -242,6 +241,15 @@ static int destroy_vm(struct vm *vm)
 
 	free(vm);
 
+	/*
+	 * when close the fd, kernel will destroy the vm using
+	 * HVC call.
+	 */
+	if (vmfd > 0) {
+		pr_info("close vm fd\n");
+		close(vmfd);
+	}
+
 	return 0;
 }
 
@@ -254,10 +262,10 @@ static void signal_handler(int signum)
 	switch (signum) {
 	case SIGTERM:
 	case SIGBUS:
-	case SIGKILL:
 	case SIGSEGV:
 	case SIGSTOP:
 	case SIGTSTP:
+	case SIGINT:
 		if (mvm_vm) {
 			vm = mvm_vm;
 			mvm_vm = NULL;
@@ -546,7 +554,7 @@ void *vm_vcpu_thread(void *data)
 	return NULL;
 }
 
-int __vm_shutdown(struct vm *vm)
+static int __vm_shutdown(struct vm *vm)
 {
 	pr_notice("***************************\n");
 	pr_notice("vm-%d shutdown exit mvm\n", vm->vmid);
@@ -558,17 +566,6 @@ int __vm_shutdown(struct vm *vm)
 
 int vm_shutdown(struct vm *vm)
 {
-	int ret;
-
-	if (vm && vm->vm_fd) {
-		ret = ioctl(vm->vm_fd, IOCTL_POWER_DOWN_VM, 0);
-		if (ret) {
-			pr_err("can not power-off vm-%d now, try again\n",
-					vm->vmid);
-			return -EAGAIN;
-		}
-	}
-
 	return __vm_shutdown(vm);
 }
 
@@ -705,10 +702,10 @@ static int mvm_main(void)
 
 	signal(SIGTERM, signal_handler);
 	signal(SIGBUS, signal_handler);
-	signal(SIGKILL, signal_handler);
 	signal(SIGSEGV, signal_handler);
 	signal(SIGSTOP, signal_handler);
 	signal(SIGTSTP, signal_handler);
+	signal(SIGINT, signal_handler);
 
 	vm = mvm_vm = (struct vm *)calloc(1, sizeof(struct vm));
 	if (!vm)
