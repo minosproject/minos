@@ -28,6 +28,11 @@
 #include <virt/vmodule.h>
 #include <minos/of.h>
 
+#define VGICV2_MODE_HWA 0x0 // hardware accelerate mode
+#define VGICV2_MODE_SWE 0x1 // software emulate mode
+
+static int vgicv2_mode;
+
 struct vgicv2_dev {
 	struct vdev vdev;
 	uint32_t gicd_ctlr;
@@ -624,11 +629,10 @@ static struct virq_chip *vgicv2_virqchip_init(struct vm *vm,
 	 * platform has a hardware gicv2, otherwise
 	 * we need to emulated the trap.
 	 */
-	if (vgicv2_info.gicv_base != 0) {
+	if (vgicv2_mode != VGICV2_MODE_SWE) {
 		flags |= VIRQCHIP_F_HW_VIRT;
 		pr_notice("map gicc 0x%x to gicv 0x%x size 0x%x\n",
 				gicc_base, vgicv2_info.gicv_base, gicc_size);
-
 		create_guest_mapping(&vm->mm, gicc_base,
 				vgicv2_info.gicv_base, gicc_size, VM_IO);
 	} else {
@@ -703,16 +707,29 @@ static int gicv2_vmodule_init(struct vmodule *vmodule)
 
 int vgicv2_init(uint64_t *data, int len)
 {
-	int i;
-	uint32_t vtr;
 	unsigned long *value = (unsigned long *)&vgicv2_info;
+	uint32_t vtr;
+	int i;
 
-	for (i = 0; i < len; i++)
-		value[i] = (unsigned long)data[i];
+	if ((data == NULL) || (len == 0)) {
+		pr_notice("vgicv2 using software emulation mode\n");
+		vgicv2_mode = VGICV2_MODE_SWE;
+		return 0;
+	}
 
 	for (i = 0; i < len; i++) {
-		if (value[i] == 0)
-			panic("invalid address of gicv2\n");
+		value[i] = data[i];
+		if (value[i] == 0) {
+			pr_err("invalid vgicv2 address, fallback to SWE mode\n");
+			vgicv2_mode = VGICV2_MODE_SWE;
+			return 0;
+		}
+	}
+
+	if (vgicv2_info.gicv_base == 0) {
+		pr_warn("no gicv base address, fall back to SWE mode\n");
+		vgicv2_mode = VGICV2_MODE_SWE;
+		return 0;
 	}
 
 	vtr = readl_relaxed((void *)vgicv2_info.gich_base + GICH_VTR);

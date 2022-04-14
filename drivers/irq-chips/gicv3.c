@@ -503,10 +503,14 @@ static int __init_text gicv3_init(struct device_node *node)
 
 	spin_unlock(&gicv3_lock);
 
-#if defined CONFIG_VIRQCHIP_VGICV3 && defined CONFIG_VIRT
+#ifdef CONFIG_VIRT
+#ifdef CONFIG_VIRQCHIP_VGICV3
 	vgicv3_init(array, 10);
+#else
+	pr_err("vgicv3 is not enabled, using vgicv2 instead\n");
+	vgicv2_init(NULL, 0);
 #endif
-
+#endif
 	return 0;
 }
 
