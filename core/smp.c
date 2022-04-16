@@ -157,7 +157,9 @@ void smp_cpus_up(void)
 			pr_fatal("failed to bring up cpu-%d\n", i);
 			continue;
 		}
+	}
 
+	for (i = 1; i < CONFIG_NR_CPUS; i++) {
 		pr_notice("waiting 2 seconds for cpu-%d up\n", i);
 		while ((smp_affinity_id[i] == 0) && (cnt < 2000)) {
 			mdelay(1);
@@ -167,8 +169,9 @@ void smp_cpus_up(void)
 		if (smp_affinity_id[i] == 0) {
 			pr_err("cpu-%d is not up with affinity id 0x%p\n",
 					i, smp_affinity_id[i]);
-		} else
+		} else {
 			cpumask_set_cpu(i, &cpu_online);
+		}
 	}
 
 	cpus_all_up = 1;
