@@ -21,9 +21,10 @@ struct ramdisk_inode {
 
 struct ramdisk_sb {
 	uint32_t file_cnt;
-	uint32_t block_size;	// reserved
-	uint64_t inode_offset;
-	uint64_t data_offset;	// reserved
+	uint32_t block_size;	// always 4096
+	uint64_t inode_offset;	// inode offset
+	uint64_t data_offset;	// file data offset.
+	uint64_t ramdisk_size;	// total size of the ramdisk.
 };
 
 struct ramdisk_file {

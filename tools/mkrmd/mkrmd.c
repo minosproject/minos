@@ -250,6 +250,9 @@ static int packing_ramdisk(int fd)
 	file_offset = (file_offset + 4095) & ~(4095);	// 4096 byte align
 	ramdisk_sb.data_offset = file_offset; 
 
+	ramdisk_sb.ramdisk_size = ramdisk_sb.data_offset + fmem.used;
+	ramdisk_sb.ramdisk_size = (ramdisk_sb.ramdisk_size) & ~(4095);
+
 	/*
 	 * write the superblock.
 	 */
@@ -340,6 +343,7 @@ int main(int argc, char **argv)
 					ramdisk_sb.file_cnt,
 					ramdisk_sb.inode_offset,
 					ramdisk_sb.data_offset);
+		printf("ramdisk size 0x%lx\n", ramdisk_sb.ramdisk_size);
 	}
 
 out:
