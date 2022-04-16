@@ -118,8 +118,6 @@ void boot_secondary(int cpuid)
 	while (!is_cpus_all_up())
 		mb();
 
-	percpu_init(cpuid);
-
 	early_init_percpu();
 
 	arch_init_percpu();

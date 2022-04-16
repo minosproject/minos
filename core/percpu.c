@@ -29,14 +29,7 @@ void percpu_init(int cpuid)
 {
 	extern unsigned char __percpu_start;
 	extern unsigned char __percpu_section_size;
-	struct pcpu *pcpu;
 	int i;
-
-	if ((cpuid < 0) || (cpuid >= NR_CPUS))
-		panic("cpuid too big %d >= %d\n", cpuid, NR_CPUS);
-
-	pcpu = &pcpus[cpuid];
-	get_per_cpu(pcpu, cpuid) = pcpu;
 
 	/*
 	 * the data of percpu section has been zeroed at boot code
@@ -44,15 +37,12 @@ void percpu_init(int cpuid)
 	 *
 	 * some member of pcpu has been init on boot stage, like cpuid.
 	 */
-	if (cpuid == 0) {
-		for (i = 0; i < CONFIG_NR_CPUS; i++) {
-			percpu_offset[i] = (phy_addr_t)(&__percpu_start) +
-				(size_t)(&__percpu_section_size) * i;
-			pr_info("percpu [%d] offset 0x%x\n", i, percpu_offset[i]);
-		}
+	for (i = 0; i < CONFIG_NR_CPUS; i++) {
+		percpu_offset[i] = (phy_addr_t)(&__percpu_start) +
+			(size_t)(&__percpu_section_size) * i;
+		pr_info("percpu [%d] offset 0x%x\n", i, percpu_offset[i]);
+		get_per_cpu(pcpu, i) = &pcpus[i];
 	}
-
-	pcpu->state = PCPU_STATE_RUNNING;
 }
 
 static int percpu_subsystem_init(void)
@@ -62,6 +52,7 @@ static int percpu_subsystem_init(void)
 	pcpu->stack = get_free_pages(2);
 	ASSERT(pcpu->stack != NULL);
 	pcpu->stack += 2 * PAGE_SIZE;
+	pcpu->state = PCPU_STATE_RUNNING;
 
 	return 0;
 }
