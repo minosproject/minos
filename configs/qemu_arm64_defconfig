@@ -118,3 +118,4 @@ CONFIG_SHELL=y
 #
 # Third Party Library And Module
 #
+CONFIG_SHELL_COMMAND_TASK=y

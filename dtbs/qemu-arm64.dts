@@ -8,7 +8,9 @@
 
 	chosen {
 		minos,stdout = "pl011";
-		bootargs = "bootwait=3 tty=vm0 rootfs=virtio-blk.drv";
+		bootargs = "bootwait=3 tty=vm1 rootfs=virtio-blk.drv";
+		minos,ramdisk-start = <0x0 0x44000000>;
+		minos,ramdisk-end = <0x0 0x4645A000>;
 	};
 
 	psci {
@@ -23,6 +25,31 @@
 	memory@40000000 {
 		reg = < 0x00 0x40000000 0x01 0x00 >;
 		device_type = "memory";
+	};
+
+	vms {
+		vm1 {
+			device_type = "virtual_machine";
+			vm_name = "fvp_linux_host";
+			host_vm;
+			vmid = <1>;
+			type = "linux";
+			kernel_image = "Image";
+			dtb_image = "qemu-virt.dtb";
+			vcpus = <1>;
+			entry = <0x0 0x46680000>;
+			setup_data = <0x0 0x50000000>;
+			vcpu_affinity = <0 1 2 3>;
+			cmdline = "console=hvc0 earlycon=dbcon,io,0x0 loglevel=8 consolelog=9 root=/dev/vda2 rw";
+			memory = <0x0 0x46600000 0x0 0x40000000>;
+			vm1_bdi {
+				vm_console_vm1 {
+					virtual_device;
+					vc-dynamic-res;
+					compatible = "minos,vm_console";
+				};
+			};
+		};
 	};
 
 	platform@c000000 {
