@@ -783,10 +783,10 @@ static void vmm_area_init(struct mm_struct *mm, int bit64)
 		size = (1UL << 40);
 	} else {
 #ifdef CONFIG_VM_LPAE
-		base = 0x1000;
+		base = 0x0;
 		size = 0x100000000;
 #else
-		base = 0x1000;
+		base = 0x0;
 		size = 0x100000000;
 #endif
 	}
@@ -1022,6 +1022,7 @@ void vmm_init(void)
 {
 	struct memory_region *region;
 	struct block_section *bs;
+	unsigned long start, end;
 	int size;
 
 	ASSERT(!is_list_empty(&mem_list));
@@ -1037,10 +1038,20 @@ void vmm_init(void)
 		/*
 		 * block section need BLOCK align.
 		 */
+		start = BALIGN(region->phy_base, BLOCK_SIZE);
+		end = ALIGN(region->phy_base + region->size, BLOCK_SIZE);
+		if (end - start <= 0) {
+			pr_warn("VMM drop memory region [0x%lx 0x%lx]\n",
+					region->phy_base,
+					region->phy_base + region->size);
+			continue;
+		}
+
+		pr_notice("VMM add memory region [0x%lx 0x%lx]\n", start, end);
 		bs = malloc(sizeof(struct block_section));
 		ASSERT(bs != NULL);
-		bs->start = BALIGN(region->phy_base, BLOCK_SIZE);
-		bs->end = ALIGN(region->phy_base + region->size, BLOCK_SIZE);
+		bs->start = start;
+		bs->end = end;
 		bs->size = bs->end - bs->start;
 		bs->total_blocks = bs->free_blocks = bs->size >> BLOCK_SHIFT;
 		bs->current_index = 0;
