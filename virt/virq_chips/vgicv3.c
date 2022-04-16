@@ -263,7 +263,6 @@ static int vgic_gicd_mmio_write(struct vcpu *vcpu,
 		for_each_set_bit(bit, value, 32)
 			virq_disable(vcpu, y + bit);
 		break;
-
 	case GICD_IPRIORITYR...GICD_IPRIORITYR_END:
 		t = *value;
 		x = (offset - GICD_IPRIORITYR) / 4;
@@ -533,8 +532,15 @@ static void vgic_gicr_init(struct vcpu *vcpu,
 	spin_lock_init(&gicr->gicr_lock);
 
 	/* TBD */
-	gicr->gicr_typer = 0 | ((unsigned long)vcpu->vcpu_id << 32);
 	gicr->gicr_pidr2 = 0x3 << 4;
+
+	/*
+	 * Linux will use the Last bit (bit 4) to detect whether
+	 * this gicr is the last GICR.
+	 */
+	gicr->gicr_typer = 0 | ((unsigned long)vcpu->vcpu_id << 32);
+	if (vcpu->vcpu_id == (vcpu->vm->vcpu_nr - 1))
+		gicr->gicr_typer |= (1 << 4);
 }
 
 static void vm_release_gic(struct vgicv3_dev *gic)
