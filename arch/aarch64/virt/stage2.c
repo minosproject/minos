@@ -154,58 +154,58 @@ static inline void stage2_pmd_populate(pmd_t *pmdp, unsigned long addr, unsigned
 	stage2_set_pmd(pmdp, vtop(addr) | attrs);
 }
 
-static inline pmd_t stage2_pmd_attr(unsigned long phy, unsigned long flags)
+static inline uint64_t stage2_block_attr(unsigned long flags)
 {
-	pmd_t pmd = phy & S2_PMD_MASK;
+	uint64_t attr = 0;
 
 	switch (flags & VM_TYPE_MASK) {
 	case __VM_NORMAL_NC:
-		pmd |= S2_BLOCK_NORMAL_NC;
+		attr |= S2_BLOCK_NORMAL_NC;
 		break;
 	case __VM_IO:
-		pmd |= S2_BLOCK_DEVICE;
+		attr |= S2_BLOCK_DEVICE;
 		break;
 	case __VM_WT:
-		pmd |= S2_BLOCK_WT;
+		attr |= S2_BLOCK_WT;
 		break;
 	default:
-		pmd |= S2_BLOCK_NORMAL;
+		attr |= S2_BLOCK_NORMAL;
 		break;
 	}
 
 	switch (flags & VM_RW_MASK) {
 	case __VM_RO:
-		pmd |= S2_AP_RO;
+		attr |= S2_AP_RO;
 		break;
 	case __VM_RW:
-		pmd |= S2_AP_RW;
+		attr |= S2_AP_RW;
 		break;
 	case __VM_WO:
-		pmd |= S2_AP_WO;
+		attr |= S2_AP_WO;
 		break;
 	default:
-		pmd |= S2_AP_NON;
+		attr |= S2_AP_NON;
 		break;
 	}
 
 	if (!(flags & __VM_EXEC))
-		pmd |= S2_XN;
+		attr |= S2_XN;
 
 	if (flags & __VM_PFNMAP)
-		pmd |= S2_PFNMAP;
+		attr |= S2_PFNMAP;
 
 	if (flags & __VM_DEVMAP)
-		pmd |= S2_DEVMAP;
+		attr |= S2_DEVMAP;
 
 	if (flags & __VM_SHARED)
-		pmd |= S2_SHARED;
+		attr |= S2_SHARED;
 
-	return pmd;
+	return attr;
 }
 
-static inline pte_t stage2_pte_attr(unsigned long phy, unsigned long flags)
+static inline uint64_t stage2_page_attr(unsigned long flags)
 {
-	pte_t pte = phy & S2_PTE_MASK;
+	uint64_t pte = 0;
 
 	switch (flags & VM_TYPE_MASK) {
 	case __VM_NORMAL_NC:
@@ -337,7 +337,7 @@ static int stage2_map_pte_range(struct mm_struct *vs, pte_t *ptep, unsigned long
 	pte_t old_pte;
 
 	pte = stage2_pte_offset(ptep, start);
-	pte_attr = stage2_pte_attr(0, flags);
+	pte_attr = stage2_page_attr(flags);
 
 	do {
 		old_pte = *pte;
@@ -352,7 +352,7 @@ static int stage2_map_pte_range(struct mm_struct *vs, pte_t *ptep, unsigned long
 static inline bool stage2_pmd_huge_page(pmd_t old_pmd, unsigned long start,
 		unsigned long phy, size_t size, unsigned long flags)
 {
-	if (!(flags & __VM_HUGE_2M) || old_pmd)
+	if (!(flags & (__VM_HUGE_2M | __VM_HUGE_1G)) || old_pmd)
 		return false;
 
 	if (!IS_BLOCK_ALIGN(start) || !IS_BLOCK_ALIGN(phy) || !(IS_BLOCK_ALIGN(size)))
@@ -382,10 +382,10 @@ static int stage2_map_pmd_range(struct mm_struct *vs, pmd_t *pmdp, unsigned long
 		 * virtual memory need to map as PMD huge page
 		 */
 		if (stage2_pmd_huge_page(old_pmd, start, physical, size, flags)) {
-			attr = stage2_pmd_attr(physical, flags);
-			stage2_set_pmd(pmd, attr);
+			attr = stage2_block_attr(flags);
+			stage2_set_pmd(pmd, attr | (physical & S2_PMD_MASK));
 		} else {
-			if (old_pmd && ((old_pmd & 0x03) == S2_DES_BLOCK)) {
+			if (old_pmd && stage2_pmd_huge(old_pmd)) {
 				pr_err("stage2: vaddr 0x%x has mapped as huge page\n", start);
 				return -EINVAL;
 			}
@@ -409,33 +409,57 @@ static int stage2_map_pmd_range(struct mm_struct *vs, pmd_t *pmdp, unsigned long
 	return 0;
 }
 
+static inline int stage2_pud_huge_page(pud_t old_pud, unsigned long start,
+		unsigned long phy, size_t size, unsigned long flags)
+{
+	if (!(flags & __VM_HUGE_1G) || old_pud)
+		return false;
+
+	if (!IS_PUD_ALIGN(start) || !IS_PUD_ALIGN(phy) || !(IS_PUD_ALIGN(size)))
+		return false;
+
+	return true;
+}
+
 static int stage2_map_pud_range(struct mm_struct *vs, unsigned long start,
 		unsigned long end, unsigned long physical, unsigned long flags)
 {
-	unsigned long next;
+	unsigned long next, attr;
 	pud_t *pud;
 	pmd_t *pmdp;
 	size_t size;
+	pud_t old_pud;
 	int ret;
 
 	pud = stage2_pud_offset((pud_t *)vs->pgdp, start);
 	do {
 		next = stage2_pud_addr_end(start, end);
 		size = next - start;
+		old_pud = *pud;
 
-		if (stage2_pud_none(*pud)) {
-			pmdp = (pmd_t *)stage2_get_free_page(flags);
-			if (!pmdp)
-				return -ENOMEM;
-			memset(pmdp, 0, PAGE_SIZE);
-			stage2_pud_populate(pud, (unsigned long)pmdp, flags);
+		if (stage2_pud_huge_page(old_pud, start, physical, size, flags)) {
+			attr = stage2_block_attr(flags);
+			stage2_set_pud(pud, attr | (physical & S2_PUD_MASK));
 		} else {
-			pmdp = (pmd_t *)ptov(stage2_pmd_table_addr(*pud));
-		}
+			if (old_pud && stage2_pud_huge(old_pud)) {
+				pr_err("stage2: vaddr 0x%x mapped as PUD huge page\n", start);
+				return -EINVAL;
+			}
 
-		ret = stage2_map_pmd_range(vs, pmdp, start, next, physical, flags);
-		if (ret)
-			return ret;
+			if (stage2_pud_none(*pud)) {
+				pmdp = (pmd_t *)stage2_get_free_page(flags);
+				if (!pmdp)
+					return -ENOMEM;
+				memset(pmdp, 0, PAGE_SIZE);
+				stage2_pud_populate(pud, (unsigned long)pmdp, flags);
+			} else {
+				pmdp = (pmd_t *)ptov(stage2_pmd_table_addr(*pud));
+			}
+
+			ret = stage2_map_pmd_range(vs, pmdp, start, next, physical, flags);
+			if (ret)
+				return ret;
+		}
 	} while (pud++, physical += size, start = next, start != end);
 
 	return 0;

@@ -7,16 +7,14 @@
 #define __VM_NORMAL		(0x00000002)	/* Normal memory */
 #define __VM_NORMAL_NC		(0x00000004)
 #define __VM_WT			(0x00000008)	/* Write thought */
-#define VM_TYPE_MASK		(__VM_IO | __VM_NORMAL | __VM_NORMAL_NC | __VM_WT)
 
 #define __VM_PFNMAP		(0x00000100)	/* map to the physical normal memory directly */
 #define __VM_HUGE_2M		(0x00000200)
-#define __VM_DEVMAP		(0x00000400)
-#define __VM_SHARED		(0x00000800)	/* do not release the memory, kobject will release it */
-
-#define __VM_HOST		(0x00001000)
-#define __VM_GUEST		(0x00002000)
-#define __VM_OWNER		(0x00004000)
+#define __VM_HUGE_1G		(0x00000400)
+#define __VM_DEVMAP		(0x00000800)
+#define __VM_SHARED		(0x00001000)	/* do not release the memory, kobject will release it */
+#define __VM_HOST		(0x00002000)
+#define __VM_GUEST		(0x00004000)
 
 #define __VM_RW_NON		(0x00000000)
 #define __VM_READ		(0x00100000)
@@ -26,9 +24,10 @@
 #define __VM_WO			(__VM_WRITE)
 #define __VM_RW			(__VM_READ | __VM_WRITE)
 
+#define VM_TYPE_MASK		(__VM_IO | __VM_NORMAL | __VM_NORMAL_NC | __VM_WT)
+
 #define VM_HOST			(__VM_HOST)
 #define VM_GUEST		(__VM_GUEST)
-#define VM_OWNER		(__VM_OWNER)
 
 #define VM_RW_NON		(__VM_RW_NON)
 #define VM_RO			(__VM_RO)

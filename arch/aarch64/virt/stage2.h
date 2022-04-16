@@ -105,6 +105,9 @@
 #define stage2_pmd_value(pmdp)		(*(pmdp))
 #define stage2_pte_value(ptep)		(*(ptep))
 
+#define IS_PUD_ALIGN(addr)\
+	(!((unsigned long)(addr) & (S2_PUD_SIZE - 1)))
+
 #define stage2_pgd_index(addr)		(((addr) >> S2_PGD_SHIFT) & (PTRS_PER_S2_PGD - 1))
 #define stage2_pud_index(addr)		(((addr) >> S2_PUD_SHIFT) & (PTRS_PER_S2_PUD - 1))
 #define stage2_pmd_index(addr)		(((addr) >> S2_PMD_SHIFT) & (PTRS_PER_S2_PMD - 1))
