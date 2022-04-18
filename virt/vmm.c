@@ -37,6 +37,7 @@ static DEFINE_SPIN_LOCK(bs_lock);
 static unsigned long free_blocks;
 
 #define mm_to_vm(__mm) container_of((__mm), struct vm, mm)
+#define VMA_SIZE(vma) ((vma)->end - (vma)->start)
 
 static int __create_guest_mapping(struct mm_struct *mm, virt_addr_t vir,
 		phy_addr_t phy, size_t size, unsigned long flags)
@@ -50,9 +51,8 @@ static int __create_guest_mapping(struct mm_struct *mm, virt_addr_t vir,
 	phy = ALIGN(phy, PAGE_SIZE);
 	size = tmp - vir;
 
-	pr_debug("map 0x%x->0x%x size-0x%x vm-%d\n", vir,
-			phy, size, vm->vmid);
-
+	pr_debug("map [x%x 0x%x] to [0x%x 0x%x] vm-%d\n",
+			vir, vir + size, phy, phy + size, vm->vmid);
 	ret = arch_guest_map(mm, vir, vir + size, phy, flags);
 	if (!ret)
 		ret = iommu_iotlb_flush_all(vm);
@@ -79,7 +79,7 @@ static int __destroy_guest_mapping(struct mm_struct *mm,
 	int ret;
 
 	if (!IS_PAGE_ALIGN(vir) || !IS_PAGE_ALIGN(size)) {
-		pr_warn("WARN: destroy guest mapping 0x%x---->0x%x\n",
+		pr_warn("WARN: destroy guest mapping [0x%x 0x%x]\n",
 				vir, vir + size);
 		end = PAGE_BALIGN(vir + size);
 		vir = PAGE_ALIGN(vir);
@@ -96,6 +96,7 @@ static int __destroy_guest_mapping(struct mm_struct *mm,
 int destroy_guest_mapping(struct mm_struct *mm, unsigned long vir, size_t size)
 {
 	int ret;
+
 	spin_lock(&mm->lock);
 	ret = __destroy_guest_mapping(mm, vir, size);
 	spin_unlock(&mm->lock);
@@ -113,52 +114,46 @@ static struct vmm_area *__alloc_vmm_area_entry(unsigned long base, size_t size)
 
 	va->start = base;
 	va->pstart = BAD_ADDRESS;
-	va->end = base + size - 1;
-	va->size = size;
+	va->end = base + size;
 	va->flags = 0;
 
 	return va;
 }
 
-static void __add_used_vmm_area(struct mm_struct *mm, struct vmm_area *va)
-{
-	list_add_tail(&mm->vmm_area_used, &va->list);
-}
-
 static int __add_free_vmm_area(struct mm_struct *mm, struct vmm_area *area)
 {
+	struct vmm_area *tmp, *next, *va = area;
 	size_t size;
-	struct vmm_area *tmp, *va = area;
 
-	/* indicate it not inserted to the free list */
+	/*
+	 * indicate it not inserted to the free list
+	 */
 	va->list.next = NULL;
-	size = va->size;
+	size = va->end - va->start;
 	va->flags = 0;
 	va->vmid = 0;
 	va->pstart = 0;
-
 repeat:
 	/*
 	 * check whether this two vmm_area can merged to one
 	 * vmm_area and do the action
 	 */
-	list_for_each_entry(tmp, &mm->vmm_area_free, list) {
-		if (va->start == (tmp->end + 1)) {
-			tmp->size += va->size;
-			list_del(&tmp->list);
-			free(va);
-			va = tmp;
-			goto repeat;
-		}
-
-		if ((va->end + 1) == tmp->start) {
-			va->size += tmp->size;
+	list_for_each_entry_safe(tmp, next, &mm->vmm_area_free, list) {
+		if (va->start == tmp->end) {
+			va->start = tmp->start;
 			list_del(&tmp->list);
 			free(tmp);
 			goto repeat;
 		}
 
-		if (size <= tmp->size) {
+		if (va->end == tmp->start) {
+			va->end = tmp->end;
+			list_del(&tmp->list);
+			free(tmp);
+			goto repeat;
+		}
+
+		if (size <= (tmp->end - tmp->start)) {
 			list_insert_before(&tmp->list, &va->list);
 			break;
 		}
@@ -192,7 +187,7 @@ static void release_vmm_area_memory(struct vmm_area *va)
 	 * is shareded with other vmm area, not the owner of
 	 * it.
 	 */
-	if (va->flags & VM_SHARED)
+	if (va->flags & __VM_SHARED)
 		return;
 
 	switch (va->flags & VM_MAP_TYPE_MASK) {
@@ -203,7 +198,7 @@ static void release_vmm_area_memory(struct vmm_area *va)
 		break;
 	default:
 		if (va->pstart) {
-			if (va->flags |= VM_SHARED)
+			if (va->flags & __VM_SHMEM)
 				free_shmem((void *)va->pstart);
 			else
 				free_pages((void *)va->pstart);
@@ -224,42 +219,17 @@ int release_vmm_area(struct mm_struct *mm, struct vmm_area *va)
 	return 0;
 }
 
-static int create_free_vmm_area(struct mm_struct *mm, unsigned long base,
-		unsigned long size, unsigned long flags)
-{
-	int ret;
-	struct vmm_area *va;
-
-	if (!IS_PAGE_ALIGN(base) || !IS_PAGE_ALIGN(size)) {
-		pr_err("vm_area is not page align 0x%p 0x%x\n",
-				base, size);
-		return -EINVAL;
-	}
-
-	va = __alloc_vmm_area_entry(base, size);
-	if (!va) {
-		pr_err("failed to alloc free vmm_area\n");
-		return -ENOMEM;
-	}
-
-	spin_lock(&mm->lock);
-	ret = __add_free_vmm_area(mm, va);
-	spin_unlock(&mm->lock);
-
-	return ret;
-}
-
 static int vmm_area_map_ln(struct mm_struct *mm, struct vmm_area *va)
 {
 	return __create_guest_mapping(mm, va->start,
-			va->pstart, va->size, va->flags);
+			va->pstart, VMA_SIZE(va), va->flags);
 }
 
 static int vmm_area_map_bk(struct mm_struct *mm, struct vmm_area *va)
 {
 	struct mem_block *block = va->b_head;;
 	unsigned long base = va->start;
-	unsigned long size = va->size;
+	unsigned long size = VMA_SIZE(va);
 	int ret;
 
 	while (block) {
@@ -283,7 +253,6 @@ int map_vmm_area(struct mm_struct *mm,
 {
 	int ret;
 
-	spin_lock(&mm->lock);
 	switch (va->flags & VM_MAP_TYPE_MASK) {
 	case VM_MAP_PT:
 		va->pstart = va->start;
@@ -297,93 +266,79 @@ int map_vmm_area(struct mm_struct *mm,
 		ret = vmm_area_map_ln(mm, va);
 		break;
 	}
-	spin_unlock(&mm->lock);
 
 	return ret;
 }
 
-static struct vmm_area *__alloc_free_vmm_area(struct mm_struct *mm,
-		struct vmm_area *fva, size_t size,
-		unsigned long mask, unsigned long flags)
+static struct vmm_area *__split_vmm_area(struct mm_struct *mm,
+		struct vmm_area *vma, unsigned long base,
+		unsigned long end, int flags)
 {
-	unsigned long va_base = fva->start;
-	unsigned long new_base, new_size;
-	struct vmm_area *old = NULL, *old1 = NULL, *new = NULL;
+	struct vmm_area *left = NULL, *right = NULL;
+	size_t left_size, right_size;
 
-	/*
-	 * allocate a free vma from another vma area, first need to
-	 * check the start address is the address type we needed, need
-	 * to check
-	 */
-	if (!(va_base & mask)) {
-		new = __alloc_vmm_area_entry(fva->start, size);
-		if (!new)
-			return NULL;
+	left_size = base - vma->start;
+	right_size = vma->end - end;
 
-		if (size < fva->size) {
-			fva->start = new->end + 1;
-			fva->size = fva->size - size;
-			old = fva;
-		}
-
+	if (left_size == 0 && right_size == 0)
 		goto out;
+
+	if (left_size > 0) {
+		left = __alloc_vmm_area_entry(vma->start, left_size);
+		if (!left)
+			return NULL;
+		list_add(&mm->vmm_area_free, &left->list);
 	}
 
-	new_base = (va_base + mask) & ~mask;
-	new_size = fva->size - (new_base - va_base);
+	if (right_size > 0) {
+		right = __alloc_vmm_area_entry(end, right_size);
+		if (!right)
+			goto out_err_right;
+		list_add(&mm->vmm_area_free, &right->list);
+	}
+out:
+	vma->start = base;
+	vma->end = end;
+	vma->flags = flags;
+	list_del(&vma->list);
+	list_add_tail(&mm->vmm_area_used, &vma->list);
 
-	if (new_size < size)
+	return vma;
+
+out_err_right:
+	if (left) {
+		list_del(&left->list);
+		free(left);
+	}
+	return NULL;
+}
+
+static struct vmm_area *__alloc_free_vmm_area(struct mm_struct *mm,
+		struct vmm_area *vma, size_t size,
+		unsigned long mask, int flags)
+{
+	unsigned long base, end;
+
+	base = (vma->start + mask) & ~mask;
+	end = base + size;
+	if (!((base >= vma->start) && (end <= vma->end)))
 		return NULL;
 
-	/* split the header of the va to a new va */
-	old1 = __alloc_vmm_area_entry(fva->start, new_base - va_base);
-	fva->size -= (new_base - va_base);
-	fva->start += (new_base - va_base);
-
-	if (fva->size > size) {
-		new = __alloc_vmm_area_entry(fva->start, size);
-		if (!new)
-			return NULL;
-
-		old = fva;
-		old->start = old->start + size;
-		old->size = old->size - size;
-		old->end = old->start + old->size - 1;
-	} else if (fva->size == size) {
-		new = fva;
-	}
-
-out:
-	list_del(&fva->list);
-	if (old1)
-		__add_free_vmm_area(mm, old1);
-	if (old)
-		__add_free_vmm_area(mm, old);
-
-	if (new) {
-		new->flags = flags;
-		__add_used_vmm_area(mm, new);
-	}
-
-	return new;
+	return __split_vmm_area(mm, vma, base, end, flags);
 }
 
 struct vmm_area *alloc_free_vmm_area(struct mm_struct *mm,
-		size_t size, unsigned long mask, unsigned long flags)
+		size_t size, unsigned long mask, int flags)
 {
 	struct vmm_area *va;
 	struct vmm_area *new = NULL;
 
+	mask = (mask == BLOCK_MASK) ? BLOCK_MASK : PAGE_MASK;
 	size = BALIGN(size, PAGE_SIZE);
-	if ((mask != PAGE_MASK) && (mask != BLOCK_MASK))
-		mask = PAGE_MASK;
-
-	if (mask == BLOCK_MASK)
-		size = BALIGN(size, MEM_BLOCK_SIZE);
 
 	spin_lock(&mm->lock);
 	list_for_each_entry(va, &mm->vmm_area_free, list) {
-		if (va->size < size)
+		if ((va->end - va->start) < size)
 			continue;
 
 		new = __alloc_free_vmm_area(mm, va, size, mask, flags);
@@ -395,18 +350,13 @@ struct vmm_area *alloc_free_vmm_area(struct mm_struct *mm,
 	return new;
 }
 
-struct vmm_area *split_vmm_area(struct mm_struct *mm, unsigned long base,
-		unsigned long size, unsigned long flags)
+struct vmm_area *split_vmm_area(struct mm_struct *mm,
+		unsigned long base, size_t size, int flags)
 {
-	unsigned long start, end;
-	unsigned long new_end = base + size;
-	struct vmm_area *va;
-	struct vmm_area *new = NULL;
-	struct vmm_area *old = NULL;
-	struct vmm_area *old1 = NULL;
+	unsigned long end = base + size;
+	struct vmm_area *va, *out = NULL;
 
-	if ((flags & VM_NORMAL) && (!IS_PAGE_ALIGN(base)
-				|| !IS_PAGE_ALIGN(size))) {
+	if ((flags & VM_NORMAL) && (!IS_PAGE_ALIGN(base) || !IS_PAGE_ALIGN(size))) {
 		pr_err("vm_area is not PAGE align 0x%p 0x%x\n",
 				base, size);
 		return NULL;
@@ -414,71 +364,28 @@ struct vmm_area *split_vmm_area(struct mm_struct *mm, unsigned long base,
 
 	spin_lock(&mm->lock);
 	list_for_each_entry(va, &mm->vmm_area_free, list) {
-		start = va->start;
-		end = va->end + 1;
-
-		if ((base > end) || (base < start) || (new_end > end))
-			continue;
-
-		if ((base == start) && (new_end == end)) {
-			new = va;
+		if ((base >= va->start) && (end <= va->end)) {
+			out = va;
 			break;
-		} else if ((base == start) && new_end < end) {
-			old = va;
-			va->start = new_end;
-			va->size -= size;
-		} else if ((base > start) && (new_end < end)) {
-			/* allocate a new vmm_area for right free */
-			old1 = __alloc_vmm_area_entry(base, size);
-			if (!old1)
-				panic("no more memory for vmm_area\n");
-
-			old1->start = new_end;
-			old1->size = end - new_end;
-			old1->end = old1->start + old1->size - 1;
-			old1->flags = va->flags;
-
-			old = va;
-			va->size = base - start;
-			va->end = va->start + va->size - 1;
-		} else if ((base > start) && end == new_end) {
-			old = va;
-			va->size = va->size - size;
 		}
-
-		new = __alloc_vmm_area_entry(base, size);
-		if (!new)
-			panic("no more memory for vmm_area\n");
-
-		break;
 	}
 
-	if ((old == NULL) && (new == NULL)) {
-		pr_err("invalid vmm_area config 0x%p 0x%x\n", base, size);
-		spin_unlock(&mm->lock);
-		return NULL;
-	}
+	if (!out)
+		goto exit;
 
-	list_del(&va->list);
-
-	if (old)
-		__add_free_vmm_area(mm, old);
-	if (old1)
-		__add_free_vmm_area(mm, old1);
-
-	if (new) {
-		new->flags = flags;
-		__add_used_vmm_area(mm, new);
-	}
-
+	out = __split_vmm_area(mm, out, base, end, flags);
+exit:
 	spin_unlock(&mm->lock);
 
-	return new;
+	if (!out)
+		pr_err("split vma [0x%lx 0x%lx] failed\n", base, end);
+
+	return out;
 }
 
-struct vmm_area *request_vmm_area(struct mm_struct *mm, unsigned long base,
-		unsigned long pbase, size_t size,
-		unsigned long flags)
+struct vmm_area *request_vmm_area(struct mm_struct *mm,
+		unsigned long base, unsigned long pbase,
+		size_t size, int flags)
 {
 	struct vmm_area *va;
 
@@ -515,7 +422,7 @@ static void release_vmm_area_in_vm0(struct vm *vm)
 		if (va->vmid != vm->vmid)
 			continue;
 
-		__destroy_guest_mapping(mm, va->start, va->size);
+		__destroy_guest_mapping(mm, va->start, VMA_SIZE(va));
 
 		if (!(va->flags & VM_SHARED))
 			free_pages((void *)va->pstart);
@@ -531,7 +438,7 @@ int unmap_vmm_area(struct mm_struct *mm, struct vmm_area *va)
 	int ret;
 
 	spin_lock(&mm->lock);
-	ret = __destroy_guest_mapping(mm, va->start, va->size);
+	ret = __destroy_guest_mapping(mm, va->start, VMA_SIZE(va));
 	spin_unlock(&mm->lock);	
 
 	return ret;
@@ -724,7 +631,7 @@ static int __alloc_vm_memory(struct mm_struct *mm, struct vmm_area *va)
 
 	va->b_head = NULL;
 	va->flags |= VM_MAP_BK;
-	count = va->size >> MEM_BLOCK_SHIFT;
+	count = VMA_SIZE(va) >> MEM_BLOCK_SHIFT;
 
 	/*
 	 * here get all the memory block for the vm
@@ -771,6 +678,7 @@ out:
 static void vmm_area_init(struct mm_struct *mm, int bit64)
 {
 	unsigned long base, size;
+	struct vmm_area *va;
 
 	/*
 	 * the virtual memory space for a virtual machine:
@@ -779,7 +687,7 @@ static void vmm_area_init(struct mm_struct *mm, int bit64)
 	 * 32bit - TBD (with LPAE)
 	 */
 	if (bit64) {
-		base = 0x1000;
+		base = 0x0;
 		size = (1UL << 40);
 	} else {
 #ifdef CONFIG_VM_LPAE
@@ -791,7 +699,11 @@ static void vmm_area_init(struct mm_struct *mm, int bit64)
 #endif
 	}
 
-	create_free_vmm_area(mm, base, size, 0);
+	va = __alloc_vmm_area_entry(base, size);
+	if (!va)
+		pr_err("failed to alloc free vmm_area\n");
+	else
+		list_add_tail(&mm->vmm_area_free, &va->list);
 }
 
 static inline int check_vm_address(struct vm *vm, unsigned long addr)
@@ -882,8 +794,8 @@ int vm_mm_init(struct vm *vm)
 
 		ret = map_vmm_area(mm, va, va->start);
 		if (ret) {
-			pr_err("map mem failed for vm-%d 0x%p 0x%p\n",
-				vm->vmid, va->start, va->size);
+			pr_err("map mem failed for vm-%d [0x%lx 0x%lx]\n",
+				vm->vmid, va->start, va->end);
 			return ret;
 		}
 	}
@@ -894,26 +806,22 @@ int vm_mm_init(struct vm *vm)
 	 */
 	list_for_each_entry_safe(va, n, &mm->vmm_area_free, list) {
 		base = BALIGN(va->start, PAGE_SIZE);
-		end = ALIGN(va->end + 1, PAGE_SIZE);
+		end = ALIGN(va->end, PAGE_SIZE);
 		size = end - base;
 
-		if ((va->size < PAGE_SIZE) || (size == 0) || (base >= end)) {
-			pr_debug("drop unused vmm_area 0x%p ---> 0x%p @0x%x\n",
-					va->start, va->end, va->size);
+		if (size < PAGE_SIZE) {
+			pr_debug("drop unused vmm_area [0x%lx 0x%lx]\n",
+					va->start, va->end);
 			list_del(&va->list);
 			free(va);
 			continue;
 		}
 
-		end -= 1;
-
-		if ((base != va->start) || (va->end != end) || (size != va->size)) {
-			pr_debug("adjust vmm_area: [0x%p->0x%p] to [0x%p->0x%p]\n",
-					va->start, va->start + va->size,
-					base, base +size);
+		if (size != (va->end - va->start)) {
+			pr_debug("adjust vma [0x%lx 0x%lx] to [0x%lx->0x%lx]\n",
+					va->start, va->end, base, end);
 			va->start = base;
 			va->end = end;
-			va->size = size;
 		}
 	}
 

@@ -264,7 +264,7 @@ static int fdt_setup_memory(struct vm *vm)
 			continue;
 
 		mstart = va->start;
-		msize = va->size;
+		msize = va->end - va->start;
 
 		pr_notice("add memory region to vm%d 0x%p 0x%p\n",
 				vm->vmid, mstart, msize);

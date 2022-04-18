@@ -312,9 +312,11 @@ static int stage2_map_pte_range(struct mm_struct *vs, pte_t *ptep, unsigned long
 
 	do {
 		old_pte = *pte;
-		if (old_pte)
-			pr_err("error: pte remaped 0x%x\n", start);
 		stage2_set_pte(pte, pte_attr | physical);
+		if (old_pte) {
+			pr_warn("pte range 0x%lx remaped old 0x%lx new 0x%lx\n",
+					start, old_pte, pte_attr | physical);
+		}
 	} while (pte++, start += PAGE_SIZE, physical += PAGE_SIZE, start != end);
 
 	return 0;

@@ -32,7 +32,6 @@ struct vmm_area {
 	unsigned long start;
 	unsigned long end;
 	unsigned long pstart;
-	size_t size;
 	int flags;
 	int vmid;			/* 0 - for self other for VM */
 	struct list_head list;
@@ -52,7 +51,6 @@ struct mm_struct {
 	 * vmm_area_used : list to all the used vmm_area
 	 * lock		 : spin lock for vmm_area allocate
 	 */
-	struct vmm_area *mem_va;
 	struct list_head vmm_area_free;
 	struct list_head vmm_area_used;
 };
@@ -79,18 +77,18 @@ unsigned long create_hvm_shmem_map(struct vm *vm,
 void destroy_hvm_iomem_map(unsigned long vir, uint32_t size);
 int create_early_pmd_mapping(unsigned long vir, unsigned long phy);
 
-struct vmm_area *split_vmm_area(struct mm_struct *mm, unsigned long base,
-		unsigned long size, unsigned long flags);
+struct vmm_area *split_vmm_area(struct mm_struct *mm,
+		unsigned long base, unsigned long size, int flags);
 
-struct vmm_area *request_vmm_area(struct mm_struct *mm, unsigned long base,
-		unsigned long pbase, size_t size,
-		unsigned long flags);
+struct vmm_area *request_vmm_area(struct mm_struct *mm,
+		unsigned long base, unsigned long pbase,
+		size_t size, int flags);
 
-int map_vmm_area(struct mm_struct *mm, struct vmm_area *va,
-		unsigned long pbase);
+int map_vmm_area(struct mm_struct *mm,
+		struct vmm_area *va, unsigned long pbase);
 
 struct vmm_area *alloc_free_vmm_area(struct mm_struct *mm,
-		size_t size, unsigned long mask, unsigned long flags);
+		size_t size, unsigned long mask, int flags);
 
 int unmap_vmm_area(struct mm_struct *mm, struct vmm_area *va);
 

@@ -15,6 +15,7 @@
 #define __VM_SHARED		(0x00001000)	/* do not release the memory, kobject will release it */
 #define __VM_HOST		(0x00002000)
 #define __VM_GUEST		(0x00004000)
+#define __VM_SHMEM		(0x00008000)	/* prviate memory, will not be shared */
 
 #define __VM_RW_NON		(0x00000000)
 #define __VM_READ		(0x00100000)
@@ -43,13 +44,14 @@
 #define VM_DMA			(__VM_NORMAL_NC)
 #define VM_HUGE			(__VM_HUGE_2M)
 #define VM_SHARED		(__VM_SHARED)
+#define VM_SHMEM		(__VM_PRIVATE)
 
 #define VM_MAP_BK		(0X01000000)	/* mapped as block */
 #define VM_MAP_PT		(0x02000000)	/* mapped as pass though, PFN_MAP */
 #define VM_MAP_TYPE_MASK	(0x0f000000)
 
-#define VM_HOST_NORMAL		(VM_NORMAL | __VM_PFNMAP | __VM_HOST)
-#define VM_HOST_NORMAL_NC	(__VM_NORMAL_NC | __VM_PFNMAP | VM_HOST)
+#define VM_HOST_NORMAL		(VM_NORMAL | VM_PFNMAP | VM_HOST)
+#define VM_HOST_NORMAL_NC	(__VM_NORMAL_NC | VM_PFNMAP | VM_HOST)
 #define VM_HOST_IO		(VM_IO | VM_HOST)
 
 #define VM_GUEST_NORMAL		(__VM_NORMAL | VM_RWX | VM_MAP_BK)
