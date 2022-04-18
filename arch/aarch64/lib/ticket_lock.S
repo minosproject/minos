@@ -50,7 +50,7 @@ func arch_ticket_trylock
 
 	mov	w3, #0
 	ldaxr	w1, [x0]
-	ldar	w2, [x4]
+	ldaxr	w2, [x4]
 	cmp	w1, w2
 	b.ne	fail_trylock
 
