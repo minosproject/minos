@@ -296,7 +296,7 @@ int __of_get_u64_array(void *dtb, int node, char *attr,
 	memset(array, 0, sizeof(uint64_t) * len);
 	val = (fdt64_t *)__of_getprop(dtb, node, attr, &length);
 	if (!val) {
-		pr_err("can not get %s\n", attr);
+		pr_err("of: attr %s not found\n", attr);
 		return -EINVAL;
 	}
 
