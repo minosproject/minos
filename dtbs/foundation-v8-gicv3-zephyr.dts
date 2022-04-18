@@ -11,7 +11,7 @@
 		minos,stdout = "pl011";
 		bootargs = "bootwait=3 tty=vm1";
 		minos,ramdisk-start = <0x0 0xc4000000>;
-		minos,ramdisk-end = <0x0 0xc4969000>;
+		minos,ramdisk-end = <0x0 0xC522F000>;
 	};
 
 	aliases {
