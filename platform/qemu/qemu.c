@@ -25,9 +25,13 @@
 #endif
 
 #ifdef CONFIG_VIRT
-static int qemu_setup_hvm(struct vm *vm, void *data)
+static int qemu_setup_hvm(void *item, void *data)
 {
+	struct vm *vm = (struct vm *)item;
 	int ret;
+
+	if (!vm_is_host_vm(vm))
+		return 0;
 
 	/*
 	 * workaroud, create the PCIE memory region for VM
@@ -54,6 +58,15 @@ static int qemu_setup_hvm(struct vm *vm, void *data)
 
 	return ret;
 }
+
+static int qemu_platform_init(void)
+{
+	register_hook(qemu_setup_hvm, OS_HOOK_CREATE_VM);
+
+	return 0;
+}
+device_initcall(qemu_platform_init);
+
 #endif
 
 static struct platform platform_qemu = {
@@ -63,7 +76,6 @@ static struct platform platform_qemu = {
 	.cpu_off	 = psci_cpu_off,
 	.system_reboot	 = psci_system_reboot,
 	.system_shutdown = psci_system_shutdown,
-	.setup_hvm	 = qemu_setup_hvm,
 #else
 	.cpu_on		 = psci_cpu_on_hvc,
 	.cpu_off	 = psci_cpu_off_hvc,
