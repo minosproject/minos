@@ -5,6 +5,7 @@
 #include <minos/mm.h>
 #include <virt/vm_mmap.h>
 #include <virt/iommu.h>
+#include <virt/virt.h>
 
 struct vm;
 

@@ -31,8 +31,38 @@
 #include <virt/virq.h>
 #include <virt/os.h>
 #include <asm/vtcb.h>
+#include <asm/tlb.h>
 
 static uint32_t mpidr_el1[NR_CPUS];
+
+void flush_all_tlb_mm(struct mm_struct *mm)
+{
+	struct vm *vm = container_of(mm, struct vm, mm);
+	uint64_t vttbr = vtop(mm->pgdp) | ((uint64_t)vm->vmid << 48);
+	unsigned long flags;
+	uint64_t old_vttbr;
+
+	local_irq_save(flags);
+
+	/*
+	 * switch to the target VM's VTTBR to VTTBR_EL2, make sure
+	 * use the correct vmid.
+	 */
+	old_vttbr = read_sysreg(VTTBR_EL2);
+	write_sysreg(vttbr, VTTBR_EL2);
+
+	/*
+	 * flush all the tlb with the vmid.
+	 */
+	flush_all_tlb_guest();
+
+	/*
+	 * restore the origin vttbr.
+	 */
+	write_sysreg(old_vttbr, VTTBR_EL2);
+
+	local_irq_restore(flags);
+}
 
 void arch_set_virq_flag(void)
 {

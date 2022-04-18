@@ -552,6 +552,11 @@ static int do_start_vm(struct vm *vm)
 		return -ENOENT;
 	}
 
+	/*
+	 * flush all the tlb for this vm.
+	 */
+	flush_all_tlb_mm(&vm->mm);
+
 	vcpu_online(vcpu0);
 
 	return 0;

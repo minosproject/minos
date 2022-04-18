@@ -3,10 +3,11 @@
 
 #include <asm/virt.h>
 
-struct task;
+struct mm_struct;
 
 int virt_init(void);
-
 void start_all_vm(void);
+
+void flush_all_tlb_mm(struct mm_struct *mm);
 
 #endif
