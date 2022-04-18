@@ -57,6 +57,7 @@ extern unsigned long sched_tick_handler(unsigned long data);
 void arch_enable_timer(unsigned long expires)
 {
 	uint64_t deadline;
+	unsigned long ctl;
 
 	if (expires == 0) {
 		write_sysreg32(0, ARM64_CNTSCHED_CTL);
@@ -65,7 +66,11 @@ void arch_enable_timer(unsigned long expires)
 
 	deadline = ns_to_ticks(expires);
 	write_sysreg64(deadline, ARM64_CNTSCHED_CVAL);
-	write_sysreg32(1 << 0, ARM64_CNTSCHED_CTL);
+
+	ctl = read_sysreg(ARM64_CNTSCHED_CTL);
+	ctl |= CNT_CTL_ENABLE;
+	ctl &= ~CNT_CTL_IMASK;
+	write_sysreg(1 << 0, ARM64_CNTSCHED_CTL);
 	isb();
 }
 
@@ -141,8 +146,12 @@ static int __init_text timers_arch_init(void)
 static int timer_interrupt_handler(uint32_t irq, void *data)
 {
 	extern void soft_timer_interrupt(void);
+	unsigned long ctl;
 
-	write_sysreg32(0, ARM64_CNTSCHED_CTL);
+	ctl = read_sysreg(ARM64_CNTSCHED_CTL);
+	ctl |= CNT_CTL_IMASK;			// disable the interrupt.
+	write_sysreg(ctl, ARM64_CNTSCHED_CTL);
+
 	soft_timer_interrupt();
 
 	return 0;
