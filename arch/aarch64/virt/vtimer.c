@@ -42,10 +42,6 @@
 #define REG_CNTV_TVAL		0x38
 #define REG_CNTV_CTL		0x3c
 
-#define CNT_CTL_ISTATUS		(1 << 2)
-#define CNT_CTL_IMASK		(1 << 1)
-#define CNT_CTL_ENABLE		(1 << 0)
-
 #define ACCESS_REG		0x0
 #define ACCESS_MEM		0x1
 
@@ -90,13 +86,12 @@ static void virt_timer_expire_function(unsigned long data)
 	struct vtimer *vtimer = (struct vtimer *)data;
 
 	/*
-	 * linux timer driver will check the status bit to check
-	 * whether the timer has trigger the interrupt, here set
-	 * this bit, otherwise, linux timer dirver may not work
-	 * correctly.
+	 * just wake up the target vCPU. when switch to
+	 * this vcpu, the value of vtimer will restore and
+	 * if the irq is not mask, the vtimer will trigger
+	 * the hardware irq again.
 	 */
-	vtimer->cnt_ctl |= CNT_CTL_ISTATUS;
-	send_virq_to_vcpu(vtimer->vcpu, vtimer->virq);
+	wake(&vtimer->vcpu->vcpu_event);
 }
 
 static void vtimer_state_restore(struct vcpu *vcpu, void *context)
@@ -104,12 +99,12 @@ static void vtimer_state_restore(struct vcpu *vcpu, void *context)
 	struct vtimer_context *c = (struct vtimer_context *)context;
 	struct vtimer *vtimer = &c->virt_timer;
 
-	del_timer(&vtimer->timer);
+	del_timer_sync(&vtimer->timer);
 
 	write_sysreg64(c->offset, ARM64_CNTVOFF_EL2);
 	write_sysreg64(vtimer->cnt_cval, ARM64_CNTV_CVAL_EL0);
 	write_sysreg32(vtimer->cnt_ctl, ARM64_CNTV_CTL_EL0);
-	dsb();
+	isb();
 }
 
 static void vtimer_state_save(struct vcpu *vcpu, void *context)
@@ -118,10 +113,10 @@ static void vtimer_state_save(struct vcpu *vcpu, void *context)
 	struct vtimer_context *c = (struct vtimer_context *)context;
 	struct vtimer *vtimer = &c->virt_timer;
 
-	vtimer->cnt_ctl = read_sysreg32(ARM64_CNTV_CTL_EL0);
-	write_sysreg32((vtimer->cnt_ctl & ~CNT_CTL_ENABLE) | CNT_CTL_IMASK, CNTV_CTL_EL0);
 	vtimer->cnt_cval = read_sysreg64(ARM64_CNTV_CVAL_EL0);
-	dsb();
+	vtimer->cnt_ctl = read_sysreg32(ARM64_CNTV_CTL_EL0);
+	write_sysreg32(0, CNTV_CTL_EL0);
+	isb();
 
 	if ((task->state == TASK_STATE_STOP) ||
 			(task->state == TASK_STATE_SUSPEND))
@@ -129,7 +124,6 @@ static void vtimer_state_save(struct vcpu *vcpu, void *context)
 
 	if ((vtimer->cnt_ctl & CNT_CTL_ENABLE) &&
 		!(vtimer->cnt_ctl & CNT_CTL_IMASK)) {
-
 		mod_timer(&vtimer->timer, ticks_to_ns(vtimer->cnt_cval +
 				c->offset - boot_tick));
 	}
@@ -326,16 +320,13 @@ int virtual_timer_irq_handler(uint32_t irq, void *data)
 	}
 
 	value = read_sysreg32(ARM64_CNTV_CTL_EL0);
-	rmb();
-
 	if (!(value & CNT_CTL_ISTATUS)) {
-		pr_debug("vtimer is not trigger\n");
+		pr_err("vtimer is not trigger\n");
 		return 0;
 	}
 
 	value = value | CNT_CTL_IMASK;
 	write_sysreg32(value, ARM64_CNTV_CTL_EL0);
-	dsb();
 
 	return send_virq_to_vcpu(vcpu, vcpu->vm->vtimer_virq);
 }

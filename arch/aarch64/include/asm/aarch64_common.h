@@ -397,4 +397,8 @@
 #define TCR_HD			(UL(1) << 40)
 #define TCR_NFD1		(UL(1) << 54)
 
+#define CNT_CTL_ISTATUS		(1 << 2)
+#define CNT_CTL_IMASK		(1 << 1)
+#define CNT_CTL_ENABLE		(1 << 0)
+
 #endif
