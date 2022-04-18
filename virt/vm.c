@@ -643,28 +643,6 @@ int create_guest_vm(struct vmtag __guest *tag)
 	return vm->vmid;
 }
 
-static void do_setup_native_vm(struct vm *vm)
-{
-	/* 
-	 * here need to create the resource based on the vm's
-	 * os, when the os is a linux system, usually it will
-	 * used device tree, if the os is rtos, need to write
-	 * the iomem and virqs in the hypervisor's device tree
-	 *
-	 * here to check whether there are information in the
-	 * hypervisor's dts, if not then try to parsing the dtb
-	 * of the VM
-	 *
-	 * first map the dtb address to the hypervisor, here
-	 * map these native VM's memory as read only
-	 *
-	 * just do these step only when the VM has not been
-	 * online.
-	 */
-	os_setup_vm(vm);
-	do_hooks(vm, NULL, OS_HOOK_SETUP_VM);
-}
-
 static int create_vm_resource(struct vm *vm)
 {
 	int ret;
@@ -716,8 +694,26 @@ static void __setup_native_vm(struct vm *vm)
 		ASSERT(ret == 0);
 	}
 
+	/*
+	 * here need to create the resource based on the vm's
+	 * os, when the os is a linux system, usually it will
+	 * used device tree, if the os is rtos, need to write
+	 * the iomem and virqs in the hypervisor's device tree
+	 *
+	 * here to check whether there are information in the
+	 * hypervisor's dts, if not then try to parsing the dtb
+	 * of the VM
+	 *
+	 * first map the dtb address to the hypervisor, here
+	 * map these native VM's memory as read only
+	 *
+	 * just do these step only when the VM has not been
+	 * online.
+	 */
 	create_vm_resource(vm);
-	do_setup_native_vm(vm);
+
+	os_setup_vm(vm);
+	do_hooks(vm, NULL, OS_HOOK_SETUP_VM);
 
 	/*
 	 * the DTB content may modified, get the final size, and
@@ -943,14 +939,14 @@ struct vm *create_vm(struct vmtag *vme, struct device_node *node)
 		goto release_vm;
 	}
 
-	if (do_hooks((void *)vm, NULL, OS_HOOK_CREATE_VM)) {
-		pr_err("create vm failed in hook function\n");
-		goto release_vm;
-	}
-
 	if ((vm->flags & VM_FLAGS_HOST)) {
 		ASSERT(host_vm == NULL);
 		host_vm = vm;
+	}
+
+	if (do_hooks((void *)vm, NULL, OS_HOOK_CREATE_VM)) {
+		pr_err("create vm failed in hook function\n");
+		goto release_vm;
 	}
 
 	return vm;
