@@ -16,7 +16,7 @@
 
 #include <minos/errno.h>
 #include <asm/io.h>
-#include <minos/mmu.h>
+#include <minos/mm.h>
 #include <minos/init.h>
 #include <config/config.h>
 #include <minos/console.h>

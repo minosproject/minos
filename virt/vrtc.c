@@ -62,10 +62,9 @@ struct vrtc_dev {
 	(struct vrtc_dev *)container_of(vdev, struct vrtc_dev, vdev)
 
 static int vrtc_mmio_read(struct vdev *vdev, gp_regs *regs,
-		unsigned long address, unsigned long *value)
+		int idx, unsigned long offset, unsigned long *value)
 {
 	struct vrtc_dev *vrtc = vdev_to_vrtc(vdev);
-	unsigned long offset = address - PL031_IOMEM_BASE;
 	uint64_t t;
 
 	switch (offset) {
@@ -186,11 +185,10 @@ static int vrtc_set_alarm(struct vrtc_dev *vrtc, uint32_t alarm)
 }
 
 static int vrtc_mmio_write(struct vdev *vdev, gp_regs *regs,
-		unsigned long address, unsigned long *value)
+		int idx, unsigned long offset, unsigned long *value)
 {
 	uint32_t v = *((uint32_t *)value);
 	struct vrtc_dev *vrtc = vdev_to_vrtc(vdev);
-	unsigned long offset = address - PL031_IOMEM_BASE;
 
 	switch (offset) {
 	case RTC_MR:
@@ -266,14 +264,19 @@ static void *vrtc_init(struct vm *vm, struct device_node *node)
 	if (!dev)
 		return NULL;
 
-	host_vdev_init(vm, &dev->vdev, base, size);
-	vdev_set_name(&dev->vdev, "vrtc");
+	host_vdev_init(vm, &dev->vdev, "vrtc");
+	if (vdev_add_iomem_range(&dev->vdev, base, size)) {
+		pr_err("add iomem for vrtc fail\n");
+		free(dev);
+	}
+
 	request_virq(vm, irq, flags | VIRQF_CAN_WAKEUP);
 
 	dev->vdev.read = vrtc_mmio_read;
 	dev->vdev.write = vrtc_mmio_write;
 	dev->vdev.deinit = vrtc_deinit;
 	dev->vdev.reset = vrtc_reset;
+	vdev_add(&dev->vdev);
 
 	init_timer_on_cpu(&dev->alarm_timer, vcpu->task->affinity);
 	dev->alarm_timer.function = vrtc_alarm_function;

@@ -565,10 +565,9 @@ static int vmbox_handle_dev_read(struct vmbox_controller *vc,
 }
 
 static int vmbox_con_read(struct vdev *vdev, gp_regs *regs,
-		unsigned long address, unsigned long *value)
+		int idx, unsigned long offset, unsigned long *value)
 {
 	struct vmbox_controller *vc = vdev_to_vmbox_con(vdev);
-	unsigned long offset = address - (unsigned long)vc->va;
 
 	if (offset < VMBOX_CON_DEV_BASE)
 		return vmbox_handle_con_read(vc, offset, value);
@@ -671,10 +670,9 @@ static int vmbox_handle_dev_write(struct vmbox_controller *vc,
 }
 
 static int vmbox_con_write(struct vdev *vdev, gp_regs *regs,
-		unsigned long address, unsigned long *value)
+		int idx, unsigned long offset, unsigned long *value)
 {
 	struct vmbox_controller *vc = vdev_to_vmbox_con(vdev);
-	unsigned long offset = address - (unsigned long)vc->va;
 
 	if (offset < VMBOX_CON_DEV_BASE)
 		return vmbox_handle_con_write(vc, offset, value);
@@ -746,8 +744,8 @@ static int __vm_create_vmbox_controller_dynamic(struct vm *vm)
 	if (!vc)
 		return -ENOMEM;
 
-	va = alloc_free_vmm_area(&vm->mm, PAGE_SIZE, PAGE_MASK,
-			VM_MAP_PT | VM_IO | VM_RO);
+	host_vdev_init(vm, &vc->vdev, "vmbox-con");
+	va = vdev_alloc_iomem_range(&vc->vdev, PAGE_SIZE, 0);
 	if (!va) {
 		free(vc);
 		return -ENOMEM;
@@ -767,11 +765,11 @@ static int __vm_create_vmbox_controller_dynamic(struct vm *vm)
 	 * operation (read/write) on the virtual address will
 	 * be trap to hypervisor
 	 */
-	host_vdev_init(vm, &vc->vdev, (unsigned long)vc->va, PAGE_SIZE);
 	vc->vdev.read = vmbox_con_read;
 	vc->vdev.write = vmbox_con_write;
 	vc->vdev.deinit = vmbox_con_deinit;
 	vc->vdev.reset = vmbox_con_reset;
+	vdev_add(&vc->vdev);
 
 	list_add_tail(&vmbox_con_list, &vc->list);
 
@@ -803,22 +801,28 @@ static int __vm_create_vmbox_controller_static(struct vm *vm)
 	if (ret || (irq < 32))
 		return -ENOENT;
 
-	split_vmm_area(&vm->mm, base, size, VM_GUEST_IO);
-	request_virq(vm, irq, 0);
-
 	vc = zalloc(sizeof(*vc));
 	if (!vc)
 		return -ENOMEM;
+
+	host_vdev_init(vm, &vc->vdev, "vmbox-con");
+	ret = vdev_add_iomem_range(&vc->vdev, base, size);
+	if (ret) {
+		free(vc);
+		return ret;
+	}
+
+	request_virq(vm, irq, 0);
 
 	vc->va = (void *)base;
 	vc->vm = vm;
 	vc->virq = irq;
 
-	host_vdev_init(vm, &vc->vdev, base, PAGE_SIZE);
 	vc->vdev.read = vmbox_con_read;
 	vc->vdev.write = vmbox_con_write;
 	vc->vdev.deinit = vmbox_con_deinit;
 	vc->vdev.reset = vmbox_con_reset;
+	vdev_add(&vc->vdev);
 
 	list_add_tail(&vmbox_con_list, &vc->list);
 

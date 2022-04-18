@@ -238,34 +238,33 @@ static int create_pdev_iomem_of(struct vm *vm, struct device_node *node)
 	uint64_t addr, size;
 	int i, nr_addr, ret;
 
+	/* virqchip do not need request and map the virtual
+	 * address, the virqchip will handle it. */
+	if (node->class == DT_CLASS_VIRQCHIP)
+		return 0;
+
 	/* get the count of memory region for the device */
 	nr_addr = of_n_addr_count(node);
 
 	for (i = 0; i < nr_addr; i++) {
 		ret = of_translate_address_index(node, &addr, &size, i);
-		if (ret) {
+		if (ret || (size == 0)) {
 			pr_warn("bad address index %d for %s\n", i, node->name);
 			continue;
 		}
 
-		if (size == 0)
+		if (vm_is_host_vm(vm) && !platform_iomem_valid(addr)) {
+			pr_warn("address range [0x%lx 0x%lx] droped by platform\n",
+					addr, size);
 			continue;
-
-		if (vm_is_host_vm(vm)) {
-			if (!platform_iomem_valid(addr))
-				continue;
 		}
 
 		/* map the physical memory for vm */
 		pr_info("[VM%d IOMEM] 0x%x->0x%x 0x%x %s\n", vm->vmid,
 				addr, addr, size, node->name);
 		split_vmm_area(&vm->mm, addr, size, VM_GUEST_IO | VM_RW);
-
-		/* virqchip do not map the virtual address */
-		if (node->class != DT_CLASS_VIRQCHIP) {
-			create_guest_mapping(&vm->mm, addr, addr,
-					size, VM_GUEST_IO | VM_RW);
-		}
+		create_guest_mapping(&vm->mm, addr, addr,
+				size, VM_GUEST_IO | VM_RW);
 	}
 
 	return 0;

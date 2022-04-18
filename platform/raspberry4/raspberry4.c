@@ -32,7 +32,7 @@
 #define BCM2838_RELEASE_ADDR	0xff800000
 
 static int bcm2838_fake_scu_read(struct vdev *vdev, gp_regs *regs,
-		unsigned long address, unsigned long *value)
+		int idx, unsigned long address, unsigned long *value)
 {
 	return 0;
 }
@@ -53,14 +53,13 @@ static int inline bcm2838_bootup_secondary(struct vm *vm,
 }
 
 static int bcm2838_fake_64bit_scu_write(struct vdev *vdev, gp_regs *regs,
-		unsigned long address, unsigned long *value)
+		int idx, unsigned long offset, unsigned long *value)
 {
 	int cpu;
 	struct vm *vm = vdev->vm;
-	unsigned long offset = address - BCM2838_RELEASE_ADDR;
 
 	if (offset % sizeof(uint64_t)) {
-		pr_err("unsupport address 0x%x\n", address);
+		pr_err("unsupport reg offset 0x%x\n", offset);
 		return -EINVAL;
 	}
 
@@ -70,10 +69,9 @@ static int bcm2838_fake_64bit_scu_write(struct vdev *vdev, gp_regs *regs,
 }
 
 static int bcm2838_fake_32bit_scu_write(struct vdev *vdev, gp_regs *regs,
-		unsigned long address, unsigned long *value)
+		int idx, unsigned long offset, unsigned long *value)
 {
 	int cpu;
-	unsigned long offset = address - BCM2838_RELEASE_ADDR;
 
 	cpu = (offset - LOCAL_MAILBOX3_SET0) >> 4;
 
@@ -121,8 +119,8 @@ static int raspberry4_setup_hvm(struct vm *vm, void *dtb)
 		if (!vdev)
 			panic("no more memory for spi-table\n");
 
-		host_vdev_init(vm, vdev, BCM2838_RELEASE_ADDR, 0x1000);
-		vdev_set_name(vdev, "smp-fake-controller");
+		host_vdev_init(vm, vdev, "smp-fake-con");
+		vdev_add_iomem_range(vdev, BCM2838_RELEASE_ADDR, 0x1000);
 
 		/*
 		 * for raspberry4, currently kernel will use the local
@@ -134,10 +132,12 @@ static int raspberry4_setup_hvm(struct vm *vm, void *dtb)
 			vdev->write = bcm2838_fake_32bit_scu_write;
 		else
 			vdev->write = bcm2838_fake_64bit_scu_write;
+		vdev_add(vdev);
 	}
 
 	/* create pcie address mapping for VM0 */
-	create_guest_mapping(&vm->vs, 0x600000000, 0x600000000, 0x4000000, VM_IO);
+	create_guest_mapping(&vm->mm, 0x600000000, 0x600000000,
+			0x4000000, VM_GUEST_IO | VM_RW);
 
 	pr_notice("raspberry4 setup vm done\n");
 
@@ -212,14 +212,14 @@ static void raspberry4_parse_mem_info(void)
 	 * information will store in bootargs/extra-memory field in
 	 * minos device tree
 	 */
-	if (!hv_dtb)
+	if (!dtb_address)
 		return;
 
-	node = fdt_path_offset(hv_dtb, "/chosen");
+	node = fdt_path_offset(dtb_address, "/chosen");
 	if (node <= 0)
 		return;
 
-	v = (fdt32_t *)fdt_getprop(hv_dtb, node, "extra-memory", &len);
+	v = (fdt32_t *)fdt_getprop(dtb_address, node, "extra-memory", &len);
 	if (!v || (len < 8))
 		return;
 
@@ -234,7 +234,7 @@ static void raspberry4_parse_mem_info(void)
 		size = fdt32_to_cpu(v[1]);
 
 		pr_notice("register extra memory region 0x%x 0x%x\n", base, size);
-		add_memory_region(base, size, MEMORY_REGION_F_NORMAL);
+		add_memory_region(base, size, MEMORY_REGION_TYPE_NORMAL, 0);
 		len -= 2;
 		v += 2;
 	}

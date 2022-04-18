@@ -17,7 +17,7 @@
 #include <minos/minos.h>
 #include <asm/arch.h>
 #include <asm/io.h>
-#include <minos/mmu.h>
+#include <minos/mm.h>
 #include <device/bcm_irq.h>
 #include <libfdt/libfdt.h>
 #include <minos/of.h>

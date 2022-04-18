@@ -228,7 +228,6 @@ static void dcon_write(struct vm_debug_console *dcon)
 	if (!dcon->tty->open) {
 		ring->ridx = ring->widx;
 		wmb();
-
 		return;
 	}
 

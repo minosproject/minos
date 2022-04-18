@@ -7,6 +7,7 @@ struct vm;
 
 struct virtio_device {
 	struct vdev vdev;
+	void *iomem;
 };
 
 int virtio_mmio_init(struct vm *vm, unsigned long gbase,

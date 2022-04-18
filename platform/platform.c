@@ -41,8 +41,8 @@ int platform_iomem_valid(unsigned long addr)
 {
 	if (platform->iomem_valid)
 		return platform->iomem_valid(addr);
-
-	return 1;
+	else
+		return 1;
 }
 
 void platform_init(void)

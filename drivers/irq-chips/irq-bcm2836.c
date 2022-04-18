@@ -25,7 +25,7 @@
 #include <minos/irq.h>
 #include <minos/of.h>
 #include <device/bcm_irq.h>
-#include <minos/mmu.h>
+#include <minos/mm.h>
 
 extern int bcm_virq_init(unsigned long l1_base, size_t l1_size,
 		unsigned long l2_base, size_t l2_size);

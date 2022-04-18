@@ -32,10 +32,14 @@ struct vmm_area {
 	unsigned long end;
 	unsigned long pstart;
 	size_t size;
-	unsigned long flags;
+	int flags;
 	int vmid;			/* 0 - for self other for VM */
 	struct list_head list;
 	struct mem_block *b_head;
+
+	/* if this vmm_area is belong to VDEV, this will link
+	 * to the next vmm_area of the VDEV */
+	struct vmm_area *next;
 };
 
 struct mm_struct {

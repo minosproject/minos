@@ -19,8 +19,10 @@
 #include <virt/vdev.h>
 #include <virt/virq.h>
 #include <virt/vmcs.h>
+#include <virt/vmm.h>
+#include <virt/vm.h>
 
-void vdev_set_name(struct vdev *vdev, char *name)
+static void vdev_set_name(struct vdev *vdev, const char *name)
 {
 	int len;
 
@@ -36,7 +38,12 @@ void vdev_set_name(struct vdev *vdev, char *name)
 
 void vdev_release(struct vdev *vdev)
 {
+	if (vdev->list.next != NULL)
+		list_del(&vdev->list);
 
+	/*
+	 * release the vmm_areas if has.
+	 */
 }
 
 static void vdev_deinit(struct vdev *vdev)
@@ -46,39 +53,137 @@ static void vdev_deinit(struct vdev *vdev)
 	free(vdev);
 }
 
-int host_vdev_init(struct vm *vm, struct vdev *vdev,
-		unsigned long base, uint32_t size)
+void host_vdev_init(struct vm *vm, struct vdev *vdev, const char *name)
 {
-	if (!vdev)
-		return -EINVAL;
-
-	pr_debug("vdev init with addr@0x%p size@0x%x\n", base, size);
+	if (!vm || !vdev) {
+		pr_err("%s: no such VM or VDEV\n");
+		return;
+	}
 
 	memset(vdev, 0, sizeof(struct vdev));
-	vdev->gvm_paddr = base;
-	vdev->mem_size = size;
 	vdev->vm = vm;
 	vdev->host = 1;
 	vdev->list.next = NULL;
 	vdev->deinit = vdev_deinit;
-	list_add_tail(&vm->vdev_list, &vdev->list);
+	vdev->list.next = NULL;
+	vdev->list.pre = NULL;
+	vdev_set_name(vdev, name);
+}
+
+static void inline vdev_add_vmm_area(struct vdev *vdev, struct vmm_area *va)
+{
+	struct vmm_area *head = vdev->gvm_area;
+	struct vmm_area *prev = NULL;
+
+	/*
+	 * add to the list tail.
+	 */
+	while (head) {
+		prev = head;
+		head = head->next;
+	}
+
+	va->next = NULL;
+	if (prev == NULL)
+		vdev->gvm_area = va;
+	else
+		prev->next = va;
+}
+
+int vdev_add_iomem_range(struct vdev *vdev, unsigned long base, size_t size)
+{
+	struct vmm_area *va;
+
+	if (!vdev || !vdev->vm)
+		return -ENOENT;
+
+	/*
+	 * vdev memory usually will not mapped to the real
+	 * physical space, here set the flags to 0.
+	 */
+	va = split_vmm_area(&vdev->vm->mm, base, size, VM_IO);
+	if (!va) {
+		pr_err("vdev: request vmm area failed 0x%lx 0x%lx\n",
+				base, base + size);
+		return -ENOMEM;
+	}
+
+	vdev_add_vmm_area(vdev, va);
 
 	return 0;
 }
 
-struct vdev *create_host_vdev(struct vm *vm, unsigned long base, uint32_t size)
+void vdev_add(struct vdev *vdev)
+{
+	if (!vdev->vm)
+		pr_err("%s vdev has not been init\n");
+	else
+		list_add_tail(&vdev->vm->vdev_list, &vdev->list);
+}
+
+struct vmm_area *vdev_alloc_iomem_range(struct vdev *vdev, size_t size, int flags)
+{
+	struct vmm_area *va;
+
+	va = alloc_free_vmm_area(&vdev->vm->mm, size, PAGE_MASK, flags);
+	if (!va)
+		return NULL;
+
+	vdev_add_vmm_area(vdev, va);
+
+	return va;
+}
+
+struct vmm_area *vdev_get_vmm_area(struct vdev *vdev, int idx)
+{
+	struct vmm_area *va = vdev->gvm_area;
+
+	while (idx || !va) {
+		va = va->next;
+		idx--;
+	}
+
+	return va;
+}
+
+struct vdev *create_host_vdev(struct vm *vm, const char *name)
 {
 	struct vdev *vdev;
-
-	size = PAGE_BALIGN(size);
 
 	vdev = malloc(sizeof(*vdev));
 	if (!vdev)
 		return NULL;
 
-	host_vdev_init(vm, vdev, base, size);
+	host_vdev_init(vm, vdev, name);
 
 	return vdev;
+}
+
+static inline int handle_mmio_write(struct vdev *vdev, gp_regs *regs,
+		int idx, unsigned long offset, unsigned long *value)
+{
+	if (vdev->write)
+		return vdev->write(vdev, regs, idx, offset, value);
+	else
+		return 0;
+}
+
+static inline int handle_mmio_read(struct vdev *vdev, gp_regs *regs,
+		int idx, unsigned long offset, unsigned long *value)
+{
+	if (vdev->read)
+		return vdev->read(vdev, regs, idx, offset, value);
+	else
+		return 0;
+}
+
+static inline int handle_mmio(struct vdev *vdev, gp_regs *regs, int write,
+		int idx, unsigned long offset, unsigned long *value)
+{
+	if (write)
+		return handle_mmio_write(vdev, regs, idx, offset, value);
+	else
+		return handle_mmio_read(vdev, regs, idx, offset, value);
 }
 
 int vdev_mmio_emulation(gp_regs *regs, int write,
@@ -86,14 +191,23 @@ int vdev_mmio_emulation(gp_regs *regs, int write,
 {
 	struct vm *vm = get_current_vm();
 	struct vdev *vdev;
+	struct vmm_area *va;
+	int idx, ret = 0;
 
 	list_for_each_entry(vdev, &vm->vdev_list, list) {
-		if ((address >= vdev->gvm_paddr) &&
-			(address < vdev->gvm_paddr + vdev->mem_size)) {
-			if (write)
-				return vdev->write(vdev, regs, address, value);
-			else
-				return vdev->read(vdev, regs, address, value);
+		idx = 0;
+		va = vdev->gvm_area;
+		while (va) {
+			if ((address >= va->start) && (address <= va->end)) {
+				ret = handle_mmio(vdev, regs, write,
+						idx, address - va->start, value);
+				if (ret)
+					pr_warn("vm%d %s mmio 0x%lx failed\n", vm->vmid,
+							write ? "write" : "read", address);
+				return 0;
+			}
+			idx++;
+			va = va->next;
 		}
 	}
 
@@ -104,5 +218,12 @@ int vdev_mmio_emulation(gp_regs *regs, int write,
 	if (vm_is_native(vm))
 		return -EFAULT;
 
-	return trap_vcpu(VMTRAP_TYPE_MMIO, write, address, value);
+	ret = trap_vcpu(VMTRAP_TYPE_MMIO, write, address, value);
+	if (ret) {
+		pr_warn("vm%d %s mmio 0x%lx failed %d\n", vm->vmid,
+				write ? "write" : "read", address, ret);
+		ret = (ret == -EACCES) ? -EACCES : 0;
+	}
+
+	return ret;
 }

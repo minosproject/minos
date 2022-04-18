@@ -32,18 +32,20 @@
 	container_of(vd, struct virtio_device, vdev)
 
 static int virtio_mmio_read(struct vdev *vdev, gp_regs *regs,
-		unsigned long address, unsigned long *read_value)
+		int idx, unsigned long offset, unsigned long *read_value)
 {
 	return 0;
 }
 
 static int virtio_mmio_write(struct vdev *vdev, gp_regs *regs,
-		unsigned long address, unsigned long *write_value)
+		int idx, unsigned long offset, unsigned long *write_value)
 {
-	uint32_t tmp;
+	struct vmm_area *va = vdev_get_vmm_area(vdev, idx);
+	struct virtio_device *dev = vdev_to_virtio(vdev);
 	uint32_t value = *(uint32_t *)write_value;
-	void *iomem = vdev->iomem;
-	unsigned long offset = address - vdev->gvm_paddr;
+	unsigned long address = va->start + offset;
+	void *iomem = dev->iomem;
+	uint32_t tmp;
 
 	switch (offset) {
 	case VIRTIO_MMIO_HOST_FEATURES:
@@ -184,20 +186,21 @@ static void *virtio_create_device(struct vm *vm, struct device_node *node)
 	if (ret)
 		return NULL;
 
-	virtio_dev = malloc(sizeof(struct virtio_device));
+	virtio_dev = zalloc(sizeof(struct virtio_device));
 	if (!virtio_dev)
 		return NULL;
 
-	memset(virtio_dev, 0, sizeof(struct virtio_device));
 	vdev = &virtio_dev->vdev;
-	ret = host_vdev_init(vm, vdev, base, VIRTIO_DEVICE_IOMEM_SIZE);
+	host_vdev_init(vm, vdev, "virtio-mmio");
+	ret = vdev_add_iomem_range(vdev, base, VIRTIO_DEVICE_IOMEM_SIZE);
 	if (ret)
 		goto out;
 
 	request_virq(vm, irq, 0);
 
 	/* set up the iomem base of the vdev */
-	ret = translate_guest_ipa(&vm->mm, base, (phy_addr_t *)&vdev->iomem);
+	ret = translate_guest_ipa(&vm->mm, base,
+			(unsigned long *)&virtio_dev->iomem);
 	if (ret) {
 		pr_err("get iomem for virtio_device failed\n");
 		release_virtio_dev(vm, virtio_dev);
@@ -208,6 +211,7 @@ static void *virtio_create_device(struct vm *vm, struct device_node *node)
 	vdev->write = virtio_mmio_write;
 	vdev->deinit = virtio_dev_deinit;
 	vdev->reset = virtio_dev_reset;
+	vdev_add(vdev);
 
 	return vdev;
 

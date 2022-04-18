@@ -681,7 +681,7 @@ static int virq_destroy_vm(void *item, void *data)
 	return 0;
 }
 
-static int __init_text virqs_init(void)
+static int virqs_init(void)
 {
 	register_hook(virq_create_vm, OS_HOOK_CREATE_VM);
 	register_hook(virq_destroy_vm, OS_HOOK_DESTROY_VM);
