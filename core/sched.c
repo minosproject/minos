@@ -379,7 +379,7 @@ static void task_run_again(struct pcpu *pcpu, struct task *task)
 
 	if ((pcpu->tasks_in_prio[task->prio] > 1) &&
 			(pcpu->sched_timer.entry.next == NULL))
-		mod_timer(&pcpu->sched_timer, now + MILLISECS(task->delay));
+		mod_timer(&pcpu->sched_timer, now + MILLISECS(task->run_time));
 }
 
 void task_exit(int errno)
