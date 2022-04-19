@@ -513,10 +513,11 @@ static int wake_up_interrupted(struct task *task,
 	unsigned long flags;
 
 	ASSERT(pend_state != TASK_STATE_PEND_TO);
-	if (task->state != TASK_STATE_WAIT_EVENT) {
-		pr_err("unexpected irq happend when wait_event() ?\n");
-		return -EINVAL;
-	}
+	if (task->state != TASK_STATE_WAIT_EVENT)
+		return 0;
+
+	if (!irq_disabled())
+		panic("unexpected irq happend when wait_event() ?\n");
 
 	/*
 	 * the interrup occurs when task try to wait_event. in

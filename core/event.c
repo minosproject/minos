@@ -27,6 +27,13 @@ void event_init(struct event *event, int type, void *pdata)
 	spin_lock_init(&event->lock);
 	init_list(&event->wait_list);
 	event->data = pdata;
+
+	if (event->type == OS_EVENT_TYPE_NORMAL) {
+		if (pdata == NULL)
+			event->data = (void *)current;
+		event->owner = current->tid;
+		event->cnt = 0;
+	}
 }
 
 void __wait_event(void *ev, int mode, uint32_t to)
@@ -124,12 +131,24 @@ void event_pend_down(void)
 
 long wake(struct event *ev)
 {
+	struct task *task = (struct task *)ev->data;
 	unsigned long flags;
 	int ret;
 
-	spin_lock_irqsave(&ev->lock, flags);
-	ret = wake_up_event_waiter(ev, NULL, TASK_STATE_PEND_OK, 0);
-	spin_unlock_irqrestore(&ev->lock, flags);
+	if (ev->type != OS_EVENT_TYPE_NORMAL) {
+		pr_err("event type %d can not use wake\n");
+		return -EPERM;
+	}
+
+	if (task == current) {
+		return __wake_up(task, TASK_STATE_PEND_OK,
+				OS_EVENT_TYPE_NORMAL, NULL);
+	} else {
+		spin_lock_irqsave(&ev->lock, flags);
+		ret = __wake_up(task, TASK_STATE_PEND_OK,
+					OS_EVENT_TYPE_NORMAL, NULL);
+		spin_unlock_irqrestore(&ev->lock, flags);
+	}
 
 	return ret;
 }

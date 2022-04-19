@@ -377,7 +377,7 @@ static struct vcpu *create_vcpu(struct vm *vm, uint32_t vcpu_id)
 
 	vcpu_virq_struct_init(vcpu);
 	vm->vcpus[vcpu_id] = vcpu;
-	event_init(&vcpu->vcpu_event, OS_EVENT_TYPE_NORMAL, NULL);
+	event_init(&vcpu->vcpu_event, OS_EVENT_TYPE_NORMAL, task);
 
 	vcpu->next = NULL;
 	if (vcpu_id != 0)
