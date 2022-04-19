@@ -38,12 +38,21 @@ static void vdev_set_name(struct vdev *vdev, const char *name)
 
 void vdev_release(struct vdev *vdev)
 {
+	struct vmm_area *vma = vdev->gvm_area;
+	struct vmm_area *next;
+
 	if (vdev->list.next != NULL)
 		list_del(&vdev->list);
 
 	/*
-	 * release the vmm_areas if has.
+	 * release the vmm_areas if has. just delete it, the VMM
+	 * will release all the vmm_area of VM.
 	 */
+	while (vma) {
+		next = vma->next;
+		vma->next = NULL;
+		vma = next;
+	}
 }
 
 static void vdev_deinit(struct vdev *vdev)
@@ -101,7 +110,7 @@ int vdev_add_iomem_range(struct vdev *vdev, unsigned long base, size_t size)
 	 * vdev memory usually will not mapped to the real
 	 * physical space, here set the flags to 0.
 	 */
-	va = split_vmm_area(&vdev->vm->mm, base, size, VM_IO);
+	va = split_vmm_area(&vdev->vm->mm, base, size, VM_GUEST_VDEV);
 	if (!va) {
 		pr_err("vdev: request vmm area failed 0x%lx 0x%lx\n",
 				base, base + size);

@@ -197,12 +197,12 @@ static void release_vmm_area_memory(struct vmm_area *va)
 		release_vmm_area_bk(va);
 		break;
 	default:
-		if (va->pstart) {
+		if (va->pstart != BAD_ADDRESS) {
 			if (va->flags & __VM_SHMEM)
 				free_shmem((void *)va->pstart);
 			else
 				free_pages((void *)va->pstart);
-			va->pstart = 0;
+			va->pstart = BAD_ADDRESS;
 		}
 		break;
 	}
@@ -486,7 +486,8 @@ unsigned long create_hvm_shmem_map(struct vm *vm,
 	struct vm *vm0 = get_host_vm();
 	struct vmm_area *va;
 
-	va = alloc_free_vmm_area(&vm0->mm, size, PAGE_MASK, VM_GUEST_SHMEM | VM_RW);
+	va = alloc_free_vmm_area(&vm0->mm, size, PAGE_MASK, VM_GUEST_SHMEM |
+			VM_SHARED | VM_RW);
 	if (!va)
 		return BAD_ADDRESS;
 
@@ -599,7 +600,7 @@ struct vmm_area *vm_mmap(struct vm *vm, unsigned long offset, size_t size)
 	 * all the memory.
 	 */
 	va = alloc_free_vmm_area(&vm0->mm, size,
-			BLOCK_MASK, VM_NORMAL | VM_RW | VM_SHARED);
+			BLOCK_MASK, VM_GUEST_NORMAL | VM_SHARED | VM_RW);
 	if (!va)
 		return 0;
 

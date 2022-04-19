@@ -386,7 +386,7 @@ static int vmbox_device_attach(struct vmbox_controller *_vc,
 	 * will release the memory final.
 	 */
 	va = alloc_free_vmm_area(&vm->mm, vmbox->shmem_size,
-			PAGE_MASK, VM_SHARED | VM_IO);
+			PAGE_MASK, VM_SHARED | VM_GUEST_SHMEM);
 	if (!va)
 		return -ENOMEM;
 

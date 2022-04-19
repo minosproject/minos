@@ -44,7 +44,9 @@
 #define VM_DMA			(__VM_NORMAL_NC)
 #define VM_HUGE			(__VM_HUGE_2M)
 #define VM_SHARED		(__VM_SHARED)
-#define VM_SHMEM		(__VM_PRIVATE)
+#define VM_SHMEM		(__VM_SHMEM)
+#define VM_PFNMAP		(__VM_PFNMAP)
+#define VM_DEVMAP		(__VM_DEVMAP)
 
 #define VM_MAP_BK		(0X01000000)	/* mapped as block */
 #define VM_MAP_PT		(0x02000000)	/* mapped as pass though, PFN_MAP */
@@ -54,11 +56,11 @@
 #define VM_HOST_NORMAL_NC	(__VM_NORMAL_NC | VM_PFNMAP | VM_HOST)
 #define VM_HOST_IO		(VM_IO | VM_HOST)
 
-#define VM_GUEST_NORMAL		(__VM_NORMAL | VM_RWX | VM_MAP_BK)
-#define VM_GUEST_IO		(VM_IO | VM_MAP_PT | __VM_DEVMAP)	/* passthough device for guest VM */
-#define VM_GUEST_VDEV		(VM_RW_NONE)				/* virtual device created by host for guest VM, memory R/W will trapped */
-#define VM_GUEST_SHMEM		(VM_NORMAL_NC | VM_SHARED)		/* shared memory between guests, memory will managemented by host */
-#define VM_NATIVE_NORMAL	(__VM_NORMAL | VM_RWX | __VM_PFNMAP | VM_HUGE)
+#define VM_GUEST_NORMAL		(VM_NORMAL | VM_RWX | VM_MAP_BK | VM_GUEST)
+#define VM_GUEST_IO		(VM_IO | VM_MAP_PT | VM_DEVMAP | VM_GUEST)	/* passthough device for guest VM */
+#define VM_GUEST_VDEV		(VM_GUEST)					/* virtual device created by host for guest VM, memory R/W will trapped */
+#define VM_GUEST_SHMEM		(VM_NORMAL_NC | VM_SHMEM | VM_GUEST)		/* shared memory between guests, memory will managemented by host */
+#define VM_NATIVE_NORMAL	(VM_NORMAL | VM_RWX | VM_PFNMAP | VM_HUGE | VM_GUEST) /* native VM using the memory config from device tree */
 
 #define MEM_BLOCK_SIZE		(0x200000)
 #define MEM_BLOCK_SHIFT		(21)

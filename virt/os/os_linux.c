@@ -55,7 +55,7 @@ static int fdt_setup_romflash(struct vm *vm)
 	 */
 	size = ramdisk_file_size(vm->initrd_file);
 	va = alloc_free_vmm_area(&vm->mm, size, PAGE_MASK,
-			VM_IO | __VM_PFNMAP | VM_MAP_PT | VM_RW);
+			VM_NORMAL_NC | VM_PFNMAP | VM_RO | VM_SHARED);
 	if (!va)
 		return -ENOMEM;
 
