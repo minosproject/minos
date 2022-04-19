@@ -97,12 +97,6 @@ struct task {
 	struct timer_list delay_timer;
 
 	/*
-	 * the next task belongs to the same process
-	 */
-	struct task *next;
-	struct process *proc;
-
-	/*
 	 * the spinlock will use to protect the below member
 	 * which may modified by different cpu at the same
 	 * time:
