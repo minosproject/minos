@@ -319,9 +319,19 @@ int virtual_timer_irq_handler(uint32_t irq, void *data)
 		return 0;
 	}
 
+	/*
+	 * this case ususally happened when the vcpu called
+	 * WFI to enter idle idle mode, but the vtimer irq is
+	 * triggered when context switch. then when in idle task
+	 * this IRQ is responsed. two case need consider:
+	 *
+	 * 1 - the vtimer interrup will send to wrong vcpu ?
+	 * 2 - Here the logic of idle can be optimized to avoid
+	 *     this situation
+	 */
 	value = read_sysreg32(ARM64_CNTV_CTL_EL0);
 	if (!(value & CNT_CTL_ISTATUS)) {
-		pr_err("vtimer is not trigger\n");
+		pr_debug("vtimer is not trigger\n");
 		return 0;
 	}
 

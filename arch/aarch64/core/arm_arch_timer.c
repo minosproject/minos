@@ -70,7 +70,7 @@ void arch_enable_timer(unsigned long expires)
 	ctl = read_sysreg(ARM64_CNTSCHED_CTL);
 	ctl |= CNT_CTL_ENABLE;
 	ctl &= ~CNT_CTL_IMASK;
-	write_sysreg(1 << 0, ARM64_CNTSCHED_CTL);
+	write_sysreg(ctl, ARM64_CNTSCHED_CTL);
 	isb();
 }
 
