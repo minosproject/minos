@@ -89,8 +89,6 @@ static void task_init(struct task *task, char *name,
 		void *stack, uint32_t stk_size, int prio,
 		int tid, int aff, unsigned long opt, void *arg)
 {
-	int cpu;
-
 	/*
 	 * idle task is setup by create_idle task, skip
 	 * to setup the stack information of idle task, by
@@ -115,10 +113,8 @@ static void task_init(struct task *task, char *name,
 	task->state = TASK_STATE_SUSPEND;
 	task->cpu = -1;
 
-	cpu = (aff == TASK_AFF_ANY) ? 0 : aff;
-	init_timer_on_cpu(&task->delay_timer, cpu);
-	task->delay_timer.function = task_timeout_handler;
-	task->delay_timer.data = (unsigned long)task;
+	init_timer(&task->delay_timer, task_timeout_handler,
+			(unsigned long)task);
 
 	os_task_table[tid] =  task;
 

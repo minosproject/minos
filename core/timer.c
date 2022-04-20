@@ -23,13 +23,17 @@
 #include <minos/time.h>
 #include <minos/arch.h>
 
-DEFINE_PER_CPU(struct timers, timers);
+#define TIMER_PRECISION 1000000 // 1ms 1000ns
+
+DEFINE_PER_CPU(struct raw_timer, timers);
+
+#define DEFAULT_TIMER_MARGIN	(TIMER_PRECISION / 2)
 
 void soft_timer_interrupt(void)
 {
-	struct timer_list *timer;
+	struct raw_timer *timers = &get_cpu_var(timers);
+	struct timer *timer;
 	unsigned long expires = ~0, now;
-	struct timers *timers = &get_cpu_var(timers);
 	struct list_head tmp_head;
 	timer_func_t fn;
 	unsigned long data;
@@ -40,32 +44,30 @@ void soft_timer_interrupt(void)
 	raw_spin_lock(&timers->lock);
 
 	while (!is_list_empty(&timers->active)) {
-		timer = list_first_entry(&timers->active, struct timer_list, entry);
-
+		timer = list_first_entry(&timers->active, struct timer, entry);
 		if (timer->expires <= (now + DEFAULT_TIMER_MARGIN)) {	
 			/* 
 			 * need to release the spin lock to avoid
 			 * dead lock because on the timer handler
 			 * function the task may aquire other spinlocks
+			 * so load the function and data on the stack.
 			 */
+			timers->running_timer = timer;
+			smp_wmb();
+
 			fn = timer->function;
 			data = timer->data;
-
 			list_del(&timer->entry);
 			timer->entry.next = NULL;
-			timers->running_timer = timer;
 			raw_spin_unlock(&timers->lock);
 
-			fn(data);
+			if (!timer->stop) {
+				fn(data);
+				mb();
+			}
 
-			raw_spin_lock(&timers->lock);
-
-			/*
-			 * inform other cpu that this timer has been
-			 * finish processing
-			 */
 			timers->running_timer = NULL;
-			wmb();
+			raw_spin_lock(&timers->lock);
 		} else {
 			/*
 			 * need to be careful one case, when do the expires
@@ -109,12 +111,12 @@ void soft_timer_interrupt(void)
 	}
 }
 
-static inline int timer_pending(const struct timer_list * timer)
+static inline int timer_pending(const struct timer * timer)
 {
 	return ((timer->entry.next) != NULL);
 }
 
-static int detach_timer(struct timers *timers, struct timer_list *timer)
+static int detach_timer(struct raw_timer *timers, struct timer *timer)
 {
 	struct list_head *entry = &timer->entry;
 
@@ -126,16 +128,37 @@ static int detach_timer(struct timers *timers, struct timer_list *timer)
 	return 0;
 }
 
-static int __mod_timer(struct timer_list *timer)
+static int __mod_timer(struct timer *timer)
 {
+	struct raw_timer *timers = NULL;
 	unsigned long flags;
-	struct timers *timers = timer->timers;
+	int cpu;
 
-	pr_debug("modify timer to 0x%x\n", timer->expires);
+	preempt_disable();
+	cpu = smp_processor_id();
 
+	/*
+	 * if the timer is not on the current cpu's
+	 * timers, need to migrate it to the current
+	 * cpu's timers list
+	 */
+	if ((timer->cpu != -1) && (timer->cpu != cpu)) {
+		ASSERT(timer->raw_timer != NULL);
+		timers = timer->raw_timer;
+		spin_lock_irqsave(&timers->lock, flags);
+		detach_timer(timers, timer);
+		spin_unlock_irqrestore(&timers->lock, flags);
+	}
+
+	timers = &get_per_cpu(timers, cpu);
 	spin_lock_irqsave(&timers->lock, flags);
 
 	detach_timer(timers, timer);
+	timer->stop = 0;
+	timer->raw_timer = timers;
+	smp_wmb();
+
+	timer->cpu = cpu;
 	list_add_tail(&timers->active, &timer->entry);
 
 	/*
@@ -145,102 +168,96 @@ static int __mod_timer(struct timer_list *timer)
 	 * smaller than NOW()
 	 */
 	if ((timers->running_expires > timer->expires) ||
-			(timers->running_expires == 0)) {
+				(timers->running_expires == 0)) {
 		timers->running_expires = timer->expires;
 		enable_timer(timers->running_expires);
 	}
 
 	spin_unlock_irqrestore(&timers->lock, flags);
-
-	return 0;
-}
-
-int mod_timer(struct timer_list *timer, unsigned long expires)
-{
-	struct timers *timers = timer->timers;
-	unsigned long flags;
-	int cpu;
-
-	preempt_disable();
-	cpu = smp_processor_id();
-	timer->expires = expires;
-
-	/*
-	 * if the timer is not on the current cpu's
-	 * timers, need to migrate it to the current
-	 * cpu's timers list
-	 */
-	if (timer->cpu != cpu) {
-		spin_lock_irqsave(&timers->lock, flags);
-		detach_timer(timers, timer);
-		timer->cpu = cpu;
-		timer->timers = &get_per_cpu(timers, cpu);
-		spin_unlock_irqrestore(&timers->lock, flags);
-	}
-	__mod_timer(timer);
 	preempt_enable();
 
 	return 0;
 }
 
-void init_timer_on_cpu(struct timer_list *timer, int cpu)
+int mod_timer(struct timer *timer, uint64_t cval)
 {
-	BUG_ON(!timer);
+	uint64_t now = NOW();
 
+	if (cval < (now + TIMER_PRECISION))
+		timer->expires = now + TIMER_PRECISION;
+	else
+		timer->expires = cval;
+
+	return __mod_timer(timer);
+}
+
+static int __start_delay_timer(struct timer *timer)
+{
+	if (timer->timeout < TIMER_PRECISION)
+		timer->timeout = TIMER_PRECISION;
+	timer->expires = NOW() + timer->timeout;
+
+	return __mod_timer(timer);
+}
+
+void init_timer(struct timer *timer, timer_func_t fn, unsigned long data)
+{
 	preempt_disable();
+	timer->cpu = -1;
 	timer->entry.next = NULL;
 	timer->expires = 0;
-	timer->function = NULL;
-	timer->data = 0;
-	timer->timers = &get_per_cpu(timers, cpu);
-	timer->cpu = cpu;
+	timer->timeout = 0;
+	timer->function = fn;
+	timer->data = data;
+	timer->raw_timer = NULL;
 	preempt_enable();
 }
 
-void init_timer(struct timer_list *timer)
+int start_timer(struct timer *timer)
 {
-	preempt_disable();
-	BUG_ON(!timer);
-	init_timer_on_cpu(timer, smp_processor_id());
-	preempt_enable();
+	return __start_delay_timer(timer);
 }
 
-int del_timer(struct timer_list *timer)
+void setup_timer(struct timer *timer, uint64_t tval)
 {
+	timer->timeout = tval;
+}
+
+void setup_and_start_timer(struct timer *timer, uint64_t tval)
+{
+	timer->timeout = tval;
+	start_timer(timer);
+}
+
+int stop_timer(struct timer *timer)
+{
+	struct raw_timer *timers = timer->raw_timer;
 	unsigned long flags;
-	struct timers *timers = timer->timers;
 
+	if (timer->cpu == -1)
+		return 0;
+
+	timer->stop = 1;
+	ASSERT(timer->raw_timer != NULL);
 	spin_lock_irqsave(&timers->lock, flags);
+	/*
+	 * wait the timer finish the action if already
+	 * timedout.
+	 */
+	while (timers->running_timer == timer)
+		cpu_relax();
+
 	detach_timer(timers, timer);
+	timer->cpu = -1;
 	spin_unlock_irqrestore(&timers->lock, flags);
 
 	return 0;
 }
 
-int del_timer_sync(struct timer_list *timer)
+static int init_raw_timers(void)
 {
-	struct timers *timers = timer->timers;
-
-	/*
-	 * if this timer is running now, waitting for
-	 * this timer finish
-	 */
-	while (timers->running_timer == timer)
-		smp_rmb();
-
-	return del_timer(timer);
-}
-
-void add_timer(struct timer_list *timer)
-{
-	BUG_ON(timer_pending(timer));
-	mod_timer(timer, timer->expires);
-}
-
-void init_timers(void)
-{
+	struct raw_timer *timers;
 	int i;
-	struct timers *timers;
 
 	for (i = 0; i < CONFIG_NR_CPUS; i++) {
 		timers = &get_per_cpu(timers, i);
@@ -248,4 +265,7 @@ void init_timers(void)
 		timers->running_expires = 0;
 		spin_lock_init(&timers->lock);
 	}
+
+	return 0;
 }
+arch_initcall(init_raw_timers);

@@ -55,7 +55,7 @@ struct vrtc_dev {
 	uint32_t time_base;
 	uint32_t time_alarm;
 	uint64_t time_offset;
-	struct timer_list alarm_timer;
+	struct timer alarm_timer;
 };
 
 #define vdev_to_vrtc(vdev) \
@@ -141,7 +141,7 @@ static int vrtc_enable(struct vrtc_dev *vrtc, int en)
 		vrtc->time_offset = NOW();
 	} else {
 		/* delete the alarm if started */
-		del_timer(&vrtc->alarm_timer);
+		stop_timer(&vrtc->alarm_timer);
 		vrtc->rtc_int_trigger = 0;
 		vrtc->rtc_int_en = 0;
 		vrtc->time_alarm = 0;
@@ -232,7 +232,7 @@ static void vrtc_deinit(struct vdev *vdev)
 {
 	struct vrtc_dev *dev = vdev_to_vrtc(vdev);
 
-	del_timer(&dev->alarm_timer);
+	stop_timer(&dev->alarm_timer);
 	dev->rtc_en = 0;
 	dev->rtc_int_en = 0;
 	dev->rtc_int_trigger = 0;
@@ -246,7 +246,6 @@ static void *vrtc_init(struct vm *vm, struct device_node *node)
 	int ret;
 	uint32_t irq;
 	struct vrtc_dev *dev;
-	struct vcpu *vcpu = get_vcpu_in_vm(vm, 0);
 	uint64_t base, size;
 	unsigned long flags;
 
@@ -278,9 +277,7 @@ static void *vrtc_init(struct vm *vm, struct device_node *node)
 	dev->vdev.reset = vrtc_reset;
 	vdev_add(&dev->vdev);
 
-	init_timer_on_cpu(&dev->alarm_timer, vcpu->task->affinity);
-	dev->alarm_timer.function = vrtc_alarm_function;
-	dev->alarm_timer.data = (unsigned long)dev;
+	init_timer(&dev->alarm_timer, vrtc_alarm_function, (unsigned long)dev);
 
 	return (void *)dev;
 }

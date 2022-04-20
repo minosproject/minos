@@ -59,7 +59,7 @@ struct vwdt_dev {
 	uint8_t access_lock;
 	unsigned long load_value;
 	unsigned long timeout_value;
-	struct timer_list wdt_timer;
+	struct timer wdt_timer;
 	struct vdev vdev;
 };
 
@@ -157,7 +157,7 @@ static void inline vwdt_config_ctrl(struct vwdt_dev *wdt,
 			mod_timer(&wdt->wdt_timer, wdt->timeout_value);
 		} else {
 			wdt->int_trigger = 0;
-			del_timer(&wdt->wdt_timer);
+			stop_timer(&wdt->wdt_timer);
 		}
 	}
 
@@ -235,14 +235,14 @@ static void vwdt_reset(struct vdev *vdev)
 	dev->int_trigger = 0;
 	dev->load_value = 0;
 	dev->timeout_value = 0;
-	del_timer(&dev->wdt_timer);
+	stop_timer(&dev->wdt_timer);
 }
 
 static void vwdt_deinit(struct vdev *vdev)
 {
 	struct vwdt_dev *dev = vdev_to_vwdt(vdev);
 
-	del_timer(&dev->wdt_timer);
+	stop_timer(&dev->wdt_timer);
 	dev->int_enable = 0;
 	dev->access_lock = 1;
 	dev->reset_enable = 0;
@@ -257,7 +257,6 @@ static void *vwdt_init(struct vm *vm, struct device_node *node)
 	int ret;
 	uint32_t irq;
 	struct vwdt_dev *dev;
-	struct vcpu *vcpu = get_vcpu_in_vm(vm, 0);
 	uint64_t base, size;
 	unsigned long flags;
 
@@ -291,9 +290,8 @@ static void *vwdt_init(struct vm *vm, struct device_node *node)
 	dev->vdev.reset = vwdt_reset;
 	vdev_add(&dev->vdev);
 
-	init_timer_on_cpu(&dev->wdt_timer, vcpu->task->affinity);
-	dev->wdt_timer.function = vwdt_timer_expire;
-	dev->wdt_timer.data = (unsigned long)dev;
+	init_timer(&dev->wdt_timer, vwdt_timer_expire,
+			(unsigned long)dev);
 
 	return NULL;
 }

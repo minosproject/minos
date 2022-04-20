@@ -46,7 +46,7 @@ struct pcpu {
 	struct list_head ready_list[OS_PRIO_MAX];
 	int tasks_in_prio[OS_PRIO_MAX];
 
-	struct timer_list sched_timer;
+	struct timer sched_timer;
 	int os_is_running;
 
 	struct task *kworker;

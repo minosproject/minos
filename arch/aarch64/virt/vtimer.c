@@ -47,7 +47,7 @@
 
 struct vtimer {
 	struct vcpu *vcpu;
-	struct timer_list timer;
+	struct timer timer;
 	int virq;
 	uint32_t cnt_ctl;
 	uint64_t cnt_cval;
@@ -99,7 +99,7 @@ static void vtimer_state_restore(struct vcpu *vcpu, void *context)
 	struct vtimer_context *c = (struct vtimer_context *)context;
 	struct vtimer *vtimer = &c->virt_timer;
 
-	del_timer_sync(&vtimer->timer);
+	stop_timer(&vtimer->timer);
 
 	write_sysreg64(c->offset, ARM64_CNTVOFF_EL2);
 	write_sysreg64(vtimer->cnt_cval, ARM64_CNTV_CVAL_EL0);
@@ -144,29 +144,27 @@ static void vtimer_state_init(struct vcpu *vcpu, void *context)
 
 	vtimer = &c->virt_timer;
 	vtimer->vcpu = vcpu;
-	init_timer_on_cpu(&vtimer->timer, vcpu->task->affinity);
-	vtimer->timer.function = virt_timer_expire_function;
-	vtimer->timer.data = (unsigned long)vtimer;
 	vtimer->virq = vcpu->vm->vtimer_virq;
 	vtimer->cnt_ctl = 0;
 	vtimer->cnt_cval = 0;
+	init_timer(&vtimer->timer, virt_timer_expire_function,
+			(unsigned long)vtimer);
 
 	vtimer = &c->phy_timer;
 	vtimer->vcpu = vcpu;
-	init_timer_on_cpu(&vtimer->timer, vcpu->task->affinity);
-	vtimer->timer.function = phys_timer_expire_function;
-	vtimer->timer.data = (unsigned long)vtimer;
 	vtimer->virq = 26;
 	vtimer->cnt_ctl = 0;
 	vtimer->cnt_cval = 0;
+	init_timer(&vtimer->timer, phys_timer_expire_function,
+			(unsigned long)vtimer);
 }
 
 static void vtimer_state_stop(struct vcpu *vcpu, void *context)
 {
 	struct vtimer_context *c = (struct vtimer_context *)context;
 
-	del_timer_sync(&c->virt_timer.timer);
-	del_timer_sync(&c->phy_timer.timer);
+	stop_timer(&c->virt_timer.timer);
+	stop_timer(&c->phy_timer.timer);
 }
 
 static inline void
@@ -212,8 +210,9 @@ static void vtimer_handle_cntp_ctl(struct vcpu *vcpu, int access,
 				(vtimer->cnt_cval != 0)) {
 			ns = ticks_to_ns(vtimer->cnt_cval + c->offset);
 			mod_timer(&vtimer->timer, ns);
-		} else
-			del_timer(&vtimer->timer);
+		} else {
+			stop_timer(&vtimer->timer);
+		}
 	}
 }
 

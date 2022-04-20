@@ -447,7 +447,7 @@ static int irqwork_handler(uint32_t irq, void *data)
 		 * if the task has delay timer, cancel it.
 		 */
 		if (task->delay) {
-			del_timer(&task->delay_timer);
+			stop_timer(&task->delay_timer);
 			task->delay = 0;
 		}
 	}
@@ -469,10 +469,7 @@ int local_sched_init(void)
 {
 	struct pcpu *pcpu = get_pcpu();
 
-	init_timer(&pcpu->sched_timer);
-	pcpu->sched_timer.cpu = pcpu->pcpu_id;
-	pcpu->sched_timer.function = sched_tick_handler;
-	pcpu->sched_timer.data = (unsigned long)pcpu;
+	init_timer(&pcpu->sched_timer, sched_tick_handler, (unsigned long)pcpu);
 
 	pcpu->state = PCPU_STATE_RUNNING;
 
@@ -617,7 +614,7 @@ static int wake_up_common(struct task *task, long pend_state, int event, void *d
 	 * delete the timer for this task.
 	 */
 	if (timeout && (task->pend_state != TASK_STATE_PEND_TO))
-		del_timer_sync(&task->delay_timer);
+		stop_timer(&task->delay_timer);
 
 	/*
 	 * find a best cpu to run this task.

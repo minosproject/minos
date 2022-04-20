@@ -6,31 +6,38 @@
  */
 #include <minos/time.h>
 
-#define DEFAULT_TIMER_MARGIN	(10)
-
 typedef void (*timer_func_t)(unsigned long);
 
-struct timer_list {
+struct timer {
 	int cpu;
-	struct list_head entry;
-	unsigned long expires;
+	int stop;
+	uint64_t expires;
+	uint64_t timeout;
 	timer_func_t function;
 	unsigned long data;
-	struct timers *timers;
+	struct list_head entry;
+	struct raw_timer *raw_timer;
 };
 
-struct timers {
+/*
+ * raw timer is a hardware timer which use to
+ * handle timer request.
+ */
+struct raw_timer {
 	struct list_head active;
 	unsigned long running_expires;
-	struct timer_list *running_timer;
+	struct timer *running_timer;
 	spinlock_t lock;
 };
 
-void init_timer(struct timer_list *timer);
-void init_timer_on_cpu(struct timer_list *timer, int cpu);
-void add_timer(struct timer_list *timer);
-int del_timer(struct timer_list *timer);
-int del_timer_sync(struct timer_list *timer);
-int mod_timer(struct timer_list *timer, unsigned long expires);
+void init_timer(struct timer *timer, timer_func_t fn,
+		unsigned long data);
+
+int start_timer(struct timer *timer);
+int stop_timer(struct timer *timer);
+int read_timer(struct timer *timer);
+void setup_timer(struct timer *timer, uint64_t tval);
+void setup_and_start_timer(struct timer *timer, uint64_t tval);
+int mod_timer(struct timer *timer, uint64_t cval);
 
 #endif

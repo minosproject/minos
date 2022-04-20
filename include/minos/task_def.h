@@ -94,7 +94,7 @@ struct task {
 	struct list_head state_list;	// link to the sched list used for sched.
 
 	uint32_t delay;
-	struct timer_list delay_timer;
+	struct timer delay_timer;
 
 	/*
 	 * the spinlock will use to protect the below member

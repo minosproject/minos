@@ -30,8 +30,6 @@
 #include <minos/of.h>
 #include <minos/ramdisk.h>
 
-extern void softirq_init(void);
-extern void init_timers(void);
 extern void cpu_idle(void);
 extern int allsymbols_init(void);
 extern void platform_init(void);
@@ -72,9 +70,6 @@ void boot_main(void)
 #ifdef CONFIG_SMP
 	smp_init();
 #endif
-
-	init_timers();
-
 	subsys_init();
 	subsys_init_percpu();
 
