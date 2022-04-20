@@ -200,6 +200,7 @@ void arch_init_task(struct task *task, void *entry, void *user_sp, void *arg)
 	regs->pc = (uint64_t)entry;
 	regs->sp = (uint64_t)user_sp;
 	regs->x18 = (uint64_t)task;
+	regs->x0 = (uint64_t)arg;
 
 	aarch64_init_kernel_task(task, regs);
 }
