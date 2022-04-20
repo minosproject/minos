@@ -28,12 +28,13 @@ static void dump_task_info(struct task *task)
 		sprintf(vm_str, "vm-%d/", vcpu->vm->vmid);
 	}
 
-	printf("%4d %3d %s%s\n", task->tid, task->cpu, vm_str, task->name);
+	printf("%4d %3d %4d %s%s\n", task->tid, task->cpu,
+			task->state, vm_str, task->name);
 }
 
 static int ps_cmd(int argc, char **argv)
 {
-	printf(" PID CPU NAME\n");
+	printf(" PID CPU STAT NAME\n");
 	os_for_all_task(dump_task_info);
 
 	return 0;
