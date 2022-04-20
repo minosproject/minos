@@ -24,12 +24,15 @@
 #include <virt/virt.h>
 #endif
 
-static int __skip_vm_boot;
+#ifdef CONFIG_VIRT
+static long __skip_vm_boot;
+#else
+static long __skip_vm_boot = 1;
+#endif
 
 static void skip_vm_boot(void)
 {
 #ifdef CONFIG_VIRT
-
 #ifdef CONFIG_SHELL
 	uint32_t wait;
 	char str[8];
@@ -52,7 +55,6 @@ static void skip_vm_boot(void)
 		printf("\n");
 	}
 #endif
-
 	if (!__skip_vm_boot)
 		start_all_vm();
 #endif
@@ -62,8 +64,8 @@ static void start_shell_task(void)
 {
 #ifdef CONFIG_SHELL
 	extern int shell_task(void *data);
-	create_task("shell_task", shell_task,
-			0x2000, OS_PRIO_SYSTEM, -1, 0, NULL);
+	create_task("shell_task", shell_task, 0x2000, OS_PRIO_SYSTEM,
+			-1, 0, (void *)__skip_vm_boot);
 #endif
 }
 

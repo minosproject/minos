@@ -83,10 +83,12 @@ int shell_task(void *data)
 	esh_rx(pesh, '\n');
 	while (console_gets(buf, 32, 0) != 0);
 
-	i = bootarg_parse_string("tty", &tty);
-	if (!i && tty && !strncmp(tty, "vm", 2)) {
-		printf("\nAttach tty: %s\n", tty);
-		pesh->tty = open_tty(tty);
+	if ((long)data == 0) {
+		i = bootarg_parse_string("tty", &tty);
+		if (!i && tty && !strncmp(tty, "vm", 2)) {
+			printf("\nAttach tty: %s\n", tty);
+			pesh->tty = open_tty(tty);
+		}
 	}
 
 	for (; ;) {
