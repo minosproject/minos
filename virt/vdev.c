@@ -211,8 +211,8 @@ int vdev_mmio_emulation(gp_regs *regs, int write,
 				ret = handle_mmio(vdev, regs, write,
 						idx, address - va->start, value);
 				if (ret)
-					pr_warn("vm%d %s mmio 0x%lx failed\n", vm->vmid,
-							write ? "write" : "read", address);
+					pr_warn("vm%d %s mmio 0x%lx in %s failed\n", vm->vmid,
+							write ? "write" : "read", address, vdev->name);
 				return 0;
 			}
 			idx++;
