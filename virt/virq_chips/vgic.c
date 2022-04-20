@@ -62,9 +62,10 @@ int vgic_irq_enter_to_guest(struct vcpu *vcpu, void *data)
 			continue;
 
 		/* allocate a id for the virq */
-		id = ffs_table_get_and_mask_one_bit(&vs->lrs_table);
-		if (id < 0) {
-			pr_err("virq id is full can not send %d\n", virq->vno);
+		id = find_first_zero_bit(vs->lrs_bitmap, vs->nr_lrs);
+		if (id >= vs->nr_lrs) {
+			pr_err("VM%d no space to send new irq %d\n",
+					vm->vmid, virq->vno);
 			break;
 		}
 
@@ -75,6 +76,7 @@ int vgic_irq_enter_to_guest(struct vcpu *vcpu, void *data)
 			flags |= FIQ_HAS_INJECT;
 		flags++;
 		virq->id = id;
+		set_bit(id, vs->lrs_bitmap);
 		virqchip_send_virq(vcpu, virq);
 		virq->state = VIRQ_STATE_PENDING;
 
@@ -118,7 +120,7 @@ int vgic_irq_exit_from_guest(struct vcpu *vcpu, void *data)
 		virq->state = virqchip_get_virq_state(vcpu, virq);
 		if (virq->state == VIRQ_STATE_INACTIVE) {
 			virqchip_update_virq(vcpu, virq, VIRQ_ACTION_CLEAR);
-			ffs_table_unmask_bit(&vs->lrs_table, virq->id);
+			clear_bit(virq->id, vs->lrs_bitmap);
 			virq->id = VIRQ_INVALID_ID;
 			vs->active_virq--;
 			clear_bit(bit, vs->active_bitmap);

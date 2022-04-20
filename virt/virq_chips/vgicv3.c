@@ -55,7 +55,6 @@ struct vgicv3_dev {
 	struct vdev vdev;
 	struct vgic_gicd gicd;
 	struct vgic_gicr *gicr[NR_CPUS];
-	int nr_lrs;
 };
 
 #define GIC_TYPE_GICD		(0x0)
@@ -733,16 +732,10 @@ static int gicv3_generate_virq(uint32_t *array, int virq)
 
 static int vgicv3_vcpu_init(struct vcpu *vcpu, void *d, unsigned long flags)
 {
-	struct vgicv3_dev *dev = (struct vgicv3_dev *)d;
-
 	if (!(flags & VIRQCHIP_F_HW_VIRT))
 		return 0;
 
-	if (dev->nr_lrs > FFS_TABLE_NR_BITS)
-		panic("BUG : Minos virq chiq only support max %d lrs\n",
-				FFS_TABLE_NR_BITS);
-
-	ffs_table_init_and_unmask(&vcpu->virq_struct->lrs_table, dev->nr_lrs);
+	vcpu->virq_struct->nr_lrs = gicv3_nr_lr;
 
 	return 0;
 }
@@ -751,7 +744,6 @@ static void vgicv3_init_virqchip(struct virq_chip *vc,
 		struct vgicv3_dev *dev, unsigned long flags)
 {
 	if (flags & VIRQCHIP_F_HW_VIRT) {
-		dev->nr_lrs = gicv3_nr_lr;
 		vc->exit_from_guest = vgic_irq_exit_from_guest;
 		vc->enter_to_guest = vgic_irq_enter_to_guest;
 		vc->xlate = gic_xlate_irq;
@@ -1075,6 +1067,7 @@ int vgicv3_init(uint64_t *data, int len)
 	val = read_sysreg32(ICH_VTR_EL2);
 	gicv3_nr_lr = (val & 0x3f) + 1;
 	gicv3_nr_pr = ((val >> 29) & 0x7) + 1;
+	pr_notice("vgicv3: nr_lrs %d nr_prs %d\n", gicv3_nr_lr, gicv3_nr_pr);
 
 	register_vcpu_vmodule("gicv3-vmodule", gicv3_vmodule_init);
 

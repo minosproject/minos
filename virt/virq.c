@@ -444,6 +444,7 @@ void vcpu_virq_struct_reset(struct vcpu *vcpu)
 
 	memset(vs->pending_bitmap, 0, BITMAP_SIZE(vcpu->vm->vspi_nr));
 	memset(vs->active_bitmap, 0, BITMAP_SIZE(vcpu->vm->vspi_nr));
+	memset(vs->lrs_bitmap, 0, BITMAP_SIZE(vs->nr_lrs));
 	vcpu_virq_struct_init(vcpu);
 }
 

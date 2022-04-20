@@ -87,16 +87,17 @@ struct virq_desc {
 	uint8_t padding;
 } __packed;
 
+#define VGIC_MAX_LRS 128
+
 struct virq_struct {
+	int nr_lrs;
+	int last_virq;
 	atomic_t pending_virq;
 	uint32_t active_virq;
 	struct virq_desc local_desc[VM_LOCAL_VIRQ_NR];
 	unsigned long *pending_bitmap;
 	unsigned long *active_bitmap;
-#if defined(CONFIG_VIRQCHIP_VGICV2) || defined(CONFIG_VIRQCHIP_VGICV3)
-#define MAX_NR_LRS 64
-	struct ffs_table lrs_table;
-#endif
+	unsigned long lrs_bitmap[BITS_TO_LONGS(VGIC_MAX_LRS)];
 };
 
 static inline int vm_irq_count(struct vm *vm)
