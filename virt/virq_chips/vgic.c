@@ -44,9 +44,15 @@ int vgic_irq_enter_to_guest(struct vcpu *vcpu, void *data)
 	struct virq_struct *vs = vcpu->virq_struct;
 	struct vm *vm = vcpu->vm;
 	struct virq_desc *virq;
-	int id = 0, bit, flags = 0;
+	int id = 0, bit, flags = 0, size, old;
 
-	for_each_set_bit(bit, vs->pending_bitmap, vm_irq_count(vm)) {
+	bit = vs->last_fail_virq;
+	size = vm_irq_count(vm) - bit;
+	old = vs->last_fail_virq;
+	vs->last_fail_virq = 0;
+
+repeat:
+	for_each_set_bit_from(bit, vs->pending_bitmap, size) {
 		virq = get_virq_desc(vcpu, bit);
 		if (virq == NULL) {
 			pr_err("bad virq %d for vm %s\n", bit, vm->name);
@@ -66,6 +72,7 @@ int vgic_irq_enter_to_guest(struct vcpu *vcpu, void *data)
 		if (id >= vs->nr_lrs) {
 			pr_err("VM%d no space to send new irq %d\n",
 					vm->vmid, virq->vno);
+			vs->last_fail_virq = bit;
 			break;
 		}
 
@@ -92,6 +99,13 @@ int vgic_irq_enter_to_guest(struct vcpu *vcpu, void *data)
 		 */
 		atomic_dec(&vs->pending_virq);
 		clear_bit(bit, vs->pending_bitmap);
+	}
+
+	if ((old != 0) && (vs->last_fail_virq == 0)) {
+		bit = 0;
+		size = old;
+		old = 0;
+		goto repeat;
 	}
 
 	return flags;

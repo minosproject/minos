@@ -91,7 +91,7 @@ struct virq_desc {
 
 struct virq_struct {
 	int nr_lrs;
-	int last_virq;
+	int last_fail_virq;
 	atomic_t pending_virq;
 	uint32_t active_virq;
 	struct virq_desc local_desc[VM_LOCAL_VIRQ_NR];
