@@ -65,7 +65,7 @@ static inline void add_task_to_ready_list(struct pcpu *pcpu,
 		list_add_tail(&pcpu->ready_list[task->prio], &task->state_list);
 	pcpu->tasks_in_prio[task->prio]++;
 	pcpu->local_rdy_grp |= BIT(task->prio);
-	wmb();
+	mb();
 
 	if (preempt || current->prio > task->prio)
 		set_need_resched();
@@ -78,7 +78,7 @@ static inline void remove_task_from_ready_list(struct pcpu *pcpu, struct task *t
 	pcpu->tasks_in_prio[task->prio]--;
 	if (is_list_empty(&pcpu->ready_list[task->prio]))
 		pcpu->local_rdy_grp &= ~BIT(task->prio);
-	wmb();
+	mb();
 }
 
 void pcpu_resched(int pcpu_id)
@@ -198,6 +198,9 @@ static struct task *pick_next_task(struct pcpu *pcpu)
 	 * event happen. delete it from the ready list, then the
 	 * next run task can be got.
 	 */
+	mb();
+	ASSERT(task->state != TASK_STATE_READY);
+
 	if (!task_is_running(task)) {
 		remove_task_from_ready_list(pcpu, task);
                 if (task->state == TASK_STATE_STOP) {
@@ -259,6 +262,7 @@ void switch_to_task(struct task *cur, struct task *next)
 	 * safe, the task is offline now.
 	 */
 	cur->cpu = -1;
+	smp_wmb();
 
 	/*
 	 * change the current task to next task.
@@ -442,6 +446,7 @@ static int irqwork_handler(uint32_t irq, void *data)
 		task_clear_resched(task);
 
 		add_task_to_ready_list(pcpu, task, 0);
+		task->state = TASK_STATE_READY;
 
 		/*
 		 * if the task has delay timer, cancel it.
