@@ -59,30 +59,30 @@ static inline void set_current_task(struct task *task)
 
 static inline void set_need_resched(void)
 {
-	set_bit(TIF_NEED_RESCHED, &get_current_task_info()->flags);
-	smp_wmb();
+	get_current_task_info()->flags |= __TIF_NEED_RESCHED;
+	wmb();
 }
 
 static inline void clear_need_resched(void)
 {
-	clear_bit(TIF_NEED_RESCHED, &get_current_task_info()->flags);
-	smp_wmb();
+	get_current_task_info()->flags &= ~__TIF_NEED_RESCHED;
+	wmb();
 }
 
 static inline void clear_do_not_preempt(void)
 {
-	clear_bit(TIF_DONOT_PREEMPT, &get_current_task_info()->flags);
-	smp_wmb();
+	get_current_task_info()->flags &= ~__TIF_DONOT_PREEMPT;
+	wmb();
 }
 
 static inline int need_resched(void)
 {
-	return (get_current_task_info()->flags & __TIF_NEED_RESCHED);
+	return !!(get_current_task_info()->flags & __TIF_NEED_RESCHED);
 }
 
 static inline void do_not_preempt(void)
 {
-	set_bit(TIF_DONOT_PREEMPT, &get_current_task_info()->flags);
+	get_current_task_info()->flags |= __TIF_DONOT_PREEMPT;
 	wmb();
 }
 

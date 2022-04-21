@@ -32,16 +32,15 @@ DEFINE_PER_CPU(struct raw_timer, timers);
 void soft_timer_interrupt(void)
 {
 	struct raw_timer *timers = &get_cpu_var(timers);
-	struct timer *timer;
-	unsigned long expires = ~0, now;
+	struct timer *timer, *next_timer = NULL;
 	struct list_head tmp_head;
+	uint64_t now;
 	timer_func_t fn;
 	unsigned long data;
 
-	now = NOW();
-	init_list(&tmp_head);
-
 	raw_spin_lock(&timers->lock);
+	init_list(&tmp_head);
+	now = NOW();
 
 	while (!is_list_empty(&timers->active)) {
 		timer = list_first_entry(&timers->active, struct timer, entry);
@@ -78,9 +77,8 @@ void soft_timer_interrupt(void)
 			 * expires, then add it to the tmp timer list head, at
 			 * the end of this function, switch the actvie to the head
 			 */
-			if ((expires > timer->expires))
-				expires = timer->expires;
-
+			if (!next_timer || (next_timer->expires > timer->expires))
+				next_timer = timer;
 			list_del(&timer->entry);
 			list_add_tail(&tmp_head, &timer->entry);
 		}
@@ -102,13 +100,12 @@ void soft_timer_interrupt(void)
 
 	raw_spin_unlock(&timers->lock);
 
-	if (expires != ((unsigned long)~0)) {
-		timers->running_expires = expires;
-		enable_timer(expires);
-	} else {
-		/* there is no more timer on the cpu */
-		timers->running_expires = 0;
-	}
+	/*
+	 * already in interrupt context, will not be interrupted.
+	 */
+	timers->next_timer = next_timer;
+	if (next_timer)
+		enable_timer(next_timer->expires);
 }
 
 static inline int timer_pending(const struct timer * timer)
@@ -142,15 +139,9 @@ static int __mod_timer(struct timer *timer)
 	 * timers, need to migrate it to the current
 	 * cpu's timers list
 	 */
-	if ((timer->cpu != -1) && (timer->cpu != cpu)) {
-		ASSERT(timer->raw_timer != NULL);
-		timers = timer->raw_timer;
-		spin_lock_irqsave(&timers->lock, flags);
-		detach_timer(timers, timer);
-		spin_unlock_irqrestore(&timers->lock, flags);
-	}
-
+	ASSERT(!((timer->cpu != -1) && (timer->cpu != cpu)));
 	timers = &get_per_cpu(timers, cpu);
+
 	spin_lock_irqsave(&timers->lock, flags);
 
 	detach_timer(timers, timer);
@@ -162,15 +153,13 @@ static int __mod_timer(struct timer *timer)
 	list_add_tail(&timers->active, &timer->entry);
 
 	/*
-	 * reprogram the timer for next event do not
-	 * need to check the NOW() value, since the timer
-	 * also need to trigger event even if the time is
-	 * smaller than NOW()
+	 * reprogram the raw timer if the next expires bigger than
+	 * current (expires + DEFAULT_TIMER_MARGIN)
 	 */
-	if ((timers->running_expires > timer->expires) ||
-				(timers->running_expires == 0)) {
-		timers->running_expires = timer->expires;
-		enable_timer(timers->running_expires);
+	if (!timers->next_timer || (timers->next_timer->expires >
+				(timer->expires + DEFAULT_TIMER_MARGIN))) {
+		timers->next_timer = timer;
+		enable_timer(timer->expires);
 	}
 
 	spin_unlock_irqrestore(&timers->lock, flags);
@@ -249,6 +238,7 @@ int stop_timer(struct timer *timer)
 
 	detach_timer(timers, timer);
 	timer->cpu = -1;
+	timer->expires = 0;
 	spin_unlock_irqrestore(&timers->lock, flags);
 
 	return 0;
@@ -262,7 +252,8 @@ static int init_raw_timers(void)
 	for (i = 0; i < CONFIG_NR_CPUS; i++) {
 		timers = &get_per_cpu(timers, i);
 		init_list(&timers->active);
-		timers->running_expires = 0;
+		timers->next_timer = NULL;
+		timers->running_timer = NULL;
 		spin_lock_init(&timers->lock);
 	}
 

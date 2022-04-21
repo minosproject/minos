@@ -25,7 +25,7 @@ struct timer {
  */
 struct raw_timer {
 	struct list_head active;
-	unsigned long running_expires;
+	struct timer *next_timer;
 	struct timer *running_timer;
 	spinlock_t lock;
 };

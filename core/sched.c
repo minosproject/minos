@@ -55,14 +55,46 @@ void __might_sleep(const char *file, int line, int preempt_offset)
 	dump_stack(NULL, (unsigned long *)arch_get_sp());
 }
 
-static inline void add_task_to_ready_list(struct pcpu *pcpu,
+static inline void __sched_update_sched_timer(struct pcpu *pcpu, struct task *task)
+{
+	/*
+	 * enable the sched timer if there are more than one
+	 * ready task on the same prio.
+	 */
+	if ((pcpu->tasks_in_prio[task->prio] > 1))
+		setup_and_start_timer(&pcpu->sched_timer, MILLISECS(task->run_time));
+	else
+		stop_timer(&pcpu->sched_timer);
+}
+
+void sched_update_sched_timer(void)
+{
+	struct task *task = current;
+
+	if (task->ti.flags & __TIF_TICK_EXHAUST) {
+		__sched_update_sched_timer(get_pcpu(), task);
+		task->ti.flags &= ~__TIF_TICK_EXHAUST;
+	}
+}
+
+static void add_task_to_ready_list(struct pcpu *pcpu,
 		struct task *task, int preempt)
 {
+	/*
+	 * make sure the new task is insert to front of the current
+	 * task.
+	 *
+	 * if the prio is equal to the current task's prio, insert to
+	 * the front of the current task.
+	 */
 	ASSERT(task->state_list.next == NULL);
-	if (preempt)
-		list_add(&pcpu->ready_list[task->prio], &task->state_list);
-	else
+	if (current->prio == task->prio) {
+		list_insert_before(&current->state_list, &task->state_list);
+		__sched_update_sched_timer(pcpu, task);
+	} else {
 		list_add_tail(&pcpu->ready_list[task->prio], &task->state_list);
+	}
+
 	pcpu->tasks_in_prio[task->prio]++;
 	pcpu->local_rdy_grp |= BIT(task->prio);
 	mb();
@@ -71,7 +103,7 @@ static inline void add_task_to_ready_list(struct pcpu *pcpu,
 		set_need_resched();
 }
 
-static inline void remove_task_from_ready_list(struct pcpu *pcpu, struct task *task)
+static void remove_task_from_ready_list(struct pcpu *pcpu, struct task *task)
 {
 	ASSERT(task->state_list.next != NULL);
 	list_del(&task->state_list);
@@ -79,6 +111,12 @@ static inline void remove_task_from_ready_list(struct pcpu *pcpu, struct task *t
 	if (is_list_empty(&pcpu->ready_list[task->prio]))
 		pcpu->local_rdy_grp &= ~BIT(task->prio);
 	mb();
+
+	/*
+	 * check whether need to stop the sched timer.
+	 */
+	if (current->prio == task->prio)
+		__sched_update_sched_timer(pcpu, task);
 }
 
 void pcpu_resched(int pcpu_id)
@@ -247,8 +285,8 @@ void switch_to_task(struct task *cur, struct task *next)
 	 * need request a timeout timer then need setup the timer.
 	 */
 	if ((cur->state == TASK_STATE_WAIT_EVENT) && (cur->delay > 0))
-		mod_timer(&cur->delay_timer,
-				now + MILLISECS(cur->delay));
+		setup_and_start_timer(&cur->delay_timer,
+				MILLISECS(cur->delay));
 	else if (cur->state == TASK_STATE_RUNNING)
 		cur->state = TASK_STATE_READY;
 
@@ -268,6 +306,8 @@ void switch_to_task(struct task *cur, struct task *next)
 	 * change the current task to next task.
 	 */
 	next->state = TASK_STATE_RUNNING;
+	next->ti.flags &= ~__TIF_TICK_EXHAUST;
+	next->cpu = pcpu->pcpu_id;
 	set_current_task(next);
 	pcpu->running_task = next;
 
@@ -277,16 +317,12 @@ void switch_to_task(struct task *cur, struct task *next)
 	next->ctx_sw_cnt++;
 	next->wait_event = 0;
 	next->start_ns = now;
+	smp_wmb();
 
 	/*
-	 * if the task count of this PRIO in this pcpu bigger than
-	 * 1, need enable the sched timer.
+	 * udpate the sched timer for new task if need.
 	 */
-	if (pcpu->tasks_in_prio[next->prio] > 1)
-		mod_timer(&pcpu->sched_timer,
-			now + MILLISECS(next->run_time));
-
-	smp_wmb();
+	sched_update_sched_timer(pcpu, next);
 }
 
 static void sched_tick_handler(unsigned long data)
@@ -297,7 +333,7 @@ static void sched_tick_handler(unsigned long data)
 	 * mark this task has used its running ticket, and the sched
 	 * timer is off.
 	 */
-	set_bit(TIF_TICK_EXHAUST, &task->ti.flags);
+	task->ti.flags |= __TIF_TICK_EXHAUST;
 	set_need_resched();
 }
 
@@ -315,8 +351,7 @@ static void do_sched(void)
 	 * clear the bit of TIF_NEED_RESCHED and
 	 * TIF_DONOT_PREEMPT here.
 	 */
-	clear_bit(TIF_DONOT_PREEMPT, &cur->ti.flags);
-	clear_bit(TIF_NEED_RESCHED, &cur->ti.flags);
+	cur->ti.flags &= ~(__TIF_DONOT_PREEMPT | __TIF_NEED_RESCHED);
 
 	if (next == cur) {
 		BUG_ON(cur->state == TASK_STATE_WAIT_EVENT,
@@ -370,22 +405,6 @@ void irq_exit(gp_regs *regs)
 	wmb();
 }
 
-static void task_run_again(struct pcpu *pcpu, struct task *task)
-{
-	unsigned long now = NOW();
-
-	/*
-	 * enable the sched timer if there are more than one
-	 * ready task on the same prio.
-	 */
-	task->ti.flags &= ~__TIF_TICK_EXHAUST;
-	task->start_ns = now;
-
-	if ((pcpu->tasks_in_prio[task->prio] > 1) &&
-			(pcpu->sched_timer.entry.next == NULL))
-		mod_timer(&pcpu->sched_timer, now + MILLISECS(task->run_time));
-}
-
 void task_exit(int errno)
 {
 	set_current_state(TASK_STATE_STOP, 0);
@@ -401,21 +420,21 @@ void exception_return_handler(void)
 	/*
 	 * if the task is suspend state, means next the cpu
 	 * will call sched directly, so do not sched out here
+	 *
+	 * 1 - when preempt_count > 0, the scheduler whill try
+	 *     to shced() when preempt_enable.
+	 * 2 - __TIF_DONOT_PREEMPT is set, it will call sched() at
+	 *    once.
 	 */
-	if ((ti->preempt_count > 0) || (ti->flags & __TIF_DONOT_PREEMPT)) {
-		if (ti->flags & __TIF_TICK_EXHAUST)
-			task_run_again(pcpu, task);
+	if (!(ti->flags & __TIF_NEED_RESCHED) || (ti->preempt_count > 0) ||
+			(ti->flags & __TIF_DONOT_PREEMPT))
 		return;
-	}
 
+	ti->flags &= ~__TIF_NEED_RESCHED;
 	next = pick_next_task(pcpu);
-	if ((next == task)) {
-		if (ti->flags & __TIF_TICK_EXHAUST)
-			task_run_again(pcpu, task);
+	if ((next == task))
 		return;
-	}
 
-	ti->flags &= ~(__TIF_TICK_EXHAUST | __TIF_NEED_RESCHED);
 	switch_to_task(task, next);
 }
 
@@ -423,7 +442,7 @@ static int irqwork_handler(uint32_t irq, void *data)
 {
 	struct pcpu *pcpu = get_pcpu();
 	struct task *task, *n;
-	int preempt = 0;
+	int preempt = 0, need_preempt;
 
 	/*
 	 * check whether there are new taskes need to
@@ -442,10 +461,11 @@ static int irqwork_handler(uint32_t irq, void *data)
 			continue;
 		}
 
-		preempt += task_need_resched(task);
+		need_preempt = task_need_resched(task);
+		preempt += need_preempt;
 		task_clear_resched(task);
 
-		add_task_to_ready_list(pcpu, task, 0);
+		add_task_to_ready_list(pcpu, task, need_preempt);
 		task->state = TASK_STATE_READY;
 
 		/*
@@ -516,7 +536,7 @@ static int wake_up_interrupted(struct task *task,
 
 	ASSERT(pend_state != TASK_STATE_PEND_TO);
 	if (task->state != TASK_STATE_WAIT_EVENT)
-		return 0;
+		return -EACCES;
 
 	if (!irq_disabled())
 		panic("unexpected irq happend when wait_event() ?\n");
@@ -545,6 +565,7 @@ static int wake_up_interrupted(struct task *task,
 	}
 
 	task->ti.flags |= __TIF_WAIT_INTERRUPTED;
+	task->ti.flags &= ~__TIF_DONOT_PREEMPT;
 
 	/*
 	 * here this cpu got this task, and can set the new
@@ -624,7 +645,7 @@ static int wake_up_common(struct task *task, long pend_state, int event, void *d
 	/*
 	 * find a best cpu to run this task.
 	 */
-	task_ready(task, 0);
+	task_ready(task, 1);
 	preempt_enable();
 
 	return 0;

@@ -198,40 +198,9 @@ struct vcpu *get_vcpu_by_id(uint32_t vmid, uint32_t vcpu_id)
 	return get_vcpu_in_vm(vm, vcpu_id);
 }
 
-static inline void kick_by_hirq(struct vcpu *vcpu, int mode, int ret)
-{
-	/*
-	 * ret < 0 means the task do not need to wake up and in ready state.
-	 * if task is in ready state, or the task is running in guest mode
-	 * then need send a physical irq to the target irq.
-	 */
-	if ((mode == IN_GUEST_MODE) || (mode == OUTSIDE_ROOT_MODE) || (ret < 0))
-		pcpu_resched(vcpu_affinity(vcpu));
-}
-
-static inline void kick_by_virq(struct vcpu *vcpu, int mode, int ret)
-{
-	/*
-	 * if the virq is not hardware virq, when the native
-	 * wfi is enabled for the target vcpu, the target vcpu
-	 * may not receive the virq immediately, and may wait
-	 * last physical irq come, then this pcpu can wakeup
-	 * from the WFI mode, so here need to send a phyical
-	 * irq to the target pcpu. Native WFI VCPU will always
-	 * in running mode in EL1.
-	 */
-	if ((vcpu->vm->flags & VM_FLAGS_NATIVE_WFI))
-		pcpu_resched(vcpu_affinity(vcpu));
-}
-
 int kick_vcpu(struct vcpu *vcpu, int reason)
 {
-	int vcpu_mode, ret = 0;
-	int same_cpu;
-
-	vcpu_mode = vcpu->mode;
-	smp_rmb();
-	same_cpu = (smp_processor_id() == vcpu_affinity(vcpu));
+	int mode, ret = 0;
 
 	/*
 	 * 1 - whether need to wake up the task.
@@ -249,24 +218,29 @@ int kick_vcpu(struct vcpu *vcpu, int reason)
 	 * if on the same cpu, just call cond_resched to
 	 * see whether need preempt this task.
 	 */
-	if (same_cpu) {
-		cond_resched();
+	if (smp_processor_id() == vcpu_affinity(vcpu))
 		return ret;
-	}
 
-	switch (reason) {
-	case VCPU_KICK_REASON_VIRQ:
-		kick_by_virq(vcpu, vcpu_mode, ret);
-		break;
-	case VCPU_KICK_REASON_HIRQ:
-		kick_by_hirq(vcpu, vcpu_mode, ret);
-		break;
-	default:
-		/*
-		 * do nothing ?
-		 */
-		break;
-	}
+	/*
+	 * ret < 0 means the task do not need to wake up and in ready state.
+	 * if task is in ready state, or the task is running in guest mode
+	 * then need send a physical irq to the target irq.
+	 *
+	 * if the virq is not hardware virq, when the native
+	 * wfi is enabled for the target vcpu, the target vcpu
+	 * may not receive the virq immediately, and may wait
+	 * last physical irq come, then this pcpu can wakeup
+	 * from the WFI mode, so here need to send a phyical
+	 * irq to the target pcpu. Native WFI VCPU will always
+	 * in running mode in EL1.
+	 */
+	mode = vcpu->mode;
+	smp_rmb();
+
+	if ((ret < 0) && (mode != IN_ROOT_MODE))
+		pcpu_resched(vcpu_affinity(vcpu));
+	else if ((ret < 0) && (vcpu->vm->flags & VM_FLAGS_NATIVE_WFI))
+		pcpu_resched(vcpu_affinity(vcpu));
 
 	return ret;
 }
