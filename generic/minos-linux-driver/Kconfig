@@ -1,0 +1,19 @@
+menu "Minos"
+
+config MINOS
+	bool "Enable Minos Hypervisor driver"
+	default y
+	select HVC_DRIVER
+	select HVC_IRQ
+	---help---
+	  Enable support for Minos hyperviosr
+
+if MINOS
+
+config VIRTIO_CONSOLE_EARLY_PRINTK
+	bool "early printk based on virtio console device"
+	default y
+
+endif
+
+endmenu
