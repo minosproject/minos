@@ -225,7 +225,7 @@ int vdev_mmio_emulation(gp_regs *regs, int write,
 	 * in host can handle it
 	 */
 	if (vm_is_native(vm))
-		return -EFAULT;
+		return -EACCES;
 
 	ret = trap_vcpu(VMTRAP_TYPE_MMIO, write, address, value);
 	if (ret) {

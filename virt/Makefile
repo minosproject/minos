@@ -18,3 +18,4 @@ obj-y				+= iommu.o
 obj-y				+= shmem.o
 obj-y				+= vm_daemon.o
 obj-y				+= vm_pm.o
+obj-y				+= vfault.o

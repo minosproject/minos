@@ -326,12 +326,35 @@ static void arch_vcpu_state_restore(struct vcpu *vcpu, void *c)
 	mb();
 }
 
+static void arch_vcpu_state_dump(struct vcpu *vcpu, void *context)
+{
+	struct vcpu_context *c = (struct vcpu_context *)context;
+
+	pr_notice("----- dump vcpu context -----\n");
+	pr_notice(" vbar_el1: 0x%16lx    esr_el1: 0x%16lx\n", c->vbar_el1, c->esr_el1);
+	pr_notice("   sp_el1: 0x%16lx contextidr: 0x%16lx\n", c->sp_el1, c->contextidr);
+	pr_notice("   sp_el0: 0x%16lx    elr_el1: 0x%16lx\n", c->sp_el0, c->elr_el1);
+	pr_notice("   vmpidr: 0x%16lx  tpidr_el0: 0x%16lx\n", c->vmpidr, c->tpidr_el0);
+	pr_notice("    vpidr: 0x%16lx  sctlr_el1: 0x%16lx\n", c->vpidr, c->sctlr_el1);
+	pr_notice("  hcr_el2: 0x%16lx    tpidrro: 0x%16lx\n", c->hcr_el2, c->tpidrro_el0);
+	pr_notice(" spsr_el1: 0x%16lx    far_el1: 0x%16lx\n", c->spsr_el1, c->far_el1);
+	pr_notice("actlr_el1: 0x%16lx    cntkctl: 0x%16lx\n", c->actlr_el1, c->cntkctl);
+	pr_notice("tpidr_el1: 0x%16lx     csselr: 0x%16lx\n", c->tpidr_el1, c->csselr);
+	pr_notice("    cpacr: 0x%16lx      afsr0: 0x%16lx\n", c->cpacr, c->afsr0);
+	pr_notice("    afsr1: 0x%16lx   vtcr_el2: 0x%16lx\n", c->afsr1, c->vtcr_el2);
+	pr_notice("ttbr0_el1: 0x%16lx  ttbr1_el1: 0x%16lx\n", c->ttbr0_el1, c->ttbr1_el1);
+	pr_notice("vttbr_el2: 0x%16lx   mair_el1: 0x%16lx\n", c->vttbr_el2, c->mair_el1);
+	pr_notice("amair_el1: 0x%16lx    tcr_el1: 0x%16lx\n", c->mair_el1, c->tcr_el1);
+	pr_notice("  par_el1: 0x%16lx\n", c->par_el1);
+}
+
 static int aarch64_vcpu_context_init(struct vmodule *vmodule)
 {
 	vmodule->context_size = sizeof(struct vcpu_context);
 	vmodule->state_init = arch_vcpu_state_init;
 	vmodule->state_save = arch_vcpu_state_save;
 	vmodule->state_restore = arch_vcpu_state_restore;
+	vmodule->state_dump = arch_vcpu_state_dump;
 
 	return 0;
 }

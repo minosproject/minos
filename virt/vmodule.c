@@ -153,6 +153,7 @@ VCPU_VMODULE_ACTION(reset)
 VCPU_VMODULE_ACTION(stop)
 VCPU_VMODULE_ACTION(suspend)
 VCPU_VMODULE_ACTION(resume)
+VCPU_VMODULE_ACTION(dump)
 
 static int vmodules_init(void)
 {

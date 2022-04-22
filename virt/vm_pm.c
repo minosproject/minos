@@ -275,7 +275,7 @@ static int __shutdown_native_vm(struct vm *vm, int flags)
 
 static int __shutdown_guest_vm(struct vm *vm, int flags)
 {
-	if (!pm_action_by_self(flags))
+	if (!pm_action_by_mvm(flags))
 		return 0;
 
 	pr_notice("send SHUTDOWN request to mvm\n");
@@ -332,9 +332,6 @@ int vm_power_off(int vmid, void *arg, int flags)
 	if (vm_is_native(vm) && (!(vm->flags & VM_FLAGS_CAN_RESET) ||
 				pm_action_by_mvm(flags))) {
 		pr_err("vm%d do not support shutdown\n", vm->vmid);
-		return -EPERM;
-	} else if (!vm_is_native(vm) && pm_action_by_host(flags)) {
-		pr_err("guest vm can not shutdown by host\n");
 		return -EPERM;
 	}
 

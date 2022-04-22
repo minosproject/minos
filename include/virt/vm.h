@@ -245,4 +245,8 @@ int start_native_vm(struct vm *vm);
 
 int start_guest_vm(struct vm *vm);
 
+void vcpu_dump(struct vcpu *vcpu, gp_regs *regs);
+
+void vcpu_fault(struct vcpu *vcpu, gp_regs *regs);
+
 #endif

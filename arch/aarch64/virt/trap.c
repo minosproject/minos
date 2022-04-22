@@ -270,8 +270,8 @@ static int dataabort_tfl_handler(gp_regs *regs, int ec, uint32_t esr_value)
 		ipa = guest_va_to_ipa(vaddr, 1);
 
 	ret = vdev_mmio_emulation(regs, iswrite, ipa, &value);
-	if (ret) {
-		pr_warn("handle mmio read/write fail 0x%x vmid:%d\n", ipa,
+	if (ret == -EACCES) {
+		pr_warn("Fault on mmio read/write fail 0x%x vmid:%d\n", ipa,
 				get_vmid(get_current_vcpu()));
 		/*
 		 * if failed to handle the mmio trap inject a
@@ -286,7 +286,10 @@ static int dataabort_tfl_handler(gp_regs *regs, int ec, uint32_t esr_value)
 	return 0;
 
 out_fail:
-	inject_virtual_data_abort(esr_value);
+	vcpu_fault(current_vcpu, regs);
+	/*
+	 * the VCPU will exit when return to guest.
+	 */
 	return -EFAULT;
 }
 
