@@ -82,4 +82,9 @@ static inline int __smp_processor_id(void)
 }
 #endif
 
+static inline void arch_sys_sched(void)
+{
+	__asm__ volatile("svc #0");
+}
+
 #endif

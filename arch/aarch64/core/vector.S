@@ -82,38 +82,6 @@
 	__SAVE_GP_REGS
 .endm
 
-.macro SAVE_GP_REGS_SW
-	stp	x29, x30, [sp, #-16]!
-	stp	x27, x28, [sp, #-16]!
-	stp	x25, x26, [sp, #-16]!
-	stp	x23, x24, [sp, #-16]!
-	stp	x21, x22, [sp, #-16]!
-	stp	x19, x20, [sp, #-16]!
-	stp	x17, x18, [sp, #-16]!
-	stp     x15, x16, [sp, #-16]!
-	stp     x13, x14, [sp, #-16]!
-	stp     x11, x12, [sp, #-16]!
-	stp     x9, x10, [sp, #-16]!
-	stp     x7, x8, [sp, #-16]!
-	stp     x5, x6, [sp, #-16]!
-	stp     x3, x4, [sp, #-16]!
-	stp     x1, x2, [sp, #-16]!
-	str	x0, [sp, #-8]!
-
-	mrs	x2, SP_EL0			// SP_EL0
-	str	x2, [sp, #-8]!
-
-	mrs	x2, daif			// pstate
-	mrs	x3, nzcv
-	mov	x4, #ARM64_SPSR_KERNEL
-	orr	x2, x2, x3
-	orr	x2, x2, x4
-	str	x2, [sp, #-8]!
-
-	str	x30, [sp, #-8]!			// pc
-	dsb	nsh
-.endm
-
 .macro LOAD_GP_REGS
 	ldr	x0, [sp], #8			// restore task context
 	msr	ARM64_ELR, x0
@@ -149,25 +117,6 @@ lb:
 	b	lb
 vfunc_end __bad_mode
 
-vfunc arch_switch_task_sw
-	SAVE_GP_REGS_SW			// x0 is current task x1 is the next task
-
-	mov	x3, sp				// save the current stack to task
-	str	x3, [x0, #TASK_STACK_OFFSET]
-
-	LOAD_PCPU_STACK x2			// load the pcpu stack as temp stack.
-
-	bl	switch_to_task			// switch to the new task.
-
-	ldr	x0, [x18, #TASK_STACK_OFFSET]	// load current task's stack
-	mov	sp, x0
-
-	LOAD_GP_REGS
-
-	eret
-	isb
-vfunc_end arch_switch_task_sw
-
 vfunc exception_return
 	LOAD_PCPU_STACK x1			// load percpu stack, need ensure the irq is off.
 
@@ -194,8 +143,17 @@ vfunc __sync_exception_from_current_el
 
 	mov	x0, sp
 	str	x0, [x18, #TASK_STACK_OFFSET]
-	bl	sync_exception_from_current_el	// go to the c handler
 
+	// use SVC for sched() , other type will
+	// go to the exception handler.
+	mrs	x1, ESR_EL2
+	ubfx	x2, x1, #ESR_ELx_EC_SHIFT, #ESR_ELx_EC_WIDTH
+	cmp	x2, #ESR_ELx_EC_SVC64
+	b.eq	__sync_current_out
+
+	bl	sync_exception_from_current_el	// go to the c handler, will die.
+
+__sync_current_out:
 	b	exception_return
 vfunc_end __sync_exception_from_current_el
 
@@ -221,6 +179,12 @@ vfunc __irq_exception_from_lower_el
 
 	PCPU_LOAD_CURRENT_TASK			// x18 will store the current task
 
+	// Set the irq flags into ti->flags.
+	ldr	x1, [x18, #TASK_INFO_FLAGS_OFFSET]
+	orr	x1, x1, #__TIF_HARDIRQ_MASK
+	str	x1, [x18, #TASK_INFO_FLAGS_OFFSET]
+	dsb	sy
+
 	mov	x0, sp				// x0 is the gp_regs pass to irq_c_handler
 	str	x0, [x18, #TASK_STACK_OFFSET]	// save the current task's stack to task
 	bl	task_exit_from_user
@@ -228,15 +192,33 @@ vfunc __irq_exception_from_lower_el
 	mov	x0, sp
 	bl	irq_from_lower_el		// call the c irq handler
 
+	// clear the irq flags into ti->flags.
+	ldr	x1, [x18, #TASK_INFO_FLAGS_OFFSET]
+	and	x1, x1, #(~__TIF_HARDIRQ_MASK)
+	str	x1, [x18, #TASK_INFO_FLAGS_OFFSET]
+	dsb	sy
+
 	b	exception_return
 vfunc_end __irq_exception_from_lower_el
 
 vfunc __irq_exception_from_current_el
 	SAVE_GP_REGS
 
+	// Set the irq flags into ti->flags.
+	ldr	x1, [x18, #TASK_INFO_FLAGS_OFFSET]
+	orr	x1, x1, #__TIF_HARDIRQ_MASK
+	str	x1, [x18, #TASK_INFO_FLAGS_OFFSET]
+	dsb	sy
+
 	mov	x0, sp
 	str     x0, [x18, #TASK_STACK_OFFSET]	// store the stack in case this task will scheded out.
 	bl	irq_from_current_el		// irq is disabled all the time
+
+	// clear the irq flags into ti->flags.
+	ldr	x1, [x18, #TASK_INFO_FLAGS_OFFSET]
+	and	x1, x1, #(~__TIF_HARDIRQ_MASK)
+	str	x1, [x18, #TASK_INFO_FLAGS_OFFSET]
+	dsb	sy
 
 	b	exception_return
 vfunc_end __irq_exception_from

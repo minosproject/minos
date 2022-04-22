@@ -20,9 +20,7 @@
 
 static inline void irq_handler(gp_regs *regs)
 {
-	irq_enter(regs);
 	do_irq_handler();
-	irq_exit(regs);
 }
 
 void irq_from_lower_el(gp_regs *regs)
