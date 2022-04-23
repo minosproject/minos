@@ -16,19 +16,19 @@ mkdir ~/minos-workspace/arm-fvp
    cd ~/minos-workspace
    git clone https://github.com/minosproject/minos-hypervisor.git
    cd minos
-   make ARCH=aarch64 CROSS_COMPILE=aarch64-linux-gnu- fvp_defconfig
-   make ARCH=aarch64 CROSS_COMPILE=aarch64-linux-gnu- O=0
-   make dtbs
+   make fvp_defconfig
+   make
+   make mvm
+   make mkrmd
    ```
 
-   `O=0` means close the O2 optimization for debug step in.
+   Use `make O=0` to disable the O2 optimization for debug step in.
 
 ## 3. Build FVP Kernel
 
    ``` shell script
-   cd ~/minos-workspace
-   git clone https://github.com/minosproject/linux-marvell.git
-   cd linux-marvell
+   The Minos kernel driver is under ${MINOS_SRC}/generic/minos-linux-driver, copy or link this folder to your kernel source tree and build this driver to kernel. Currently the kernel driver has been test on 4.19.238 and 4.4.52.
+
    make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig
    make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j8 Image
    ```
@@ -39,7 +39,7 @@ mkdir ~/minos-workspace/arm-fvp
    cd ~/minos-workspace
    git clone https://github.com/ARM-software/arm-trusted-firmware.git
    cd arm-trusted-firmware
-   make CROSS_COMPILE=aarch64-linux-gnu- PLAT=fvp RESET_TO_BL31=1 ARM_LINUX_KERNEL_AS_BL33=1 PRELOADED_BL33_BASE=0xc0008000 ARM_PRELOADED_DTB_BASE=0xc3e00000
+   make CROSS_COMPILE=aarch64-linux-gnu- PLAT=fvp RESET_TO_BL31=1 ARM_LINUX_KERNEL_AS_BL33=1 PRELOADED_BL33_BASE=0xc0000000 ARM_PRELOADED_DTB_BASE=0xc3e00000
    ```
 
    That will build the `bl31.bin` in `arm-trusted-firmware/build/fvp/release/`. ARM FVP using `bl31.bin` to do something like bootloader(u-boot) to boot minos.
@@ -96,7 +96,7 @@ mkdir ~/minos-workspace/arm-fvp
   -C bp.virtioblockdevice.image_path=/home/{whoami}/minos-workspace/arm-fvp/sd.img \
   --data cluster0.cpu0=/home/{whoami}/minos-workspace/arm-fvp/bl31.bin@0x04020000 \
   --data cluster0.cpu0=/home/{whoami}/minos-workspace/arm-fvp/Image@0x80080000 \
-  --data cluster0.cpu0=/home/{whoami}/minos-workspace/arm-fvp/minos.bin@0xc0008000 \
+  --data cluster0.cpu0=/home/{whoami}/minos-workspace/arm-fvp/minos.bin@0xc0000000 \
   --data cluster0.cpu0=/home/{whoami}/minos-workspace/arm-fvp/fdt.dtb@0xc3e00000
   --data cluster0.cpu0=/home/{whoami}/minos-workspace/arm-fvp/fvp_linux.dtb@0x83e00000
   ```

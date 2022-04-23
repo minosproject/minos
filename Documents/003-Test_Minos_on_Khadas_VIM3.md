@@ -15,7 +15,6 @@ mkdir ~/minos-vim3
    git clone https://github.com/minosproject/minos-hypervisor.git
    cd minos-hypervisor
    make kvim3_defconfig
-   make
    make dtbs
    ```
 

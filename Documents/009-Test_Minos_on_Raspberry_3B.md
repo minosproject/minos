@@ -47,7 +47,7 @@ Plug in the SD card to Ubuntu system again, the two partition will be mounted au
    # git clone https://github.com/minosproject/minos-hypervisor.git
    # cd minos
    # make rpi_3_defconfig
-   # make && make dtbs && make mvm
+   # make && make mvm
    ```
 
 2. Build u-boot
@@ -62,8 +62,8 @@ Plug in the SD card to Ubuntu system again, the two partition will be mounted au
 3. Build Kernel and Kernel modules
 
    ```
-   # git clone https://github.com/minosproject/linux-raspberry.git
-   # git checkout -b rpi3 origin/minos-rpi3
+   The Minos kernel driver is under ${MINOS_SRC}/generic/minos-linux-driver, copy or link this folder to your kernel source tree and build this driver to kernel. Currently the kernel driver has been test on 4.19.238 and 4.4.52.
+
    # make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- bcmrpi3_defconfig
    # make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- Image -j8
    # make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules dtbs -j8

@@ -18,7 +18,7 @@ This is only for raspberry-4b 4GB version, other please modify the config.
    # git clone https://github.com/minosproject/minos-hypervisor.git
    # cd minos
    # make rpi_4_defconfig
-   # make && make dtbs && make mvm
+   # make && make mvm
    ```
 
 2. Build u-boot
@@ -33,8 +33,7 @@ This is only for raspberry-4b 4GB version, other please modify the config.
 3. Build Kernel and Kernel modules
 
    ```
-   git clone https://github.com/minosproject/linux-raspberry.git
-   git checkout -b minos-rpi4 origin/minos-rpi4
+   The Minos kernel driver is under ${MINOS_SRC}/generic/minos-linux-driver, copy or link this folder to your kernel source tree and build this driver to kernel. Currently the kernel driver has been test on 4.19.238 and 4.4.52.
    ```
 
    - 32bit Kernel

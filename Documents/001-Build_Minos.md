@@ -43,14 +43,15 @@
 # make xxx_defconfig (xxx_defconfig see above table)
 # make menuconfig (option)
 # make
-# make dtbs
 # make mvm
+# make mkrmd
 ```
 
 #### images generated
 
-| Name          | Comments                            |
-| ------------- | ----------------------------------- |
-| minos.bin     | binary image of  minos              |
-| dtbs/xxx.dtb  | device tree image for each board    |
-| tools/mvm/mvm | user space tools to create guest VM |
+| Name              | Comments                                 |
+| ------------------| -----------------------------------------|
+| minos.bin         | binary image of  minos                   |
+| dtbs/xxx.dtb      | device tree image for each board         |
+| tools/mvm/mvm     | user space tools to create guest VM      |
+| tools/mkrmd/mkrmd | user space tools to create ramdisk image |

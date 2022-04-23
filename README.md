@@ -1,7 +1,5 @@
 # Minos 
 
-http://minosproject.org
-
 Flexible Virtualization Solution for Embedded System
 
 ## What is Minos
@@ -17,6 +15,7 @@ Minos defines a device hypervisor reference stack and an architecture for runnin
 - [x] Raspberry 4
 - [x] Khadas VIM3
 - [x] Renesas R-Car r8a7795
+- [x] Qemu Virt
 
 #### Supported OSes
 
@@ -24,7 +23,6 @@ Minos defines a device hypervisor reference stack and an architecture for runnin
 - [x] Ubuntu
 - [x] Android
 - [x] zephyr
-- [x] XNU (IOS kernel)
 
 ## Documentation
 
@@ -35,7 +33,10 @@ We will have various `README` files in the  `Documents` subdirectory. Please ref
 3. [Documents/003-Test_Minos_on_Khadas_VIM3.md](https://github.com/minosproject/minos/blob/master/Documents/003-Test_Minos_on_Khadas_VIM3.md)
 4. [Documents/004-Test_Minos_on_ARM_FVP.md](https://github.com/minosproject/minos/blob/master/Documents/004-Test_Minos_on_ARM_FVP.md)
 5. [Documents/005-Test_IOS_kernel_using_Minos_on_VIM3.md](https://github.com/minosproject/minos/blob/master/Documents/005-Test_IOS_kernel_using_Minos_on_VIM3.md)
-6. [Documents/006-How_to_use_mvm_create_guest_VM.md](https://github.com/minosproject/minos/blob/master/Documents/006-How_to_use_mvm_create_guest_VM.md)
-7. [Documents/007-How_to_create_Native_VM.md](https://github.com/minosproject/minos/blob/master/Documents/007-How_to_create_Native_VM.md)
-8. [Documents/008-Developer_Guide.md](https://github.com/minosproject/minos/blob/master/Documents/008-Developer_Guide.md)
-9. [Documents/009-Test_Minos_on_Raspberry_3B.md](https://github.com/minosproject/minos/blob/master/Documents/009-Test_Minos_on_Raspberry_3B.md)
+6. [Documents/009-Test_Minos_on_Raspberry_3B.md](https://github.com/minosproject/minos/blob/master/Documents/009-Test_Minos_on_Raspberry_3B.md)
+
+## Others
+
+The V0.4 only test on ARM-FVP and Qemu-virt platform.
+
+Finally, please remember - It's all Just For Fun .......
