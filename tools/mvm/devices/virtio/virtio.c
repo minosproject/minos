@@ -155,14 +155,14 @@ static int get_indirect_buf(struct vring_desc *desc, int index,
 
 static void virtq_update_used_flags(struct virt_queue *vq)
 {
-	vq->used->flags = vq->used_flags;
 	mb();
+	vq->used->flags = vq->used_flags;
 }
 
 static void virtq_update_avail_event(struct virt_queue *vq, uint16_t event)
 {
-	*virtq_avail_event(vq) = event;
 	mb();
+	*virtq_avail_event(vq) = event;
 }
 
 int virtq_enable_notify(struct virt_queue *vq)
@@ -270,8 +270,8 @@ int virtq_get_descs(struct virt_queue *vq,
 
 void virtq_discard_desc(struct virt_queue *vq, int n)
 {
+	mb();
 	vq->last_avail_idx -= n;
-	wmb();
 }
 
 static int __virtq_add_used_n(struct virt_queue *vq,
@@ -288,10 +288,11 @@ static int __virtq_add_used_n(struct virt_queue *vq,
 	if (count == 1) {
 		used->id = heads[0].id;
 		used->len = heads[0].len;
-	} else
+	} else {
 		memcpy(used, heads, count * sizeof(*used));
+	}
 
-	wmb();
+	mb();
 
 	old = vq->last_used_idx;
 	new = (vq->last_used_idx += count);
@@ -320,6 +321,7 @@ int virtq_add_used_n(struct virt_queue *vq,
 
 	r = __virtq_add_used_n(vq, heads, count);
 
+	mb();
 	vq->used->idx = vq->last_used_idx;
 
 	return r;

@@ -445,7 +445,11 @@ static int vcpu_handle_mmio(struct vm *vm, int trap_reason,
 		}
 	}
 
-	return -ENODEV;
+	/*
+	 * return -EACCES to the hyprvisor, when -EACCES hypervisor
+	 * will inject abort to guest.
+	 */
+	return -EACCES;
 }
 
 static int vcpu_handle_common_trap(struct vm *vm, int trap_reason,

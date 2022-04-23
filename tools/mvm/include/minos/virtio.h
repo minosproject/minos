@@ -173,7 +173,6 @@ static inline void virtio_send_irq(struct virtio_device *dev, int type)
 
 	value = ioread32(dev->vdev->iomem + VIRTIO_MMIO_INTERRUPT_STATUS);
 	rmb();
-
 	value |= type;
 	iowrite32(dev->vdev->iomem + VIRTIO_MMIO_INTERRUPT_STATUS, value);
 	wmb();
