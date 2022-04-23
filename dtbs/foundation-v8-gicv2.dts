@@ -19,16 +19,28 @@
 	};
 
 	vms {
-		vm0 {
+		vm1 {
 			device_type = "virtual_machine";
-			vmid = <0>;
 			vm_name = "fvp_linux_host";
+			host_vm;
+			vmid = <1>;
 			type = "linux";
-			vcpus = <1>;
+			vcpus = <2>;
 			entry = <0x0 0x80080000>;
-			vcpu_affinity = <0 1>;
-			memory = <0x0 0x80000000 0x0 0x8000000>;
+			setup_data = <0x0 0x83e00000>;
+			vcpu_affinity = <0 1 2 3>;
+			cmdline = "console=hvc0 earlycon=dbcon,io,0x0 loglevel=8 consolelog=9 root=/dev/vda2 rw";
+			memory = <0x0 0x80000000 0x0 0x10000000>;
+
+			vm1_bdi {
+				vm_console_vm1 {
+					virtual_device;
+					vc-dynamic-res;
+					compatible = "minos,vm_console";
+				};
+			};
 		};
+
 	};
 
 	psci {
@@ -146,7 +158,7 @@
 
 	memory@80000000 {
 		device_type = "memory";
-		reg = <0x0 0x80000000 0x0 0x8000000>;
+		reg = <0x0 0x80000000 0x0 0x80000000 0x8 0x80000000 0x0 0x80000000>;
 	};
 
 	interrupt-controller@2f000000 {

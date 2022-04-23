@@ -9,7 +9,9 @@
 
 	chosen {
 		minos,stdout = "pl011";
-		bootargs = "bootwait=3 tty=vm0";
+		bootargs = "bootwait=3 tty=vm1";
+		minos,ramdisk-start = <0x0 0xc4000000>;
+		minos,ramdisk-end = <0x0 0xC522F000>;
 	};
 
 	aliases {
@@ -17,22 +19,21 @@
 	};
 
 	vms {
-		vm0 {
+		vm1 {
 			device_type = "virtual_machine";
-			vmid = <1>;
 			vm_name = "fvp_linux_host";
+			host_vm;
+			vmid = <1>;
 			type = "linux";
-			native_wfi;
-			vm_32bit;
-			vcpus = <1>;
-			entry = <0x0 0x80008000>;
+			vcpus = <2>;
+			entry = <0x0 0x80080000>;
 			setup_data = <0x0 0x83e00000>;
 			vcpu_affinity = <0 1 2 3>;
 			cmdline = "console=hvc0 earlycon=dbcon,io,0x0 loglevel=8 consolelog=9 root=/dev/vda2 rw";
 			memory = <0x0 0x80000000 0x0 0x10000000>;
 
-			vm0_bdi {
-				vm_console_vm0 {
+			vm1_bdi {
+				vm_console_vm1 {
 					virtual_device;
 					vc-dynamic-res;
 					compatible = "minos,vm_console";
