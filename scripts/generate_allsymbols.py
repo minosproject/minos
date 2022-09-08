@@ -42,7 +42,7 @@ if __name__ == "__main__":
         while line :
             array = [i.strip('\r\t\n') for i in line.split(' ') if i]
             t = array[1]
-            if t is 'T' or t is 't':
+            if t == 'T' or t == 't':
                 total_nums_syms += 1
                 addrs += "        PTR        0x%s\n" %(array[0])
                 offsets += "        .long 0x%x\n" %(total_nums_chr)

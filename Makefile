@@ -281,7 +281,7 @@ endef
 
 PHONY += scriptconfig iscriptconfig menuconfig guiconfig dumpvarsconfig
 
-PYTHONCMD ?= python
+PYTHONCMD ?= python3
 kpython := PYTHONPATH=$(srctree)/scripts/Kconfiglib:$$PYTHONPATH $(PYTHONCMD)
 KCONFIG ?= $(srctree)/Kconfig
 
@@ -366,7 +366,7 @@ genconfig:
 	/bin/false)
 	$(Q) echo "  GEN      .config From configs/$@"
 	$(Q) mkdir -p include/config
-	$(Q) python $(srctree)/scripts/Kconfiglib/defconfig.py $(Kconfig) configs/$@
+	$(Q) python3 $(srctree)/scripts/Kconfiglib/defconfig.py $(Kconfig) configs/$@
 
 endif
 
