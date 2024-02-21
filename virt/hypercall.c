@@ -98,6 +98,9 @@ static int vm_hvc_handler(gp_regs *c, uint32_t id, uint64_t *args)
 	case HVC_CHANGE_LOG_LEVEL:
 		change_log_level((unsigned int)args[0]);
 		break;
+	case HVC_DUMP_LOG:
+		dump_system_log();
+		break;
 	default:
 		pr_err("unsupport vm hypercall");
 		break;
