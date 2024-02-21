@@ -612,9 +612,11 @@ static int wake_up_common(struct task *task, long pend_state, int event, void *d
 	if (event == OS_EVENT_TYPE_FLAG) {
 		task->flags_rdy = (long)data;
 		task->msg = NULL;
+		spin_unlock_irqrestore(&task->s_lock, flags);
 	} else {
 		task->msg = data;
 		task->flags_rdy = 0;
+		spin_unlock_irqrestore(&task->s_lock, flags);
 	}
 
 	spin_unlock_irqrestore(&task->s_lock, flags);
