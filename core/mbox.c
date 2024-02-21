@@ -99,12 +99,6 @@ static int __mbox_post_opt(mbox_t *m, void *pmsg, int pend_state, int opt)
 	 */
 	spin_lock_irqsave(&m->lock, flags);
 	ret = wake_up_event_waiter(TO_EVENT(m), pmsg, pend_state, opt);
-	if (!ret) {
-		if (m->data != NULL)
-			ret = -ENOSPC;
-		else
-			m->data = pmsg;
-	}
 	spin_unlock_irqrestore(&m->lock, flags);
 
 	if (ret)
